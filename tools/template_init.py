@@ -3,10 +3,8 @@
 "Use this template" copies the files with their placeholders still in them.
 This script, run once by .github/workflows/template-init.yml on the first
 push, fills the five placeholders in every text file outside
-.github/workflows/, writes export.json again (tools/project_export.py: the
-names and the sizes it lists change with the fill), removes the marker
-folder .template/ and, with a token, makes the labels the board uses and
-opens the "Set up this project" issue.
+.github/workflows/, removes the marker folder .template/ and, with a token,
+makes the labels the board uses and opens the "Set up this project" issue.
 The workflows are never written: they carry no placeholder, and the
 GITHUB_TOKEN the workflow runs with may not create, change or delete a file
 under .github/workflows/, so the init workflow stays in the tree and ends
@@ -26,8 +24,6 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
-
-import project_export
 
 API = "https://api.github.com"
 API_VERSION = "2022-11-28"
@@ -196,8 +192,8 @@ def setup_issue_body(repo, default_branch):
         "This repository was made from the SDLC template. Finish setting it up:",
         "",
         f"- [ ] Protect the default branch `{default_branch}` ([docs/setup/github.md]({base}/docs/setup/github.md)).",
-        f"- [ ] Make a claude.ai Project per Claude account and link this repository as its only resource; the first thread sets the Project up ([docs/setup/claude-project.md]({base}/docs/setup/claude-project.md)).",
-        f"- [ ] When a second account joins, make the coordinator routine on the main account ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)).",
+        f"- [ ] Make the thin Project for each Claude account ([docs/setup/claude-project.md]({base}/docs/setup/claude-project.md)).",
+        f"- [ ] Make the worker routine in the main account's Project ([docs/agents/routines/worker.md]({base}/docs/agents/routines/worker.md)), and the coordinator ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)) once a second account joins.",
         f"- [ ] Fill in [docs/project.md]({base}/docs/project.md) and [docs/agents/OWNERSHIP.md]({base}/docs/agents/OWNERSHIP.md).",
         "- [ ] Run `bash scripts/check.sh` once locally.",
         "",
@@ -243,8 +239,6 @@ def main(argv=None):
             print(f"{path}: filled")
         if filled:
             print(WORKFLOWS_NOTE)
-        if (root / project_export.CLAUDE_MD).is_file() and project_export.write(root):
-            print(f"{project_export.MANIFEST}: written")
         for path in remove_template_files(root):
             print(f"{path}: deleted")
         token = os.environ.get("GITHUB_TOKEN")

@@ -8,7 +8,7 @@ The queue is GitHub Issues on {{REPO}}. The board is the file STATE.md on the br
 - claimed: an account has pushed its branch. The account's own label goes on with it.
 - in-review: the pull request is ready; the owner merges it and the merge closes the issue.
 - blocker: the issue stops everyone until it is done.
-- account:main: the main account, the one that runs the coordinator routine. One label per account; docs/setup/github.md says how to add one.
+- account:main: the main account, the first one, which runs the worker routine and, once a second account joins, the coordinator. One label per account; docs/setup/github.md says how to add one.
 
 ## Pick
 

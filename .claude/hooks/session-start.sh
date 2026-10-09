@@ -6,7 +6,7 @@
 # .github/workflows/board.yml, so it is read from origin/board and never from
 # the checkout (docs/agents/STATE.md here only describes it). The hook never
 # fails the session: every path ends in exit 0, each fetch is cut off after
-# ten seconds, and the output stays under sixty lines.
+# ten seconds, and the output stays under about 130 lines.
 
 set -u
 
@@ -61,8 +61,8 @@ fi
 
 if git rev-parse --verify --quiet refs/remotes/origin/board >/dev/null 2>&1 \
    && board=$(git show origin/board:STATE.md 2>/dev/null); then
-  printf '\nThe board (origin/board:STATE.md, as last fetched), first 40 lines:\n'
-  printf '%s\n' "$board" | head -n 40
+  printf '\nThe board (origin/board:STATE.md, as last fetched), first 120 lines:\n'
+  printf '%s\n' "$board" | head -n 120
 else
   printf '\nThe board has not been written yet: origin has no branch "board" (the first run of .github/workflows/board.yml makes it).\n'
 fi

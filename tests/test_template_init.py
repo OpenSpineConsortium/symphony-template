@@ -4,7 +4,6 @@ The placeholders are assembled at run time so this file survives an init of
 the repository it lives in."""
 
 import io
-import json
 import sys
 import tempfile
 import unittest
@@ -14,7 +13,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-import project_export  # noqa: E402
 import template_init  # noqa: E402
 from template_init import placeholder  # noqa: E402
 
@@ -137,22 +135,6 @@ class Init(unittest.TestCase):
             ".template/: deleted",
         ])
 
-    def test_writes_export_json_when_the_tree_is_a_project(self):
-        # The fill changes the names and the sizes export.json lists, so the
-        # init tool writes it again, and the first commit of a copy is current.
-        write(self.root, "CLAUDE.md", f"# {P['PROJECT_NAME']}\n")
-        write(self.root, "docs/project.md", f"# x\n\n## Goal\n\nA goal.\n\n## Repositories\n\n- {P['REPO']}, this one: here.\n")
-        write(self.root, "docs/memory/MEMORY.md", f"# Memory index for {P['PROJECT_NAME']}\n")
-        write(self.root, "export.json", "{}\n")
-        code, lines = run_init(self.root)
-        self.assertEqual(code, 0)
-        self.assertIn("export.json: written", lines)
-        self.assertEqual(project_export.check(self.root), [])
-        manifest = json.loads((self.root / "export.json").read_text())
-        self.assertEqual(manifest["name"], "widgets")
-        self.assertEqual(manifest["settings"]["config"]["default_source_urls"], ["https://github.com/octo/widgets"])
-        self.assertEqual(manifest["files"][0]["bytes"], len("# Memory index for widgets\n"))
-
     def test_a_second_run_changes_nothing(self):
         before = tree_bytes(self.root)
         code, lines = run_init(self.root)
@@ -187,9 +169,9 @@ class Labels(unittest.TestCase):
         self.assertFalse(template_init.already_exists({"errors": [{"code": "invalid"}]}))
         self.assertFalse(template_init.already_exists(None))
 
-    def test_the_setup_issue_links_the_five_pages(self):
+    def test_the_setup_issue_links_the_six_pages(self):
         body = template_init.setup_issue_body("octo/widgets", "main")
-        for page in ("docs/setup/github.md", "docs/setup/claude-project.md", "docs/agents/routines/coordinator.md", "docs/project.md", "docs/agents/OWNERSHIP.md"):
+        for page in ("docs/setup/github.md", "docs/setup/claude-project.md", "docs/agents/routines/worker.md", "docs/agents/routines/coordinator.md", "docs/project.md", "docs/agents/OWNERSHIP.md"):
             self.assertIn(f"https://github.com/octo/widgets/blob/main/{page}", body)
         self.assertIn("bash scripts/check.sh", body)
         self.assertEqual(body.count("- [ ]"), 5)

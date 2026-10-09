@@ -4,7 +4,7 @@ One routine, on the main account (the one labelled account:main), keeps the queu
 
 ## How to make it
 
-Make the routine inside the main account's Project (docs/setup/claude-project.md), not on the routines page: open the Project's own conversation, paste the prompt below and ask for the schedule ("run this every hour"). It then runs as threads of that Project, with the Project's repository and instructions, and shows on the Project's Routines tab, where a stopped routine shows too (docs/setup/github.md). A routine made at claude.ai/code/routines, outside the Project, runs on its own and not as a thread of it. Every thread of the routine clones {{DEFAULT_BRANCH}}, where docs/agents/STATE.md only describes the board, which is why the prompt's first step fetches the branch `board` and shows the file.
+Make the routine inside the main account's Project (docs/setup/claude-project.md), not on the routines page: open the Project's own conversation, paste the prompt below and ask for the schedule ("run this every hour"). It then runs as threads of that Project, each from a fresh clone of the Project's repository, and shows on the Project's Routines tab, where a stopped routine shows too (docs/setup/github.md). A routine made at claude.ai/code/routines, outside the Project, runs on its own and not as a thread of it. Every thread of the routine clones {{DEFAULT_BRANCH}}, where docs/agents/STATE.md only describes the board, which is why the prompt's first step fetches the branch `board` and shows the file.
 
 ## Triggers to set
 

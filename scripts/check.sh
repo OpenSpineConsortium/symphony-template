@@ -8,7 +8,6 @@ set -eu
 cd "$(dirname "$0")/.."
 
 python3 tools/check_docs.py
-python3 tools/project_export.py --check
 python3 -m unittest discover -s tests -v
 
 # The project's own checks go here: its linter, its test runner, its build.

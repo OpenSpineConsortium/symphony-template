@@ -1,10 +1,10 @@
 # {{PROJECT_NAME}}: goal and settings
 
-This file is the project's goal and the settings every account's thin Project shares. It is the one place where the goal is written; the claude.ai Projects only point here. It changes by pull request like everything else.
+This file is the project's goal and the settings every account's thin Project shares. It is the one place where the goal is written: CLAUDE.md imports this file into every session, and the claude.ai Projects carry no copy of it. It changes by pull request like everything else.
 
 ## Goal
 
-Not yet written. One paragraph: what this project makes, for whom, and what done looks like. The first session after setup writes it from the "Set up this project" issue, and the owner merges it.
+Not yet written. One paragraph: what this project makes, for whom, and what done looks like. The owner writes it, or asks a session to, when ticking the "Set up this project" issue's box for this file, and merges it by pull request.
 
 ## Scope
 
@@ -24,14 +24,8 @@ Every account's Project uses the same model and the same effort, so the work rea
 - Model: not yet chosen.
 - Effort: not yet chosen.
 
-## Worker routine
-
-The worker routine (docs/agents/routines/worker.md) is the one part of a Project's setup that no import places: it is made in each account's Project, by hand or by the bootstrap card (.claude/skills/bootstrap), unless the line below says none.
-
-- Worker routine: hourly
-
 ## Owners
 
 - Repository owner: {{OWNER}}, who merges to {{DEFAULT_BRANCH}}; .github/CODEOWNERS names the same login.
-- Main Claude account: the one whose Project runs the coordinator routine (docs/agents/routines/coordinator.md); its label is account:main.
+- Main Claude account: the first account, whose Project runs the worker routine (docs/agents/routines/worker.md) and, once a second account joins, the coordinator (docs/agents/routines/coordinator.md); its label is account:main.
 - Other accounts: none yet. Each gets a label of its own (docs/setup/github.md, Labels) and a row in docs/agents/OWNERSHIP.md.
