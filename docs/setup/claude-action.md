@@ -38,6 +38,21 @@ too.
   there; an account working in this repository pushes claim branches, not
   forks (docs/agents/PROTOCOL.md).
 
+## The worker on a schedule, optional
+
+.github/workflows/claude-worker.yml runs the worker routine's own
+discipline (docs/agents/routines/worker.md) from Actions on the same
+token: every six hours a cheap step asks GitHub whether the queue holds
+an unclaimed todo issue or an open claim pull request needs carrying,
+and only then starts a Claude session, so an empty queue costs seconds
+of a runner and no plan usage. It is off until the repository variable
+CLAUDE_WORKER is set to true, under
+https://github.com/{{REPO}}/settings/variables/actions; delete the
+variable to stop it. Run it from the workflow's own page with "Run
+workflow" to try it once. An account that already runs the worker as a
+claude.ai routine does not need this one too: pick either, not both, or
+they will race for the same queue under the same account label.
+
 ## Keeping the token
 
 Treat the token like a password: it is the main account's subscription.

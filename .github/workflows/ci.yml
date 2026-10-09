@@ -14,9 +14,16 @@ name: Checks
 # trigger leaves out the claim branches, whose pull request runs the check, so
 # no run is ever skipped under the name "check" and a required check cannot be
 # satisfied by a skipped run.
+# On a pull request the same job also runs tools/check_protocol.py, which
+# holds a claude/<issue> pull request to the claim protocol: its claim file
+# while draft, that file's deletion when ready, a body that closes its
+# issue, a head in this repository. The extra event types are the moments
+# those facts change without a push: marked ready, converted back to draft,
+# the body edited.
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
   push:
     branches-ignore: ["claude/**"]
 
@@ -35,3 +42,7 @@ jobs:
 
       - name: Run the checks
         run: bash scripts/check.sh
+
+      - name: Hold a claude/ pull request to the claim protocol
+        if: github.event_name == 'pull_request'
+        run: python3 tools/check_protocol.py
