@@ -90,6 +90,29 @@ class Values(unittest.TestCase):
                 self.assertNotIn(marker, text, path.name)
 
 
+class Checkpoint(unittest.TestCase):
+    """The template's own repository keeps a real checkpoint for whoever
+    continues its work; a new copy starts blank instead of inheriting it."""
+
+    def test_a_new_copy_starts_with_the_blank_checkpoint(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tiny_tree(root)
+            (root / ".claude" / "session.md").write_text("# Session checkpoint\n\nWork on claude/10.\n")
+            code, lines = run_init(root)
+            self.assertEqual(code, 0)
+            self.assertEqual((root / ".claude" / "session.md").read_text(), template_init.BLANK_CHECKPOINT)
+            self.assertIn(".claude/session.md: reset to a blank checkpoint", lines)
+
+    def test_a_blank_checkpoint_is_left_alone(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tiny_tree(root)
+            (root / ".claude" / "session.md").write_text(template_init.BLANK_CHECKPOINT)
+            code, lines = run_init(root)
+            self.assertNotIn(".claude/session.md: reset to a blank checkpoint", lines)
+
+
 class Init(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
