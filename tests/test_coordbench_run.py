@@ -6,9 +6,11 @@ ephemeral port; CooperBench's scorer is a fake with the shape of its
 results. Nothing here starts a container or a Claude."""
 
 import contextlib
+import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -29,11 +31,35 @@ import hub as hub_module  # noqa: E402
 import run as runner  # noqa: E402
 
 REAL_COOPERBENCH_TEST = runner.cooperbench_test
+REAL_DOCKER = drivers.docker
+REAL_START_HUB = runner.start_hub
 
 # Distinctive, so a leak is found by a plain search, and shaped like no
-# real credential, so the repository's own secret check lets it be.
+# real credential, so the repository's own secret check lets them be.
 SECRET = "coordbench-fake-oauth-token-7f3a9c2e51d0"
+ADMIN_SECRET = "coordbench-fake-admin-token-4b8d1e6a90c3"
 BASE = "0123456789abcdef0123456789abcdef01234567"
+GIT_EMAIL = "agent@cooperbench.local"
+HAS_PROC = Path("/proc/self/environ").exists()
+
+
+def cooperbench_coop_module(name):
+    """A file of CooperBench's _coop package (runtime.py, prompt.py), loaded
+    on its own from the checkout COOPERBENCH_DIR names, or ~/cooperbench:
+    the package's __init__ pulls in the whole runner, the files need only
+    the standard library."""
+    for root in filter(None, [os.environ.get("COOPERBENCH_DIR"), str(Path.home() / "cooperbench")]):
+        path = Path(root) / "src" / "cooperbench" / "agents" / "_coop" / f"{name}.py"
+        if path.is_file():
+            spec = importlib.util.spec_from_file_location(f"cooperbench_coop_{name}", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+    return None
+
+
+COOPERBENCH_RUNTIME = cooperbench_coop_module("runtime")
+COOPERBENCH_PROMPT = cooperbench_coop_module("prompt")
 REPO, TASK = "pallets_click_task", 2068
 IMAGE = "akhatua/cooperbench-pallets-click:task2068"
 PATCHES = {
@@ -76,6 +102,11 @@ def env_value(arguments, name):
     return None
 
 
+def quietly():
+    """What the runner says on stderr, kept out of the test's output."""
+    return contextlib.redirect_stderr(io.StringIO())
+
+
 def call_tool(rpc_url, tool, arguments):
     body = json.dumps({"tool": tool, "arguments": arguments}).encode()
     request = urllib.request.Request(rpc_url, data=body, method="POST", headers={"Content-Type": "application/json"})
@@ -83,9 +114,28 @@ def call_tool(rpc_url, tool, arguments):
         return json.loads(response.read())
 
 
+def git_answer(command, url, agent):
+    """What git prints for one read of the git set-up in a repository that
+    CooperBench's setup command configured for `agent` against `url`."""
+    if not agent:
+        return ""
+    if command == "git remote get-url team":
+        return url
+    if command in ("git symbolic-ref --short HEAD", "git config user.name"):
+        return agent
+    if "--abbrev-ref" in command:
+        return f"team/{agent}"
+    if command == "git config user.email":
+        return GIT_EMAIL
+    return BASE
+
+
 class FakeDocker:
     """Stands in for drivers.docker: records every command and answers the
-    ones whose output the runner reads, the way docker would."""
+    ones whose output the runner reads, the way docker would. Its git
+    remembers each container's set-up and answers the read-back as git
+    would; with git_breaks the set-up does nothing, as when git refuses
+    the repository, and says why."""
 
     def __init__(self, python=True, mountpoint="/var/lib/docker/volumes/v/_data", fail_seed=False):
         self.stream = SAMPLE_STREAM
@@ -96,6 +146,8 @@ class FakeDocker:
         self.fail_seed = fail_seed
         self.claude_times_out = False
         self.on_claude = None
+        self.git_setups = {}
+        self.git_breaks = False
 
     def __call__(self, *args, input=None, timeout=None, output=None):
         args = [str(arg) for arg in args]
@@ -119,7 +171,24 @@ class FakeDocker:
             return (0, "/usr/bin/python3\n") if self.python else (1, "")
         if args[0] == "exec" and args[-2:] == ["cat", "/workspace/repo/patch.txt"]:
             return self.patch_of(args[1])
+        if args[0] == "exec" and args[-2] == "-lc" and "git remote add team" in args[-1]:
+            return self.set_up_git(args[-4], args[-1])
+        if args[0] == "exec" and args[-2] == "-lc" and runner.GIT_READ_MARK in args[-1]:
+            return self.read_git(args[-4], args[-1])
         return 0, ""
+
+    def set_up_git(self, container, script):
+        if self.git_breaks:
+            return 0, "fatal: detected dubious ownership in repository at '/workspace/repo'\n"
+        url = re.search(r"git remote add team (\S+)", script).group(1)
+        agent = re.search(r"git config user\.name (\S+)", script).group(1)
+        self.git_setups[container] = (url, agent)
+        return 0, ""
+
+    def read_git(self, container, script):
+        url, agent = self.git_setups.get(container, ("", ""))
+        commands = re.findall(r'"\$\((.*?) 2>/dev/null\)"', script)
+        return 0, "".join(f"{runner.GIT_READ_MARK}{git_answer(c, url, agent)}\n" for c in commands)
 
     def run_claude(self, args, output):
         if self.claude_times_out:
@@ -192,22 +261,27 @@ def write_dataset(cooperbench_dir):
 
 
 class RunnerCase(unittest.TestCase):
-    """A temporary CooperBench tree, a live hub in this process, and docker
-    and the scorer replaced by fakes for the length of each test."""
+    """A temporary CooperBench tree, a live hub in this process that wants
+    the admin token the runner's environment holds and may load the arms
+    under <tmp>/arms, and docker and the scorer replaced by fakes for the
+    length of each test."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="coordbench-run-test-"))
         self.cooperbench = self.tmp / "cooperbench"
         write_dataset(self.cooperbench)
         self.logs = self.cooperbench / "logs"
-        self.hub = hub_module.Hub()
+        self.arms = self.tmp / "arms"
+        self.hub = hub_module.Hub(arm_dirs=[self.arms], admin_token=ADMIN_SECRET)
         self.server = hub_module.serve_in_background(self.hub)
         self.hub_url = self.hub.bound_url
+        (self.tmp / "volume").mkdir()
         self.docker = FakeDocker(mountpoint=str(self.tmp / "volume"))
         self.scorer = FakeScorer()
+        environment = {"CLAUDE_CODE_OAUTH_TOKEN": SECRET, "COORD_ADMIN_TOKEN": ADMIN_SECRET}
         for patcher in (mock.patch.object(drivers, "docker", self.docker),
                         mock.patch.object(runner, "cooperbench_test", self.scorer),
-                        mock.patch.dict(os.environ, {"CLAUDE_CODE_OAUTH_TOKEN": SECRET})):
+                        mock.patch.dict(os.environ, environment)):
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -219,13 +293,23 @@ class RunnerCase(unittest.TestCase):
     def settings(self, arm, **overrides):
         return {"arm": arm, "driver": "recording", "model": "claude-test", "run_name": "t",
                 "log_dir": self.logs, "cooperbench_dir": self.cooperbench, "hub": self.hub_url,
-                "timeout_s": 60.0, "max_turns": None, "keep": False, "force": False, "options": {}, **overrides}
+                "timeout_s": 60.0, "max_turns": None, "keep": False, "force": False, "options": {},
+                "arm_dirs": [], **overrides}
 
     def prepare(self, arm, driver=None, **overrides):
         driver = driver or RecordingDriver()
-        plan, handles = runner.prepare_pair(self.settings(arm, **overrides), runner.HubClient(self.hub_url),
-                                            driver, REPO, TASK, [1, 6])
+        hub = runner.HubClient(self.hub_url, ADMIN_SECRET)
+        plan, handles = runner.prepare_pair(self.settings(arm, **overrides), hub, driver, REPO, TASK, [1, 6])
         return plan, handles, driver
+
+    def copy_arm(self, name, source="coop", **config):
+        """A built-in arm copied to <tmp>/arms/<name>, as an arm from elsewhere."""
+        arm_dir = self.arms / name
+        shutil.copytree(COORDBENCH / "arms" / source, arm_dir, ignore=shutil.ignore_patterns("__pycache__"))
+        settings = json.loads((arm_dir / "arm.json").read_text())
+        settings.update(name=name, **config)
+        (arm_dir / "arm.json").write_text(json.dumps(settings))
+        return arm_dir
 
     def main(self, *argv):
         out, err = io.StringIO(), io.StringIO()
@@ -243,14 +327,20 @@ class RunnerCase(unittest.TestCase):
     def options_of(self, plan):
         return self.hub.runs[plan["run_id"]].run.options
 
-    def assert_secret_nowhere(self):
-        for call in self.docker.commands():
-            self.assertNotIn(SECRET, " ".join(call))
-        for call in self.docker.calls:
-            self.assertNotIn(SECRET, call["input"] or "")
-        for path in self.tmp.rglob("*"):
-            if path.is_file():
-                self.assertNotIn(SECRET.encode(), path.read_bytes(), str(path))
+    def assert_secret_nowhere(self, *said, secrets=()):
+        """Neither the agents' credential nor the hub's admin token (nor any
+        other secret given) is on a docker command line, in what was piped to
+        docker, in any file the run left, or in what the runner printed."""
+        for secret in (SECRET, ADMIN_SECRET, *secrets):
+            for call in self.docker.commands():
+                self.assertNotIn(secret, " ".join(call))
+            for call in self.docker.calls:
+                self.assertNotIn(secret, call["input"] or "")
+            for path in self.tmp.rglob("*"):
+                if path.is_file():
+                    self.assertNotIn(secret.encode(), path.read_bytes(), str(path))
+            for text in said:
+                self.assertNotIn(secret, text)
 
 
 class TheDataset(RunnerCase):
@@ -297,6 +387,7 @@ class Provisioning(RunnerCase):
             self.assertIn(["exec", container, "python3", "/opt/coordbench/cli.py", "install", "/usr/local/bin"],
                           commands)
         self.assertFalse([c for c in commands if "bash" in c and "-lc" in c])
+        self.assertFalse([c for c in commands if "safe.directory" in c])
         self.assertEqual(self.options_of(plan), {})
         self.assertEqual([job.agent for job in driver.jobs], ["agent1", "agent2"])
         self.assertEqual(driver.jobs[0].env, {"COORD_MCP_URL": plan["agents"][0]["mcp_url"],
@@ -327,13 +418,20 @@ class Provisioning(RunnerCase):
         for agent in ("agent1", "agent2"):
             self.assertIn(["exec", "coordbench-git", "git", "-C", f"/git/{run_id}/repo.git", "branch", agent, "main"],
                           commands)
-        setups = [c for c in self.docker.matching("exec", "-w", "/workspace/repo") if c[-2] == "-lc"]
+        shells = [c for c in self.docker.matching("exec", "-w", "/workspace/repo") if c[-2] == "-lc"]
+        setups = [c for c in shells if "git remote add team" in c[-1]]
         self.assertEqual(len(setups), 2)
+        self.assertEqual(setups[0][-1], runner.git_setup_command("agent1", url))
         self.assertIn(f"git remote add team {url}", setups[0][-1])
         self.assertIn("git checkout -b agent1", setups[0][-1])
         self.assertIn("git push -u team agent2 --force", setups[1][-1])
+        reads = [c for c in shells if runner.GIT_READ_MARK in c[-1]]
+        self.assertEqual([c[-4] for c in reads], [a["container"] for a in plan["agents"]])
+        for setup, read in zip(setups, reads):
+            self.assertLess(shells.index(setup), shells.index(read))
         self.assertEqual(self.options_of(plan), {"git_remote": url, "base_ref": BASE,
                                                  "git_remote_host": f"git://127.0.0.1:9418/{run_id}/repo.git"})
+        self.assertEqual(plan["warnings"], [])
         first_agent = self.docker.matching("run", "-d", "--name", plan["agents"][0]["container"])[0]
         self.assertLess(commands.index(seed), commands.index(first_agent))
         runner.teardown(plan)
@@ -348,20 +446,65 @@ class Provisioning(RunnerCase):
             self.assertIn(f"{volume}:/workspace/shared", started)
         self.assertEqual(self.options_of(plan), {"shared_dir": "/workspace/shared",
                                                  "shared_dir_host": str(self.tmp / "volume")})
+        self.assertEqual(plan["warnings"], [])
         self.assertFalse([c for c in self.docker.commands() if "coordbench-git" in c])
         runner.teardown(plan)
         self.assertIn(["volume", "rm", "-f", volume], self.docker.commands())
         self.assertIn(["rm", "-f", *[a["container"] for a in plan["agents"]]], self.docker.commands())
 
+    def test_a_shared_volume_with_no_host_path_fails_the_pair_and_one_not_writable_is_warned_of(self):
+        self.docker.mountpoint = ""
+        with self.assertRaisesRegex(runner.PairFailed, "no host path"), quietly():
+            self.prepare("team")
+        self.assertEqual(self.hub.run_count(), 0)
+        self.docker.mountpoint = str(self.tmp / "nowhere")
+        plan, _, _ = self.prepare("team")
+        self.assertEqual(self.options_of(plan)["shared_dir_host"], str(self.tmp / "nowhere"))
+        self.assertTrue(any("not writable" in warning for warning in plan["warnings"]))
+
+    def test_a_run_gets_every_option_of_every_need_or_does_not_start(self):
+        with mock.patch.object(runner, "create_git_repository", return_value={"git_remote": "git://x/r.git"}):
+            with self.assertRaisesRegex(runner.PairFailed, "without git_remote_host, base_ref"), quietly():
+                self.prepare("coop-git")
+        self.assertEqual(self.hub.run_count(), 0)
+
+    def test_an_option_naming_a_need_gets_it_provisioned_as_cooperbench_s_git_gives_team_a_remote(self):
+        plan, _, driver = self.prepare("team", options={"git_remote": True, "note": "kept"})
+        self.assertEqual(plan["needs"], ["shared_volume", "git_remote"])
+        run_id = plan["run_id"]
+        url = f"git://coordbench-git:9418/{run_id}/repo.git"
+        self.assertEqual(self.options_of(plan), {
+            "note": "kept", "git_remote": url, "git_remote_host": f"git://127.0.0.1:9418/{run_id}/repo.git",
+            "base_ref": BASE, "shared_dir": "/workspace/shared", "shared_dir_host": str(self.tmp / "volume")})
+        self.assertEqual(sorted(self.docker.git_setups.values()), [(url, a["id"]) for a in plan["agents"]])
+        for job in driver.jobs:
+            self.assertIn("A shared git remote named `team` is already configured", job.prompt)
+            self.assertIn(f"Your branch: `{job.agent}` (already created and pushed)", job.prompt)
+        self.assertEqual(runner.arm_needs(runner.find_arm("coop"), {"shared_dir": "/x"}), ["shared_volume"])
+        self.assertEqual(runner.arm_needs(runner.find_arm("coop"), {"git_remote": ""}), [])
+
+    def test_a_git_set_up_that_leaves_a_promise_unkept_fails_the_pair(self):
+        self.docker.git_breaks = True
+        code, out, err = self.main(*self.run_arguments("coop-git", "--features", "1,6"))
+        self.assertEqual(code, 1)
+        result = json.loads((self.pair() / "result.json").read_text())
+        self.assertIn("the git set-up for agent1 left its git block untrue", result["error"])
+        for promise in ("the remote team (found nothing)", "the branch agent1 checked out",
+                        "agent1 pushed with -u", "team/main at the base commit", "user.name the agent id",
+                        f"user.email {GIT_EMAIL}", "git said: fatal: detected dubious ownership"):
+            self.assertIn(promise, result["error"])
+        self.assertIn("left its git block untrue", err)
+        self.assertEqual({a["status"] for a in result["agents"].values()}, {"Error"})
+        self.assertTrue(self.hub.runs[result["run_id"]].run.closed)
+        self.assertIn(["rm", "-f", f"coordbench-{result['run_id']}-agent1"], self.docker.commands())
+        self.assertEqual(self.scorer.calls, [])
+        self.assert_secret_nowhere(out, err)
+
     def test_an_arm_from_elsewhere_brings_its_plugins_and_mcp_servers(self):
-        arm_dir = self.tmp / "arms" / "myarm"
-        shutil.copytree(COORDBENCH / "arms" / "coop", arm_dir, ignore=shutil.ignore_patterns("__pycache__"))
+        servers = {"docs": {"type": "http", "url": "http://docs.example/mcp"}}
+        arm_dir = self.copy_arm("myarm", plugins=["extra-plugin"], mcp_servers=servers)
         (arm_dir / "extra-plugin" / ".claude-plugin").mkdir(parents=True)
         (arm_dir / "extra-plugin" / ".claude-plugin" / "plugin.json").write_text('{"name": "extra"}')
-        config = json.loads((arm_dir / "arm.json").read_text())
-        servers = {"docs": {"type": "http", "url": "http://docs.example/mcp"}}
-        config.update(name="myarm", plugins=["extra-plugin"], mcp_servers=servers)
-        (arm_dir / "arm.json").write_text(json.dumps(config))
         plan, _, driver = self.prepare(str(arm_dir))
         container = plan["agents"][0]["container"]
         commands = self.docker.commands()
@@ -639,6 +782,8 @@ class Runs(RunnerCase):
             self.assertIn(".coordbench-done", (workspace / ".git" / "info" / "exclude").read_text())
             started = self.docker.matching("run", "-d", "--name", agent["container"])[0]
             self.assertIn(f"{workspace}:/workspace/repo", started)
+            self.assertIn(["exec", agent["container"], "git", "config", "--global", "--add", "safe.directory",
+                           "/workspace/repo"], self.docker.commands())
             self.assertEqual(entry["prompt_file"], str(pair / f"{agent['id']}.session-prompt.md"))
             self.assertIn("Do 1." if agent["id"] == "agent1" else "Do 6.", Path(entry["prompt_file"]).read_text())
             wrapper = pair / "bin" / agent["id"] / "coop-send"
@@ -651,6 +796,7 @@ class Runs(RunnerCase):
             (workspace / "patch.txt").write_text(PATCHES[agent["id"]])
             (workspace / ".coordbench-done").touch()
 
+        said = out + err
         code, out, err = self.main("finish", "--run-dir", str(pair))
         self.assertEqual(code, 0, err)
         self.assertEqual(json.loads(out), {"run_dir": str(pair), "verdict": "pass"})
@@ -662,7 +808,77 @@ class Runs(RunnerCase):
         self.assertEqual(list(json.loads((pair / "eval.json").read_text())), COOP_EVAL_KEYS)
         self.assertFalse((pair / "workspaces").exists())
         self.assertIn(["rm", "-f", *[a["container"] for a in saved["agents"]]], self.docker.commands())
-        self.assert_secret_nowhere()
+        self.assert_secret_nowhere(said, out, err)
+
+    def test_a_hub_named_by_hub_is_asked_for_its_token_before_anything_is_provisioned(self):
+        os.environ.pop("COORD_ADMIN_TOKEN")
+        code, out, err = self.main(*self.run_arguments("coop", "--features", "1,6"))
+        self.assertEqual(code, 2)
+        self.assertIn("wants its admin token in COORD_ADMIN_TOKEN", err)
+        os.environ["COORD_ADMIN_TOKEN"] = "not-the-hub-s-token"
+        code, out, err = self.main(*self.run_arguments("coop", "--features", "1,6"))
+        self.assertEqual(code, 2)
+        self.assertIn("refuses the token in COORD_ADMIN_TOKEN", err)
+        self.assertNotIn("not-the-hub-s-token", out + err)
+        self.assertEqual(self.docker.calls, [])
+        self.assertEqual(self.hub.run_count(), 0)
+
+    def test_a_hub_the_runner_starts_may_load_the_arm_directory_and_each_arm_dir(self):
+        arm_dir = self.copy_arm("myarm")
+        more = self.tmp / "more-arms"
+        started = []
+
+        def start_and_keep(*arguments, **keywords):
+            process, client = REAL_START_HUB(*arguments, **keywords)
+            started.append((process, client))
+            return process, client
+
+        with mock.patch.object(runner, "start_hub", side_effect=start_and_keep):
+            code, out, err = self.main("run", "--arm", str(arm_dir), "--arm-dir", str(more), "--repo", REPO,
+                                       "--task", str(TASK), "--features", "1,6", "--name", "t",
+                                       "--model", "claude-test", "--cooperbench-dir", str(self.cooperbench))
+        self.assertEqual(code, 0, err)
+        (process, client), = started
+        command = process.args
+        allowed = [command[i + 1] for i, word in enumerate(command) if word == "--arm-dir"]
+        self.assertEqual(allowed, [str(more.resolve()), str(arm_dir.resolve())])
+        self.assertIsNotNone(process.poll())
+        result = json.loads((self.pair() / "result.json").read_text())
+        self.assertEqual(result["arm"], "myarm")
+        self.assertIn("events", result["metrics"])
+        self.assertNotIn("closing the run on the hub failed", err)
+        self.assertEqual(self.hub.run_count(), 0)
+        self.assert_secret_nowhere(out, err, " ".join(command), secrets=(client.admin_token,))
+
+    @unittest.skipUnless(HAS_PROC, "finish reads the token back through Linux's /proc")
+    def test_prepare_then_finish_with_a_hub_the_runner_starts(self):
+        code, out, err = self.main("prepare", "--arm", "coop", "--repo", REPO, "--task", str(TASK),
+                                   "--features", "1,6", "--name", "t", "--cooperbench-dir", str(self.cooperbench))
+        self.assertEqual(code, 0, err)
+        pair = self.pair()
+        saved = json.loads((pair / "plan.json").read_text())
+        pid, url = saved["hub_pid"], saved["hub_url"]
+        self.addCleanup(runner.stop_hub_pid, pid, url)
+        token = runner.hub_admin_token(pid, url)
+        self.assertRegex(token, "^[0-9a-f]{64}$")
+        self.assertNotIn(token.encode(), Path(f"/proc/{pid}/cmdline").read_bytes())
+        self.assertFalse(runner.HubClient(url, ADMIN_SECRET).authorized())
+        sent = subprocess.run([str(pair / "bin" / "agent1" / "coop-send"), "agent2", "hello"],
+                              capture_output=True, text=True, timeout=60)
+        self.assertEqual(sent.returncode, 0, sent.stderr)
+        for agent in saved["agents"]:
+            (Path(agent["workspace"]) / "patch.txt").write_text(PATCHES[agent["id"]])
+            (Path(agent["workspace"]) / ".coordbench-done").touch()
+        said = out + err
+        code, out, err = self.main("finish", "--run-dir", str(pair))
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("closing the run on the hub failed", err)
+        self.assertEqual(json.loads((pair / "result.json").read_text())["metrics"]["messages_sent"], 1)
+        deadline = time.time() + 10
+        while runner.is_hub(pid, url) and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertFalse(runner.is_hub(pid, url))
+        self.assert_secret_nowhere(said, out, err, sent.stdout, sent.stderr, secrets=(token,))
 
 
 class Scoring(unittest.TestCase):
@@ -690,18 +906,202 @@ class Scoring(unittest.TestCase):
                 REAL_COOPERBENCH_TEST("solo", {}, scratch)
 
 
+def copy_coop_arm(destination):
+    shutil.copytree(COORDBENCH / "arms" / "coop", destination, ignore=shutil.ignore_patterns("__pycache__"))
+    return destination
+
+
 class TheHubProcess(unittest.TestCase):
+    """hub.py as the runner starts it, a process of its own, with the
+    runner's own environment holding both secrets it must not pass on."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="coordbench-hub-test-"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        secrets = {"CLAUDE_CODE_OAUTH_TOKEN": SECRET, "COORD_ADMIN_TOKEN": ADMIN_SECRET}
+        environment = mock.patch.dict(os.environ, secrets)
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def start(self, **keywords):
+        process, client = runner.start_hub(self.tmp / "hub", host="127.0.0.1", **keywords)
+        self.addCleanup(runner.stop_hub, process)
+        return process, client
+
     def test_start_hub_serves_on_a_free_port_and_tells_agents_the_docker_host(self):
-        with tempfile.TemporaryDirectory() as scratch:
-            process, url = runner.start_hub(Path(scratch), host="127.0.0.1")
-            try:
-                self.assertTrue(runner.HubClient(url).healthy())
-                port = url.rsplit(":", 1)[1]
-                first = next(Path(scratch).glob("hub-*.out")).read_text().splitlines()[0]
-                self.assertEqual(first, f"http://host.docker.internal:{port}")
-            finally:
-                runner.stop_hub(process)
-            self.assertIsNotNone(process.poll())
+        process, client = self.start()
+        self.assertTrue(client.healthy())
+        port = client.base_url.rsplit(":", 1)[1]
+        self.assertEqual(client.base_url, f"http://127.0.0.1:{port}")
+        first = next((self.tmp / "hub").glob("hub-*.out")).read_text().splitlines()[0]
+        self.assertEqual(first, f"http://host.docker.internal:{port}")
+        runner.stop_hub(process)
+        self.assertIsNotNone(process.poll())
+
+    def test_it_wants_a_fresh_token_and_loads_only_the_arm_directories_it_was_given(self):
+        mine = copy_coop_arm(self.tmp / "arms" / "mine")
+        elsewhere = copy_coop_arm(self.tmp / "elsewhere")
+        process, client = self.start(arm_dirs=[self.tmp / "arms"])
+        self.assertRegex(client.admin_token, "^[0-9a-f]{64}$")
+        self.assertNotEqual(client.admin_token, ADMIN_SECRET)
+        self.assertTrue(client.authorized())
+        self.assertFalse(runner.HubClient(client.base_url).authorized())
+        self.assertFalse(runner.HubClient(client.base_url, ADMIN_SECRET).authorized())
+        specs = {1: "Do 1.", 6: "Do 6."}
+        answer = client.create_run(str(mine), "r-mine", [1, 6], specs, {})
+        self.assertEqual([agent["id"] for agent in answer["agents"]], ["agent1", "agent2"])
+        with self.assertRaises(runner.HubError) as refused:
+            client.create_run(str(elsewhere), "r-elsewhere", [1, 6], specs, {})
+        self.assertEqual(refused.exception.status, 403)
+        with self.assertRaises(runner.HubError) as refused:
+            runner.HubClient(client.base_url).close_run("r-mine")
+        self.assertEqual(refused.exception.status, 401)
+        self.assertIn("events", client.close_run("r-mine"))
+        self.assertNotIn(client.admin_token, " ".join(process.args))
+        self.assertIn(str((self.tmp / "arms").resolve()), process.args)
+
+    @unittest.skipUnless(HAS_PROC, "reading a process's environment back needs Linux's /proc")
+    def test_the_token_lives_in_the_hub_s_environment_alone_and_finish_reads_it_back_from_there(self):
+        process, client = self.start()
+        token = client.admin_token
+        command = Path(f"/proc/{process.pid}/cmdline").read_bytes()
+        environment = Path(f"/proc/{process.pid}/environ").read_bytes()
+        for secret in (token, SECRET, ADMIN_SECRET):
+            self.assertNotIn(secret.encode(), command)
+        self.assertIn(f"COORD_ADMIN_TOKEN={token}".encode(), environment.split(b"\0"))
+        self.assertNotIn(SECRET.encode(), environment)
+        self.assertNotIn(ADMIN_SECRET.encode(), environment)
+        self.assertEqual(runner.hub_admin_token(process.pid, client.base_url), token)
+        self.assertIsNone(runner.hub_admin_token(process.pid, "http://127.0.0.1:1"))
+        self.assertIsNone(runner.hub_admin_token(os.getpid(), client.base_url))
+        finishing = runner.finish_client({"hub_pid": process.pid, "hub_url": client.base_url})
+        self.assertEqual(finishing.admin_token, token)
+        self.assertTrue(finishing.authorized())
+        named = runner.finish_client({"hub_pid": None, "hub_url": client.base_url})
+        self.assertEqual(named.admin_token, ADMIN_SECRET)
+        runner.stop_hub_pid(os.getpid(), client.base_url)
+        runner.stop_hub_pid(process.pid, "http://127.0.0.1:1")
+        self.assertIsNone(process.poll())
+        runner.stop_hub_pid(process.pid, client.base_url)
+        process.wait(10)
+        for path in (self.tmp / "hub").rglob("*"):
+            self.assertNotIn(token.encode(), path.read_bytes(), str(path))
+
+
+@unittest.skipUnless(shutil.which("git"), "git is not installed")
+class TheGitSetUp(unittest.TestCase):
+    """CooperBench's setup command run by real git, in a repository cloned
+    from a task's, against a bare remote seeded as the runner seeds the
+    git server's, and read back as the runner reads it."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="coordbench-git-test-"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        # No user's or system's git configuration takes part.
+        self.environment = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+        self.remote = str(self.tmp / "remote.git")
+        self.git("init", "-q", "--bare", self.remote)
+        self.git("-C", self.remote, "config", "receive.denyCurrentBranch", "ignore")
+        self.task = self.tmp / "task"
+        self.git("init", "-q", str(self.task))
+        (self.task / "README.md").write_text("the task's repository\n")
+        self.git("-C", str(self.task), "add", "README.md")
+        self.git("-C", str(self.task), "-c", "user.name=task", "-c", "user.email=task@example.invalid",
+                 "commit", "-q", "-m", "the task's base")
+        self.base = self.git("-C", str(self.task), "rev-parse", "HEAD").strip()
+        self.git("-C", str(self.task), "push", "-q", self.remote, "HEAD:refs/heads/main")
+        for agent in ("agent1", "agent2"):
+            self.git("-C", self.remote, "branch", agent, "main")
+
+    def git(self, *arguments):
+        done = subprocess.run(["git", *arguments], capture_output=True, text=True, env=self.environment,
+                              timeout=60, stdin=subprocess.DEVNULL)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return done.stdout
+
+    def shell(self, script):
+        return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=self.environment,
+                              timeout=60, stdin=subprocess.DEVNULL)
+
+    def agent_repository(self, agent):
+        repository = self.tmp / agent
+        self.git("clone", "-q", str(self.task), str(repository))
+        return str(repository)
+
+    def unkept(self, agent, repository):
+        promises = runner.git_promises(agent, {"git_remote": self.remote, "base_ref": self.base})
+        return runner.unkept_promises(promises, self.shell(runner.git_read_script(promises, repository)).stdout)
+
+    def test_the_setup_command_keeps_every_promise_of_the_git_block(self):
+        for agent in ("agent1", "agent2"):
+            repository = self.agent_repository(agent)
+            setup = self.shell(runner.git_setup_command(agent, self.remote, repository))
+            self.assertEqual(setup.returncode, 0, setup.stderr)
+            self.assertEqual(self.unkept(agent, repository), [])
+        self.assertEqual(self.git("-C", self.remote, "rev-parse", "main").strip(), self.base)
+
+    def test_a_set_up_that_failed_is_found_out_though_its_exit_code_says_nothing(self):
+        repository = self.agent_repository("agent1")
+        setup = self.shell(runner.git_setup_command("agent1", str(self.tmp / "no-such-remote.git"), repository))
+        self.assertEqual(setup.returncode, 0)
+        unkept = self.unkept("agent1", repository)
+        self.assertTrue(unkept[0].startswith("the remote team (found "), unkept)
+        for promise in ("agent1 pushed with -u (found nothing)", "team/agent1 at the base commit (found nothing)",
+                        "team/main at the base commit (found nothing)"):
+            self.assertIn(promise, unkept)
+        self.assertEqual(len(unkept), 4, unkept)
+        untouched = self.unkept("agent2", self.agent_repository("agent2"))
+        self.assertEqual(len(untouched), 7, untouched)
+        self.assertFalse([promise for promise in untouched if promise.startswith("agent2 at the base commit")])
+
+    @unittest.skipIf(COOPERBENCH_RUNTIME is None or COOPERBENCH_PROMPT is None,
+                     "CooperBench's source is not here; set COOPERBENCH_DIR to its checkout")
+    def test_the_command_and_the_promises_are_cooperbench_s(self):
+        for agent, url in (("agent1", "git://coordbench-git:9418/r1/repo.git"), ("lead", "git://h/a b.git")):
+            self.assertEqual(runner.git_setup_command(agent, url),
+                             COOPERBENCH_RUNTIME.build_git_setup_command(agent_id=agent, server_url=url))
+        self.assertEqual(COOPERBENCH_RUNTIME.CONTAINER_REPO_PATH, drivers.CONTAINER_REPO)
+        block = COOPERBENCH_PROMPT._git_block("agent1", ["agent2"])
+        for promise in ("A shared git remote named `team` is already configured in this repo.",
+                        "- Your branch: `agent1` (already created and pushed)",
+                        "- Base reference: `team/main` (pristine starting state)"):
+            self.assertIn(promise, block)
+        self.assertIn(f"git config user.email '{GIT_EMAIL}'",
+                      COOPERBENCH_RUNTIME.build_git_setup_command(agent_id="agent1", server_url="u"))
+
+
+class SecretsInTheDrivers(unittest.TestCase):
+    def test_the_docker_client_holds_the_agents_credential_but_never_the_admin_token(self):
+        environment = {"CLAUDE_CODE_OAUTH_TOKEN": SECRET, "COORD_ADMIN_TOKEN": ADMIN_SECRET}
+        with mock.patch.dict(os.environ, environment), mock.patch.object(drivers.subprocess, "run") as run:
+            REAL_DOCKER("ps")
+            REAL_DOCKER("ps", input="text")
+            REAL_DOCKER("ps", output=os.devnull)
+        self.assertEqual(len(run.call_args_list), 3)
+        for call in run.call_args_list:
+            self.assertEqual(call.kwargs["env"].get("CLAUDE_CODE_OAUTH_TOKEN"), SECRET)
+            self.assertNotIn("COORD_ADMIN_TOKEN", call.kwargs["env"])
+
+    def test_a_secret_in_a_job_s_environment_never_reaches_the_command_line(self):
+        job = drivers.AgentJob(run_id="r1", agent="agent1", role="peer", features=(1,), container="c-agent1",
+                               prompt="p", arm_dir=str(COORDBENCH / "arms" / "coop"),
+                               env={"COORD_RPC_URL": "http://h:1/rpc/r1/agent1", "CLAUDE_CODE_OAUTH_TOKEN": SECRET,
+                                    "COORD_ADMIN_TOKEN": ADMIN_SECRET})
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_OAUTH_TOKEN": SECRET}):
+            arguments = drivers.claude_exec_arguments(job)
+        line = " ".join(arguments)
+        for unwanted in (SECRET, ADMIN_SECRET, "COORD_ADMIN_TOKEN"):
+            self.assertNotIn(unwanted, line)
+        self.assertIn(["-e", "CLAUDE_CODE_OAUTH_TOKEN"], [arguments[i:i + 2] for i in range(len(arguments) - 1)])
+        self.assertEqual(env_value(arguments, "COORD_RPC_URL"), "http://h:1/rpc/r1/agent1")
+
+    def test_the_scorer_the_hub_and_git_get_neither_secret(self):
+        environment = {"CLAUDE_CODE_OAUTH_TOKEN": SECRET, "COORD_ADMIN_TOKEN": ADMIN_SECRET, "KEEP": "1"}
+        with mock.patch.dict(os.environ, environment):
+            cleaned = runner.environment_without_secrets()
+        self.assertEqual(cleaned.get("KEEP"), "1")
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", cleaned)
+        self.assertNotIn("COORD_ADMIN_TOKEN", cleaned)
 
 
 if __name__ == "__main__":

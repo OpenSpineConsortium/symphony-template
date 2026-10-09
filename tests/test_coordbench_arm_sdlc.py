@@ -4,10 +4,12 @@ arms. These tests pin the protocol's promises: a claim is exclusive and
 first come, first served; an agent claims only its own issue unless the
 queue is open; a pull request that merges cleanly lands on main as a merge
 commit; one that conflicts answers the board's "main moved" and leaves main
-as it was; and once its author merges main in and pushes, it lands. The
-merge gate acts on a real bare repository in a temporary directory, with
-two working clones playing the two agents, so what is checked is what git
-itself did."""
+as it was; and once its author merges main in and pushes, it lands. A
+refusal's exit code tells losing a claim (2) from main having moved (3);
+the board titles each issue from its spec; closing the run frees the
+gate's scratch clone. The merge gate acts on a real bare repository in a
+temporary directory, with two working clones playing the two agents, so
+what is checked is what git itself did."""
 
 import json
 import os
@@ -15,7 +17,6 @@ import subprocess
 import sys
 import tempfile
 import threading
-import time
 import unittest
 import urllib.request
 from pathlib import Path
@@ -100,9 +101,13 @@ def commit_and_push(clone, issue, files, message):
     git(clone, "push", "--quiet", "team", f"claude/{issue}")
 
 
-def new_run(features=(1, 2), options=None):
+def new_run(features=(1, 2), options=None, specs=None):
+    """A run as the hub makes one, with run.specs set before setup; the
+    specs default to SPECS' for the run's features."""
     arm = find_arm(str(ARM_DIR))
-    run = Run("r1", arm, arm.layout(list(features)), options)
+    if specs is None:
+        specs = {number: SPECS[number] for number in features if number in SPECS}
+    run = Run("r1", arm, arm.layout(list(features)), options, specs=specs)
     arm.setup(run)
     return arm, run
 
@@ -111,12 +116,29 @@ def call(run, agent, tool, **arguments):
     return run.arm.tools_for(run, agent)[tool].handler(Call(run, agent, arguments))
 
 
+def refused(run, agent, tool, **arguments):
+    """The refusal a call raises; a call that answers instead fails the test."""
+    try:
+        answer = call(run, agent, tool, **arguments)
+    except ToolError as refusal:
+        return refusal
+    raise AssertionError(f"{tool} was expected to refuse, and answered: {answer}")
+
+
 def call_over_mcp(run, agent, tool, **arguments):
-    """A tools/call as the hub answers it, so the run records a "tool" event."""
+    """A tools/call as the hub answers it, so the run records a "tool" event;
+    the text, whether it is an error, and the exit code an error carries."""
     request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                "params": {"name": tool, "arguments": arguments}}
     result = mcp.handle(request, run, agent)["result"]
-    return result["content"][0]["text"], result["isError"]
+    exit_code = (result.get("_meta") or {}).get("coordbench/exitCode", 0)
+    return result["content"][0]["text"], result["isError"], exit_code
+
+
+def board_row(text, number):
+    """The Issues table's row for one issue."""
+    issues = text.split("## Issues")[1].split("## Claims")[0]
+    return next(line for line in issues.splitlines() if line.startswith(f"| #{number} |"))
 
 
 def frontmatter(text):
@@ -183,6 +205,15 @@ class ArmFilesTest(unittest.TestCase):
             self.assertIn(f"`{tool.alias or 'coord-' + tool.name}", body)
         self.assertIn(" ".join(MAIN_MOVED.split()), " ".join(body.split()))
         self.assertIn("git diff <base ref> team/main > patch.txt", body)
+
+    def test_the_skill_gives_the_exit_codes_the_refusals_carry(self):
+        body = (ARM_DIR / "skills" / "coordbench-sdlc" / "SKILL.md").read_text(encoding="utf-8")
+        for row in ("| 0 | done |", "| 1 | refused:", "| 2 | someone else's:", "| 3 | main moved:",
+                    "| 4 | the merge gate could not act:"):
+            self.assertIn(row, body)
+        self.assertIn("`coordbench/exitCode`", body)
+        self.assertIn("refused (exit 2)", body)
+        self.assertIn("answers (exit 3)", body)
 
     def test_every_file_is_ascii_with_lf(self):
         for path in sorted(ARM_DIR.rglob("*")):
@@ -267,11 +298,77 @@ class ClaimTest(unittest.TestCase):
         self.assertEqual(len(winners), 1)
         self.assertEqual(run.state["sdlc_queue"].issues[3].claimant, winners[0])
 
+    def test_a_claim_someone_else_holds_exits_2_and_a_mistake_exits_1(self):
+        _, run = new_run(options={"open_queue": True})
+        call(run, "agent1", "claim_issue", issue=2)
+        self.assertEqual(refused(run, "agent2", "claim_issue", issue=2).exit_code, 2)
+        self.assertEqual(refused(run, "agent1", "claim_issue", issue=2).exit_code, 1, "already yours")
+        self.assertEqual(refused(run, "agent1", "claim_issue", issue=9).exit_code, 1)
+        self.assertEqual(refused(run, "agent1", "claim_issue", issue="one").exit_code, 1)
+        self.assertEqual(refused(run, "agent1", "claim_issue").exit_code, 1)
+
+    def test_an_issue_given_to_another_agent_is_someone_elses(self):
+        _, run = new_run()
+        self.assertEqual(refused(run, "agent1", "claim_issue", issue=2).exit_code, 2)
+
     def test_without_a_remote_the_gate_says_so(self):
         _, run = new_run()
         call(run, "agent1", "claim_issue", issue=1)
-        with self.assertRaisesRegex(ToolError, "no git_remote_host"):
-            call(run, "agent1", "open_pull_request", issue=1)
+        refusal = refused(run, "agent1", "open_pull_request", issue=1)
+        self.assertIn("no git_remote_host", str(refusal))
+        self.assertEqual(refusal.exit_code, 4)
+        run.arm.teardown(run)  # a run without a gate has nothing to free
+
+
+class TitleTest(unittest.TestCase):
+    """The board titles each issue from its spec's first heading line, the
+    way CooperBench's specs open, or Feature N without one. Titles touch no
+    git, so these runs have no remote."""
+
+    def board(self, specs, features=None):
+        _, run = new_run(tuple(features or specs), specs=specs)
+        return call(run, "agent1", "board")
+
+    def test_each_issue_is_titled_by_its_specs_first_heading(self):
+        text = self.board({1: SPECS[1], 2: "Some prose first.\n\n## Farewell ##\n\n# Later\n"})
+        self.assertEqual(board_row(text, 1), "| #1 | Greeting | agent1 | todo |")
+        self.assertEqual(board_row(text, 2), "| #2 | Farewell | agent2 | todo |")
+        self.assertIn("| #1 | Greeting | agent1 |", text.split("## Queue")[1])
+
+    def test_cooperbench_title_lines_lose_their_markup_and_label(self):
+        # The forms the first lines of CooperBench's feature.md files take.
+        specs = {1: "**Title**: Add MAC Address Validator\n\n**Pull Request Details**\n",
+                 2: "***Title**: Add Custom HTTP Method Validation (default 501)*\n",
+                 3: "**Feature 4: Configurable Focus on Invalid Submission**\n",
+                 4: "# Title: feat(mux): support http.Request.PathValue\n",
+                 5: "**Feature: Template Path Filtering for Loaders**\n",
+                 6: "# Add `default` argument for `str.first` and `str.last`\n"}
+        titles = {1: "Add MAC Address Validator", 2: "Add Custom HTTP Method Validation (default 501)",
+                  3: "Configurable Focus on Invalid Submission", 4: "feat(mux): support http.Request.PathValue",
+                  5: "Template Path Filtering for Loaders",
+                  6: "Add `default` argument for `str.first` and `str.last`"}
+        text = self.board(specs)
+        for number, title in titles.items():
+            self.assertEqual(board_row(text, number), f"| #{number} | {title} | agent{number} | todo |")
+
+    def test_a_spec_without_a_heading_is_feature_n(self):
+        text = self.board({1: "Prose only, no heading.\n", 2: "#\n\n**\n"})
+        self.assertEqual(board_row(text, 1), "| #1 | Feature 1 | agent1 | todo |")
+        self.assertEqual(board_row(text, 2), "| #2 | Feature 2 | agent2 | todo |")
+
+    def test_a_run_given_no_specs_is_feature_n(self):
+        text = self.board({}, features=(1, 2))
+        self.assertEqual(board_row(text, 2), "| #2 | Feature 2 | agent2 | todo |")
+
+    def test_a_pipe_in_a_title_keeps_the_table_whole(self):
+        text = self.board({1: "# Read | write\n"})
+        self.assertEqual(board_row(text, 1), "| #1 | Read \\| write | agent1 | todo |")
+
+    def test_a_bold_paragraph_taken_for_a_heading_is_cut(self):
+        title = board_row(self.board({1: "**Note** " + "word " * 60}), 1).split(" | ")[1]
+        self.assertTrue(title.startswith("Note word word"))
+        self.assertTrue(title.endswith("..."))
+        self.assertLessEqual(len(title), 120)
 
 
 class PromptTest(unittest.TestCase):
@@ -326,14 +423,9 @@ class GateTest(unittest.TestCase):
         self.arm, self.run = new_run(options={"git_remote_host": str(self.remote.bare),
                                               "base_ref": self.remote.base,
                                               "git_remote": "git://host.docker.internal/team.git"})
-        self.addCleanup(self.release_gate)
+        self.addCleanup(self.arm.teardown, self.run)
         self.one = self.remote.clone("agent1")
         self.two = self.remote.clone("agent2")
-
-    def release_gate(self):
-        gate = self.run.state["sdlc_gate"]
-        if gate is not None:
-            gate.release()
 
     def claim_branch_and_open(self, agent, clone, issue, files):
         call(self.run, agent, "claim_issue", issue=issue)
@@ -350,18 +442,29 @@ class GateTest(unittest.TestCase):
         self.assertIn("merged", call(self.run, "agent1", "mark_ready", issue=1))
 
     def test_a_pull_request_needs_the_claim_and_the_pushed_branch(self):
-        with self.assertRaisesRegex(ToolError, "nobody has claimed it"):
-            call(self.run, "agent1", "open_pull_request", issue=1)
+        unclaimed = refused(self.run, "agent1", "open_pull_request", issue=1)
+        self.assertIn("nobody has claimed it", str(unclaimed))
+        self.assertEqual(unclaimed.exit_code, 1)
         call(self.run, "agent1", "claim_issue", issue=1)
-        with self.assertRaisesRegex(ToolError, "claude/1 is not on team yet; push it first"):
-            call(self.run, "agent1", "open_pull_request", issue=1)
+        unpushed = refused(self.run, "agent1", "open_pull_request", issue=1)
+        self.assertIn("claude/1 is not on team yet; push it first", str(unpushed))
+        self.assertEqual(unpushed.exit_code, 1)
         start_branch(self.one, 1, self.remote.base)
         commit_and_push(self.one, 1, {"one.py": "ONE = 1\n"}, "feature 1")
         self.assertIn("opened the pull request for #1", call(self.run, "agent1", "open_pull_request", issue=1))
+        self.assertEqual(self.run.state["sdlc_queue"].pulls[1].title, "Greeting", "titled as its issue")
         with self.assertRaisesRegex(ToolError, "one issue, one pull request"):
             call(self.run, "agent1", "open_pull_request", issue=1)
-        with self.assertRaisesRegex(ToolError, "claimed by agent1"):
-            call(self.run, "agent2", "open_pull_request", issue=1)
+        theirs = refused(self.run, "agent2", "open_pull_request", issue=1)
+        self.assertIn("claimed by agent1", str(theirs))
+        self.assertEqual(theirs.exit_code, 2)
+
+    def test_a_pull_request_keeps_the_title_its_author_gives(self):
+        call(self.run, "agent1", "claim_issue", issue=1)
+        start_branch(self.one, 1, self.remote.base)
+        commit_and_push(self.one, 1, {"one.py": "ONE = 1\n"}, "feature 1")
+        call(self.run, "agent1", "open_pull_request", issue=1, title="Greet the world")
+        self.assertEqual(self.run.state["sdlc_queue"].pulls[1].title, "Greet the world")
 
     def test_a_clean_pull_request_lands_on_main_as_a_merge_commit(self):
         self.claim_branch_and_open("agent1", self.one, 1, {"one.py": "ONE = 1\n"})
@@ -384,9 +487,9 @@ class GateTest(unittest.TestCase):
     def test_a_conflicting_pull_request_answers_main_moved_and_leaves_main(self):
         self.both_change_the_same_line()
         main_before = self.remote.main()
-        with self.assertRaises(ToolError) as refusal:
-            call(self.run, "agent2", "mark_ready", issue=2)
-        answer = str(refusal.exception)
+        refusal = refused(self.run, "agent2", "mark_ready", issue=2)
+        self.assertEqual(refusal.exit_code, 3)
+        answer = str(refusal)
         self.assertTrue(answer.startswith(MAIN_MOVED + "."))
         self.assertIn("Conflicting files: app.py.", answer)
         self.assertIn(f"main is still at {main_before[:7]}", answer)
@@ -431,10 +534,12 @@ class GateTest(unittest.TestCase):
         start_branch(self.one, 1, self.remote.base)
         git(self.one, "push", "--quiet", "team", "claude/1")
         call(self.run, "agent1", "open_pull_request", issue=1)
-        with self.assertRaisesRegex(ToolError, "only its author marks it ready"):
-            call(self.run, "agent2", "mark_ready", issue=1)
-        with self.assertRaisesRegex(ToolError, "nothing to merge"):
-            call(self.run, "agent1", "mark_ready", issue=1)
+        not_theirs = refused(self.run, "agent2", "mark_ready", issue=1)
+        self.assertIn("only its author marks it ready", str(not_theirs))
+        self.assertEqual(not_theirs.exit_code, 2)
+        nothing_new = refused(self.run, "agent1", "mark_ready", issue=1)
+        self.assertIn("nothing to merge", str(nothing_new))
+        self.assertEqual(nothing_new.exit_code, 1)
         queue = self.run.state["sdlc_queue"]
         self.assertEqual(queue.pulls[1].state, "draft")
         self.assertEqual(queue.issues[1].label(), "claimed", "a refused ready keeps the claim")
@@ -490,8 +595,8 @@ class GateTest(unittest.TestCase):
         main = self.remote.main()
         self.assertIn(f"As of commit {main[:7]} on main; the run began at the base ref {self.remote.base[:7]}",
                       text)
-        self.assertIn("| #1 | Feature 1 | agent1 | closed |", text)
-        self.assertIn("| #2 | Feature 2 | agent2 | in-review |", text)
+        self.assertEqual(board_row(text, 1), "| #1 | Greeting | agent1 | closed |")
+        self.assertEqual(board_row(text, 2), "| #2 | Farewell | agent2 | in-review |")
         claims = text.split("## Claims")[1].split("## Pull requests")[0]
         self.assertIn("| (none) |", claims, "a ready pull request has released its claim")
         self.assertIn(f"| #1 | claude/1 | agent1 | merged | merged as {main[:7]} | 1 |", text)
@@ -502,7 +607,7 @@ class GateTest(unittest.TestCase):
         call(self.run, "agent1", "claim_issue", issue=1)
         text = call(self.run, "agent2", "board")
         self.assertIn("| #1 | claude/1 | agent1 | none yet |", text)
-        self.assertIn("| #2 | Feature 2 | agent2 |", text.split("## Queue")[1])
+        self.assertIn("| #2 | Farewell | agent2 |", text.split("## Queue")[1])
         self.assertIn("| (none) |", text.split("## Pull requests")[1].split("## Queue")[0])
 
     def test_metrics_count_the_protocols_steps(self):
@@ -517,9 +622,10 @@ class GateTest(unittest.TestCase):
         call_over_mcp(self.run, "agent2", "open_pull_request", issue=2)
         before = self.arm.metrics(self.run)
         self.assertIsNone(before["time_to_first_merge_seconds"])
-        self.assertEqual(call_over_mcp(self.run, "agent1", "mark_ready", issue=1)[1], False)
-        text, is_error = call_over_mcp(self.run, "agent2", "mark_ready", issue=2)
+        self.assertEqual(call_over_mcp(self.run, "agent1", "mark_ready", issue=1)[1:], (False, 0))
+        text, is_error, exit_code = call_over_mcp(self.run, "agent2", "mark_ready", issue=2)
         self.assertTrue(is_error)
+        self.assertEqual(exit_code, 3)
         self.assertTrue(text.startswith(MAIN_MOVED))
         metrics = self.arm.metrics(self.run)
         self.assertEqual({key: metrics[key] for key in ("claims", "prs_opened", "merge_attempts", "merges",
@@ -531,19 +637,39 @@ class GateTest(unittest.TestCase):
         self.assertEqual(metrics["tool_calls"]["mark_ready"], 2)
         self.assertEqual(metrics["events"]["merge"], 1)
 
-    def test_closing_the_run_frees_the_scratch_clone(self):
+    def test_teardown_frees_the_scratch_clone_and_shuts_the_gate(self):
         self.claim_branch_and_open("agent1", self.one, 1, {"one.py": "ONE = 1\n"})
         gate = self.run.state["sdlc_gate"]
         scratch = gate.scratch.name
-        self.assertTrue(os.path.isdir(scratch))
         with self.run.lock:
             self.run.closed = True
             self.arm.metrics(self.run)
-        deadline = time.monotonic() + 10
-        while os.path.isdir(scratch) and time.monotonic() < deadline:
-            time.sleep(0.05)
+        self.assertTrue(os.path.isdir(scratch), "metrics only read; freeing the clone is teardown's")
+        self.arm.teardown(self.run)
         self.assertFalse(os.path.isdir(scratch))
-        self.assertIn("Pull request for #1", call(self.run, "agent1", "pull_request_status", issue=1))
+        status = call(self.run, "agent1", "pull_request_status", issue=1)
+        self.assertIn("Pull request for #1", status)
+        self.assertIn("Against main: unknown", status)
+        late = refused(self.run, "agent1", "mark_ready", issue=1)
+        self.assertIn("the run has closed", str(late))
+        self.assertEqual(late.exit_code, 4)
+        self.assertIsNone(gate.scratch, "a call after teardown does not clone again")
+        self.assertEqual(self.remote.main(), self.remote.base)
+        self.arm.teardown(self.run)
+
+    def test_teardown_waits_for_a_merge_in_progress(self):
+        self.claim_branch_and_open("agent1", self.one, 1, {"one.py": "ONE = 1\n"})
+        gate = self.run.state["sdlc_gate"]
+        scratch = gate.scratch.name
+        done = threading.Event()
+        with gate.lock:  # as mark_ready holds it while it merges
+            closer = threading.Thread(target=lambda: (self.arm.teardown(self.run), done.set()))
+            closer.start()
+            self.assertFalse(done.wait(0.3), "teardown must not free the clone under a merge")
+            self.assertTrue(os.path.isdir(scratch))
+        closer.join(10)
+        self.assertTrue(done.is_set())
+        self.assertFalse(os.path.isdir(scratch))
 
     def test_without_a_base_ref_the_remotes_main_at_the_start_stands_in(self):
         _, run = new_run(options={"git_remote_host": str(self.remote.bare)})
@@ -569,9 +695,17 @@ class HubTest(unittest.TestCase):
         with opener.open(request, timeout=30) as response:
             return json.loads(response.read())
 
+    def options(self):
+        return {"git_remote": "git://host.docker.internal/team.git", "git_remote_host": str(self.remote.bare),
+                "base_ref": self.remote.base}
+
+    def create(self, run_id):
+        answer = self.hub.create_run("sdlc", [2, 1], {"1": SPECS[1], "2": SPECS[2]}, self.options(), run_id)
+        self.addCleanup(self.hub.close_run, run_id)
+        return answer
+
     def test_the_hub_serves_the_protocol_over_mcp_and_rpc(self):
-        options = {"git_remote_host": str(self.remote.bare), "base_ref": self.remote.base}
-        answer = self.hub.create_run("sdlc", [2, 1], {"1": SPECS[1], "2": SPECS[2]}, options, "sdlc-run")
+        answer = self.create("sdlc-run")
         self.assertEqual([(a["id"], a["role"], a["features"]) for a in answer["agents"]],
                          [("agent1", "peer", [1]), ("agent2", "peer", [2])])
         agent1 = answer["agents"][0]
@@ -579,15 +713,32 @@ class HubTest(unittest.TestCase):
         self.assertEqual({tool["name"] for tool in listed["result"]["tools"]}, set(ALIASES))
         claimed = self.post(agent1["rpc_url"], {"tool": "claim_issue", "arguments": {"issue": 1}})
         self.assertFalse(claimed["isError"])
+        self.assertNotIn("exitCode", claimed)
         self.assertIn("claimed #1", claimed["text"])
-        refused = self.post(answer["agents"][1]["rpc_url"], {"tool": "claim_issue", "arguments": {"issue": 1}})
-        self.assertTrue(refused["isError"])
-        self.release(answer)
+        refused_claim = self.post(answer["agents"][1]["rpc_url"],
+                                  {"tool": "claim_issue", "arguments": {"issue": 1}})
+        self.assertTrue(refused_claim["isError"])
+        self.assertEqual(refused_claim["exitCode"], 2)
+        board = self.post(agent1["rpc_url"], {"tool": "board", "arguments": {}})
+        self.assertEqual(board_row(board["text"], 1), "| #1 | Greeting | agent1 | claimed |",
+                         "the hub hands the arm its specs before setup")
         self.assertEqual(self.hub.get_run("sdlc-run")["metrics"]["claims"], 1)
 
-    def release(self, answer):
-        gate = self.hub.hosted(answer["run_id"]).run.state["sdlc_gate"]
-        self.addCleanup(gate.release)
+    def test_the_hub_refuses_a_run_without_the_shared_remote(self):
+        options = {key: value for key, value in self.options().items() if key != "git_remote"}
+        with self.assertRaises(hub_module.HubError) as refusal:
+            self.hub.create_run("sdlc", [1, 2], {"1": SPECS[1], "2": SPECS[2]}, options, "no-remote")
+        self.assertEqual(refusal.exception.status, 400)
+        self.assertIn("needs git_remote", refusal.exception.message)
+
+    def test_closing_the_run_frees_the_scratch_clone(self):
+        answer = self.create("sdlc-close")
+        self.post(answer["agents"][0]["rpc_url"], {"tool": "board", "arguments": {}})
+        gate = self.hub.hosted("sdlc-close").run.state["sdlc_gate"]
+        scratch = gate.scratch.name
+        self.assertTrue(os.path.isdir(scratch), "reading the board cloned the shared remote")
+        self.assertEqual(self.hub.close_run("sdlc-close")["claims"], 0)
+        self.assertFalse(os.path.isdir(scratch))
 
 
 if __name__ == "__main__":

@@ -3,20 +3,27 @@ best arm of the authors' ablation, so a run through coordbench is worth
 setting beside theirs only if the arm is theirs. These tests pin what
 makes it so: the lead is chosen and the list seeded as runner/team.py
 does, a claim is atomic and refuses another agent's task as coop_task.py
-does, updates, listing and typed requests behave and print as the
-in-container commands do, each tool answers to CooperBench's command, the
-prompt is build_team_instruction's text (checked against CooperBench's own
-function when its source is at hand), the metrics are metrics.py's, and
-the directory is a well-formed Claude Code plugin as well as an arm."""
+does, updates, listing and typed requests behave, print and exit as the
+in-container commands do (checked against coop_task.py itself when
+CooperBench's source is at hand), each tool answers to CooperBench's
+command and options, the prompt is build_team_instruction's text
+(checked against CooperBench's own function likewise), the metrics are
+metrics.py's, and the directory is a well-formed Claude Code plugin as
+well as an arm."""
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
 import types
 import unittest
+import urllib.error
+import urllib.request
 from pathlib import Path
 from unittest import mock
 
@@ -28,13 +35,16 @@ sys.path.insert(0, str(COORDBENCH))
 import cli  # noqa: E402
 import hub as hub_module  # noqa: E402
 import mcp  # noqa: E402
-from arm import SUBMISSION_BLOCK, Call, Run, find_arm  # noqa: E402
+from arm import SUBMISSION_BLOCK, Run, find_arm  # noqa: E402
 
 RULE = "\n\n---\n\n"
 DASH = "\u2014"
 # Unstripped, with a trailing newline, as CooperBench reads feature.md.
 SPECS = {3: "# Verbose flag\n\nAdd a --verbose flag.\n", 7: "# TOML\n\nRead TOML configs.\n",
          9: "# Colours\n\nColour the help.\n"}
+# What the runner gives a run of an arm that needs the shared volume; the
+# hub refuses a team run without it.
+SHARED = {"shared_dir": "/workspace/shared"}
 
 ALIASES = {"task_create": "coop-task-create", "task_claim": "coop-task-claim",
            "task_update": "coop-task-update", "task_list": "coop-task-list",
@@ -42,10 +52,14 @@ ALIASES = {"task_create": "coop-task-create", "task_claim": "coop-task-claim",
            "send_message": "coop-send", "broadcast": "coop-broadcast",
            "receive_messages": "coop-recv", "peek_messages": "coop-peek",
            "list_agents": "coop-agents", "wait_for_message": ""}
-ARGV = {"task_create": ["words..."], "task_claim": ["task_id"],
-        "task_update": ["task_id", "status", "flag", "note"], "task_list": ["flag", "second_flag"],
-        "request": ["recipient", "kind", "words..."], "respond": ["request_id", "body..."],
+# coop_task.py's positionals and options, by the tool that stands in for
+# each of its subcommands.
+ARGV = {"task_create": ["title..."], "task_claim": ["task_id"], "task_update": ["task_id", "status"],
+        "task_list": [], "request": ["recipient", "kind", "body..."], "respond": ["request_id", "body..."],
         "pending": []}
+FLAGS = {"task_create": {"--assign": "assign"}, "task_claim": {},
+         "task_update": {"-n": "note", "--note": "note"}, "task_list": {"--mine": "mine", "--open": "open"},
+         "request": {"--wait": "wait"}, "respond": {}, "pending": {}}
 TASK_FIELDS = ["id", "title", "owner", "status", "created_by", "created_at", "last_note", "metadata"]
 
 # team_harness/prompt.py's _TEAM_LIST_USAGE, copied here so the test does
@@ -112,27 +126,95 @@ def load_module(name, path):
 TEAM_MODULE = load_module("coordbench_arm_team_under_test", TEAM / "arm.py")
 
 
-def cooperbench_team_prompt():
-    """CooperBench's team_harness/prompt.py, from a checkout named by
+def cooperbench_source():
+    """CooperBench's package directory, from a checkout named by
     COOPERBENCH_DIR (the variable experiment/setup.sh uses) or at
-    ~/cooperbench, with the one module it imports (_coop/prompt.py) put in
-    place of CooperBench's package, whose own imports need redis and
-    modal. Returns the module and the stand-in modules its git branch
-    imports at call time, or None when the source is not here."""
+    ~/cooperbench, or None when the source is not here."""
     for root in (os.environ.get("COOPERBENCH_DIR"), str(Path.home() / "cooperbench")):
         source = Path(root or "/nonexistent") / "src" / "cooperbench"
-        coop_file = source / "agents" / "_coop" / "prompt.py"
-        team_file = source / "team_harness" / "prompt.py"
-        if coop_file.is_file() and team_file.is_file():
-            packages = ("cooperbench", "cooperbench.agents", "cooperbench.agents._coop")
-            stand_ins = {name: types.ModuleType(name) for name in packages}
-            stand_ins["cooperbench.agents._coop.prompt"] = load_module("cooperbench_coop_prompt", coop_file)
-            with mock.patch.dict(sys.modules, stand_ins):
-                return load_module("cooperbench_team_prompt", team_file), stand_ins
+        if (source / "team_harness").is_dir():
+            return source
     return None
 
 
+def cooperbench_team_prompt():
+    """CooperBench's team_harness/prompt.py, with the one module it imports
+    (_coop/prompt.py) put in place of CooperBench's package, whose own
+    imports need redis and modal. Returns the module and the stand-in
+    modules its git branch imports at call time, or None."""
+    source = cooperbench_source()
+    coop_file = source and source / "agents" / "_coop" / "prompt.py"
+    team_file = source and source / "team_harness" / "prompt.py"
+    if not (source and coop_file.is_file() and team_file.is_file()):
+        return None
+    packages = ("cooperbench", "cooperbench.agents", "cooperbench.agents._coop")
+    stand_ins = {name: types.ModuleType(name) for name in packages}
+    stand_ins["cooperbench.agents._coop.prompt"] = load_module("cooperbench_coop_prompt", coop_file)
+    with mock.patch.dict(sys.modules, stand_ins):
+        return load_module("cooperbench_team_prompt", team_file), stand_ins
+
+
+def cooperbench_coop_task():
+    """CooperBench's in-container command, team_harness/coop_task.py, loaded
+    with an empty stand-in for the redis package it imports; each test
+    hands it a FakeRedis in place of a server. None when the source is
+    not here."""
+    source = cooperbench_source()
+    path = source and source / "team_harness" / "coop_task.py"
+    if not (path and path.is_file()):
+        return None
+    with mock.patch.dict(sys.modules, {"redis": types.ModuleType("redis")}):
+        return load_module("cooperbench_coop_task", path)
+
+
 COOPERBENCH = cooperbench_team_prompt()
+COOP_TASK = cooperbench_coop_task()
+NO_SOURCE = "CooperBench's source is not here; set COOPERBENCH_DIR to its checkout"
+
+
+class FakeRedis:
+    """The Redis commands coop_task.py uses, over dicts, so CooperBench's own
+    command runs here without a server. Values are kept as the strings
+    Redis would hold; blpop answers at once, as a wait that ran out."""
+
+    def __init__(self):
+        self.hashes, self.sets, self.lists = {}, {}, {}
+
+    def hset(self, key, mapping):
+        self.hashes.setdefault(key, {}).update({field: str(value) for field, value in mapping.items()})
+
+    def hget(self, key, field):
+        return self.hashes.get(key, {}).get(field)
+
+    def hgetall(self, key):
+        return dict(self.hashes.get(key, {}))
+
+    def exists(self, key):
+        return int(key in self.hashes)
+
+    def delete(self, key):
+        self.hashes.pop(key, None)
+
+    def sadd(self, key, member):
+        self.sets.setdefault(key, set()).add(member)
+
+    def srem(self, key, member):
+        self.sets.get(key, set()).discard(member)
+
+    def smembers(self, key):
+        return set(self.sets.get(key, ()))
+
+    def rpush(self, key, value):
+        self.lists.setdefault(key, []).append(value)
+
+    def lrange(self, key, start, end):
+        return list(self.lists.get(key, ()))
+
+    def blpop(self, keys, timeout=0):
+        for key in keys:
+            if self.lists.get(key):
+                return key, self.lists[key].pop(0)
+        return None
 
 
 def new_run(features=(3, 7, 9), options=None, run_id="r1"):
@@ -147,6 +229,15 @@ def call(run, agent, tool, **arguments):
     return hub_module.Hub().call(run, agent, tool, arguments)
 
 
+def refusal(text, exit_code):
+    return {"text": text, "isError": True, "exitCode": exit_code}
+
+
+def exit_code(answer):
+    """What the tool's shell command exits with, given its /rpc answer."""
+    return answer["exitCode"] if answer["isError"] else 0
+
+
 def text_of(run, agent, tool, **arguments):
     answer = call(run, agent, tool, **arguments)
     if answer["isError"]:
@@ -154,14 +245,38 @@ def text_of(run, agent, tool, **arguments):
     return answer["text"]
 
 
-def shell(run, agent, tool, *words):
-    """A shell command as cli.py runs it: its words mapped onto the tool's
-    argv as the hub describes it, then the same /rpc call."""
+def shell_arguments(description, words, stdin=None):
+    """A command's words as the arguments of its tool, read as arm.py's
+    contract says a shell command reads them: a word naming one of the
+    tool's flags sets that flag's argument, as a switch when the schema
+    makes it a boolean and from the next word otherwise, and the other
+    words go onto argv as cli.py maps them, the text on stdin standing in
+    for a trailing argument no word was left for."""
+    flags = description.get("flags") or {}
+    properties = description["inputSchema"].get("properties", {})
+    arguments, rest, queue = {}, [], list(words)
+    while queue:
+        word = queue.pop(0)
+        name = flags.get(word)
+        if name is None:
+            rest.append(word)
+        elif properties.get(name, {}).get("type") == "boolean":
+            arguments[name] = True
+        elif queue:
+            arguments[name] = cli.coerce(description, name, queue.pop(0))
+        else:
+            raise cli.Failure(f"{word} takes a value")
+    with mock.patch.object(cli, "stdin_has_text", return_value=stdin is not None), \
+            mock.patch.object(sys, "stdin", io.StringIO(stdin or "")):
+        return {**cli.words_to_arguments(description, rest), **arguments}
+
+
+def shell(run, agent, tool, *words, stdin=None):
+    """A shell command: its words read against the tool as the hub
+    describes it to cli.py, then the same /rpc call."""
     hub = hub_module.Hub()
     description = next(t for t in hub.describe_tools(run, agent) if t["name"] == tool)
-    with mock.patch.object(cli, "stdin_has_text", return_value=False):
-        arguments = cli.words_to_arguments(description, list(words))
-    return hub.call(run, agent, tool, arguments)
+    return hub.call(run, agent, tool, shell_arguments(description, words, stdin))
 
 
 def tasks_of(run, agent="agent1", **filters):
@@ -184,10 +299,17 @@ class LayoutAndSeeding(unittest.TestCase):
                                   ("agent3", "member", (9,))])
 
     def test_the_hub_creates_a_team_run_by_its_name(self):
-        answer = hub_module.Hub().create_run("team", [7, 3], {3: "a", 7: "b"})
+        answer = hub_module.Hub().create_run("team", [7, 3], {3: "a", 7: "b"}, SHARED)
         self.assertEqual(answer["arm"], "team")
         self.assertEqual([(a["id"], a["role"], a["features"]) for a in answer["agents"]],
                          [("agent1", "lead", [3]), ("agent2", "member", [7])])
+
+    def test_the_hub_refuses_a_team_run_without_the_shared_directory(self):
+        for options in (None, {}, {"shared_dir_host": "/tmp/shared"}):
+            with self.subTest(options=options), self.assertRaises(hub_module.HubError) as refused:
+                hub_module.Hub().create_run("team", [7, 3], {3: "a", 7: "b"}, options)
+            self.assertEqual(refused.exception.status, 400)
+            self.assertIn("shared_volume", refused.exception.message)
 
     def test_each_member_gets_its_feature_assigned_and_the_lead_its_integration_task(self):
         _, run = new_run()
@@ -222,7 +344,7 @@ class Claims(unittest.TestCase):
         task = task_titled(run, "Write the parser")
         self.assertEqual((task["owner"], task["status"]), ("agent3", "in_progress"))
 
-    def test_exactly_one_of_many_racing_agents_wins(self):
+    def test_exactly_one_of_many_racing_agents_wins_and_the_rest_exit_2(self):
         _, run = new_run(features=tuple(range(1, 13)))
         agents = list(run.agents)
         for _ in range(10):
@@ -245,8 +367,9 @@ class Claims(unittest.TestCase):
             self.assertEqual(len(answers), len(agents))
             self.assertEqual(len(winners), 1)
             self.assertEqual(board(run).tasks[task_id]["owner"], winners[0])
-            losses = {a["content"][0]["text"] for a in answers.values() if a["isError"]}
-            self.assertEqual(losses, {f"task {task_id} owned by {winners[0]}"})
+            losses = [a for a in answers.values() if a["isError"]]
+            self.assertEqual({a["content"][0]["text"] for a in losses}, {f"task {task_id} owned by {winners[0]}"})
+            self.assertEqual({a["_meta"]["coordbench/exitCode"] for a in losses}, {2})
             claims = [e for e in board(run).log if e["kind"] == "claim" and e["task_id"] == task_id]
             self.assertEqual([e["by"] for e in claims], winners)
 
@@ -255,7 +378,7 @@ class Claims(unittest.TestCase):
         task = task_titled(run, "Implement feature 7")
         for intruder in ("agent3", "agent1"):
             answer = call(run, intruder, "task_claim", task_id=task["id"])
-            self.assertEqual(answer, {"text": f"task {task['id']} owned by agent2", "isError": True})
+            self.assertEqual(answer, refusal(f"task {task['id']} owned by agent2", 2))
         after = task_titled(run, "Implement feature 7")
         self.assertEqual((after["owner"], after["status"]), ("agent2", "open"))
         self.assertNotIn("claim", [e["kind"] for e in board(run).log])
@@ -268,10 +391,10 @@ class Claims(unittest.TestCase):
         self.assertEqual(task_titled(run, "Implement feature 7")["status"], "in_progress")
         self.assertEqual(run.arm.metrics(run)["claims_per_agent"], {"agent2": 2})
 
-    def test_an_unknown_task_cannot_be_claimed(self):
+    def test_an_unknown_task_cannot_be_claimed_and_exits_1(self):
         _, run = new_run()
         self.assertEqual(call(run, "agent2", "task_claim", task_id="nope"),
-                         {"text": "task nope does not exist", "isError": True})
+                         refusal("task nope does not exist", 1))
 
 
 class UpdatesAndListing(unittest.TestCase):
@@ -293,16 +416,22 @@ class UpdatesAndListing(unittest.TestCase):
         self.assertEqual(task_titled(self.run, "Implement feature 7")["last_note"], "need the API")
         self.assertNotIn("note", board(self.run).log[-1])
 
-    def test_only_the_owner_updates(self):
+    def test_only_the_owner_updates_and_anyone_else_exits_3(self):
         answer = call(self.run, "agent1", "task_update", task_id=self.task_id, status="done")
-        self.assertEqual(answer, {"text": f"task {self.task_id} owned by 'agent2', not you", "isError": True})
+        self.assertEqual(answer, refusal(f"task {self.task_id} owned by 'agent2', not you", 3))
 
-    def test_an_unknown_status_or_task_is_refused(self):
+    def test_an_unknown_status_exits_4_and_an_unknown_task_1(self):
         answer = call(self.run, "agent2", "task_update", task_id=self.task_id, status="finished")
-        self.assertEqual(answer["text"],
-                         "invalid status 'finished'; expected one of ['blocked', 'done', 'in_progress', 'open']")
+        self.assertEqual(answer, refusal(
+            "invalid status 'finished'; expected one of ['blocked', 'done', 'in_progress', 'open']", 4))
         answer = call(self.run, "agent2", "task_update", task_id="nope", status="done")
-        self.assertEqual(answer, {"text": "task nope does not exist", "isError": True})
+        self.assertEqual(answer, refusal("task nope does not exist", 1))
+
+    def test_the_owner_check_comes_before_the_status_check(self):
+        # coop_task.py checks the owner first, so a stranger with a bad
+        # status hears that the task is not theirs.
+        answer = call(self.run, "agent3", "task_update", task_id=self.task_id, status="finished")
+        self.assertEqual(exit_code(answer), 3)
 
     def test_list_holds_every_task_in_id_order(self):
         ids = [task["id"] for task in tasks_of(self.run)]
@@ -315,21 +444,57 @@ class UpdatesAndListing(unittest.TestCase):
         still_open = {t["title"] for t in tasks_of(self.run, "agent2", open=True)}
         self.assertEqual(still_open, {"Implement feature 9", "Lead-only: integrate and submit feature 3"})
         self.assertEqual(tasks_of(self.run, "agent2", mine=True, open=True), [])
+        self.assertEqual(len(tasks_of(self.run, "agent2", mine=False, open="false")), 3)
+
+
+class MissingArguments(unittest.TestCase):
+    def test_a_missing_argument_exits_2_with_argparses_words(self):
+        _, run = new_run()
+        task_id = task_titled(run, "Implement feature 7")["id"]
+        for tool, arguments, missing in (
+                ("task_create", {"assign": "agent2"}, "title"),
+                ("task_create", {"title": ""}, "title"),
+                ("task_claim", {}, "task_id"),
+                ("task_update", {"status": "done"}, "task_id"),
+                ("task_update", {"task_id": task_id}, "status"),
+                ("request", {"kind": "review"}, "recipient"),
+                ("request", {"recipient": "agent1"}, "kind"),
+                ("respond", {"body": "yes"}, "request_id")):
+            with self.subTest(tool=tool, arguments=arguments):
+                self.assertEqual(call(run, "agent2", tool, **arguments),
+                                 refusal(f"the following arguments are required: {missing}", 2))
+        self.assertEqual(len(board(run).tasks), 3)
+        self.assertEqual(board(run).requests, {})
 
 
 class ShellCommands(unittest.TestCase):
-    def test_each_tool_answers_to_cooperbenchs_command(self):
+    def test_each_tool_answers_to_cooperbenchs_command_and_options(self):
         _, run = new_run()
         for agent in run.agents:
             described = hub_module.Hub().describe_tools(run, agent)
             self.assertEqual({t["name"]: t["alias"] for t in described}, ALIASES)
             self.assertEqual({t["name"]: t["argv"] for t in described if t["name"] in ARGV}, ARGV)
+            self.assertEqual({t["name"]: t["flags"] for t in described if t["name"] in FLAGS}, FLAGS)
+
+    def test_every_flag_sets_a_field_of_the_schema_that_no_position_fills(self):
+        _, run = new_run()
+        switches = set()
+        for tool in hub_module.Hub().describe_tools(run, "agent1"):
+            properties = tool["inputSchema"]["properties"]
+            positions = {name.removesuffix("...") for name in tool["argv"]}
+            for flag, name in tool["flags"].items():
+                with self.subTest(tool=tool["name"], flag=flag):
+                    self.assertIn(name, properties)
+                    self.assertNotIn(name, positions)
+                    if properties[name].get("type") == "boolean":
+                        switches.add(flag)
+        self.assertEqual(switches, {"--mine", "--open"})
 
     def test_create_with_and_without_assign(self):
         _, run = new_run()
         for words, owner in ((["Write the parser"], ""),
                              (["--assign", "agent2", "Write the parser"], "agent2"),
-                             (["Write the parser", "--assign=agent3"], "agent3")):
+                             (["Write", "the", "parser", "--assign", "agent3"], "agent3")):
             answer = shell(run, "agent1", "task_create", *words)
             self.assertFalse(answer["isError"], answer)
             task = board(run).tasks[answer["text"]]
@@ -338,29 +503,34 @@ class ShellCommands(unittest.TestCase):
 
     def test_create_needs_a_title(self):
         _, run = new_run()
-        self.assertEqual(shell(run, "agent1", "task_create", "--assign", "agent2")["text"],
-                         "the following arguments are required: title")
+        self.assertEqual(shell(run, "agent1", "task_create", "--assign", "agent2"),
+                         refusal("the following arguments are required: title", 2))
 
-    def test_update_takes_its_note_anywhere(self):
+    def test_update_takes_its_note_anywhere_and_by_either_name(self):
         _, run = new_run()
         task_id = task_titled(run, "Implement feature 7")["id"]
         shell(run, "agent2", "task_claim", task_id)
         answer = shell(run, "agent2", "task_update", task_id, "done", "-n", "patch at /workspace/shared/agent2.patch")
         self.assertFalse(answer["isError"], answer)
-        answer = shell(run, "agent2", "task_update", "-n", "waiting on agent1", task_id, "blocked")
+        self.assertEqual(board(run).tasks[task_id]["last_note"], "patch at /workspace/shared/agent2.patch")
+        answer = shell(run, "agent2", "task_update", "--note", "waiting on agent1", task_id, "blocked")
         self.assertFalse(answer["isError"], answer)
         task = board(run).tasks[task_id]
         self.assertEqual((task["status"], task["last_note"]), ("blocked", "waiting on agent1"))
 
-    def test_update_refuses_the_words_argparse_refuses(self):
+    def test_update_by_a_stranger_exits_3_from_the_shell_too(self):
         _, run = new_run()
         task_id = task_titled(run, "Implement feature 7")["id"]
-        self.assertEqual(shell(run, "agent2", "task_update", task_id, "done", "-n")["text"],
-                         "argument -n: expected one argument")
-        self.assertEqual(shell(run, "agent2", "task_update", task_id, "done", "a note")["text"],
-                         "unrecognized arguments: a note")
-        with self.assertRaises(cli.Failure):
-            shell(run, "agent2", "task_update", task_id, "done", "-n", "a", "note")
+        answer = shell(run, "agent3", "task_update", task_id, "done", "-n", "mine now")
+        self.assertEqual(answer, refusal(f"task {task_id} owned by 'agent2', not you", 3))
+
+    def test_words_the_command_cannot_place_never_reach_the_list(self):
+        _, run = new_run()
+        task_id = task_titled(run, "Implement feature 7")["id"]
+        for tool, words in (("task_update", (task_id, "done", "a note")), ("task_list", ("--all",))):
+            with self.subTest(tool=tool), self.assertRaises(cli.Failure):
+                shell(run, "agent2", tool, *words)
+        self.assertEqual(board(run).tasks[task_id]["status"], "open")
 
     def test_an_mcp_note_is_never_read_as_flags(self):
         _, run = new_run()
@@ -376,7 +546,6 @@ class ShellCommands(unittest.TestCase):
         both = json.loads(shell(run, "agent2", "task_list", "--open", "--mine")["text"])
         self.assertEqual([t["title"] for t in both], ["Implement feature 7"])
         self.assertEqual(len(json.loads(shell(run, "agent2", "task_list")["text"])), 3)
-        self.assertEqual(shell(run, "agent2", "task_list", "--all")["text"], "unrecognized arguments: --all")
 
     def test_request_with_a_body_of_many_words_and_a_wait(self):
         _, run = new_run()
@@ -393,6 +562,24 @@ class ShellCommands(unittest.TestCase):
         waiting.join(10)
         response = json.loads(answers["text"])
         self.assertEqual((response["from"], response["to"], response["body"]), ("agent1", "agent2", "yes, take it"))
+
+    def test_a_body_left_off_the_words_is_read_from_stdin(self):
+        # coop_task.py reads the body of a request or a response from stdin
+        # when no word gives it, which is how a long body is piped in.
+        _, run = new_run()
+        request_id = shell(run, "agent2", "request", "agent1", "review", stdin="the plan:\n- one\n")["text"]
+        self.assertEqual(board(run).requests[request_id]["body"], "the plan:\n- one\n")
+        self.assertFalse(shell(run, "agent1", "respond", request_id, stdin="approved\n")["isError"])
+        self.assertEqual(board(run).responses[request_id][0]["body"], "approved\n")
+
+    def test_a_wait_that_runs_out_exits_5_and_a_wait_that_is_no_number_2(self):
+        _, run = new_run()
+        answer = shell(run, "agent2", "request", "agent1", "review", "look", "--wait", "0.05")
+        request_id = next(iter(board(run).requests))
+        self.assertEqual(answer, refusal(f"timed out waiting for response to {request_id}", 5))
+        answer = shell(run, "agent2", "request", "agent1", "review", "look", "--wait", "soon")
+        self.assertEqual(answer, refusal("argument --wait: invalid float value: 'soon'", 2))
+        self.assertEqual(len(board(run).requests), 1)
 
 
 class Requests(unittest.TestCase):
@@ -411,11 +598,11 @@ class Requests(unittest.TestCase):
     def test_only_the_addressee_responds_and_only_once(self):
         request_id = text_of(self.run, "agent2", "request", recipient="agent1", kind="review", body="x")
         self.assertEqual(call(self.run, "agent3", "respond", request_id=request_id, body="no"),
-                         {"text": f"request {request_id} not addressed to agent3", "isError": True})
+                         refusal(f"request {request_id} not addressed to agent3", 7))
         self.assertEqual(text_of(self.run, "agent1", "respond", request_id=request_id, body="fine"), "")
         self.assertEqual(json.loads(text_of(self.run, "agent1", "pending")), [])
         self.assertEqual(call(self.run, "agent1", "respond", request_id=request_id, body="again"),
-                         {"text": f"unknown request {request_id}", "isError": True})
+                         refusal(f"unknown request {request_id}", 6))
 
     def test_a_waiting_request_gets_its_response(self):
         answers = {}
@@ -431,14 +618,14 @@ class Requests(unittest.TestCase):
         self.assertEqual(list(response), ["id", "from", "to", "body", "ts"])
         self.assertEqual((response["id"], response["body"]), (request_id, "approved"))
 
-    def test_a_wait_times_out_with_cooperbenchs_message(self):
+    def test_a_wait_times_out_with_cooperbenchs_message_and_code(self):
         answer = call(self.run, "agent2", "request", recipient="agent1", kind="k", body="b", wait=0.1)
         request_id = next(iter(board(self.run).requests))
-        self.assertEqual(answer, {"text": f"timed out waiting for response to {request_id}", "isError": True})
+        self.assertEqual(answer, refusal(f"timed out waiting for response to {request_id}", 5))
 
     def test_closing_the_run_ends_a_wait(self):
         hub = hub_module.Hub()
-        hub.create_run("team", [1, 2], {1: "a", 2: "b"}, run_id="closing")
+        hub.create_run("team", [1, 2], {1: "a", 2: "b"}, SHARED, run_id="closing")
         run = hub.hosted("closing").run
         answers = {}
         waiting = threading.Thread(target=lambda: answers.update(hub.call(
@@ -448,15 +635,14 @@ class Requests(unittest.TestCase):
         hub.close_run("closing")
         waiting.join(10)
         self.assertFalse(waiting.is_alive())
-        self.assertTrue(answers["isError"])
+        self.assertEqual((answers["isError"], answers["exitCode"]), (True, 5))
         self.assertTrue(answers["text"].startswith("timed out waiting for response to "))
 
     def test_a_request_to_nobody_or_with_a_bad_wait_is_refused(self):
         answer = call(self.run, "agent2", "request", recipient="agent9", kind="k", body="b")
-        self.assertEqual(answer, {"text": "no agent named 'agent9'; the agents are agent1, agent2, agent3",
-                                  "isError": True})
+        self.assertEqual(answer, refusal("no agent named 'agent9'; the agents are agent1, agent2, agent3", 1))
         answer = call(self.run, "agent2", "request", recipient="agent1", kind="k", wait="soon")
-        self.assertEqual(answer["text"], "argument --wait: invalid float value: 'soon'")
+        self.assertEqual(answer, refusal("argument --wait: invalid float value: 'soon'", 2))
         self.assertEqual(board(self.run).requests, {})
 
     def test_requests_are_audited_but_do_not_count_as_task_activity(self):
@@ -468,6 +654,147 @@ class Requests(unittest.TestCase):
         self.assertEqual(log[0]["request_kind"], "k")
         metrics = self.run.arm.metrics(self.run)
         self.assertEqual((metrics["claims_per_agent"], metrics["updates_per_agent"]), ({}, {}))
+
+
+# One session of the commands, run through this arm and through
+# coop_task.py over the same list: each step's exit code and output must
+# agree. <feature 7> and <request> stand for ids both sides share.
+PARITY_SESSION = [
+    ("agent3", ("claim", "<feature 7>")),
+    ("agent2", ("claim", "<feature 7>")),
+    ("agent2", ("claim", "<feature 7>")),
+    ("agent2", ("claim", "nope")),
+    ("agent2", ("claim",)),
+    ("agent1", ("update", "<feature 7>", "done")),
+    ("agent3", ("update", "<feature 7>", "finished")),
+    ("agent2", ("update", "<feature 7>", "finished")),
+    ("agent2", ("update", "nope", "done")),
+    ("agent2", ("update", "<feature 7>")),
+    ("agent2", ("update", "<feature 7>", "blocked", "-n", "need the API")),
+    ("agent2", ("update", "<feature 7>", "in_progress")),
+    ("agent2", ("list", "--mine")),
+    ("agent3", ("list", "--open")),
+    ("agent1", ("list", "--open", "--mine")),
+    ("agent2", ("update", "<feature 7>", "done", "--note", "patch at /workspace/shared/agent2.patch")),
+    ("agent1", ("list",)),
+    ("agent1", ("pending",)),
+    ("agent3", ("respond", "<request>", "no")),
+    ("agent1", ("respond", "<request>", "approved")),
+    ("agent1", ("respond", "<request>", "again")),
+    ("agent1", ("pending",)),
+    ("agent1", ("create",)),
+    ("agent1", ("create", "--assign", "agent2")),
+    ("agent2", ("request", "agent1", "review", "look", "--wait", "soon")),
+    ("agent2", ("request", "agent1", "review")),
+    ("agent2", ("request", "agent1", "review", "look", "--wait", "0.05")),
+    ("agent1", ("create", "--assign", "agent2", "Write the parser")),
+]
+
+TEN_HEX = re.compile(r"\b[0-9a-f]{10}\b")
+
+
+def seeded_redis(run):
+    """A FakeRedis holding the run's tasks and open requests as coop_task.py
+    stores them, under the same ids."""
+    fake, space = FakeRedis(), f"cb:{run.id}"
+    for task in board(run).tasks.values():
+        fake.hset(f"{space}:task:{task['id']}", mapping={**task, "metadata": json.dumps(task["metadata"])})
+        fake.sadd(f"{space}:tasks:all", task["id"])
+    for request in board(run).requests.values():
+        fake.hset(f"{space}:requests:open:{request['id']}", mapping=request)
+        fake.sadd(f"{space}:requests:by_recipient:{request['to']}", request["id"])
+    return fake
+
+
+def outcome(code, out, err):
+    """(exit code, what the command said): stdout on success, else the
+    message on stderr, argparse's without its usage line. Ids a step
+    makes afresh differ between the two sides, so they read as <id>."""
+    said = out if code == 0 else err.strip().splitlines()[-1].split(" error: ", 1)[-1]
+    return code, TEN_HEX.sub("<id>", said.strip())
+
+
+def run_coop_task(fake, run_id, agent, words):
+    out, err = io.StringIO(), io.StringIO()
+    environment = {"CB_TEAM_REDIS_URL": "redis://localhost:6379/0", "CB_TEAM_RUN_ID": run_id,
+                   "CB_TEAM_AGENT_ID": agent}
+    # A request or a response with no body reads stdin, which here is
+    # empty, as the shell side's is.
+    with mock.patch.object(COOP_TASK, "redis", types.SimpleNamespace(from_url=lambda url: fake)), \
+            mock.patch.dict(os.environ, environment), mock.patch.object(sys, "stdin", io.StringIO("")), \
+            contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        os.environ.pop("CB_TEAM_TASKS_DIR", None)
+        try:
+            code = COOP_TASK.main(list(words))
+        except SystemExit as stop:
+            code = stop.code
+    return outcome(code, out.getvalue(), err.getvalue())
+
+
+def run_ours(run, agent, words):
+    subcommand, *rest = words
+    tool = next(name for name, alias in ALIASES.items() if alias in (f"coop-task-{subcommand}", f"coop-{subcommand}"))
+    answer = shell(run, agent, tool, *rest)
+    return outcome(exit_code(answer), "" if answer["isError"] else answer["text"], answer["text"])
+
+
+@unittest.skipIf(COOP_TASK is None, NO_SOURCE)
+class CooperBenchsOwnCommands(unittest.TestCase):
+    def test_a_session_of_commands_exits_and_prints_as_coop_task_py_does(self):
+        _, run = new_run()
+        request_id = board(run).request("agent2", "agent1", "plan_approval", "may I take cli.py?")
+        names = {"<feature 7>": task_titled(run, "Implement feature 7")["id"], "<request>": request_id}
+        fake = seeded_redis(run)
+        codes = set()
+        for agent, words in PARITY_SESSION:
+            words = tuple(names.get(word, word) for word in words)
+            with self.subTest(agent=agent, words=words):
+                theirs = run_coop_task(fake, run.id, agent, words)
+                self.assertEqual(run_ours(run, agent, words), theirs)
+                codes.add(theirs[0])
+        self.assertEqual(codes, {0, 1, 2, 3, 4, 5, 6, 7})
+
+
+def exchange(url, body=None):
+    """GET the url, or POST body to it as JSON: (status, the JSON answer)."""
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    data = None if body is None else json.dumps(body).encode("utf-8")
+    request = urllib.request.Request(url, data=data, method="GET" if data is None else "POST",
+                                     headers={"Content-Type": "application/json"})
+    try:
+        with opener.open(request, timeout=10) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as problem:
+        with problem:
+            return problem.code, json.loads(problem.read())
+
+
+class OverHttp(unittest.TestCase):
+    def setUp(self):
+        self.server = hub_module.serve_in_background(hub_module.Hub())
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        self.base = self.server.hub.base_url
+
+    def create(self, options):
+        return exchange(f"{self.base}/api/runs", {"arm": "team", "features": [1, 2],
+                                                  "specs": {"1": "a", "2": "b"}, "options": options})
+
+    def test_rpc_lists_the_flags_and_answers_a_lost_claim_with_exit_code_2(self):
+        status, created = self.create(SHARED)
+        self.assertEqual(status, 201)
+        rpc = created["agents"][0]["rpc_url"]
+        status, described = exchange(rpc)
+        self.assertEqual({t["name"]: t["flags"] for t in described["tools"] if t["name"] in FLAGS}, FLAGS)
+        status, listed = exchange(rpc, {"tool": "task_list", "arguments": {"open": True}})
+        task_id = next(t["id"] for t in json.loads(listed["text"]) if t["owner"] == "agent2")
+        status, answer = exchange(rpc, {"tool": "task_claim", "arguments": {"task_id": task_id}})
+        self.assertEqual((status, answer), (200, refusal(f"task {task_id} owned by agent2", 2)))
+
+    def test_a_run_without_the_shared_directory_is_400(self):
+        status, answer = self.create({})
+        self.assertEqual(status, 400)
+        self.assertIn("shared_volume", answer["error"])
 
 
 class Prompts(unittest.TestCase):
@@ -506,7 +833,7 @@ class Prompts(unittest.TestCase):
     def test_a_team_of_one_gets_the_solo_prompt(self):
         self.assertEqual(self.prompts(features=(3,))["agent1"], SPECS[3] + RULE + SUBMISSION_BLOCK)
 
-    @unittest.skipIf(COOPERBENCH is None, "CooperBench's source is not here; set COOPERBENCH_DIR to its checkout")
+    @unittest.skipIf(COOPERBENCH is None, NO_SOURCE)
     def test_prompts_are_cooperbenchs_but_for_the_mcp_sentence(self):
         team, stand_ins = COOPERBENCH
         for git in (False, True):
@@ -557,7 +884,7 @@ class Metrics(unittest.TestCase):
 
     def test_closing_through_the_hub_answers_the_metrics(self):
         hub = hub_module.Hub()
-        hub.create_run("team", [1, 2], {1: "a", 2: "b"}, run_id="m")
+        hub.create_run("team", [1, 2], {1: "a", 2: "b"}, SHARED, run_id="m")
         self.assertEqual(hub.close_run("m")["tasks_total"], 2)
 
 

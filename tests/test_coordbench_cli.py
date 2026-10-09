@@ -1,8 +1,8 @@
 """The shell surface and the stdio bridge are what an agent without an HTTP
 MCP client sees of the hub, so these pin both against a small fake of the
 hub's /rpc and /mcp endpoints served on an ephemeral port: the commands'
-argument mapping and exit codes, the wrappers install writes, and the
-bridge's session handling, streaming, and errors."""
+argument mapping (argv and flags) and exit codes, the wrappers install
+writes, and the bridge's session handling, streaming, and errors."""
 
 import io
 import json
@@ -26,6 +26,7 @@ sys.path.insert(0, str(COORDBENCH))
 import cli  # noqa: E402
 
 TEXT = {"type": "string"}
+BOOLEAN = {"type": "boolean"}
 TOOLS = [
     {"name": "send_message", "description": "Send a message to one peer, by agent id.",
      "inputSchema": {"type": "object", "properties": {"to": TEXT, "text": TEXT}},
@@ -41,8 +42,22 @@ TOOLS = [
     {"name": "wait_for_message", "description": "Block until a message arrives.\nPrefer it to polling.",
      "inputSchema": {"type": "object", "properties": {"timeout_ms": {"type": "integer"}}},
      "alias": "", "argv": []},
-    {"name": "refuse", "description": "Always refuses.",
-     "inputSchema": {"type": "object", "properties": {}}, "alias": "", "argv": []},
+    {"name": "refuse", "description": "Always refuses, with the exit code it is given.",
+     "inputSchema": {"type": "object", "properties": {"code": {"type": "integer"}}},
+     "alias": "", "argv": ["code"]},
+    # The tools above are listed as by a hub that lists no flags, which
+    # must read as tools without any; these carry coop_task.py's options,
+    # as the team arm lists them.
+    {"name": "task_update", "description": "Set the status of a task you own.",
+     "inputSchema": {"type": "object", "properties": {"task_id": TEXT, "status": TEXT, "note": TEXT}},
+     "alias": "coop-task-update", "argv": ["task_id", "status"], "flags": {"-n": "note", "--note": "note"}},
+    {"name": "task_list", "description": "Every task on the list.",
+     "inputSchema": {"type": "object", "properties": {"mine": BOOLEAN, "open": BOOLEAN}},
+     "alias": "coop-task-list", "argv": [], "flags": {"--mine": "mine", "--open": "open"}},
+    {"name": "request", "description": "Send a typed request.",
+     "inputSchema": {"type": "object", "properties": {"recipient": TEXT, "kind": TEXT, "body": TEXT,
+                                                      "wait": {"type": "number"}}},
+     "alias": "coop-request", "argv": ["recipient", "kind", "body..."], "flags": {"--wait": "wait"}},
 ]
 PROMPT = "You are agent1. Implement feature 1."
 RPC_PATH = "/rpc/run1/agent1"
@@ -88,7 +103,12 @@ class FakeHub(BaseHTTPRequestHandler):
         if name not in {t["name"] for t in TOOLS}:
             return self.send_json(400, {"error": f"unknown tool {name!r}"})
         if name == "refuse":
-            return self.send_json(200, {"text": "not allowed", "isError": True})
+            # Without a code the answer has no exitCode, as from a hub
+            # that predates it; with one, the code is sent as given.
+            refusal = {"text": "not allowed", "isError": True}
+            if "code" in arguments:
+                refusal["exitCode"] = arguments["code"]
+            return self.send_json(200, refusal)
         echo = json.dumps({"tool": name, "arguments": arguments}, sort_keys=True)
         self.send_json(200, {"text": echo, "isError": False})
 
@@ -218,6 +238,21 @@ class CommandTest(HubTestCase):
                       "    Block until a message arrives.\n    Prefer it to polling.", out)
         self.assertIn("receive_messages  (shell: coop-recv)", out)
 
+    def test_tools_shows_each_tools_flags_before_its_words(self):
+        code, out, _ = run_cli("--url", self.rpc_url, "tools")
+        self.assertEqual(code, 0)
+        self.assertIn("task_update  (shell: coop-task-update [-n|--note <note>] <task_id> <status>)\n"
+                      "    Set the status of a task you own.", out)
+        self.assertIn("task_list  (shell: coop-task-list [--mine] [--open])\n", out)
+        self.assertIn("request  (shell: coop-request [--wait <wait>] <recipient> <kind> <body...>)\n", out)
+
+    def test_usage_offers_key_value_words_only_for_arguments_no_flag_sets(self):
+        tool = {"name": "list", "inputSchema": {"properties": {"mine": BOOLEAN, "limit": {"type": "integer"}}},
+                "flags": {"--mine": "mine"}}
+        self.assertEqual(cli.usage(tool), "coord-list [--mine] [key=value ...]")
+        tool["flags"]["--limit"] = "limit"
+        self.assertEqual(cli.usage(tool), "coord-list [--mine] [--limit <limit>]")
+
     def test_prompt_prints_the_agents_prompt(self):
         self.assertEqual(run_cli("--url", self.rpc_url, "prompt"), (0, PROMPT + "\n", ""))
 
@@ -250,8 +285,87 @@ class CommandTest(HubTestCase):
         self.assertIn("too many words; usage: coord-claim_task <task_id>", err)
         self.assertEqual(self.server.calls, [])
 
+    def test_flags_set_their_arguments_before_among_or_after_the_words(self):
+        for words in (["3", "done", "-n", "patch ready"],
+                      ["--note", "patch ready", "3", "done"],
+                      ["3", "--note=patch ready", "done"],
+                      ["3", "done", "-n=patch ready"]):
+            with self.subTest(words=words):
+                code, out, err = run_cli("--url", self.rpc_url, "alias-run", "task_update", *words)
+                self.assertEqual((code, err), (0, ""))
+                self.assertEqual(self.call_arguments(out),
+                                 {"task_id": "3", "status": "done", "note": "patch ready"})
+
+    def test_a_flag_whose_argument_is_a_boolean_is_a_switch(self):
+        for words, arguments in ((["--open", "--mine"], {"open": True, "mine": True}),
+                                 (["--mine"], {"mine": True}),
+                                 (["--mine=false"], {"mine": False}),
+                                 ([], {})):
+            with self.subTest(words=words):
+                code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "task_list", *words)
+                self.assertEqual((code, self.call_arguments(out)), (0, arguments))
+
+    def test_a_flag_takes_the_next_word_typed_by_the_schema_and_the_text_stays_whole(self):
+        for words, wait in ((["--wait", "10"], 10), (["--wait=0.5"], 0.5), (["--wait", "soon"], "soon")):
+            with self.subTest(words=words):
+                code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "request",
+                                       "agent1", "review", "look", "at", "this", *words)
+                self.assertEqual(code, 0)
+                self.assertEqual(self.call_arguments(out), {"recipient": "agent1", "kind": "review",
+                                                            "body": "look at this", "wait": wait})
+
+    def test_flags_leave_the_trailing_text_to_stdin(self):
+        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "request", "agent1", "review",
+                               "--wait", "5", stdin="the plan:\n- one\n")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.call_arguments(out), {"recipient": "agent1", "kind": "review",
+                                                    "body": "the plan:\n- one\n", "wait": 5})
+
+    def test_words_that_only_look_like_flags_stay_words(self):
+        # --note is another tool's flag and --waiting only starts like this
+        # one's; a message may start with a dash, and keeps it.
+        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "request", "agent1", "review",
+                               "-x", "--note", "--waiting=5", "-1")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.call_arguments(out)["body"], "-x --note --waiting=5 -1")
+        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "send_message", "agent2",
+                               "--wait", "for", "me")
+        self.assertEqual(self.call_arguments(out), {"to": "agent2", "text": "--wait for me"})
+        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "task_update", "3", "-blocked")
+        self.assertEqual(self.call_arguments(out), {"task_id": "3", "status": "-blocked"})
+
+    def test_a_flag_left_without_its_value_is_exit_2_and_calls_nothing(self):
+        self.assertEqual(run_cli("--url", self.rpc_url, "alias-run", "task_update", "3", "done", "-n"),
+                         (2, "", "coordbench: -n takes a value; usage: "
+                                 "coop-task-update [-n|--note <note>] <task_id> <status>\n"))
+        self.assertEqual(self.server.calls, [])
+
+    def test_words_left_over_after_the_flags_are_refused(self):
+        code, _, err = run_cli("--url", self.rpc_url, "alias-run", "task_update", "3", "done", "now",
+                               "-n", "a note")
+        self.assertEqual(code, 2)
+        self.assertIn("too many words; usage: coop-task-update [-n|--note <note>] <task_id> <status>", err)
+        code, _, err = run_cli("--url", self.rpc_url, "alias-run", "task_list", "--mine", "--all")
+        self.assertEqual(code, 2)
+        self.assertIn("expected key=value or one JSON object, got '--all'", err)
+        self.assertEqual(self.server.calls, [])
+
     def test_a_tool_error_goes_to_stderr_with_exit_1(self):
         self.assertEqual(run_cli("--url", self.rpc_url, "call", "refuse"), (1, "", "not allowed\n"))
+
+    def test_a_tool_error_exits_with_the_code_the_tool_gave(self):
+        # A ported command keeps its codes: coop-task-claim exits 2 when
+        # another agent holds the task. 0 is a code too, if an arm gives it.
+        for words, code in ((["call", "refuse", "code=2"], 2), (["alias-run", "refuse", "7"], 7),
+                            (["call", "refuse", '{"code": 0}'], 0)):
+            with self.subTest(words=words):
+                self.assertEqual(run_cli("--url", self.rpc_url, *words), (code, "", "not allowed\n"))
+
+    def test_a_code_no_shell_can_exit_with_reads_as_1(self):
+        for code in ('"2"', "true", "2.0", "256", "-1", "null"):
+            with self.subTest(code=code):
+                self.assertEqual(run_cli("--url", self.rpc_url, "call", "refuse", f'{{"code": {code}}}'),
+                                 (1, "", "not allowed\n"))
 
     def test_an_unreachable_hub_is_one_line_with_exit_2(self):
         code, out, err = run_cli("--url", closed_port_url(RPC_PATH), "call", "receive_messages")
@@ -291,8 +405,8 @@ class InstallTest(HubTestCase):
         code, _, _ = run_cli("install", str(self.bin_dir), "--url", self.rpc_url)
         self.assertEqual(code, 0)
         names = {p.name for p in self.bin_dir.iterdir()}
-        expected = {"coop-send", "coop-broadcast", "coop-recv"} | {f"coord-{t['name']}" for t in TOOLS}
-        self.assertEqual(names, expected)
+        aliases = {"coop-send", "coop-broadcast", "coop-recv", "coop-task-update", "coop-task-list", "coop-request"}
+        self.assertEqual(names, aliases | {f"coord-{t['name']}" for t in TOOLS})
         for path in self.bin_dir.iterdir():
             self.assertTrue(os.access(path, os.X_OK), path)
         script = (self.bin_dir / "coop-send").read_text().splitlines()
@@ -310,6 +424,12 @@ class InstallTest(HubTestCase):
         self.assertEqual(json.loads(piped.stdout)["arguments"], {"text": "piped text\n"})
         refused = self.run_command("coord-refuse")
         self.assertEqual((refused.returncode, refused.stdout, refused.stderr), (1, "", "not allowed\n"))
+        held = self.run_command("coord-refuse", "2")
+        self.assertEqual((held.returncode, held.stdout, held.stderr), (2, "", "not allowed\n"))
+        noted = self.run_command("coop-task-update", "-n", "waiting on agent1", "3", "blocked")
+        self.assertEqual(noted.returncode, 0, noted.stderr)
+        self.assertEqual(json.loads(noted.stdout)["arguments"],
+                         {"task_id": "3", "status": "blocked", "note": "waiting on agent1"})
 
     def test_wrappers_without_a_url_use_the_environment(self):
         os.environ["COORD_RPC_URL"] = self.rpc_url
