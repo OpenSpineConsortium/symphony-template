@@ -14,8 +14,8 @@ name: Template init
 # template repository itself, and on a push to any other branch, the job is
 # skipped, so the placeholders stay for the next copy. A push made with
 # GITHUB_TOKEN starts no workflow, so the first Checks run comes with the
-# first pull request, and the first Board run at the next hour or the first
-# issue or pull request a person opens.
+# first pull request, and the first Board run at the next six-hourly
+# fallback or the first issue or pull request a person opens.
 
 on:
   push:

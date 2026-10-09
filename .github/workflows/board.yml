@@ -31,7 +31,11 @@ name: Board
 # moment it is pushed and a merged claim's branch leaves the board when it
 # goes. The job is skipped in the template repository itself, for a push
 # to any other branch, and for a pull request from a fork, whose token is
-# read-only. The last step tells the coordinator routine the board moved,
+# read-only. A scheduled run carries no repository object to ask whether
+# this is the template, and GitHub reads the missing value as equal to
+# false, so the job starts there too; its first step then finds the marker
+# folder .template/, which only the template keeps (template-init deletes
+# it in every copy), and the run ends without writing anything. The last step tells the coordinator routine the board moved,
 # only when it did and the two secrets are set; it fails softly, so a
 # routine that did not answer never turns the board red.
 
@@ -76,7 +80,16 @@ jobs:
         with:
           ref: ${{ env.DEFAULT_BRANCH }}
 
+      - name: Stop in the template repository itself
+        id: gate
+        run: |
+          if [ -e .template/PENDING ]; then
+            echo "the template itself, or a copy not yet initialised; no board"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Fetch the previous board
+        if: steps.gate.outputs.skip != 'true'
         run: |
           # By name, so a checkout made for one branch gets it too; no board
           # yet is not a failure. It is only compared with, below.
@@ -84,6 +97,7 @@ jobs:
             || echo "no board branch yet"
 
       - name: Render the board and comment on waiting pull requests
+        if: steps.gate.outputs.skip != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -91,6 +105,7 @@ jobs:
 
       - name: Write the board to the branch board when it changed
         id: board
+        if: steps.gate.outputs.skip != 'true'
         env:
           GIT_AUTHOR_NAME: github-actions[bot]
           GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com

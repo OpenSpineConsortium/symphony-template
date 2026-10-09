@@ -5,8 +5,9 @@ branch while this file exists: it fills the names into every file except
 the workflows under .github/workflows/, which carry no placeholder because
 GitHub's own token may not write them, creates the labels, opens the issue
 "Set up this project", and deletes this folder. The workflow itself stays in
-the tree and does nothing once this file is gone. Nothing else reads this
-file.
+the tree and does nothing once this file is gone. The board workflow reads
+it too: a scheduled run cannot ask the event whether this is the template,
+so it stops when this file is here.
 
 In the template repository itself, tick "Template repository" under
 Settings, General before the first push; until then the workflow would run

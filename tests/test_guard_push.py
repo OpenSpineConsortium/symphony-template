@@ -59,27 +59,66 @@ class RefusalTest(unittest.TestCase):
     def test_detached_head_plain_push_passes(self):
         self.assertIsNone(refusal([], current=None))
 
+    def test_plus_refspec_is_a_forced_push(self):
+        self.assertIsNotNone(refusal(["origin", "+claude/7"]))
+        self.assertIsNotNone(refusal(["origin", "+claude/8"]))
+        self.assertIsNotNone(refusal(["origin", "+HEAD:claude/7"]))
+
+    def test_short_cluster_with_f_is_a_forced_push(self):
+        self.assertIsNotNone(refusal(["-uf", "origin", "claude/7"]))
+        self.assertIsNone(refusal(["-uq", "origin", "claude/7"]))
+
 
 class ParsingTest(unittest.TestCase):
     def test_compound_command_finds_the_push(self):
         commands = guard_push.simple_commands("git fetch origin && git push origin main")
-        pushes = [guard_push.push_arguments(argv) for argv in commands]
-        self.assertIn(["origin", "main"], pushes)
+        pushes = [guard_push.push_invocation(argv) for argv in commands]
+        self.assertIn((["origin", "main"], None), pushes)
 
     def test_quoted_text_is_not_a_push(self):
         commands = guard_push.simple_commands("echo 'git push origin main'")
-        self.assertTrue(all(guard_push.push_arguments(argv) is None for argv in commands))
+        self.assertTrue(all(guard_push.push_invocation(argv) is None for argv in commands))
 
     def test_redirection_target_is_not_a_refspec(self):
         commands = guard_push.simple_commands("git push origin claude/7 2>&1")
-        self.assertEqual(guard_push.push_arguments(commands[0]), ["origin", "claude/7"])
+        self.assertEqual(guard_push.push_invocation(commands[0]), (["origin", "claude/7"], None))
 
     def test_git_global_options_are_stepped_over(self):
-        self.assertEqual(guard_push.push_arguments(["git", "-C", "clone", "push", "origin", "x"]),
-                         ["origin", "x"])
+        self.assertEqual(guard_push.push_invocation(["git", "-C", "clone", "push", "origin", "x"]),
+                         (["origin", "x"], "clone"))
+
+    def test_dash_c_options_stack(self):
+        self.assertEqual(guard_push.push_invocation(["git", "-C", "a", "-C", "b", "push"]),
+                         ([], "a/b"))
 
     def test_other_git_verbs_are_not_pushes(self):
-        self.assertIsNone(guard_push.push_arguments(["git", "pull", "origin", "main"]))
+        self.assertIsNone(guard_push.push_invocation(["git", "pull", "origin", "main"]))
+
+    def test_a_newline_ends_a_command(self):
+        commands = guard_push.simple_commands("git add -A\ngit commit -m x\ngit push origin main")
+        self.assertEqual(commands[-1], ["git", "push", "origin", "main"])
+        self.assertEqual(len(commands), 3)
+
+    def test_a_comment_does_not_join_the_lines_around_it(self):
+        commands = guard_push.simple_commands("git status # look first\ngit push origin main")
+        self.assertEqual(commands, [["git", "status"], ["git", "push", "origin", "main"]])
+
+    def test_a_backslash_newline_joins_two_lines(self):
+        commands = guard_push.simple_commands("git push \\\n  origin main")
+        self.assertEqual(commands, [["git", "push", "origin", "main"]])
+
+    def test_a_heredoc_body_is_not_a_command(self):
+        commands = guard_push.simple_commands("cat > f <<'EOF'\ngit push origin main\nEOF\ngit status")
+        self.assertEqual(commands, [["cat"], ["git", "status"]])
+
+    def test_a_quoted_heredoc_message_then_a_push(self):
+        command = "git commit -m \"$(cat <<'EOF'\nClaim #7\n\nEOF\n)\" && git push -u origin claude/7"
+        pushes = [guard_push.push_invocation(argv) for argv in guard_push.simple_commands(command)]
+        self.assertIn((["-u", "origin", "claude/7"], None), pushes)
+
+    def test_cd_and_dash_c_move_where_a_push_runs(self):
+        found = guard_push.pushes_and_where("cd ../scratch && git push && git -C sub push", "/repo")
+        self.assertEqual(found, [([], "/repo/../scratch"), ([], "/repo/../scratch/sub")])
 
     def test_unparseable_command_yields_nothing(self):
         self.assertEqual(guard_push.simple_commands("git push 'unclosed"), [])
@@ -113,6 +152,31 @@ class MainTest(unittest.TestCase):
     def test_broken_payload_passes(self):
         with mock.patch.object(sys, "stdin", io.StringIO("not json")):
             self.assertEqual(guard_push.main(), 0)
+
+    def test_payload_that_is_not_an_object_passes(self):
+        with mock.patch.object(sys, "stdin", io.StringIO("[1, 2]")):
+            self.assertEqual(guard_push.main(), 0)
+
+    def test_push_to_main_on_a_later_line_is_refused(self):
+        code, message = self.run_main("git add -A\ngit commit -m x\ngit push origin main")
+        self.assertEqual(code, 2)
+        self.assertIn("pull requests", message)
+
+    def test_claim_push_then_a_fetch_of_main_passes(self):
+        code, _ = self.run_main("git push -u origin claude/7\ngit fetch origin main")
+        self.assertEqual(code, 0)
+
+    def test_plain_push_is_judged_where_it_runs(self):
+        def by_place(where):
+            return ("work", "main") if "scratch" in where else ("main", "main")
+        for command, expected in (("git -C ../scratch push", 0),
+                                  ("cd ../scratch && git push", 0),
+                                  ("git push", 2)):
+            payload = json.dumps({"tool_input": {"command": command}, "cwd": str(ROOT)})
+            with mock.patch.object(sys, "stdin", io.StringIO(payload)), \
+                 mock.patch.object(sys, "stderr", io.StringIO()), \
+                 mock.patch.object(guard_push, "branches", side_effect=by_place):
+                self.assertEqual(guard_push.main(), expected, command)
 
 
 if __name__ == "__main__":
