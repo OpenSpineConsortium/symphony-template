@@ -121,6 +121,22 @@ def fill_tree(root, mapping):
     return changed
 
 
+# The checkpoint a new copy starts with. The template's own repository
+# keeps its real checkpoint in .claude/session.md, for whoever continues
+# the template's work, and a copy must not inherit it.
+CHECKPOINT = ".claude/session.md"
+BLANK_CHECKPOINT = '# Session checkpoint\n\nNothing has been checkpointed yet. The checkpoint skill (.claude/skills/checkpoint) and `cswap checkpoint write` rewrite this file at the end of a session, with these sections.\n\n## Completed work\n\n(none yet)\n\n## Current state\n\n(none yet)\n\n## Remaining tasks\n\n(none yet)\n\n## Decisions\n\n(none yet)\n\n## Constraints\n\n(none yet)\n'
+
+
+def reset_checkpoint(root):
+    """Write the blank checkpoint over the template's own; the path when it changed."""
+    path = root / CHECKPOINT
+    if not path.exists() or path.read_text(encoding="utf-8") == BLANK_CHECKPOINT:
+        return []
+    path.write_text(BLANK_CHECKPOINT, encoding="utf-8")
+    return [CHECKPOINT]
+
+
 def remove_template_files(root):
     """Delete the marker folder; the paths removed."""
     removed = []
@@ -248,6 +264,8 @@ def main(argv=None):
             print(WORKFLOWS_NOTE)
         for path in remove_template_files(root):
             print(f"{path}: deleted")
+        for path in reset_checkpoint(root):
+            print(f"{path}: reset to a blank checkpoint")
         token = os.environ.get("GITHUB_TOKEN")
         if (args.create_labels or args.open_issue) and not token:
             raise InitError("GITHUB_TOKEN is not set; labels and the issue need it")
