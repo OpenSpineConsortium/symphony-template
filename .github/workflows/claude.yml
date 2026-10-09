@@ -9,7 +9,9 @@ name: Claude
 # account's plan limits and bills no API. Until the secret is set, every
 # run ends at the first step with a pointer and does nothing, so the
 # template works without it. The turn cap keeps one runaway mention from
-# spending the owner's five-hour window.
+# spending the owner's five-hour window. Without --allowedTools the action
+# grants only its own GitHub tools, so the session could not run git, gh or
+# the checks; the repository variable CLAUDE_ALLOWED_TOOLS overrides the list.
 
 on:
   issue_comment:
@@ -50,4 +52,6 @@ jobs:
         if: env.HAVE_TOKEN == 'true'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: --max-turns 50
+          claude_args: |
+            --max-turns 50
+            --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"

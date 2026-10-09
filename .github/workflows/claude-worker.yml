@@ -1,78 +1,117 @@
 name: Worker
 
-# The worker routine (docs/agents/routines/worker.md), run from Actions
-# instead of a claude.ai Project: on its schedule, carry the account's own
-# open claim forward, else take one unclaimed issue from the queue to a
-# draft pull request, under the same CLAUDE.md, rules and protocol as
-# every other session. Off until a person sets the repository variable
-# CLAUDE_WORKER to true (Settings, Secrets and variables, Actions,
-# Variables), so nothing spends minutes or plan limits unasked; it also
-# needs the secret CLAUDE_CODE_OAUTH_TOKEN (docs/setup/claude-action.md),
-# whose runs draw on the main account's subscription and bill no API.
-# A first cheap step asks GitHub whether there is anything to do, on
-# GITHUB_TOKEN alone, and the Claude session only starts when there is:
-# an empty queue costs seconds of a runner and no tokens. One run at a
-# time; a run left behind is not cancelled, it is the one doing the work.
+# The members of team mode (docs/agents/TEAM.md), and the worker routine
+# (docs/agents/routines/worker.md) run from Actions when there is no team.
+# The repository variable CLAUDE_TEAM names the members as a JSON list,
+# as in ["w1","w2","w3"], and one leg runs per member, in parallel; without
+# it one member named main runs, which is the plain worker and labels its
+# claims account:main, as the main account's routine would. Each leg first
+# asks tools/team.py what its member should do, on GITHUB_TOKEN alone: its
+# own claim that needs work, its pre-assigned task, its share of the
+# unclaimed blockers and todos, or nothing; only the first three start a
+# Claude session, so an idle team costs seconds of a runner and no usage,
+# and members asking at once are dealt different issues rather than race
+# for one. After a session, a leg that still has work dispatches itself
+# again (workflow_dispatch, which GITHUB_TOKEN may start), up to
+# CLAUDE_MAX_ROUNDS rounds in a row (6 if unset); the six-hourly schedule
+# picks up the rest. Such a run's actor is the github-actions bot, so the
+# action is told to accept it. Off until CLAUDE_WORKER is true; Claude
+# runs need the secret CLAUDE_CODE_OAUTH_TOKEN (docs/setup/claude-action.md)
+# and draw on the main account's subscription. One run at a time per
+# member.
 
 on:
   schedule:
     - cron: '43 */6 * * *'
-  workflow_dispatch: {}
-
-concurrency:
-  group: worker
-  cancel-in-progress: false
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: "One member to run; empty runs every member"
+        required: false
+        default: ""
+      round:
+        description: "How many rounds this member has run in a row"
+        required: false
+        default: "1"
 
 jobs:
   worker:
     if: vars.CLAUDE_WORKER == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: ${{ fromJSON(inputs.agent && format('["{0}"]', inputs.agent) || vars.CLAUDE_TEAM || '["main"]') }}
+    concurrency:
+      group: worker-${{ matrix.agent }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
       contents: write
       pull-requests: write
       issues: write
-      actions: read
+      checks: read
+      actions: write
       id-token: write
     env:
       HAVE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      AGENT: ${{ matrix.agent }}
+      CLAUDE_TEAM: ${{ vars.CLAUDE_TEAM }}
+      LABEL: ${{ vars.CLAUDE_TEAM != '' && format('agent:{0}', matrix.agent) || format('account:{0}', matrix.agent) }}
     steps:
-      - name: Ask GitHub whether there is anything to do
-        id: queue
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -eu
-          todo=$(gh issue list --repo "$REPO" --label todo --state open --json number --jq length)
-          claims=$(gh pr list --repo "$REPO" --state open --json headRefName \
-            --jq '[.[] | select(.headRefName | test("^claude/[0-9]+$"))] | length')
-          if [ "$todo" != "0" ] || [ "$claims" != "0" ]; then
-            echo "work=true" >> "$GITHUB_OUTPUT"
-            echo "$todo issue(s) in the queue, $claims open claim pull request(s)"
-          else
-            echo "work=false" >> "$GITHUB_OUTPUT"
-            echo "the queue is empty and no claim pull request is open; no session runs"
-          fi
-      - name: Point at the setup when the token is not there
-        if: steps.queue.outputs.work == 'true' && env.HAVE_TOKEN != 'true'
-        run: echo "The repository secret CLAUDE_CODE_OAUTH_TOKEN is not set; docs/setup/claude-action.md says how. Doing nothing."
       - uses: actions/checkout@v7
-        if: steps.queue.outputs.work == 'true' && env.HAVE_TOKEN == 'true'
         with:
           fetch-depth: 0
+      - name: Ask what this member should do
+        id: next
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          answer=$(python3 tools/team.py next --agent "$AGENT" --label "$LABEL")
+          echo "$AGENT: $answer"
+          echo "move=${answer%% *}" >> "$GITHUB_OUTPUT"
+          echo "issue=${answer##* }" >> "$GITHUB_OUTPUT"
+      - name: Point at the setup when the token is not there
+        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN != 'true'
+        run: echo "The repository secret CLAUDE_CODE_OAUTH_TOKEN is not set; docs/setup/claude-action.md says how. Doing nothing."
       - uses: anthropics/claude-code-action@v1
-        if: steps.queue.outputs.work == 'true' && env.HAVE_TOKEN == 'true'
+        id: claude
+        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: --max-turns 80
+          allowed_bots: "github-actions,claude"
+          claude_args: |
+            --max-turns 80
+            --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
           prompt: |
-            You are the worker on this repository, the account labelled account:main, running on a schedule. First read the board: git fetch origin board && git show origin/board:STATE.md; before the first board run that branch does not exist, and then you read the open issues and pull requests directly. Then follow CLAUDE.md and docs/agents/PROTOCOL.md, one issue this run, nothing else.
+            You are the member ${{ matrix.agent }} on this repository, under the claim protocol (docs/agents/PROTOCOL.md) and team mode (docs/agents/TEAM.md); your label is ${{ env.LABEL }}. This run: ${{ steps.next.outputs.move }} issue #${{ steps.next.outputs.issue }}, and nothing else.
 
-            1. If a claim of yours is open (a branch claude/<issue> whose issue carries account:main and is still open), carry it on instead of taking new work: read its pull request, checks and comments, fix what the check names, answer the comments, rebase on the default branch when the board said "main moved" (your own claim branch is the one place git push --force-with-lease is allowed), and finish as PROTOCOL.md's Finish section says. Then stop.
-            2. Otherwise take one issue: an unclaimed blocker first, else the lowest-numbered issue the Queue shows unclaimed. None free: say so in one line and stop. Too unclear to act on: ask on the issue, leave it unclaimed, stop.
-            3. Claim it as the protocol says: branch claude/<issue> from the default branch, the claim file docs/agents/claims/<issue>.md as the first and only commit, pushed; the labels claimed and account:main, the plan as a comment; a draft pull request at once with "Closes #<issue>".
-            4. Work in small commits with bash scripts/check.sh passing before every push; a fact worth keeping goes to docs/memory/ in the same pull request.
-            5. Done means: claim file deleted, "Closes #<issue>" in the body, checks green, the pull request marked ready and labelled in-review, one line saying what it does. Do not merge.
+            1. Read the issue and what has been said on it (gh issue view ${{ steps.next.outputs.issue }} --comments). If it names an epic ("Epic: #N"), read that epic, its plan and its comments first (gh issue view N --comments): the plan says which files your task owns and which belong to your peers, and the comments are where the lead and your peers settle questions. Stay inside your files.
+            2. take: claim it as the protocol says, with "- Account: ${{ matrix.agent }}" on the claim file: the branch claude/${{ steps.next.outputs.issue }} from the default branch, the claim file as its first and only commit, pushed; the labels claimed and ${{ env.LABEL }} on the issue; a draft pull request at once, with "Closes #${{ steps.next.outputs.issue }}". If the push is refused because the branch exists, another member or account has it: stop. carry: check out claude/${{ steps.next.outputs.issue }} and see from its pull request, checks and comments what is left.
+            3. While you work, look at your peers on origin: git fetch origin, then the other open claude/ branches of the same epic, so your code meets theirs at the interfaces the plan names instead of colliding with them. When the default branch has moved, merge it into your branch (git merge origin/<default branch>) and resolve what conflicts; do not rebase, so no forced push is ever needed.
+            4. Work in small commits with bash scripts/check.sh passing before every push.
+            5. If only a peer or the lead can unblock you, say on the epic exactly what you need, then add the label blocked to your issue, which calls the lead, and stop.
+            6. Done: delete the claim file, make sure the pull request says "Closes #${{ steps.next.outputs.issue }}" and the checks pass, mark it ready, add the label in-review, and turn on auto-merge with gh pr merge --auto --merge; if the repository does not allow auto-merge, leave the merge to the owner.
 
-            Never push to another account's branch, never to the default branch; never force-push anything but your own claim after a rebase; never close an issue that is not done; never write a credential anywhere. Plain prose, no emoji. Nothing to do: say so in one line.
+            Never push to another member's or account's branch or to the default branch; never force-push; never close an issue that is not done; never write a credential anywhere. Plain prose, no emoji.
+      - name: Go another round while this member has work
+        if: steps.claude.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          ROUND: ${{ inputs.round || '1' }}
+          MAX_ROUNDS: ${{ vars.CLAUDE_MAX_ROUNDS || '6' }}
+        run: |
+          set -eu
+          if [ "$ROUND" -ge "$MAX_ROUNDS" ]; then
+            echo "$AGENT ran $ROUND rounds in a row; the schedule picks up the rest"
+            exit 0
+          fi
+          answer=$(python3 tools/team.py next --agent "$AGENT" --label "$LABEL")
+          if [ "$answer" = "none" ]; then
+            echo "$AGENT has nothing left"
+            exit 0
+          fi
+          gh workflow run claude-worker.yml --repo "$GITHUB_REPOSITORY" -f agent="$AGENT" -f round="$((ROUND + 1))"
+          echo "$AGENT: round $((ROUND + 1)) dispatched for '$answer'"

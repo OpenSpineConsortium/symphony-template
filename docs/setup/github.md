@@ -21,7 +21,7 @@ Under General, turn on "Automatically delete head branches", so a merged claim b
 
 ## 2. Labels
 
-template-init created five labels: todo (the queue), claimed, in-review, blocker and account:main (the main Claude account). Check them under Issues, Labels. To add an account, add a label `account:<name>` there, give the account a row with the same name in docs/agents/OWNERSHIP.md, and the account puts the label on each issue it claims. Nothing else about an account is recorded anywhere.
+template-init created seven labels: todo (the queue), claimed, in-review, blocker, account:main (the main Claude account), and the two team mode uses, epic and blocked (docs/agents/TEAM.md); a team member's agent:<name> label is made when the lead first assigns it a task or the member first takes one. Check them under Issues, Labels. To add an account, add a label `account:<name>` there, give the account a row with the same name in docs/agents/OWNERSHIP.md, and the account puts the label on each issue it claims. Nothing else about an account is recorded anywhere.
 
 ## 3. Install the Claude GitHub App
 
