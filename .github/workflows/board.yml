@@ -44,7 +44,12 @@ on:
   issues:
     types: [opened, edited, closed, reopened, labeled, unlabeled]
   schedule:
-    - cron: "17 * * * *"
+    # The cron is a fallback for a missed webhook, not the engine: the
+    # event triggers above carry every real change. Four runs a day cost
+    # a private repository about 120 billed minutes a month where hourly
+    # cost about 750, over a third of the Free plan's 2,000
+    # (docs/setup/tiers.md); a public repository pays nothing either way.
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:

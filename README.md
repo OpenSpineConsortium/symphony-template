@@ -6,7 +6,7 @@ This repository is a Claude project kept as files: the instructions, the goal, t
 
 About ten minutes, in this order.
 
-1. Press "Use this template" on the template's GitHub page, name the new repository and choose where it lives. A public repository can protect its default branch on GitHub Free; a private one needs a paid plan for that (docs/setup/github.md says more).
+1. Press "Use this template" on the template's GitHub page, name the new repository and choose where it lives. A public repository can protect its default branch on GitHub Free; a private one needs a paid plan for that. docs/setup/tiers.md lays out what each GitHub and Claude plan actually unlocks here, with the three spending profiles; docs/setup/github.md has the settings themselves.
 2. Wait for the issue "Set up this project" to appear on the new repository. The first push runs .github/workflows/template-init.yml, which fills the names into every file except the workflows, creates the labels and opens that issue; it lists what is left to do by hand, and you close it when you are done. If the issue has not appeared after a few minutes, open the repository's Actions tab. When the run failed or Actions are off, do it by hand: clone, run `GITHUB_TOKEN=$(gh auth token) python3 tools/template_init.py --repo OWNER/NAME --default-branch main --create-labels --open-issue`, commit everything it changed and push.
 3. Protect the default branch and install the Claude GitHub App on the repository, as docs/setup/github.md describes. Every Claude Code thread that works here needs the app.
 4. Make one thin Project per Claude account, link this repository as its only resource, and leave its instructions, description and memory blank. Every Claude Code session, a thread of the Project or a cloud session opened on the repository alike, starts from a fresh clone and loads CLAUDE.md with what it imports (the goal, the protocol, the memory index), the rules, the skills and the board, so blank fields lose nothing, and a merged pull request changes what every account's sessions read at once. Only if people will also chat in the Project outside a code session, paste the pointer text from docs/setup/claude-project.md into the instructions, once: a chat has no clone, and the pointer never changes. Projects are in public beta on Pro and Max plans and are reaching accounts gradually; Team and Enterprise plans do not have them yet.
@@ -38,11 +38,11 @@ cswap is the optional multi-account switcher (claude-swap-cloud on PyPI); its `c
 This is the first layer: the repository as the shared plane, with the board, the claim protocol and the memory as plain files. Nothing below exists yet, and nothing in this layer refers to it.
 
 - Layer 2 adds a materialize step that turns a session's checkpoint or a routine's export branch into docs/memory/ and docs/history/ by pull request; CLAUDE.md stays the loader and is never generated.
-- Layer 3 adds Linear as the queue (the labels map to Linear states) and, for a repository whose owner accepts an API key there, claude-code-action; this repository stays without one.
+- Layer 3 adds Linear as the queue (the labels map to Linear states). claude-code-action already runs here on a subscription token (docs/setup/claude-action.md), and the repository stays without an API key.
 - Layer 4 adds cswap teleport --checkpoint between accounts.
 
 ## What this never does
 
 - Nothing here scripts claude.ai, and nothing writes into a Project's instructions, description or memory. Anthropic's consumer terms forbid automated access except through an API key or where Anthropic explicitly permits it; routines and cloud threads are Anthropic's own features, used as offered, and Claude Code reads the repository natively. The Project links the repository, and people press the buttons.
-- No credential and no token is kept in the repository. The workflows run on GitHub's own token; the one optional pair of secrets is the coordinator routine's trigger, kept in the repository's settings and never in a file (docs/setup/github.md).
+- No credential and no token is kept in the repository. The workflows run on GitHub's own token; the optional secrets are the coordinator routine's trigger pair and the main account's subscription token for @claude (docs/setup/claude-action.md), kept in the repository's settings and never in a file (docs/setup/github.md).
 - No API key anywhere.

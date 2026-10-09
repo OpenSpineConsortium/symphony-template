@@ -13,7 +13,7 @@ A template repository copies files only. The new repository gets none of the tem
 
 The rule must target only {{DEFAULT_BRANCH}}. The board is the file STATE.md on the branch `board`, one commit that .github/workflows/board.yml force-pushes anew on every run that changed it (read it with `git fetch origin board && git show origin/board:STATE.md`); a ruleset over all branches would block that push and leave the board stale. Nothing of the board ever lands on {{DEFAULT_BRANCH}}, so the rules above never stand in its way, and no board commit moves the default branch under an open pull request.
 
-GitHub offers branch protection and rulesets on a private repository only on a paid plan; on GitHub Free the repository must be public for them to apply. Without them the protocol still works, but nothing stops a push straight to {{DEFAULT_BRANCH}}.
+GitHub offers branch protection and rulesets on a private repository only on a paid plan; on GitHub Free the repository must be public for them to apply. Without them the protocol still works, but nothing stops a push straight to {{DEFAULT_BRANCH}}. docs/setup/tiers.md lays out the whole ladder: what each plan unlocks, and the three spending profiles this template is designed for.
 
 Under General, turn on "Automatically delete head branches", so a merged claim branch goes away on its own.
 
