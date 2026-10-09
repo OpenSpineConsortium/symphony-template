@@ -1,7 +1,10 @@
 # Session checkpoint
 
-Written 2026-10-09 by the main account's cloud session. Read this first,
-then experiment/README.md and docs/history/experiment-research/README.md.
+Written 2026-10-09 by the main account's cloud session. This is the full
+checkpoint of the work on claude/10; main's own .claude/session.md points
+here. Read this first, then experiment/README.md,
+experiment/coordbench/README.md (the plug-in contract) and
+experiment/coordbench/REVIEW.md (what to fix first).
 
 ## Completed work
 
