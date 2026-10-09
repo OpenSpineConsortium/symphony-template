@@ -18,13 +18,19 @@ too.
 
 ## Steps, once, by the main account
 
-1. On a machine where Claude Code is signed in to the main account, run
-   `claude setup-token` and approve it in the browser. It prints a token
-   good for about a year and saves it nowhere.
+One OAuth flow does everything: on a machine where Claude Code is signed
+in to the main account, run `/install-github-app`, pick this repository,
+and approve the browser flow it opens. It installs the Claude GitHub App
+and writes the repository secret CLAUDE_CODE_OAUTH_TOKEN itself, so no
+token is ever copied by hand. The workflow is already on
+{{DEFAULT_BRANCH}}; the next @claude mention runs it.
+
+By hand, where that command is not at hand:
+
+1. Run `claude setup-token` and approve it in the browser. It prints a
+   token good for about a year and saves it nowhere.
 2. Put the token in the repository secret CLAUDE_CODE_OAUTH_TOKEN, under
    https://github.com/{{REPO}}/settings/secrets/actions.
-3. Nothing else. The workflow is already on {{DEFAULT_BRANCH}}; the next
-   @claude mention runs it.
 
 ## What a run costs
 
