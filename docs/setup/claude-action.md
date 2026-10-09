@@ -59,6 +59,28 @@ workflow" to try it once. An account that already runs the worker as a
 claude.ai routine does not need this one too: pick either, not both, or
 they will race for the same queue under the same account label.
 
+## Team mode, optional
+
+A team is a lead and members running in parallel (docs/agents/TEAM.md).
+To turn it on, besides the token above:
+
+1. Set the repository variables CLAUDE_TEAM to the members' names as a
+   JSON list, as in ["w1","w2","w3"], and CLAUDE_WORKER to true, under
+   https://github.com/{{REPO}}/settings/variables/actions.
+2. Under Settings, General, turn on "Allow auto-merge", so a member's
+   finished pull request lands by itself when the check passes. Turning
+   off "Require branches to be up to date" in the default branch's
+   rules saves a run per member each time another lands; the lead's
+   integration pass then checks the whole.
+3. Open an issue describing the work and label it epic.
+
+CLAUDE_MAX_ROUNDS (6 if unset) bounds how many rounds a member runs in a
+row, and CLAUDE_ALLOWED_TOOLS replaces the tools the sessions may use
+when a project's checks need more than git, gh, python3 and
+scripts/check.sh. Every member and the lead draw on the main account's
+one usage window, so three members spend it about three times as fast
+as one session.
+
 ## Keeping the token
 
 Treat the token like a password: it is the main account's subscription.

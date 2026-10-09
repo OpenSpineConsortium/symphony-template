@@ -158,10 +158,11 @@ class Init(unittest.TestCase):
 
 
 class Labels(unittest.TestCase):
-    def test_the_five_labels_and_their_colours(self):
+    def test_the_seven_labels_and_their_colours(self):
         self.assertEqual(
             [(name, color) for name, color, _ in template_init.LABELS],
-            [("todo", "0e8a16"), ("claimed", "fbca04"), ("in-review", "1d76db"), ("blocker", "b60205"), ("account:main", "5319e7")],
+            [("todo", "0e8a16"), ("claimed", "fbca04"), ("in-review", "1d76db"), ("blocker", "b60205"),
+             ("account:main", "5319e7"), ("epic", "8b5cf6"), ("blocked", "e99695")],
         )
 
     def test_already_exists_reads_the_422(self):
@@ -169,9 +170,9 @@ class Labels(unittest.TestCase):
         self.assertFalse(template_init.already_exists({"errors": [{"code": "invalid"}]}))
         self.assertFalse(template_init.already_exists(None))
 
-    def test_the_setup_issue_links_the_eight_pages(self):
+    def test_the_setup_issue_links_the_nine_pages(self):
         body = template_init.setup_issue_body("octo/widgets", "main")
-        for page in ("docs/setup/github.md", "docs/setup/claude-action.md", "docs/setup/claude-project.md", "docs/agents/routines/worker.md", "docs/agents/routines/coordinator.md", "docs/project.md", "docs/agents/OWNERSHIP.md", "docs/setup/tiers.md"):
+        for page in ("docs/setup/github.md", "docs/setup/claude-action.md", "docs/setup/claude-project.md", "docs/agents/routines/worker.md", "docs/agents/TEAM.md", "docs/agents/routines/coordinator.md", "docs/project.md", "docs/agents/OWNERSHIP.md", "docs/setup/tiers.md"):
             self.assertIn(f"https://github.com/octo/widgets/blob/main/{page}", body)
         self.assertIn("bash scripts/check.sh", body)
         self.assertIn("ruleset-main.json", body)

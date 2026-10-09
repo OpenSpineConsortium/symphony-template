@@ -1,0 +1,143 @@
+name: Lead
+
+# The lead of team mode, the chief of staff (docs/agents/TEAM.md). When
+# an issue is labelled epic, Claude reads it and the code and returns a
+# plan as JSON: who owns which files, and the interfaces between them;
+# tools/team.py then writes the plan into the epic, opens one task per
+# member named in the repository variable CLAUDE_TEAM, labelled todo and
+# agent:<member>, and starts the members (claude-worker.yml). When the
+# last task of an epic closes, Claude runs once more to integrate: it
+# checks the default branch as a whole and fixes what the pieces broke
+# together. Everything that needs no judgement runs without Claude: the
+# route job asks tools/team.py what an event calls for, so a closed
+# issue outside any epic costs a few seconds of a runner and no usage.
+# Off until CLAUDE_TEAM is set; Claude runs need the secret
+# CLAUDE_CODE_OAUTH_TOKEN (docs/setup/claude-action.md) and draw on the
+# main account's subscription. One lead run at a time.
+
+on:
+  issues:
+    types: [labeled, closed]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "The epic's issue number"
+        required: true
+      event:
+        description: "labeled to plan it, closed to integrate it"
+        required: true
+        default: labeled
+
+concurrency:
+  group: lead
+  cancel-in-progress: false
+
+jobs:
+  route:
+    if: >-
+      vars.CLAUDE_TEAM != ''
+      && (github.event_name == 'workflow_dispatch'
+          || (github.event.action == 'labeled' && github.event.label.name == 'epic')
+          || (github.event.action == 'closed' && contains(github.event.issue.body, 'Epic: #')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      phase: ${{ steps.route.outputs.phase }}
+      epic: ${{ steps.route.outputs.epic }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Ask what this event calls for
+        id: route
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name == 'workflow_dispatch' && inputs.event || github.event.action }}
+          ISSUE: ${{ inputs.issue || github.event.issue.number }}
+        run: |
+          set -eu
+          answer=$(python3 tools/team.py route --event "$EVENT" --issue "$ISSUE" --label epic)
+          echo "$answer"
+          echo "phase=${answer%% *}" >> "$GITHUB_OUTPUT"
+          echo "epic=${answer##* }" >> "$GITHUB_OUTPUT"
+
+  plan:
+    needs: route
+    if: needs.route.outputs.phase == 'plan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      actions: write
+      id-token: write
+    env:
+      HAVE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      EPIC: ${{ needs.route.outputs.epic }}
+    steps:
+      - name: Point at the setup when the token is not there
+        if: env.HAVE_TOKEN != 'true'
+        run: echo "The repository secret CLAUDE_CODE_OAUTH_TOKEN is not set; docs/setup/claude-action.md says how. Doing nothing."
+      - uses: actions/checkout@v7
+        if: env.HAVE_TOKEN == 'true'
+      - uses: anthropics/claude-code-action@v1
+        id: lead
+        if: env.HAVE_TOKEN == 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(git log:*)"
+            --json-schema '{"type":"object","properties":{"plan":{"type":"string"},"tasks":{"type":"array","minItems":1,"items":{"type":"object","properties":{"title":{"type":"string"},"owner":{"type":"string"},"files":{"type":"array","items":{"type":"string"}},"body":{"type":"string"}},"required":["title","owner","files","body"]}}},"required":["plan","tasks"]}'
+          prompt: |
+            You are the team lead, the chief of staff, for epic #${{ needs.route.outputs.epic }} on this repository. The members are ${{ vars.CLAUDE_TEAM }}. Read the epic (gh issue view ${{ needs.route.outputs.epic }}), CLAUDE.md, docs/agents/TEAM.md, and the code the epic touches.
+
+            Plan to avoid collisions. Divide the epic into at most one task per member, fewer when the epic is small; give each task a disjoint set of files to own; where two tasks meet, write the interface between them (names, signatures, data shapes) into both tasks, so each member can build against it before the other lands. Each task's body says what to build, the interface it provides and the one it uses, and how to know it is done: the tests that must pass. Owners are member names from the list above.
+
+            Do not change any file and do not open any issue: return the plan as the JSON your output schema asks for, and a script opens the tasks. Its plan field is one or two paragraphs the members read first: who owns what, why, and in what order the pieces land. Plain prose, no emoji.
+      - name: Open the tasks and start the members
+        if: env.HAVE_TOKEN == 'true' && steps.lead.outputs.structured_output != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          CLAUDE_TEAM: ${{ vars.CLAUDE_TEAM }}
+          PLAN: ${{ steps.lead.outputs.structured_output }}
+        run: |
+          set -eu
+          printf '%s' "$PLAN" > "$RUNNER_TEMP/plan.json"
+          python3 tools/team.py seed --epic "$EPIC" --plan "$RUNNER_TEMP/plan.json"
+          gh workflow run claude-worker.yml --repo "$GITHUB_REPOSITORY"
+
+  integrate:
+    needs: route
+    if: needs.route.outputs.phase == 'integrate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+      id-token: write
+    env:
+      HAVE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+    steps:
+      - name: Point at the setup when the token is not there
+        if: env.HAVE_TOKEN != 'true'
+        run: echo "The repository secret CLAUDE_CODE_OAUTH_TOKEN is not set; docs/setup/claude-action.md says how. Doing nothing."
+      - uses: actions/checkout@v7
+        if: env.HAVE_TOKEN == 'true'
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        if: env.HAVE_TOKEN == 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --max-turns 60
+            --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
+          prompt: |
+            You are the team lead, the chief of staff, and every task of epic #${{ needs.route.outputs.epic }} is closed. Integration is the whole point of your job now: every task can pass alone while the whole fails. Read the epic and its plan (gh issue view ${{ needs.route.outputs.epic }}), CLAUDE.md and docs/agents/TEAM.md.
+
+            On the default branch, freshly fetched, run bash scripts/check.sh and every test the epic and its tasks name. If everything passes and the epic's spec is met, comment a short summary on the epic (what landed, in which pull requests) and close it. If anything fails, fix it under the claim protocol (docs/agents/PROTOCOL.md) on the branch claude/${{ needs.route.outputs.epic }}: claim, draft pull request with "Closes #${{ needs.route.outputs.epic }}", the fix with the checks passing, then mark it ready and turn on auto-merge with gh pr merge --auto --merge; the epic closes when it lands. Never push to the default branch or to another member's branch. Plain prose, no emoji.
