@@ -26,7 +26,7 @@ Every account's Project uses the same model and the same effort, so the work rea
 
 ## Worker routine
 
-The first thread of each account's Project makes the worker routine (docs/agents/routines/worker.md, .claude/skills/bootstrap) unless the line below says none.
+The worker routine (docs/agents/routines/worker.md) is the one part of a Project's setup that no import places: it is made in each account's Project, by hand or by the bootstrap card (.claude/skills/bootstrap), unless the line below says none.
 
 - Worker routine: hourly
 

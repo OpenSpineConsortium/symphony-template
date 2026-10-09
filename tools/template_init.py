@@ -3,8 +3,10 @@
 "Use this template" copies the files with their placeholders still in them.
 This script, run once by .github/workflows/template-init.yml on the first
 push, fills the five placeholders in every text file outside
-.github/workflows/, removes the marker folder .template/ and, with a token,
-makes the labels the board uses and opens the "Set up this project" issue.
+.github/workflows/, writes export.json again (tools/project_export.py: the
+names and the sizes it lists change with the fill), removes the marker
+folder .template/ and, with a token, makes the labels the board uses and
+opens the "Set up this project" issue.
 The workflows are never written: they carry no placeholder, and the
 GITHUB_TOKEN the workflow runs with may not create, change or delete a file
 under .github/workflows/, so the init workflow stays in the tree and ends
@@ -24,6 +26,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+
+import project_export
 
 API = "https://api.github.com"
 API_VERSION = "2022-11-28"
@@ -239,6 +243,8 @@ def main(argv=None):
             print(f"{path}: filled")
         if filled:
             print(WORKFLOWS_NOTE)
+        if (root / project_export.CLAUDE_MD).is_file() and project_export.write(root):
+            print(f"{project_export.MANIFEST}: written")
         for path in remove_template_files(root):
             print(f"{path}: deleted")
         token = os.environ.get("GITHUB_TOKEN")

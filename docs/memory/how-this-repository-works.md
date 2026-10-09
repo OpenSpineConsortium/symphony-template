@@ -11,9 +11,10 @@ A claude.ai Project belongs to one account, and its memory is private to that ac
 - docs/agents/OWNERSHIP.md: which account owns which area.
 - docs/agents/routines/coordinator.md: the prompt of the one routine, on the main account, that keeps the queue and the claims tidy.
 - docs/history/: where longer records will go; today it holds only its README.
-- .claude/skills/: the three procedures, claim, remember and checkpoint.
-- scripts/check.sh and tools/: the checks CI runs as "check", the board's renderer, the template's one-time initialiser and the marker-section helper the checkpoint skill uses.
+- .claude/skills/: the procedures: claim, remember and checkpoint, which a piece of work meets in that order, and bootstrap, which sets a Project up through a card when it was linked without the import below.
+- export.json: the repository described as a cswap project export, written by tools/project_export.py from the files above and kept current by the checks, so an account sets its claude.ai Project up by importing the repository in the browser with one click and no Claude prompt: the Goal as the description, the pointer text as the instructions, docs/memory/ as the memory, this repository linked.
+- scripts/check.sh and tools/: the checks CI runs as "check", the board's renderer, the export writer, the template's one-time initialiser and the marker-section helper the checkpoint skill uses.
 
-The claude.ai Project is thin on purpose: it links the repository, its instructions say to read CLAUDE.md, and nothing scripts it. Nothing in this repository holds a credential or a token, and no API key is used anywhere.
+The claude.ai Project is thin on purpose: it links the repository, its instructions say to read CLAUDE.md, and nothing here runs against claude.ai on its own; the one program that writes into a Project is cswap's import, run by the person in their own browser. Nothing in this repository holds a credential or a token, and no API key is used anywhere.
 
 Source: the template this repository was made from, its first layer.

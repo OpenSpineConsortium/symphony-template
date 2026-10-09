@@ -4,15 +4,15 @@ This repository is a Claude project kept as files: its instructions, its goal, i
 
 ## Read first
 
-- docs/project.md: the goal, the scope and who owns what.
-- The board: the file STATE.md on the branch `board`, rewritten by the board workflow from the open issues, the claim branches and the pull requests. Read it with `git fetch origin board && git show origin/board:STATE.md`; the session hook prints it at the start of every session, and docs/agents/STATE.md on {{DEFAULT_BRANCH}} only describes it.
-- docs/agents/PROTOCOL.md: how work is claimed, done in the open and finished.
+- The goal, the scope and who owns what, loaded into every session by this line: @docs/project.md
+- How work is claimed, done in the open and finished, loaded the same way: @docs/agents/PROTOCOL.md
+- The board: the file STATE.md on the branch `board`, rewritten by the board workflow from the open issues, the claim branches and the pull requests. It lives on another branch, which no import reaches: read it with `git fetch origin board && git show origin/board:STATE.md`; the session hook prints it at the start of every session, and docs/agents/STATE.md on {{DEFAULT_BRANCH}} only describes it.
 
 Before any work: fetch, read the board, check the claim on the issue you mean to take. One issue, one branch `claude/<issue>`, one pull request.
 
-## When this repository is linked to a Project
+## The Project this repository is linked to
 
-If you are a thread of a claude.ai Project whose instructions do not contain "Read CLAUDE.md first", the Project was just linked and is not set up yet: run the bootstrap skill (.claude/skills/bootstrap) before anything else, then carry on with what you were started for. It composes the Project's instructions, memory and worker routine from the repository's files and has the Project's own Claude offer them as one card, applied on the person's tap, so the person types nothing. A terminal session has no Project and skips this.
+A claude.ai Project is set up from this repository with cswap's import and no Claude prompt: export.json at the root describes the repository as a project export (tools/project_export.py writes it from the files, scripts/check.sh keeps it current), and the person imports it in their own browser with one click, as docs/setup/claude-project.md says. If you are a thread of a Project whose instructions do not contain "Read CLAUDE.md first", that import was skipped: run the bootstrap skill (.claude/skills/bootstrap) before anything else, which has the Project's own Claude offer the same setup as one card, applied on the person's tap, then carry on with what you were started for. A terminal session has no Project and skips this.
 
 ## Shared memory
 
@@ -25,7 +25,7 @@ A fact worth keeping is one file under docs/memory/ with one index line in MEMOR
 - The board first (.claude/rules/board.md): fetch, read the board (STATE.md on the branch `board`) and PROTOCOL.md, check the claim; never push to another account's branch; never force-push the default branch or any branch that is not your own claim.
 - Memory (.claude/rules/memory.md): one fact per file, a kebab-case name, a one-line description first, one index line; never a secret.
 - Writing (.claude/rules/writing.md): plain prose that says why, short functions, names that read as English, no emoji, ASCII and LF, no new dependencies; tag a durable fact in conversation as Decision: or Constraint: so a checkpoint keeps it.
-- Skills: .claude/skills/bootstrap sets a Project up from the repository; .claude/skills/claim, .claude/skills/remember and .claude/skills/checkpoint are the three procedures a piece of work meets, in that order.
+- Skills: .claude/skills/bootstrap sets a Project up from the repository when the import was skipped; .claude/skills/claim, .claude/skills/remember and .claude/skills/checkpoint are the three procedures a piece of work meets, in that order.
 - The block at the end of this file, between the cswap markers, is rewritten by the checkpoint skill and by `cswap checkpoint write`; do not edit it by hand.
 
 ## Checks

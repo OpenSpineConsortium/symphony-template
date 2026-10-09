@@ -1,11 +1,11 @@
 ---
 name: bootstrap
-description: Use at the start of a thread of a claude.ai Project that links this repository, when the Project's instructions do not yet contain "Read CLAUDE.md first", to have the Project set up from the repository's files with one tap and no typing.
+description: Use at the start of a thread of a claude.ai Project that links this repository, when the Project's instructions do not yet contain "Read CLAUDE.md first" (the import of export.json was skipped), to have the Project set up from the repository's files with one tap and no typing.
 ---
 
 # Set the Project up from the repository
 
-Linking this repository to a claude.ai Project is all a person does. claude.ai copies nothing from a linked repository by itself; what usually follows is that the Project's own Claude starts a first thread, and that thread, reading CLAUDE.md, finds this skill. The Project's own Claude never reads the repository: it knows the Project only from the Project's instructions, its chat and its memory, so without the instructions it cannot tell what "take the next issue from the board" means. The files decide what the Project gets; this thread composes it; the Project's own Claude offers it as one card in the project chat and applies it on the person's tap, because a Project's settings change only with the person's word. A claude.ai project has, of its own, a description, instructions, a memory of path-named entries, files and threads (cswap's export lists the same parts); the table says where each comes from here.
+The usual way to set a Project up from this repository is cswap's import of export.json, which the person runs in their own browser with one click and no Claude prompt (docs/setup/claude-project.md). This skill is for a Project that was linked without that import. claude.ai copies nothing from a linked repository by itself; what usually follows a link is that the Project's own Claude starts a first thread, and that thread, reading CLAUDE.md, finds this skill. The Project's own Claude never reads the repository: it knows the Project only from the Project's instructions, its chat and its memory, so without the instructions it cannot tell what "take the next issue from the board" means. The files decide what the Project gets; this thread composes it; the Project's own Claude offers it as one card in the project chat and applies it on the person's tap, because a Project's settings change only with the person's word. A claude.ai project has, of its own, a description, instructions, a memory of path-named entries, files and threads (cswap's export lists the same parts); the table says where each comes from here.
 
 | The Project's own field | Comes from | How it lands |
 | --- | --- | --- |

@@ -4,6 +4,7 @@ The placeholders are assembled at run time so this file survives an init of
 the repository it lives in."""
 
 import io
+import json
 import sys
 import tempfile
 import unittest
@@ -13,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
+import project_export  # noqa: E402
 import template_init  # noqa: E402
 from template_init import placeholder  # noqa: E402
 
@@ -134,6 +136,22 @@ class Init(unittest.TestCase):
             "(workflows are left as they are: GITHUB_TOKEN may not write them)",
             ".template/: deleted",
         ])
+
+    def test_writes_export_json_when_the_tree_is_a_project(self):
+        # The fill changes the names and the sizes export.json lists, so the
+        # init tool writes it again, and the first commit of a copy is current.
+        write(self.root, "CLAUDE.md", f"# {P['PROJECT_NAME']}\n")
+        write(self.root, "docs/project.md", f"# x\n\n## Goal\n\nA goal.\n\n## Repositories\n\n- {P['REPO']}, this one: here.\n")
+        write(self.root, "docs/memory/MEMORY.md", f"# Memory index for {P['PROJECT_NAME']}\n")
+        write(self.root, "export.json", "{}\n")
+        code, lines = run_init(self.root)
+        self.assertEqual(code, 0)
+        self.assertIn("export.json: written", lines)
+        self.assertEqual(project_export.check(self.root), [])
+        manifest = json.loads((self.root / "export.json").read_text())
+        self.assertEqual(manifest["name"], "widgets")
+        self.assertEqual(manifest["settings"]["config"]["default_source_urls"], ["https://github.com/octo/widgets"])
+        self.assertEqual(manifest["files"][0]["bytes"], len("# Memory index for widgets\n"))
 
     def test_a_second_run_changes_nothing(self):
         before = tree_bytes(self.root)
