@@ -146,6 +146,17 @@ class MainTest(unittest.TestCase):
                         "git push -u origin claude/7 # not main"):
             self.assertEqual(self.run_main(command), (0, ""), command)
 
+    def test_a_here_document_body_is_read_as_commands(self):
+        """The trade the docstring states: the hook reads no here-documents,
+        so a body line that starts a push to main is refused and the person
+        rephrases it, while a body that names no push passes as before."""
+        refused, message = self.run_main("git commit -F - <<'EOF'\nClaim #7\n\ngit push origin main\nEOF\n"
+                                         "git push -u origin claude/7")
+        self.assertEqual(refused, 2)
+        self.assertIn("pull requests", message)
+        self.assertEqual(self.run_main("git commit -F - <<'EOF'\nClaim #7\n\nThe board first.\nEOF\n"
+                                       "git push -u origin claude/7"), (0, ""))
+
     def test_command_without_push_passes_without_git(self):
         payload = json.dumps({"tool_input": {"command": "git status"}})
         with mock.patch.object(sys, "stdin", io.StringIO(payload)):
