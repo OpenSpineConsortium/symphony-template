@@ -50,8 +50,8 @@ then experiment/README.md and docs/history/experiment-research/README.md.
    pallets_click/2068 (prepare_task.sh, run_arms.sh), read the four
    summary.json files and the usage it took, and only then the rest of
    the flash subset, one task at a time.
-3. A report tool that puts the four arms' results side by side per pair,
-   with the authors' numbers for comparison.
+3. After the pilot, `python3 experiment/report.py` for the arms side by
+   side; decide on a second seed for the pairs where the arms disagree.
 4. #11: cut the rewrite back to the newline fix with its tests, or close
    it and rely on branch protection.
 5. Owner's settings, by hand: import docs/setup/ruleset-main.json, turn on
