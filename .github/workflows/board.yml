@@ -31,11 +31,13 @@ name: Board
 # moment it is pushed and a merged claim's branch leaves the board when it
 # goes. The job is skipped in the template repository itself, for a push
 # to any other branch, and for a pull request from a fork, whose token is
-# read-only. A scheduled run carries no repository object to ask whether
-# this is the template, and GitHub reads the missing value as equal to
-# false, so the job starts there too; its first step then finds the marker
-# folder .template/, which only the template keeps (template-init deletes
-# it in every copy), and the run ends without writing anything. The last step tells the coordinator routine the board moved,
+# read-only; scheduled runs carry the repository too, so the template's
+# own schedule is skipped at the job (its run history shows it). The
+# first step is a second layer for the two cases that gate cannot see: a
+# template whose "Template repository" box was never ticked, and a copy
+# whose template-init has not run yet. Both still hold the marker folder
+# .template/, which template-init deletes, so the run ends there without
+# writing anything. The last step tells the coordinator routine the board moved,
 # only when it did and the two secrets are set; it fails softly, so a
 # routine that did not answer never turns the board red.
 

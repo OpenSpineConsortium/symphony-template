@@ -14,19 +14,28 @@ The hook is the first fence and branch protection on GitHub the second,
 so anything this script cannot read it lets through rather than wedging
 the session: an unparseable command, a broken payload or a git that
 answers nothing all pass, and GitHub still refuses what matters.
+
+The command is read the way the shell would split it: a small scanner
+drops comments, joins a backslash-newline, cuts here-document bodies out
+and keeps all of that from happening inside quotes, and shlex then splits
+words and operators, a newline among them. A push is judged in the
+directory the session runs in, or in the one a leading literal `cd DIR &&`
+or a literal `git -C DIR` names. A cd anywhere else is not followed,
+since following it through a subshell, a pipeline or `cd -` needs a
+shell. A `git switch` or `git checkout -b` earlier in the command names
+the branch a later plain push sends, since a branch, unlike a directory,
+outlives any subshell.
 """
 
-import io
 import json
 import os
-import re
 import shlex
 import subprocess
 import sys
 
 # Options of git push that take their value as a separate word; the value
 # must not be read as a refspec.
-VALUE_OPTIONS = {"--receive-pack", "--repo", "-o", "--push-option"}
+VALUE_OPTIONS = {"--receive-pack", "--exec", "--repo", "-o", "--push-option"}
 
 # Global options of git itself that take a separate value, between "git"
 # and the verb, as in "git -C clone push".
@@ -36,50 +45,116 @@ GIT_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--e
 # command exactly as ; does.
 OPERATOR_CHARS = "();<>|&\n"
 
-# The opening of a here-document, <<WORD or <<-'WORD', but not the <<< of
-# a here-string.
-HEREDOC_OPENER = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+# What ends a word: a # right after one of these starts a comment, and a
+# here-document's delimiter word stops at one.
+WORD_BREAKS = " \t\n;&|()<>"
+
+# Options that name the branch a git switch or git checkout creates.
+SWITCH_NAME_OPTIONS = {"-c", "-C", "--create", "--force-create", "--orphan"}
+CHECKOUT_NAME_OPTIONS = {"-b", "-B"}
+
+LEADING_CD_ENDS = {"&&", ";", "\n"}
+DRY_RUN = {"-n", "--dry-run"}
+WHOLESALE = ("--all", "--branches", "--mirror")
 
 
-class CommentKeepsNewline(io.StringIO):
-    """shlex skips a comment by reading the rest of its line, newline and
-    all; leaving the newline unread lets it still end the command, so a
-    comment never joins the line after it to the line before."""
+def heredoc_delimiter(text, i):
+    """Read the word after a << that ends just before i: the delimiter
+    with its quoting taken off, whether <<- lets the closing line carry
+    leading tabs, and the index just past the word."""
+    dash = text.startswith("-", i)
+    i += 1 if dash else 0
+    while i < len(text) and text[i] in " \t":
+        i += 1
+    word = []
+    while i < len(text) and text[i] not in WORD_BREAKS:
+        if text[i] in "'\"":
+            end = text.find(text[i], i + 1)
+            end = len(text) if end == -1 else end
+            word.append(text[i + 1:end])
+            i = end + 1
+        elif text[i] == "\\":
+            word.append(text[i + 1:i + 2])
+            i += 2
+        else:
+            word.append(text[i])
+            i += 1
+    return "".join(word), dash, i
 
-    def readline(self, size=-1):
-        line = super().readline(size)
-        if line.endswith("\n"):
-            self.seek(self.tell() - 1)
-            return line[:-1]
-        return line
+
+def after_heredoc_bodies(text, start, pending):
+    """Where the text resumes once the bodies of the pending here-documents,
+    which begin at start, have run one after another to their closing
+    lines. A body never closed runs to the end, as in the shell."""
+    i = start
+    for delimiter, dash in pending:
+        while i < len(text):
+            end = text.find("\n", i)
+            line = text[i:] if end == -1 else text[i:end]
+            i = len(text) if end == -1 else end + 1
+            if (line.lstrip("\t") if dash else line) == delimiter:
+                break
+    return i
 
 
-def without_heredoc_bodies(command):
-    """The command with each here-document's body and closing line cut
-    out: a body is data, and a line in it that reads like a push is not
-    one. An opener with no closing line is left as it stands."""
-    kept, pos = [], 0
-    for opener in HEREDOC_OPENER.finditer(command):
-        if opener.start() < pos:
-            continue
-        line_end = command.find("\n", opener.end())
-        if line_end == -1:
-            break
-        closing = re.compile(rf"^\t*{opener.group(2)}$", re.M).search(command, line_end + 1)
-        if closing:
-            kept.append(command[pos:line_end + 1])
-            pos = closing.end()
-    kept.append(command[pos:])
-    return "".join(kept)
+def plain_shell(command):
+    """The command as plain shell for shlex: comments dropped, a
+    backslash-newline joined, here-document bodies cut out (a body is
+    data, and a line in it that reads like a push is not one), and each
+    newline set apart so it stands alone as an operator. None of this
+    happens inside quotes. A << whose word starts with a digit, as in
+    $((1<<2)), is a shift, not a here-document."""
+    text = command.replace("\r\n", "\n")
+    out, pending, quote, i = [], [], None, 0
+    while i < len(text):
+        ch = text[i]
+        if quote == "'":
+            out.append(ch)
+            quote = None if ch == "'" else quote
+            i += 1
+        elif ch == "\\":
+            if not text.startswith("\n", i + 1):
+                out.append(text[i:i + 2])
+            i += 2
+        elif quote == '"':
+            out.append(ch)
+            quote = None if ch == '"' else quote
+            i += 1
+        elif ch in "'\"":
+            out.append(ch)
+            quote = ch
+            i += 1
+        elif ch == "#" and (not out or out[-1][-1:] in WORD_BREAKS):
+            end = text.find("\n", i)
+            i = len(text) if end == -1 else end
+        elif text.startswith("<<<", i):
+            out.append("<<<")
+            i += 3
+        elif text.startswith("<<", i):
+            delimiter, dash, end = heredoc_delimiter(text, i + 2)
+            if delimiter[:1].isdigit() or not delimiter:
+                out.append("<<")
+                i += 2
+            else:
+                pending.append((delimiter, dash))
+                out.append(" << heredoc ")
+                i = end
+        elif ch == "\n":
+            out.append(" \n ")
+            i = after_heredoc_bodies(text, i + 1, pending)
+            pending = []
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
 
 
 def shell_tokens(command):
     """The words and operators of a shell command, or None when shlex
-    cannot read it (an unclosed quote). A backslash before a newline joins
-    the two lines, as the shell does."""
-    text = without_heredoc_bodies(command).replace("\\\n", "")
-    lexer = shlex.shlex(CommentKeepsNewline(text), posix=True, punctuation_chars=OPERATOR_CHARS)
+    cannot read it (an unclosed quote)."""
+    lexer = shlex.shlex(plain_shell(command), posix=True, punctuation_chars=OPERATOR_CHARS)
     lexer.whitespace = " \t\r"
+    lexer.commenters = ""
     lexer.whitespace_split = True
     try:
         return list(lexer)
@@ -87,43 +162,47 @@ def shell_tokens(command):
         return None
 
 
-def simple_commands(command):
-    """The argument lists of the simple commands inside a shell command.
-
-    Operators are their own tokens: ;, &&, |, ( ) and a newline end one
-    command, and a redirection swallows its target and the file descriptor
-    digit before it. A command shlex cannot read yields nothing, and the
-    caller lets it pass.
-    """
-    tokens = shell_tokens(command)
-    if tokens is None:
-        return []
+def commands_from(tokens):
+    """The argument lists of the simple commands in a token list. An
+    operator that holds ;, |, a parenthesis, a newline, or & outside a
+    redirection ends a command; one that holds < or > is a redirection
+    and swallows its target and the file descriptor digit before it."""
     commands, current, eat_next = [], [], False
     for token in tokens:
-        operator = all(ch in OPERATOR_CHARS for ch in token)
-        if operator and (">" in token or "<" in token):
-            if current and current[-1].isdigit():
-                current.pop()
-            eat_next = True
-        elif operator:
+        if not all(ch in OPERATOR_CHARS for ch in token):
+            if eat_next:
+                eat_next = False
+            else:
+                current.append(token)
+            continue
+        redirect = "<" in token or ">" in token
+        if any(ch in token for ch in ";|()\n") or (not redirect and "&" in token):
             if current:
                 commands.append(current)
-            current = []
-            eat_next = False
-        elif eat_next:
-            eat_next = False
-        else:
-            current.append(token)
+            current, eat_next = [], False
+        elif redirect and current and current[-1].isdigit():
+            current.pop()
+        eat_next = eat_next or redirect
     if current:
         commands.append(current)
     return commands
+
+
+def simple_commands(command):
+    """The argument lists of the simple commands inside a shell command; a
+    command shlex cannot read yields nothing, and the caller lets it pass."""
+    return commands_from(shell_tokens(command) or [])
+
+
+def is_git(argv):
+    return bool(argv) and argv[0].rsplit("/", 1)[-1] == "git"
 
 
 def push_invocation(argv):
     """The arguments after "push" and the directory git -C names (None
     when it names none), when argv is a git push; else None. Several -C
     options stack, each relative to the one before, as git reads them."""
-    if not argv or argv[0].rsplit("/", 1)[-1] != "git":
+    if not is_git(argv):
         return None
     directory, i = None, 1
     while i < len(argv):
@@ -142,18 +221,60 @@ def push_invocation(argv):
     return None
 
 
-def pushes_and_where(command, cwd):
-    """Each git push in the command with the directory it runs in: a cd
-    earlier in the command moves it, and git -C moves it for one push."""
-    found = []
-    for argv in simple_commands(command):
-        if argv[0] == "cd" and len(argv) > 1 and argv[1] != "-":
-            cwd = os.path.join(cwd, os.path.expanduser(argv[1]))
+def switched_branch(argv):
+    """The branch a git switch, or a git checkout -b, leaves checked out;
+    None for any other command or when the branch is not certain."""
+    if not is_git(argv) or len(argv) < 3 or argv[1] not in ("switch", "checkout"):
+        return None
+    rest = argv[2:]
+    names = SWITCH_NAME_OPTIONS if argv[1] == "switch" else CHECKOUT_NAME_OPTIONS
+    for option, value in zip(rest, rest[1:]):
+        if option in names:
+            return value
+    if argv[1] == "checkout" or "--detach" in rest or "-d" in rest:
+        return None
+    words = [word for word in rest if not word.startswith("-")]
+    return words[0] if words else None
+
+
+def literal_directory(word, base):
+    """The directory a literal path word names, or None when the word
+    needs a shell to expand it ($, a backquote), is an option, or names
+    no directory."""
+    if not word or word.startswith("-") or any(ch in word for ch in "$`"):
+        return None
+    path = os.path.join(base, os.path.expanduser(word))
+    return path if os.path.isdir(path) else None
+
+
+def starting_directory(tokens, cwd):
+    """The directory the command's pushes run in: the one a leading
+    literal `cd DIR &&` (or `cd DIR;`) names, when the command holds no
+    other cd; otherwise the session's own."""
+    if len(tokens) < 3 or tokens[0] != "cd" or tokens[2] not in LEADING_CD_ENDS:
+        return cwd
+    if tokens.count("cd") != 1:
+        return cwd
+    return literal_directory(tokens[1], cwd) or cwd
+
+
+def judged_pushes(command, cwd):
+    """Each git push in the command, with the directory it runs in and the
+    branch a git switch before it left checked out there (None: ask git)."""
+    tokens = shell_tokens(command) or []
+    base = starting_directory(tokens, cwd)
+    found, switched = [], None
+    for argv in commands_from(tokens):
+        branch = switched_branch(argv)
+        if branch:
+            switched = branch
             continue
         invocation = push_invocation(argv)
-        if invocation is not None:
-            args, directory = invocation
-            found.append((args, os.path.join(cwd, directory) if directory else cwd))
+        if invocation is None:
+            continue
+        args, directory = invocation
+        where = (literal_directory(directory, base) if directory else None) or base
+        found.append((args, where, switched if where == base else None))
     return found
 
 
@@ -164,37 +285,32 @@ def is_short_cluster_with_f(arg):
             and not arg.startswith("-o") and "f" in arg[1:])
 
 
-def refusal(args, current_branch, default_branch):
-    """Why this push is refused, or None when it is allowed."""
-    force = lease = False
-    wholesale = None
-    positionals = []
-    skip = False
+def push_options(args):
+    """The options of a git push that matter here, as a set of names, and
+    its positional words: the remote, then the refspecs."""
+    seen, positionals, skip = set(), [], False
     for arg in args:
         if skip:
             skip = False
-        elif arg in ("-f", "--force") or is_short_cluster_with_f(arg):
-            force = True
-        elif arg == "--force-with-lease" or arg.startswith("--force-with-lease="):
-            lease = True
-        elif arg in ("--all", "--branches", "--mirror"):
-            wholesale = arg
         elif arg in VALUE_OPTIONS:
             skip = True
-        elif arg.startswith("-"):
-            continue
-        else:
+        elif arg.startswith("--force-with-lease"):
+            seen.add("lease")
+        elif arg in ("-f", "--force") or is_short_cluster_with_f(arg):
+            seen.add("force")
+        elif arg in DRY_RUN or arg in WHOLESALE or arg == "--tags":
+            seen.add(arg)
+        elif not arg.startswith("-"):
             positionals.append(arg)
-    force = force or any(spec.startswith("+") for spec in positionals[1:])
-    if wholesale:
-        return (f"a push with {wholesale} moves branches wholesale; "
-                "push your own claim branch alone (.claude/rules/board.md)")
-    if force:
-        return ("a forced push (--force, -f or a +refspec) overwrites history another account "
-                "may hold; the one forced push "
-                "the protocol allows is --force-with-lease on your own claude/ branch "
-                "after a rebase (.claude/rules/board.md)")
-    destinations = []
+    if any(spec.startswith("+") for spec in positionals[1:]):
+        seen.add("force")
+    return seen, positionals
+
+
+def destinations(positionals, current_branch, tags_only):
+    """The branch names a push writes: each refspec's destination, or the
+    current branch when no refspec is given and --tags is not either."""
+    names = []
     for spec in positionals[1:]:
         name = spec.lstrip("+")
         if ":" in name:
@@ -203,21 +319,37 @@ def refusal(args, current_branch, default_branch):
         if name in ("", "HEAD"):
             name = current_branch
         if name:
-            destinations.append(name)
-    if not positionals[1:] and current_branch:
-        destinations.append(current_branch)
-    for name in destinations:
+            names.append(name)
+    if not positionals[1:] and current_branch and not tags_only:
+        names.append(current_branch)
+    return names
+
+
+def refusal(args, current_branch, default_branch):
+    """Why this push is refused, or None when it is allowed."""
+    seen, positionals = push_options(args)
+    if seen & DRY_RUN:
+        return None
+    wholesale = next((option for option in WHOLESALE if option in seen), None)
+    if wholesale:
+        return (f"a push with {wholesale} moves branches wholesale; "
+                "push your own claim branch alone (.claude/rules/board.md)")
+    if "force" in seen:
+        return ("a forced push (--force, -f or a +refspec) overwrites history another account "
+                "may hold; the one forced push the protocol allows is --force-with-lease on "
+                "your own claude/ branch after a rebase (.claude/rules/board.md)")
+    names = destinations(positionals, current_branch, "--tags" in seen)
+    for name in names:
         if name == default_branch:
             return (f"a push to {name} is refused: the default branch takes only "
                     "pull requests (.claude/rules/board.md)")
         if name == "board":
             return ("a push to board is refused: only the board workflow writes that "
                     "branch (.claude/rules/board.md)")
-    if lease:
-        strays = [name for name in destinations if not name.startswith("claude/")]
-        if strays:
-            return (f"--force-with-lease to {', '.join(strays)} is refused: a forced push "
-                    "is for your own claude/ branch only (.claude/rules/board.md)")
+    strays = [name for name in names if not name.startswith("claude/")]
+    if "lease" in seen and strays:
+        return (f"--force-with-lease to {', '.join(strays)} is refused: a forced push "
+                "is for your own claude/ branch only (.claude/rules/board.md)")
     return None
 
 
@@ -225,7 +357,7 @@ def git_line(args, cwd):
     """One line from git, or None when git cannot answer."""
     try:
         done = subprocess.run(["git", *args], cwd=cwd, capture_output=True, timeout=10)
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, ValueError, subprocess.TimeoutExpired):
         return None
     if done.returncode != 0:
         return None
@@ -242,19 +374,29 @@ def branches(cwd):
     return current, default
 
 
+def command_and_cwd(payload):
+    """The shell command and the session's directory from a hook payload,
+    or (None, None) when the payload is not one this hook reads."""
+    if not isinstance(payload, dict):
+        return None, None
+    tool_input = payload.get("tool_input")
+    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    cwd = payload.get("cwd")
+    return (command if isinstance(command, str) else None,
+            cwd if isinstance(cwd, str) and cwd else ".")
+
+
 def main():
     try:
         payload = json.load(sys.stdin)
     except ValueError:
         return 0
-    if not isinstance(payload, dict):
+    command, cwd = command_and_cwd(payload)
+    if not command or "push" not in command:
         return 0
-    command = (payload.get("tool_input") or {}).get("command") or ""
-    if "push" not in command:
-        return 0
-    for args, where in pushes_and_where(command, payload.get("cwd") or "."):
+    for args, where, switched in judged_pushes(command, cwd):
         current, default = branches(where)
-        reason = refusal(args, current, default)
+        reason = refusal(args, switched or current, default)
         if reason:
             print(reason, file=sys.stderr)
             return 2
