@@ -40,7 +40,7 @@ A claim with no commit for 24 hours is released by the coordinator routine (docs
 
 ## Team mode
 
-With the repository variable CLAUDE_TEAM set, an issue labelled epic is planned by a lead into sub-issues pre-assigned to members (label agent:<name>), whom this protocol binds like any account; docs/agents/TEAM.md says how they divide the work, see each other's branches, and land by auto-merge on a green check rather than by the owner's hand.
+With the repository variables CLAUDE_TEAM and CLAUDE_WORKER set, an issue labelled epic is planned by a lead into sub-issues pre-assigned to members (label agent:<name>), whom this protocol binds like any account, with two differences: members bring the default branch in by merging it, not by rebasing, so they never force-push, and they land by auto-merge on a green check rather than by the owner's hand. The board's queue leaves out an epic and its members' tasks, so no other account takes them; docs/agents/TEAM.md says how members divide the work and see each other's branches.
 
 ## Rules that hold everywhere
 

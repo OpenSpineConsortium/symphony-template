@@ -4,17 +4,21 @@ name: Worker
 # (docs/agents/routines/worker.md) run from Actions when there is no team.
 # The repository variable CLAUDE_TEAM names the members as a JSON list,
 # as in ["w1","w2","w3"], and one leg runs per member, in parallel; without
-# it one member named main runs, which is the plain worker. Each leg first
+# it one member named main runs, which is the plain worker and labels its
+# claims account:main, as the main account's routine would. Each leg first
 # asks tools/team.py what its member should do, on GITHUB_TOKEN alone: its
-# own claim that needs work, its pre-assigned task, an unassigned todo, or
-# nothing; only the first three start a Claude session, so an idle team
-# costs seconds of a runner and no usage. After a session, a leg that still
-# has work dispatches itself again (workflow_dispatch, which GITHUB_TOKEN
-# may start), up to CLAUDE_MAX_ROUNDS rounds in a row (6 if unset); the
-# six-hourly schedule picks up the rest. Off until CLAUDE_WORKER is true;
-# Claude runs need the secret CLAUDE_CODE_OAUTH_TOKEN
-# (docs/setup/claude-action.md) and draw on the main account's
-# subscription. One run at a time per member.
+# own claim that needs work, its pre-assigned task, its share of the
+# unclaimed blockers and todos, or nothing; only the first three start a
+# Claude session, so an idle team costs seconds of a runner and no usage,
+# and members asking at once are dealt different issues rather than race
+# for one. After a session, a leg that still has work dispatches itself
+# again (workflow_dispatch, which GITHUB_TOKEN may start), up to
+# CLAUDE_MAX_ROUNDS rounds in a row (6 if unset); the six-hourly schedule
+# picks up the rest. Such a run's actor is the github-actions bot, so the
+# action is told to accept it. Off until CLAUDE_WORKER is true; Claude
+# runs need the secret CLAUDE_CODE_OAUTH_TOKEN (docs/setup/claude-action.md)
+# and draw on the main account's subscription. One run at a time per
+# member.
 
 on:
   schedule:
@@ -52,6 +56,8 @@ jobs:
     env:
       HAVE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
       AGENT: ${{ matrix.agent }}
+      CLAUDE_TEAM: ${{ vars.CLAUDE_TEAM }}
+      LABEL: ${{ vars.CLAUDE_TEAM != '' && format('agent:{0}', matrix.agent) || format('account:{0}', matrix.agent) }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -62,7 +68,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          answer=$(python3 tools/team.py next --agent "$AGENT")
+          answer=$(python3 tools/team.py next --agent "$AGENT" --label "$LABEL")
           echo "$AGENT: $answer"
           echo "move=${answer%% *}" >> "$GITHUB_OUTPUT"
           echo "issue=${answer##* }" >> "$GITHUB_OUTPUT"
@@ -74,20 +80,21 @@ jobs:
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: "github-actions,claude"
           claude_args: |
             --max-turns 80
             --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
           prompt: |
-            You are the member ${{ matrix.agent }} on this repository, under the claim protocol (docs/agents/PROTOCOL.md) and team mode (docs/agents/TEAM.md); your label is agent:${{ matrix.agent }}. This run: ${{ steps.next.outputs.move }} issue #${{ steps.next.outputs.issue }}, and nothing else.
+            You are the member ${{ matrix.agent }} on this repository, under the claim protocol (docs/agents/PROTOCOL.md) and team mode (docs/agents/TEAM.md); your label is ${{ env.LABEL }}. This run: ${{ steps.next.outputs.move }} issue #${{ steps.next.outputs.issue }}, and nothing else.
 
-            1. Read the issue (gh issue view ${{ steps.next.outputs.issue }}). If it names an epic ("Epic: #N"), read that epic and its plan first: it says which files your task owns and which belong to your peers. Stay inside your files.
-            2. take: claim it as the protocol says, with "- Account: ${{ matrix.agent }}" on the claim file: the branch claude/${{ steps.next.outputs.issue }} from the default branch, the claim file as its first and only commit, pushed; the labels claimed and agent:${{ matrix.agent }} on the issue; a draft pull request at once, with "Closes #${{ steps.next.outputs.issue }}". If the push is refused because the branch exists, another member has it: stop. carry: check out claude/${{ steps.next.outputs.issue }} and see from its pull request, checks and comments what is left.
-            3. While you work, look at your peers on origin: git fetch origin, then the other open claude/ branches of the same epic, so your code meets theirs at the interfaces the plan names instead of colliding with them. When the default branch has moved, merge it into your branch (git merge origin/<default branch>) and resolve what conflicts; no forced push is needed.
+            1. Read the issue and what has been said on it (gh issue view ${{ steps.next.outputs.issue }} --comments). If it names an epic ("Epic: #N"), read that epic, its plan and its comments first (gh issue view N --comments): the plan says which files your task owns and which belong to your peers, and the comments are where the lead and your peers settle questions. Stay inside your files.
+            2. take: claim it as the protocol says, with "- Account: ${{ matrix.agent }}" on the claim file: the branch claude/${{ steps.next.outputs.issue }} from the default branch, the claim file as its first and only commit, pushed; the labels claimed and ${{ env.LABEL }} on the issue; a draft pull request at once, with "Closes #${{ steps.next.outputs.issue }}". If the push is refused because the branch exists, another member or account has it: stop. carry: check out claude/${{ steps.next.outputs.issue }} and see from its pull request, checks and comments what is left.
+            3. While you work, look at your peers on origin: git fetch origin, then the other open claude/ branches of the same epic, so your code meets theirs at the interfaces the plan names instead of colliding with them. When the default branch has moved, merge it into your branch (git merge origin/<default branch>) and resolve what conflicts; do not rebase, so no forced push is ever needed.
             4. Work in small commits with bash scripts/check.sh passing before every push.
-            5. If only a peer or the lead can unblock you, add the label blocked to your issue, say on the epic what you need, and stop.
+            5. If only a peer or the lead can unblock you, say on the epic exactly what you need, then add the label blocked to your issue, which calls the lead, and stop.
             6. Done: delete the claim file, make sure the pull request says "Closes #${{ steps.next.outputs.issue }}" and the checks pass, mark it ready, add the label in-review, and turn on auto-merge with gh pr merge --auto --merge; if the repository does not allow auto-merge, leave the merge to the owner.
 
-            Never push to another member's branch or to the default branch; never force-push; never close an issue that is not done; never write a credential anywhere. Plain prose, no emoji.
+            Never push to another member's or account's branch or to the default branch; never force-push; never close an issue that is not done; never write a credential anywhere. Plain prose, no emoji.
       - name: Go another round while this member has work
         if: steps.claude.outcome == 'success'
         env:
@@ -101,7 +108,7 @@ jobs:
             echo "$AGENT ran $ROUND rounds in a row; the schedule picks up the rest"
             exit 0
           fi
-          answer=$(python3 tools/team.py next --agent "$AGENT")
+          answer=$(python3 tools/team.py next --agent "$AGENT" --label "$LABEL")
           if [ "$answer" = "none" ]; then
             echo "$AGENT has nothing left"
             exit 0

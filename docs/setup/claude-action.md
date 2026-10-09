@@ -49,7 +49,8 @@ By hand, where that command is not at hand:
 .github/workflows/claude-worker.yml runs the worker routine's own
 discipline (docs/agents/routines/worker.md) from Actions on the same
 token: every six hours a cheap step asks GitHub whether the queue holds
-an unclaimed todo issue or an open claim pull request needs carrying,
+an unclaimed blocker or todo issue or an open claim pull request needs
+carrying,
 and only then starts a Claude session, so an empty queue costs seconds
 of a runner and no plan usage. It is off until the repository variable
 CLAUDE_WORKER is set to true, under
@@ -66,13 +67,19 @@ To turn it on, besides the token above:
 
 1. Set the repository variables CLAUDE_TEAM to the members' names as a
    JSON list, as in ["w1","w2","w3"], and CLAUDE_WORKER to true, under
-   https://github.com/{{REPO}}/settings/variables/actions.
+   https://github.com/{{REPO}}/settings/variables/actions. The lead stays
+   off until both are set, since a plan no member works is usage wasted.
+   The team replaces the main account's worker routine: turn that routine
+   off, or it and the members race for the same queue.
 2. Under Settings, General, turn on "Allow auto-merge", so a member's
    finished pull request lands by itself when the check passes. Turning
    off "Require branches to be up to date" in the default branch's
    rules saves a run per member each time another lands; the lead's
    integration pass then checks the whole.
-3. Open an issue describing the work and label it epic.
+3. Open an issue describing the work and label it epic. Once the lead
+   has planned it, the epic loses the label todo, and the board's queue
+   leaves out the epic and its members' tasks, so no other account takes
+   them.
 
 CLAUDE_MAX_ROUNDS (6 if unset) bounds how many rounds a member runs in a
 row, and CLAUDE_ALLOWED_TOOLS replaces the tools the sessions may use

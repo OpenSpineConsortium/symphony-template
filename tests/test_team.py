@@ -31,11 +31,11 @@ class FakeGitHub:
                                "state": state, "labels": [{"name": n} for n in labels]}
         return self.issues[number]
 
-    def add_pull(self, issue, draft=False, state="clean", conclusion="success"):
+    def add_pull(self, issue, draft=False, state="clean", conclusion="success", check="check"):
         sha = f"sha{issue}"
         self.pulls[f"claude/{issue}"] = {"number": 500 + issue, "draft": draft,
                                          "mergeable_state": state, "head": {"sha": sha}}
-        self.checks[sha] = [{"conclusion": conclusion}]
+        self.checks[sha] = [{"name": check, "conclusion": conclusion}]
 
     def url(self, path, params=None):
         return API + path
@@ -82,8 +82,13 @@ class FakeGitHub:
         raise AssertionError(path)
 
     def request(self, method, url, body=None, missing_ok=False):
+        parts = self.tail(url[len(API):])
+        issue = self.issues[int(parts[1])]
+        if method == "DELETE" and parts[2] == "labels":
+            issue["labels"] = [label for label in issue["labels"] if label["name"] != parts[3]]
+            return None, {}
         assert method == "PATCH"
-        self.issues[int(self.tail(url[len(API):])[1])].update(body)
+        issue.update(body)
         return {}, {}
 
 
@@ -110,6 +115,31 @@ class RouteTest(unittest.TestCase):
         self.assertEqual(team.route(api, "closed", 2), "none")
         api.issues[3]["state"] = "closed"
         self.assertEqual(team.route(api, "closed", 3), "integrate 1")
+
+    def test_integration_can_be_called_with_the_epics_own_number(self):
+        api = FakeGitHub()
+        api.add_issue(1, ["epic"], body="spec\n<!-- team:tasks 2 -->")
+        api.add_issue(2, body="Epic: #1", state="closed")
+        self.assertEqual(team.route(api, "closed", 1), "integrate 1")
+
+    def test_an_integration_already_claimed_is_not_started_twice(self):
+        api = FakeGitHub()
+        api.add_issue(1, ["epic"], body="spec\n<!-- team:tasks 2 -->")
+        api.add_issue(2, body="Epic: #1", state="closed")
+        api.branches.add("claude/1")
+        api.add_pull(1)
+        self.assertEqual(team.route(api, "closed", 2), "none")
+        api.add_pull(1, draft=True)
+        self.assertEqual(team.route(api, "closed", 2), "integrate 1")
+
+    def test_a_blocked_task_calls_the_lead(self):
+        api = FakeGitHub()
+        api.add_issue(2, ["todo", "agent:w1", "blocked"], body="Epic: #1")
+        api.add_issue(3, ["blocked"], body="not a task")
+        self.assertEqual(team.route(api, "labeled", 2, "blocked"), "unblock 2")
+        self.assertEqual(team.route(api, "labeled", 3, "blocked"), "none")
+        api.issues[2]["labels"] = [{"name": "todo"}]
+        self.assertEqual(team.route(api, "labeled", 2, "blocked"), "none")
 
     def test_a_closed_issue_outside_any_epic_routes_nowhere(self):
         api = FakeGitHub()
@@ -164,6 +194,48 @@ class NextTest(unittest.TestCase):
         self.api.add_issue(2, ["todo", "agent:w1", "blocked"])
         self.assertEqual(team.next_for(self.api, "w1"), "none")
 
+    def test_a_task_another_account_claimed_is_never_carried(self):
+        self.api.add_issue(6, ["todo", "agent:w1", "claimed", "account:second"])
+        self.api.branches.add("claude/6")
+        self.assertEqual(team.next_for(self.api, "w1"), "none")
+
+    def test_a_failure_outside_the_required_check_costs_no_run(self):
+        self.api.add_issue(2, ["claimed", "agent:w1"])
+        self.api.branches.add("claude/2")
+        self.api.add_pull(2, state="unstable", conclusion="failure", check="board")
+        self.assertEqual(team.next_for(self.api, "w1"), "none")
+
+    def test_the_plain_worker_carries_claims_labelled_with_its_account(self):
+        self.api.add_issue(5, ["claimed", "account:main"])
+        self.api.branches.add("claude/5")
+        self.assertEqual(team.next_for(self.api, "main"), "carry 5")
+
+    def test_an_unclaimed_blocker_comes_first_even_without_todo(self):
+        self.api.add_issue(3, ["todo"])
+        self.api.add_issue(9, ["blocker"])
+        self.assertEqual(team.next_for(self.api, "main"), "take 9")
+
+    def test_members_with_nothing_of_their_own_divide_the_shared_work(self):
+        self.api.add_issue(4, ["todo"])
+        self.api.add_issue(5, ["todo"])
+        members = ["w1", "w2", "w3"]
+        answers = [team.next_for(self.api, m, members) for m in members]
+        self.assertEqual(answers, ["take 4", "take 5", "none"])
+
+    def test_a_member_busy_with_its_own_task_leaves_its_share_to_the_rest(self):
+        self.api.add_issue(3, ["todo", "agent:w1"])
+        self.api.add_issue(4, ["todo"])
+        members = ["w1", "w2", "w3"]
+        answers = [team.next_for(self.api, m, members) for m in members]
+        self.assertEqual(answers, ["take 3", "take 4", "none"])
+
+    def test_main_makes_the_members_label_before_a_take(self):
+        api = FakeGitHub()
+        api.add_issue(4, ["todo"])
+        args = team.parse_args(["next", "--agent", "main", "--team", "", "--label", "account:main"])
+        self.assertEqual(team.run(api, args), "take 4")
+        self.assertIn("account:main", api.labels)
+
 
 class SeedTest(unittest.TestCase):
     PLAN = {"plan": "w1 owns the parser, w2 the printer.",
@@ -184,6 +256,17 @@ class SeedTest(unittest.TestCase):
         self.assertEqual(len(api.sub_issues), 2)
         self.assertEqual(team.seed(api, 1, self.PLAN, ["w1", "w2"]), "already planned")
         self.assertEqual(len(api.issues), 3)
+
+    def test_seed_takes_the_epic_off_the_queue(self):
+        api = FakeGitHub()
+        api.add_issue(1, ["epic", "todo"])
+        team.seed(api, 1, self.PLAN, ["w1", "w2"])
+        self.assertEqual(team.label_names(api.issues[1]), {"epic"})
+
+    def test_an_owner_off_the_team_goes_to_a_member_without_a_task(self):
+        tasks = [{"owner": "w2"}, {"owner": "W1"}, {"owner": "w3"}]
+        self.assertEqual(team.owners_for(tasks, ["w1", "w2", "w3"]), ["w2", "w1", "w3"])
+        self.assertEqual(team.owners_for([{}, {}, {}], ["w1", "w2"]), ["w1", "w2", "w1"])
 
     def test_seeded_tasks_route_to_integration_when_all_close(self):
         api = FakeGitHub()

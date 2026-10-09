@@ -151,6 +151,15 @@ class Rendering(unittest.TestCase):
         self.assertNotIn("#16", queue)
         self.assertIn("#14", queue)
 
+    def test_team_work_stays_off_the_queue(self):
+        snap = snapshot()
+        snap["issues"].append({"number": 20, "title": "An epic", "labels": [{"name": "todo"}, {"name": "epic"}]})
+        snap["issues"].append({"number": 21, "title": "A member's task", "labels": [{"name": "todo"}, {"name": "agent:w1"}]})
+        queue = board.render(snap).split(board.QUEUE_HEADING)[1].split(board.BLOCKER_HEADING)[0]
+        self.assertNotIn("#20", queue)
+        self.assertNotIn("#21", queue)
+        self.assertIn("#14", queue)
+
 
 class Rules(unittest.TestCase):
     def test_state_words(self):
