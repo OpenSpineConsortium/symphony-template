@@ -404,6 +404,13 @@ def claimed_numbers(branches):
     return {int(claim_key(b)) for b in claim_branches(branches) if claim_key(b).isdigit()}
 
 
+def reserved_for_team(labels):
+    """An epic, which team mode's lead splits, or a task the lead gave a
+    member (label agent:<name>): neither is for any account to take
+    (docs/agents/TEAM.md)."""
+    return "epic" in labels or any(name.startswith("agent:") for name in labels)
+
+
 def issue_rows(snap, label, unclaimed_only):
     claimed = claimed_numbers(snap["branches"])
     rows = []
@@ -411,7 +418,7 @@ def issue_rows(snap, label, unclaimed_only):
         labels = label_names(issue)
         if label not in labels:
             continue
-        if unclaimed_only and ("claimed" in labels or issue["number"] in claimed):
+        if unclaimed_only and ("claimed" in labels or issue["number"] in claimed or reserved_for_team(labels)):
             continue
         rows.append([f"#{issue['number']}", issue.get("title", ""), ", ".join(labels)])
     return rows

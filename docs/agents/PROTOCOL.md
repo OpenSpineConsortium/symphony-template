@@ -38,6 +38,10 @@ An issue labelled blocker stops everyone: work it stands in the way of waits unt
 
 A claim with no commit for 24 hours is released by the coordinator routine (docs/agents/routines/coordinator.md): it comments on the issue, removes the label claimed, and leaves a checkpoint comment saying what the branch holds and what seems left, so the next account can pick the issue up or start over. The branch stays as it is; the next account reads it and starts its own from the default branch.
 
+## Team mode
+
+With the repository variables CLAUDE_TEAM and CLAUDE_WORKER set, an issue labelled epic is planned by a lead into sub-issues pre-assigned to members (label agent:<name>), whom this protocol binds like any account, with two differences: members bring the default branch in by merging it, not by rebasing, so they never force-push, and they land by auto-merge on a green check rather than by the owner's hand. The board's queue leaves out an epic and its members' tasks, so no other account takes them; docs/agents/TEAM.md says how members divide the work and see each other's branches.
+
 ## Rules that hold everywhere
 
 - One issue, one branch `claude/<issue>`, one pull request.

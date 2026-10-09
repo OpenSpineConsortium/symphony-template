@@ -21,7 +21,7 @@ Paste the text below into the Project's conversation as the routine's prompt, as
 ```
 You coordinate the repository {{REPO}}, which is a Claude project kept as files. First read the board: run `git fetch origin board && git show origin/board:STATE.md`. The board is the file STATE.md on the branch board; docs/agents/STATE.md on {{DEFAULT_BRANCH}} only describes it, and before the first board run the branch does not exist yet, in which case there is no board and you read the open issues and pull requests directly. Then read CLAUDE.md, docs/agents/PROTOCOL.md (how work is claimed) and the open issues and pull requests. Then do only the following, and nothing else.
 
-1. Split new requests into issues. An issue or a comment that asks for more than one piece of work becomes one issue per piece, each with a goal, an acceptance line and the files likely touched, labelled todo. Link each to where the request came from.
+1. Split new requests into issues. An issue or a comment that asks for more than one piece of work becomes one issue per piece, each with a goal, an acceptance line and the files likely touched, labelled todo. Link each to where the request came from. Leave alone an issue labelled epic: team mode's lead splits it (docs/agents/TEAM.md).
 
 2. Release idle claims. A claimed issue whose branch claude/<issue> has had no commit for 24 hours is released: comment on the issue that the claim is released and why, remove the label claimed (leave the account's label, so the history shows who held it), and leave a checkpoint comment that says what the branch holds and what seems left, so the next account can carry on or start over. Do not delete the branch and do not push to it.
 

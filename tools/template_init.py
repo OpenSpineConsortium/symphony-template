@@ -34,13 +34,16 @@ REMOVED = (".template",)
 WORKFLOWS = (".github", "workflows")
 WORKFLOWS_NOTE = "(workflows are left as they are: GITHUB_TOKEN may not write them)"
 SETUP_ISSUE_TITLE = "Set up this project"
-# The labels GitHub Issues needs to be the queue: name, colour, description.
+# The labels GitHub Issues needs to be the queue, and the two team mode
+# adds: name, colour, description.
 LABELS = (
     ("todo", "0e8a16", "In the queue, open for a claim"),
     ("claimed", "fbca04", "A claude/<issue> branch holds it"),
     ("in-review", "1d76db", "A pull request is open and waiting"),
     ("blocker", "b60205", "Stops everyone until it is settled"),
     ("account:main", "5319e7", "Work for the main Claude account"),
+    ("epic", "8b5cf6", "A spec the team lead plans into tasks (docs/agents/TEAM.md)"),
+    ("blocked", "e99695", "A member waits on a peer or the lead (docs/agents/TEAM.md)"),
 )
 
 
@@ -197,7 +200,7 @@ def setup_issue_body(repo, default_branch):
         f"- [ ] Import the branch rules: Settings, Rules, Rulesets, Import a ruleset, pick docs/setup/ruleset-main.json from your clone; then turn on \"Automatically delete head branches\" (General) and secret scanning with push protection (Code security) ([docs/setup/github.md]({base}/docs/setup/github.md)).",
         f"- [ ] One OAuth flow for the Claude side: from Claude Code signed in as the main account, run /install-github-app and pick this repository; it installs the Claude GitHub App and writes the secret CLAUDE_CODE_OAUTH_TOKEN, which turns on @claude ([docs/setup/claude-action.md]({base}/docs/setup/claude-action.md)).",
         f"- [ ] Make the thin Project for each Claude account ([docs/setup/claude-project.md]({base}/docs/setup/claude-project.md)).",
-        f"- [ ] Make the worker routine in the main account's Project ([docs/agents/routines/worker.md]({base}/docs/agents/routines/worker.md)), or set the repository variable CLAUDE_WORKER to true to run it from Actions instead; the coordinator ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)) joins once a second account does.",
+        f"- [ ] Make the worker routine in the main account's Project ([docs/agents/routines/worker.md]({base}/docs/agents/routines/worker.md)), or set the repository variable CLAUDE_WORKER to true to run it from Actions instead, and CLAUDE_TEAM to a list of member names to run a team with a lead ([docs/agents/TEAM.md]({base}/docs/agents/TEAM.md)); the coordinator ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)) joins once a second account does.",
         f"- [ ] Fill in [docs/project.md]({base}/docs/project.md) and [docs/agents/OWNERSHIP.md]({base}/docs/agents/OWNERSHIP.md), and pick the spending profile in [docs/setup/tiers.md]({base}/docs/setup/tiers.md).",
         "- [ ] Run `bash scripts/check.sh` once locally.",
         "",

@@ -5,4 +5,5 @@ One line per fact under docs/memory/: a dash, the fact's title as a link to its 
 - [CI runs Python 3.12](ci-python-is-3-12.md): the checks run on GitHub's 3.12, so tools and tests use no API newer than that; test with python3.12 where it exists.
 - [@claude runs on the main account's subscription](claude-mentions-run-on-the-main-accounts-subscription.md): mentions run .github/workflows/claude.yml on the token from `claude setup-token`, spending plan limits, never an API key.
 - [How this repository works](how-this-repository-works.md): the repository is the shared plane for every Claude account and session; what lives where.
+- [Team mode](team-mode.md): a lead plans an epic into pre-assigned tasks, members work them in parallel and land by auto-merge; the lead integrates; switched on by CLAUDE_TEAM with CLAUDE_WORKER.
 - [The plan ladder](the-plan-ladder.md): which GitHub and Claude plans unlock what, verified 2026-10-09; public repo means free Actions and enforced protection, no payment method means a hard cap.
