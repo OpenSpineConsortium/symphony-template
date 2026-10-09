@@ -1,0 +1,133 @@
+name: Board
+
+# Keeps the board, the file STATE.md on the branch "board", equal to what
+# GitHub knows: the open issues, the claude/<issue> branches and their claim
+# files, the open pull requests with how far each is from the default
+# branch, and what merged since the previous board. Every Claude session and
+# every account reads it before claiming work (git fetch origin board &&
+# git show origin/board:STATE.md; the session hook prints it).
+# tools/board.py renders it from the REST API with GITHUB_TOKEN alone (no
+# other secret is needed) and puts no wall-clock value in it, so the file
+# changes only when the repository did, and only then is it written. The
+# board branch holds exactly one commit, built below from the rendered file
+# alone (hash-object, mktree, commit-tree; the checkout is never touched)
+# and force-pushed in its place, so the default branch carries no board
+# commit, no pull request falls behind because of one, and protection of
+# the default branch never stands in the way; a ruleset must target only
+# the default branch for the same reason (docs/setup/github.md). A push
+# made with GITHUB_TOKEN starts no workflow, so this run cannot start itself
+# again. The same run comments once on a pull request that fell behind the
+# default branch after a push to it, and once on a pull request idle for
+# more than a day; the comments carry HTML markers so a second run posts
+# nothing twice. One run at a time; when events come in a burst GitHub
+# keeps only the newest waiting run, which renders the newest state, so no
+# finished board lags.
+#
+# The checkout is the default branch itself, whatever event started the
+# run, so the board describes that branch's head (git rev-parse HEAD
+# below). The branch's name comes from the event's repository object; a
+# scheduled run carries no such object, and there GITHUB_REF_NAME is that
+# branch. The job is skipped in the template repository itself, for a push
+# to any other branch, and for a pull request from a fork, whose token is
+# read-only. The last step tells the coordinator routine the board moved,
+# only when it did and the two secrets are set; it fails softly, so a
+# routine that did not answer never turns the board red.
+
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: board
+  cancel-in-progress: false
+
+env:
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch || github.ref_name }}
+
+jobs:
+  board:
+    if: >-
+      github.event.repository.is_template == false
+      && (github.event_name != 'push' || github.ref_name == github.event.repository.default_branch)
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+
+      - name: Fetch the previous board
+        id: previous
+        run: |
+          # By name, so a checkout made for one branch gets it too; no board
+          # yet is not a failure.
+          git fetch --quiet origin +refs/heads/board:refs/remotes/origin/board 2>/dev/null \
+            || echo "no board branch yet"
+          if git rev-parse --verify --quiet refs/remotes/origin/board >/dev/null; then
+            echo "since=$(git log -1 --format=%cI origin/board)" >> "$GITHUB_OUTPUT"
+          else
+            echo "since=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Render the board and comment on waiting pull requests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SINCE: ${{ steps.previous.outputs.since }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          if [ -n "$SINCE" ]; then
+            python3 tools/board.py --default-branch "$DEFAULT_BRANCH" --sha "$sha" --since "$SINCE" --out "$RUNNER_TEMP/STATE.md"
+          else
+            python3 tools/board.py --default-branch "$DEFAULT_BRANCH" --sha "$sha" --out "$RUNNER_TEMP/STATE.md"
+          fi
+
+      - name: Write the board to the branch board when it changed
+        id: board
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          rendered="$RUNNER_TEMP/STATE.md"
+          if git show origin/board:STATE.md > "$RUNNER_TEMP/previous.md" 2>/dev/null \
+             && cmp -s "$rendered" "$RUNNER_TEMP/previous.md"; then
+            echo "board unchanged"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sha7="$(git rev-parse HEAD | cut -c1-7)"
+          blob="$(git hash-object -w "$rendered")"
+          tree="$(printf '100644 blob %s\tSTATE.md\n' "$blob" | git mktree)"
+          commit="$(git commit-tree "$tree" -m "Board as of $sha7")"
+          git push --force --quiet origin "$commit:refs/heads/board"
+          echo "board written as $commit"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Tell the coordinator routine
+        if: steps.board.outputs.changed == 'true'
+        env:
+          TRIGGER_URL: ${{ secrets.COORDINATOR_TRIGGER_URL }}
+          TRIGGER_TOKEN: ${{ secrets.COORDINATOR_TRIGGER_TOKEN }}
+        run: |
+          if [ -z "$TRIGGER_URL" ] || [ -z "$TRIGGER_TOKEN" ]; then
+            echo "no coordinator trigger is set; skipped"
+            exit 0
+          fi
+          curl -fsS -X POST "$TRIGGER_URL" \
+            -H "Authorization: Bearer $TRIGGER_TOKEN" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "Content-Type: application/json" \
+            -d '{"text": "The board moved."}' \
+            || echo "the coordinator did not answer; the board is written anyway"

@@ -1,0 +1,19 @@
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node modules, should a project add any
+node_modules/
+
+# Environment files: never a secret in the repository
+.env
+.env.*
+
+# One person's own Claude Code settings and notes
+.claude/settings.local.json
+*.local.md
+
+# Operating system clutter
+.DS_Store
+Thumbs.db

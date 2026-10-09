@@ -1,0 +1,37 @@
+name: Checks
+
+# The project's fast checks on every pull request and every push to the
+# default branch: bash scripts/check.sh, which runs tools/check_docs.py (the
+# repository's documents are the Claude project's instructions and memory,
+# so a broken import or a stray secret is a broken project), the tests, and
+# whatever lines the project adds. Branch protection requires the job named
+# "check" (docs/setup/github.md). A newer push to the same branch cancels
+# the run still going, so nobody waits on a result that is already stale.
+# The runner's own python3 is used (3.12 on ubuntu-latest); swap in
+# actions/setup-python@v5 if the image ever moves below what the tools need.
+# The file names no branch, so no placeholder is needed here and template-init
+# never writes a workflow file (GITHUB_TOKEN may not change one): the push
+# trigger leaves out the claim branches, whose pull request runs the check, so
+# no run is ever skipped under the name "check" and a required check cannot be
+# satisfied by a skipped run.
+
+on:
+  pull_request:
+  push:
+    branches-ignore: ["claude/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the checks
+        run: bash scripts/check.sh
