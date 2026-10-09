@@ -22,44 +22,22 @@ then experiment/README.md and docs/history/experiment-research/README.md.
 
 ## Current state
 
-- Team mode (#14) is merged to main (#15): a lead plans an epic into
-  pre-assigned sub-issues, members work them in parallel and land by
-  auto-merge, the lead unblocks and integrates. A review in three lenses
-  with two skeptics per finding confirmed 13 defects; all are fixed in
-  the merged code. Not yet run live on a repository.
-- #10, on claude/10 (draft pull request #13), now has experiment/: a kit
-  that runs CooperBench's four-arm ablation in one Claude Code cloud
-  session with CooperBench's own runner and scorer under Docker inside
-  the session's container. Checked in this session with no Claude usage:
-  dockerd runs; images pull from mirror.gcr.io (Docker Hub answers 429);
-  the overlay adds claude, the redis client and the proxy CA; the gold
-  patches grade (click 2068 12/12, jinja 1621 10/10); a team run with a
-  shared remote came up whole and stopped only at the API's 401 for a
-  placeholder token. experiment/README.md has the steps, cost and
-  differences from the authors' run.
-- The kit needs CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) in the
-  cloud environment's settings, and a new session started after it is
-  added. Nothing has spent usage on the experiment yet.
-- #11 (draft #12) is unchanged: the guard rewrite as work in progress.
+- Team mode (#14) is merged to main (#15). Not yet run live.
+- #10, on claude/10 (draft pull request #13), all pushed, `bash scripts/check.sh` green (414 tests):
+  - experiment/: the kit that runs CooperBench's four-arm ablation in one cloud session with CooperBench's own runner (setup.sh, prepare_task.sh, run_arms.sh, report.py). The whole flash subset was prepared and its gold patches checked: 42 of 50 pairs grade here; 7 need hosts the network policy blocks (README table).
+  - experiment/coordbench/: coordination as a plug-in. An arm is a Claude Code plugin plus arm.py; the hub serves its tools over MCP (HTTP), a stdio bridge and shell commands; built-in arms solo, coop, coop-git, team (CooperBench's, prompt-parity tested) and sdlc (this repository's claim protocol with a real merge gate); drivers claude-cli and session; scoring by CooperBench's own evaluation. README.md is the contract.
+  - experiment/coordbench/REVIEW.md: 28 confirmed review findings, not yet fixed.
+- Nothing has run an agent on a task yet. The claude-cli driver needs CLAUDE_CODE_OAUTH_TOKEN in the environment's settings and a new session.
+- The plan's usage ran out on 2026-10-09 (weekly limit resets 2026-10-15, 11:00 UTC).
+- #11 (draft #12) is unchanged.
 
 ## Remaining tasks
 
-1. Owner: create the token, add it to the environment as
-   CLAUDE_CODE_OAUTH_TOKEN, start a new session on this repository.
-2. In that session: `bash experiment/setup.sh`, then the pilot on
-   pallets_click/2068 (prepare_task.sh, run_arms.sh), read the four
-   summary.json files and the usage it took, and only then the rest of
-   the flash subset, one task at a time.
-3. After the pilot, `python3 experiment/report.py` for the arms side by
-   side; decide on a second seed for the pairs where the arms disagree.
-4. #11: cut the rewrite back to the newline fix with its tests, or close
-   it and rely on branch protection.
-5. Owner's settings, by hand: import docs/setup/ruleset-main.json, turn on
-   "Automatically delete head branches", secret scanning and push
-   protection; run /install-github-app; for team mode set CLAUDE_WORKER
-   and CLAUDE_TEAM and allow auto-merge.
-6. Re-make the test repository (sdlc-template-test) from the current
-   template.
+1. Fix experiment/coordbench/REVIEW.md, blocking ones first, then delete it; run check.sh; push.
+2. Owner: `claude setup-token`, add CLAUDE_CODE_OAUTH_TOKEN to the environment, start a new session.
+3. Pilot on pallets_click/2068: CooperBench's runner (experiment/run_arms.sh) and coordbench (run.py) for the same arm, to calibrate the harness; then the arms on the 42 pairs; experiment/report.py.
+4. #11: cut the guard rewrite to the newline fix, or close it.
+5. Owner's settings by hand: import docs/setup/ruleset-main.json, auto-delete head branches, secret scanning and push protection, /install-github-app; for team mode CLAUDE_WORKER, CLAUDE_TEAM and auto-merge.
 
 ## Decisions
 
