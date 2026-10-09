@@ -49,6 +49,10 @@ STATE_PATH = Path("STATE.md")
 CLAIM_BRANCH_PREFIX = "claude/"
 CLAIM_DIR = "docs/agents/claims"
 NO_CLAIM_FILE = "no claim file yet"
+# A claim branch that outlived its issue: the row stays, and says what to do.
+ISSUE_CLOSED = "issue closed"
+DELETE_BRANCH = "delete the branch"
+ACCOUNT_LABEL_PREFIX = "account:"
 
 MAIN_MOVED_MARKER = "<!-- sdlc-board: main-moved {sha} -->"
 IDLE_MARKER = "<!-- sdlc-board: idle -->"
@@ -64,7 +68,7 @@ PULL_COLUMNS = ("PR", "Title", "Branch", "State (clean, behind, conflicting, blo
 QUEUE_HEADING = "## Queue (open issues labelled todo, unclaimed)"
 ISSUE_COLUMNS = ("Issue", "Title", "Labels")
 BLOCKER_HEADING = "## Blockers (open issues labelled blocker)"
-MERGED_HEADING = "## Merged since the previous board"
+MERGED_HEADING = f"## Recently merged (the last {RECENT_MERGED})"
 MERGED_COLUMNS = ("PR", "Title", "Branch", "Merged")
 
 ACCOUNT_LINE = re.compile(r"^\W*account\W*:\s*(.+?)\s*$", re.IGNORECASE)
@@ -212,27 +216,39 @@ def claim_text(api, branch):
     return base64.b64decode(found.get("content") or "").decode("utf-8", "replace")
 
 
-def merged_since(api, since):
-    """The pull requests merged after the previous board, read newest-updated
-    first and no further than needed: a pull request last updated before that
-    board was merged before it too, so the paging stops at the first one.
-    With no previous board, the five most recently merged on the first page."""
-    merged = []
+def recent_merged(api):
+    """The pull requests merged last, newest first, at most RECENT_MERGED, from
+    the first page of closed pull requests by last update (a hundred). The
+    list depends on the repository alone, so two runs in a row render the
+    same one. It used to be the merges since the previous board's commit, and
+    a merge fires two runs (the pull request closing and the push to the
+    default branch): the second measured from the first's commit and lost
+    the merge it had just reported."""
     for page in api.pages(f"/repos/{api.repo}/pulls", {"state": "closed", "sort": "updated", "direction": "desc"}):
-        for pull in page:
-            if since is not None and parse_time(pull["updated_at"]) < since:
-                return merged
-            if pull.get("merged_at") and (since is None or parse_time(pull["merged_at"]) > since):
-                merged.append(pull)
-        if since is None:
-            break
-    if since is None:
+        merged = [p for p in page if p.get("merged_at")]
         merged.sort(key=lambda p: p["merged_at"], reverse=True)
         return merged[:RECENT_MERGED]
-    return merged
+    return []
 
 
-def collect(api, since, sha, default_branch):
+def claim_issues(api, branches, open_issues):
+    """The issue behind each claim branch, by number: the state and the label
+    names. An open issue comes from the list already read; any other takes one
+    call, so the board can say that a branch outlived its issue. A branch
+    whose name is not a number has none."""
+    by_number = {str(i["number"]): i for i in open_issues}
+    found = {}
+    for branch in claim_branches(branches):
+        key = claim_key(branch)
+        if not key.isdigit():
+            continue
+        issue = by_number.get(key) or api.get(f"/repos/{api.repo}/issues/{key}", missing_ok=True)
+        if issue is not None:
+            found[key] = {"state": issue.get("state", ""), "labels": label_names(issue)}
+    return found
+
+
+def collect(api, sha, default_branch):
     """Everything the board renders, in the shape a --dry-run fixture has."""
     repo = api.repo
     issues = [i for i in api.get_all(f"/repos/{repo}/issues", {"state": "open"}) if "pull_request" not in i]
@@ -246,7 +262,8 @@ def collect(api, since, sha, default_branch):
         "pulls": pulls,
         "branches": branches,
         "claims": claims,
-        "merged": merged_since(api, since),
+        "claim_issues": claim_issues(api, branches, issues),
+        "merged": recent_merged(api),
     }
 
 
@@ -331,24 +348,48 @@ def table(columns, rows):
     return lines
 
 
+def account_label(issue):
+    """The account an issue's label names (account:main gives main), or None."""
+    for name in label_names(issue or {}):
+        if name.startswith(ACCOUNT_LABEL_PREFIX):
+            return name[len(ACCOUNT_LABEL_PREFIX):]
+    return None
+
+
+def claim_row(key, branch, text, pull, issue):
+    """One claim as the board shows it. The account is the claim file's, or
+    the issue's label once the finishing pull request has deleted the file.
+    A branch whose issue is closed is a leftover: the row says so in place of
+    the pull request and asks for the branch to go in place of the files."""
+    closed = bool(issue) and issue.get("state") == "closed"
+    if pull:
+        files = sorted(pull.get("files") or [])
+    else:
+        files = claim_files(text) if text else []
+    if pull:
+        pull_cell = f"#{pull['number']}"
+    elif closed:
+        pull_cell = ISSUE_CLOSED
+    else:
+        pull_cell = "(no pull request yet)"
+    if files:
+        files_cell = ", ".join(files)
+    elif closed and not pull:
+        files_cell = DELETE_BRANCH
+    else:
+        files_cell = "-"
+    account = claim_account(text) if text else (account_label(issue) or NO_CLAIM_FILE)
+    return [issue_ref(key), branch, account, pull_cell, files_cell]
+
+
 def claim_rows(snap):
     pulls_by_branch = {p["head"]["ref"]: p for p in snap["pulls"]}
+    issues = snap.get("claim_issues") or {}
     rows = []
     for branch in sorted(claim_branches(snap["branches"]), key=lambda b: by_number(claim_key(b))):
         key = claim_key(branch)
         text = (snap.get("claims") or {}).get(key)
-        pull = pulls_by_branch.get(branch)
-        if pull:
-            files = sorted(pull.get("files") or [])
-        else:
-            files = claim_files(text) if text else []
-        rows.append([
-            issue_ref(key),
-            branch,
-            claim_account(text) if text else NO_CLAIM_FILE,
-            f"#{pull['number']}" if pull else "(no pull request yet)",
-            ", ".join(files) if files else "-",
-        ])
+        rows.append(claim_row(key, branch, text, pulls_by_branch.get(branch), issues.get(key)))
     return rows
 
 
@@ -379,7 +420,7 @@ def issue_rows(snap, label, unclaimed_only):
 def merged_rows(snap):
     return [
         [f"#{p['number']}", p.get("title", ""), p["head"]["ref"], p.get("merged_at", "")]
-        for p in sorted(snap.get("merged") or [], key=lambda p: p["number"])
+        for p in sorted(snap.get("merged") or [], key=lambda p: p.get("merged_at") or "", reverse=True)
     ]
 
 
@@ -464,7 +505,6 @@ def parse_args(argv):
     parser.add_argument("--dry-run", metavar="FIXTURE", help="render this JSON snapshot instead of asking GitHub")
     parser.add_argument("--render-only", action="store_true", help="write the board and post no comment")
     parser.add_argument("--out", help=f"where to write the board (default: {STATE_PATH} in the current directory; stdout with --dry-run)")
-    parser.add_argument("--since", help="ISO 8601 time of the previous board's commit, for the merged section")
     parser.add_argument("--default-branch", default="main", help="the default branch's name (default: main)")
     parser.add_argument("--sha", help="the default branch's commit the board describes (default: GITHUB_SHA)")
     return parser.parse_args(argv)
@@ -487,9 +527,8 @@ def run_live(args):
         raise BoardError("GITHUB_TOKEN and GITHUB_REPOSITORY must be set")
     event = env.get("GITHUB_EVENT_NAME", "")
     ref_name = env.get("GITHUB_REF_NAME", "")
-    since = parse_time(args.since) if args.since else None
     api = GitHub(token, repo)
-    snap = collect(api, since, args.sha or env.get("GITHUB_SHA", ""), args.default_branch)
+    snap = collect(api, args.sha or env.get("GITHUB_SHA", ""), args.default_branch)
     out = Path(args.out) if args.out else STATE_PATH
     changed = write_if_changed(out, render(snap))
     print(f"{out.as_posix()}: {'rewritten' if changed else 'unchanged'}")

@@ -3,7 +3,7 @@ name: Board
 # Keeps the board, the file STATE.md on the branch "board", equal to what
 # GitHub knows: the open issues, the claude/<issue> branches and their claim
 # files, the open pull requests with how far each is from the default
-# branch, and what merged since the previous board. Every Claude session and
+# branch, and the five pull requests merged last. Every Claude session and
 # every account reads it before claiming work (git fetch origin board &&
 # git show origin/board:STATE.md; the session hook prints it).
 # tools/board.py renders it from the REST API with GITHUB_TOKEN alone (no
@@ -27,7 +27,9 @@ name: Board
 # run, so the board describes that branch's head (git rev-parse HEAD
 # below). The branch's name comes from the event's repository object; a
 # scheduled run carries no such object, and there GITHUB_REF_NAME is that
-# branch. The job is skipped in the template repository itself, for a push
+# branch. A branch made or deleted starts a run too, so a claim shows the
+# moment it is pushed and a merged claim's branch leaves the board when it
+# goes. The job is skipped in the template repository itself, for a push
 # to any other branch, and for a pull request from a fork, whose token is
 # read-only. The last step tells the coordinator routine the board moved,
 # only when it did and the two secrets are set; it fails softly, so a
@@ -35,6 +37,8 @@ name: Board
 
 on:
   push:
+  create:
+  delete:
   pull_request:
     types: [opened, synchronize, reopened, closed]
   issues:
@@ -68,29 +72,17 @@ jobs:
           ref: ${{ env.DEFAULT_BRANCH }}
 
       - name: Fetch the previous board
-        id: previous
         run: |
           # By name, so a checkout made for one branch gets it too; no board
-          # yet is not a failure.
+          # yet is not a failure. It is only compared with, below.
           git fetch --quiet origin +refs/heads/board:refs/remotes/origin/board 2>/dev/null \
             || echo "no board branch yet"
-          if git rev-parse --verify --quiet refs/remotes/origin/board >/dev/null; then
-            echo "since=$(git log -1 --format=%cI origin/board)" >> "$GITHUB_OUTPUT"
-          else
-            echo "since=" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Render the board and comment on waiting pull requests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SINCE: ${{ steps.previous.outputs.since }}
         run: |
-          sha="$(git rev-parse HEAD)"
-          if [ -n "$SINCE" ]; then
-            python3 tools/board.py --default-branch "$DEFAULT_BRANCH" --sha "$sha" --since "$SINCE" --out "$RUNNER_TEMP/STATE.md"
-          else
-            python3 tools/board.py --default-branch "$DEFAULT_BRANCH" --sha "$sha" --out "$RUNNER_TEMP/STATE.md"
-          fi
+          python3 tools/board.py --default-branch "$DEFAULT_BRANCH" --sha "$(git rev-parse HEAD)" --out "$RUNNER_TEMP/STATE.md"
 
       - name: Write the board to the branch board when it changed
         id: board

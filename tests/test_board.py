@@ -65,6 +65,26 @@ class Rendering(unittest.TestCase):
         self.assertIn("| #13 | claude/13 | no claim file yet | #41 | .claude/skills/remember/SKILL.md |", self.text)
         self.assertNotIn("| main |", self.text.split(board.PULL_HEADING)[0].split("| #12")[0])
 
+    def test_a_claim_whose_issue_is_closed_says_so_and_asks_for_the_branch_to_go(self):
+        snap = snapshot()
+        snap["branches"].append("claude/3")
+        snap["claim_issues"] = {"3": {"state": "closed", "labels": ["account:main", "claimed", "todo"]}}
+        self.assertIn("| #3 | claude/3 | main | issue closed | delete the branch |", board.render(snap))
+
+    def test_a_released_claim_file_takes_the_account_from_the_issue_label(self):
+        snap = snapshot()
+        snap["claim_issues"] = {"13": {"state": "open", "labels": ["account:second", "claimed"]}}
+        self.assertIn("| #13 | claude/13 | second | #41 | .claude/skills/remember/SKILL.md |", board.render(snap))
+
+    def test_merged_rows_come_newest_first(self):
+        snap = snapshot()
+        snap["merged"] = [
+            {"number": 30, "title": "Older", "head": {"ref": "claude/30"}, "merged_at": "2026-09-20T10:00:00Z"},
+            {"number": 29, "title": "Newer", "head": {"ref": "claude/29"}, "merged_at": "2026-09-21T10:00:00Z"},
+        ]
+        text = board.render(snap)
+        self.assertLess(text.index("| #29 |"), text.index("| #30 |"))
+
     def test_a_claim_without_a_pull_request_shows_the_files_it_names(self):
         snap = snapshot()
         snap["branches"].append("claude/16")
@@ -290,42 +310,42 @@ class Client(unittest.TestCase):
         self.assertFalse(board.comment_once(api, 40, board.IDLE_MARKER, board.IDLE_TEXT))
         self.assertEqual(len(opener.calls), 1)
 
-    def test_merged_since_stops_paging_at_the_first_pull_older_than_since(self):
-        since = board.parse_time("2026-09-20T00:00:00Z")
-        first = [
-            closed_pull(50, "2026-09-22T10:00:00Z", "2026-09-21T10:00:00Z"),
-            closed_pull(49, "2026-09-21T10:00:00Z", None),
-            closed_pull(48, "2026-09-20T12:00:00Z", "2026-09-19T12:00:00Z"),
-            closed_pull(47, "2026-09-19T12:00:00Z", "2026-09-19T12:00:00Z"),
-        ]
-        opener = FakeOpener({
-            CLOSED_FIRST: FakeAnswer(first, {"Link": f'<{board.API}{CLOSED_SECOND}>; rel="next"'}),
-            CLOSED_SECOND: FakeAnswer([closed_pull(46, "2026-09-18T00:00:00Z", "2026-09-18T00:00:00Z")]),
-        })
-        api = board.GitHub("t", "o/r", opener=opener)
-        merged = board.merged_since(api, since)
-        self.assertEqual([p["number"] for p in merged], [50])
-        self.assertEqual(len(opener.calls), 1)
-
-    def test_merged_since_reads_on_while_every_pull_is_newer_than_since(self):
-        since = board.parse_time("2026-09-01T00:00:00Z")
-        opener = FakeOpener({
-            CLOSED_FIRST: FakeAnswer([closed_pull(50, "2026-09-22T10:00:00Z", "2026-09-21T10:00:00Z")], {"Link": f'<{board.API}{CLOSED_SECOND}>; rel="next"'}),
-            CLOSED_SECOND: FakeAnswer([closed_pull(49, "2026-09-20T00:00:00Z", "2026-09-19T00:00:00Z")]),
-        })
-        api = board.GitHub("t", "o/r", opener=opener)
-        merged = board.merged_since(api, since)
-        self.assertEqual([p["number"] for p in merged], [50, 49])
-        self.assertEqual(len(opener.calls), 2)
-
-    def test_merged_since_without_a_previous_board_takes_the_five_most_recent(self):
+    def test_recent_merged_takes_the_five_merged_last_from_the_first_page(self):
         page = [closed_pull(n, "2026-09-22T10:00:00Z", f"2026-09-{n:02d}T10:00:00Z") for n in range(1, 9)]
+        page.append(closed_pull(9, "2026-09-23T10:00:00Z", None))
         opener = FakeOpener({
             CLOSED_FIRST: FakeAnswer(page, {"Link": f'<{board.API}{CLOSED_SECOND}>; rel="next"'}),
         })
         api = board.GitHub("t", "o/r", opener=opener)
-        merged = board.merged_since(api, None)
+        merged = board.recent_merged(api)
         self.assertEqual([p["number"] for p in merged], [8, 7, 6, 5, 4])
+        self.assertEqual(len(opener.calls), 1)
+
+    def test_recent_merged_is_the_same_list_each_time_it_is_asked(self):
+        # A merge fires two runs; the list depends on the repository alone, so
+        # the second run reports the same merge the first did.
+        page = [closed_pull(50, "2026-09-22T10:00:00Z", "2026-09-22T10:00:00Z")]
+        opener = FakeOpener({CLOSED_FIRST: FakeAnswer(page)})
+        api = board.GitHub("t", "o/r", opener=opener)
+        self.assertEqual(board.recent_merged(api), board.recent_merged(api))
+        self.assertEqual([p["number"] for p in board.recent_merged(api)], [50])
+
+    def test_recent_merged_with_no_closed_pull_requests_is_empty(self):
+        opener = FakeOpener({CLOSED_FIRST: FakeAnswer([])})
+        api = board.GitHub("t", "o/r", opener=opener)
+        self.assertEqual(board.recent_merged(api), [])
+
+    def test_claim_issues_reads_only_the_issues_the_open_list_lacks(self):
+        opener = FakeOpener({
+            "/repos/o/r/issues/3": FakeAnswer({"number": 3, "state": "closed", "labels": [{"name": "account:main"}, {"name": "todo"}]}),
+        })
+        api = board.GitHub("t", "o/r", opener=opener)
+        open_issues = [{"number": 14, "state": "open", "labels": [{"name": "todo"}]}]
+        found = board.claim_issues(api, ["main", "claude/3", "claude/14", "claude/x"], open_issues)
+        self.assertEqual(found, {
+            "3": {"state": "closed", "labels": ["account:main", "todo"]},
+            "14": {"state": "open", "labels": ["todo"]},
+        })
         self.assertEqual(len(opener.calls), 1)
 
 
