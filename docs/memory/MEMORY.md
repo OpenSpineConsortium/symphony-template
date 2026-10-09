@@ -4,3 +4,4 @@ One line per fact under docs/memory/: a dash, the fact's title as a link to its 
 
 - [CI runs Python 3.12](ci-python-is-3-12.md): the checks run on GitHub's 3.12, so tools and tests use no API newer than that; test with python3.12 where it exists.
 - [How this repository works](how-this-repository-works.md): the repository is the shared plane for every Claude account and session; what lives where.
+- [@claude runs on the main account's subscription](claude-mentions-run-on-the-main-accounts-subscription.md): mentions run .github/workflows/claude.yml on the token from `claude setup-token`, spending plan limits, never an API key.

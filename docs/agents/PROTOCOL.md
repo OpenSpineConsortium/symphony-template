@@ -28,7 +28,7 @@ Open a draft pull request at once, from the branch to the default branch, with "
 
 ## Finish
 
-The pull request deletes its claim file, says "Closes #N", passes `bash scripts/check.sh` and is marked ready; the issue gets the label in-review. The owner merges; the merge closes the issue, and the next board no longer lists the claim. Delete the branch after the merge if the repository does not do it by itself (docs/setup/github.md).
+The pull request deletes its claim file, says "Closes #N", passes `bash scripts/check.sh` and is marked ready; the issue gets the label in-review. The owner merges; the merge closes the issue, and the next board no longer lists the claim. Delete the branch after the merge if the repository does not do it by itself (docs/setup/github.md). An issue closed without a merge loses its branch too: .github/workflows/tidy.yml deletes `claude/<issue>` once no open pull request uses it.
 
 ## Blockers
 

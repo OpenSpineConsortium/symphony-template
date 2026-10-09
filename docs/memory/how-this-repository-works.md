@@ -13,9 +13,10 @@ A claude.ai Project belongs to one account, and its memory is private to that ac
 - docs/agents/routines/coordinator.md: the prompt of the routine the main account runs once a second account joins, which keeps the queue, the claims and the memory tidy.
 - docs/history/: where longer records will go; today it holds only its README.
 - .claude/skills/: the three procedures, claim, remember and checkpoint.
-- docs/setup/: github.md, what a person with the repository's settings does once, and claude-project.md, how each account makes its thin Project with blank fields.
-- scripts/check.sh and tools/: the checks CI runs as "check", the board's renderer, the template's one-time initialiser and the marker-section helper the checkpoint skill uses.
+- .claude/settings.json, .claude/hooks/ and .claude/commands/: the session hook that prints the board, the push guard that refuses a push the board rules forbid (tools/guard_push.py), the edit check that runs the document checks the moment an instruction or memory file changes (tools/check_edit.py), the shared permission allowlist, and /board, which reprints the whole board mid-session.
+- docs/setup/: github.md, what a person with the repository's settings does once; claude-project.md, how each account makes its thin Project with blank fields; and claude-action.md, how the main account turns on @claude in issues and pull requests.
+- scripts/check.sh and tools/: the checks CI runs as "check", the board's renderer, the hooks' push guard and edit check, the template's one-time initialiser and the marker-section helper the checkpoint skill uses.
 
-The claude.ai Project is thin on purpose: it links the repository, its instructions, description and memory stay blank (the pointer text only for chats outside code sessions), nothing is copied into it, and nothing scripts it; a thread of a Project and a cloud session opened on the repository load the same files. Nothing in this repository holds a credential or a token, and no API key is used anywhere.
+The claude.ai Project is thin on purpose: it links the repository, its instructions, description and memory stay blank (the pointer text only for chats outside code sessions), nothing is copied into it, and nothing scripts it; a thread of a Project and a cloud session opened on the repository load the same files. Nothing in this repository holds a credential or a token, and no API key is used anywhere; when @claude is turned on, its workflow runs on the main account's subscription token, held in the repository's Actions secrets, never in a file (docs/setup/claude-action.md).
 
 Source: the template this repository was made from, its first layer.

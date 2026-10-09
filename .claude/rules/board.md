@@ -9,3 +9,5 @@ Before any change in this repository:
 One issue, one branch `claude/<issue>`, one pull request. Claim with the claim skill (.claude/skills/claim) before the first change to any other file, and open the draft pull request at once.
 
 Never push to a branch another account claimed. Never force-push the default branch or any branch that is not your own claim; after a rebase, your own claim branch takes `git push --force-with-lease`, and nothing else ever does. When the board comments "main moved" on your pull request, rebase on the default branch and push again. An issue labelled blocker is claimed like any other, and nobody fixes it in parallel.
+
+A hook enforces the push rules before they can be broken: tools/guard_push.py, wired in .claude/settings.json, refuses a push to the default or board branch, a plain --force anywhere, and --force-with-lease outside your own claude/ branch. A refusal is the rule working, not an obstacle; the answer is a pull request, a rebase or another branch, never a way around the hook. Branch protection on GitHub (docs/setup/github.md) stands behind it.

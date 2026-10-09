@@ -1,0 +1,53 @@
+name: Claude
+
+# Runs a Claude Code session when a person or a routine writes @claude on
+# an issue, a pull request or a review: answer a question, take a fix, do
+# what the comment asks, under the same CLAUDE.md and rules every other
+# session reads. Authentication is the main account's subscription OAuth
+# token in the repository secret CLAUDE_CODE_OAUTH_TOKEN, made with
+# `claude setup-token` (docs/setup/claude-action.md): a run draws on that
+# account's plan limits and bills no API. Until the secret is set, every
+# run ends at the first step with a pointer and does nothing, so the
+# template works without it. The turn cap keeps one runaway mention from
+# spending the owner's five-hour window.
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [opened, assigned]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      id-token: write
+    env:
+      HAVE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+    steps:
+      - name: Point at the setup when the token is not there
+        if: env.HAVE_TOKEN != 'true'
+        run: echo "The repository secret CLAUDE_CODE_OAUTH_TOKEN is not set; docs/setup/claude-action.md says how. Doing nothing."
+      - uses: actions/checkout@v7
+        if: env.HAVE_TOKEN == 'true'
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        if: env.HAVE_TOKEN == 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 50
