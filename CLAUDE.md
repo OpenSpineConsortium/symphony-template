@@ -12,7 +12,7 @@ Before any work: fetch, read the board, check the claim on the issue you mean to
 
 ## When this repository is linked to a Project
 
-If you are a thread of a claude.ai Project whose instructions do not contain "Read CLAUDE.md first", the Project was just linked and is not set up yet: run the bootstrap skill (.claude/skills/bootstrap) before anything else, then carry on with what you were started for. It writes the Project's instructions and makes the worker routine from the repository, so the person types nothing. A terminal session has no Project and skips this.
+If you are a thread of a claude.ai Project whose instructions do not contain "Read CLAUDE.md first", the Project was just linked and is not set up yet: run the bootstrap skill (.claude/skills/bootstrap) before anything else, then carry on with what you were started for. It composes the Project's instructions, memory and worker routine from the repository's files and has the Project's own Claude offer them as one card, applied on the person's tap, so the person types nothing. A terminal session has no Project and skips this.
 
 ## Shared memory
 
