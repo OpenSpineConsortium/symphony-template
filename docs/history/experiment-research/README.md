@@ -1,32 +1,22 @@
-# Research for the collaboration experiment (working material for #10)
+# Research for the collaboration experiment (the record for #10)
 
-This folder is what a research run found before it was stopped on
-2026-10-09 to save the main account's usage. It holds the summary below,
-claims.json (every claim the four researchers made, each with its source,
-its exact quote and how far verification got), and research-workflow.js
-(the workflow script that ran it, kept so the rest can be finished). It
-is working material for issue #10: the pull request that finishes the
-harness condenses it or removes it, since every copy of the template
-would otherwise carry it.
+What a research run found on 2026-10-09 before the design of the
+experiment (experiment/README.md, experiment/coordbench/README.md) was
+settled. Four researchers made 179 claims; the 130 marked load-bearing
+were each put to three skeptics who tried to refute them from the
+source, and 207 of the 390 verdicts were in when the run was stopped to
+save the main account's usage. Everything below survived that
+verification; the claims that were not reached (all of GitHub's and
+Claude's mechanics beyond those listed) were either checked later by the
+sessions that built the setup pages (docs/setup/) or left out. The run's
+raw claims and its workflow script were kept here as working material
+until the harness was built, and were removed then; this page is the
+condensed record.
 
-## How far the run got
-
-Four researchers made 179 claims; 130 were marked load-bearing and each
-was put to three skeptics who tried to refute it from the source. 207 of
-the 390 verdicts were in when the run stopped:
-
-| Topic | Confirmed | Refuted | Not reached | Not load-bearing |
-| --- | --- | --- | --- | --- |
-| CooperBench | 13 | 7 | 0 | 13 |
-| Related evidence | 26 | 11 | 0 | 10 |
-| GitHub mechanics | 9 | 2 | 18 (2 undecided) | 18 |
-| Claude mechanics | 0 | 0 | 42 | 8 |
-
-A refuted claim is usually right in its numbers and wrong in one part;
-claims.json keeps each skeptic's correction. The network policy blocked
-arxiv.org, openreview.net, docs.github.com and most paper hosts, so the
-paper was read from the authors' own copy in cooperbench/website (commit
-97dbb0a) and GitHub's docs from the github/docs source (commit 9f65179).
+The network policy blocked arxiv.org, openreview.net, docs.github.com and
+most paper hosts, so the paper was read from the authors' own copy in
+cooperbench/website (commit 97dbb0a) and GitHub's docs from the
+github/docs source (commit 9f65179).
 
 ## What CooperBench measured (verified)
 
@@ -103,13 +93,15 @@ paper was read from the authors' own copy in cooperbench/website (commit
   and every Claude-side mechanic (claude-code-action's execution_file
   contents, concurrent sessions on one subscription token, agent teams).
 
-## What this means for the design
+## What this meant for the design
 
 On GitHub, this template's claim branches are visible to every agent
 through the shared remote, so the PR-gated protocol is closer to the
 ablation's shared-remote arm than to CooperBench's isolated Coop arm.
 The honest question for the experiment is therefore which of these wins
-on the same tasks at the same budget:
+on the same tasks at the same budget, which is what experiment/coordbench
+was built to measure (its arms solo, coop, coop-git, team and sdlc map onto
+these four):
 
 1. Solo: one agent takes every issue in turn.
 2. PR-gated with visibility: this template as it stands, N agents.
@@ -125,11 +117,3 @@ final merged default branch with each task's acceptance tests, and record
 makespan, CI failures, rebases and force pushes, textual conflicts, and
 tokens. Use more tasks than harness-lab's 40, and fix the analysis before
 the first run.
-
-## Resuming
-
-To finish the verification cheaply, put only the unreached claims in
-claims.json (status "not reached before the stop") to one skeptic each,
-or check the few the design depends on by hand. The full run's three
-skeptics per claim was the expensive choice; the whole night's background
-agents used tens of millions of tokens.
