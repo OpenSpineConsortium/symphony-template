@@ -4,7 +4,9 @@ Written 2026-10-09 by the main account's cloud session. This is the full
 checkpoint of the work on claude/10; main's own .claude/session.md points
 here. Read this first, then experiment/README.md,
 experiment/coordbench/README.md (the plug-in contract) and
-experiment/coordbench/REVIEW.md (what to fix first).
+experiment/coordbench/REVIEW.md (what to fix first). The owner's
+steps (accounts, tokens, secrets, variables) are in
+docs/setup/owner-checklist.md.
 
 ## Completed work
 
@@ -37,7 +39,7 @@ experiment/coordbench/REVIEW.md (what to fix first).
 ## Remaining tasks
 
 1. Fix experiment/coordbench/REVIEW.md, blocking ones first, then delete it; run check.sh; push.
-2. Owner: `claude setup-token`, add CLAUDE_CODE_OAUTH_TOKEN to the environment, start a new session.
+2. Owner: every authorization, token, secret, variable and setting is in docs/setup/owner-checklist.md (for the experiment: `claude setup-token`, CLAUDE_CODE_OAUTH_TOKEN as an environment variable of the cloud environment, a new session).
 3. Pilot on pallets_click/2068: CooperBench's runner (experiment/run_arms.sh) and coordbench (run.py) for the same arm, to calibrate the harness; then the arms on the 42 pairs; experiment/report.py.
 4. #11: cut the guard rewrite to the newline fix, or close it.
 5. Owner's settings by hand: import docs/setup/ruleset-main.json, auto-delete head branches, secret scanning and push protection, /install-github-app; for team mode CLAUDE_WORKER, CLAUDE_TEAM and auto-merge.
