@@ -44,3 +44,4 @@ A claim with no commit for 24 hours is released by the coordinator routine (docs
 - Never push to another account's branch. Never force-push the default branch or any branch that is not your own claim.
 - Memory rides in the same pull request as the change it came from (.claude/rules/memory.md).
 - `bash scripts/check.sh` passes before a pull request is marked ready.
+- CI holds a `claude/<issue>` pull request to this protocol (tools/check_protocol.py, part of the required check): the claim file is there while the pull request is a draft, gone once it is ready, the body closes its issue, and the branch lives in this repository.
