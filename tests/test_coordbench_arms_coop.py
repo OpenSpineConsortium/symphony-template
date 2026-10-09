@@ -394,6 +394,29 @@ class MessagingTest(unittest.TestCase):
         entry = json.loads(call(run, "agent2", "receive_messages"))[0]
         self.assertEqual(set(entry), {"from", "to", "content", "timestamp", "timestamp_iso"})
 
+    def test_a_drain_whose_reply_was_never_written_puts_the_messages_back(self):
+        # The hub runs the call's undo when the client was gone before the
+        # answer was written (a broken pipe, as in the pilot): the drained
+        # messages go back at the head of the inbox, in order, ahead of
+        # what arrived since, and the record keeps the handover and its
+        # loss, so a reader does not count them received twice.
+        for name in ("coop", "coop-git"):
+            with self.subTest(arm=name):
+                arm, run = new_run(name)
+                for text in ("one", "two"):
+                    call(run, "agent1", "send_message", to="agent2", text=text)
+                drain = Call(run, "agent2", {})
+                drained = json.loads(arm.tools_for(run, "agent2")["receive_messages"].handler(drain))
+                self.assertEqual([m["content"] for m in drained], ["one", "two"])
+                self.assertEqual(call(run, "agent2", "peek_messages"), "0")
+                call(run, "agent1", "send_message", to="agent2", text="three")
+                drain.lost()
+                self.assertEqual(call(run, "agent2", "peek_messages"), "3")
+                self.assertEqual([m["content"] for m in json.loads(call(run, "agent2", "receive_messages"))],
+                                 ["one", "two", "three"])
+                self.assertEqual([(e["kind"], e["count"]) for e in run.events if e["kind"].startswith("receive")],
+                                 [("receive", 2), ("receive_lost", 2), ("receive", 3)])
+
 
 class MetricsTest(unittest.TestCase):
     def test_coop_metrics_count_messages_and_each_tools_calls(self):

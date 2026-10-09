@@ -2,7 +2,10 @@
 MCP client sees of the hub, so these pin both against a small fake of the
 hub's /rpc and /mcp endpoints served on an ephemeral port: the commands'
 argument mapping (argv and flags) and exit codes, the wrappers install
-writes, and the bridge's session handling, streaming, and errors."""
+writes, and the bridge's session handling, streaming, and errors. The
+stdin rule and the typing of words are also run as drivers.py runs a
+command, cli.py as a subprocess with stdin at /dev/null, since that is
+where the in-process runs with a patched stdin missed two regressions."""
 
 import io
 import json
@@ -29,9 +32,11 @@ TEXT = {"type": "string"}
 BOOLEAN = {"type": "boolean"}
 TOOLS = [
     # send_message takes one word per name and is marked for stderr, as
-    # kit lists it, so its echo lands on stderr in the tests of it.
+    # kit lists it, so its echo lands on stderr in the tests of it. The
+    # "required" lists are the arms' own: coop_msg.py's content and
+    # coop_task.py's body are optional positionals, the rest are not.
     {"name": "send_message", "description": "Send a message to one peer, by agent id.",
-     "inputSchema": {"type": "object", "properties": {"to": TEXT, "text": TEXT},
+     "inputSchema": {"type": "object", "properties": {"to": TEXT, "text": TEXT}, "required": ["to"],
                      "x-coordbench-prints": "stderr"},
      "alias": "coop-send", "argv": ["to", "text"]},
     {"name": "broadcast", "description": "Send a message to every other agent.",
@@ -40,8 +45,11 @@ TOOLS = [
     {"name": "receive_messages", "description": "Drain your inbox.",
      "inputSchema": {"type": "object", "properties": {}}, "alias": "coop-recv", "argv": []},
     {"name": "claim_task", "description": "Claim a task by number.",
-     "inputSchema": {"type": "object", "properties": {"task_id": {"type": "integer"}}},
+     "inputSchema": {"type": "object", "properties": {"task_id": {"type": "integer"}}, "required": ["task_id"]},
      "alias": "", "argv": ["task_id"]},
+    {"name": "task_create", "description": "Create a task and print its id.",
+     "inputSchema": {"type": "object", "properties": {"title": TEXT, "assign": TEXT}, "required": ["title"]},
+     "alias": "coop-task-create", "argv": ["title"], "flags": {"--assign": "assign"}},
     {"name": "wait_for_message", "description": "Block until a message arrives.\nPrefer it to polling.",
      "inputSchema": {"type": "object", "properties": {"timeout_ms": {"type": "integer"}}},
      "alias": "", "argv": []},
@@ -55,16 +63,20 @@ TOOLS = [
     # one word per positional, as coop_task.py does, and no shipped arm
     # uses "..." any more.
     {"name": "task_update", "description": "Set the status of a task you own.",
-     "inputSchema": {"type": "object", "properties": {"task_id": TEXT, "status": TEXT, "note": TEXT}},
+     "inputSchema": {"type": "object", "properties": {"task_id": TEXT, "status": TEXT, "note": TEXT},
+                     "required": ["task_id", "status"]},
      "alias": "coop-task-update", "argv": ["task_id", "status"], "flags": {"-n": "note", "--note": "note"}},
     {"name": "task_list", "description": "Every task on the list.",
      "inputSchema": {"type": "object", "properties": {"mine": BOOLEAN, "open": BOOLEAN}},
      "alias": "coop-task-list", "argv": [], "flags": {"--mine": "mine", "--open": "open"}},
     {"name": "request", "description": "Send a typed request.",
      "inputSchema": {"type": "object", "properties": {"recipient": TEXT, "kind": TEXT, "body": TEXT,
-                                                      "wait": {"type": "number"}}},
+                                                      "wait": {"type": "number"}},
+                     "required": ["recipient", "kind"]},
      "alias": "coop-request", "argv": ["recipient", "kind", "body..."], "flags": {"--wait": "wait"}},
 ]
+ALIASES = {"coop-send", "coop-broadcast", "coop-recv", "coop-task-create", "coop-task-update", "coop-task-list",
+           "coop-request"}
 PROMPT = "You are agent1. Implement feature 1."
 RPC_PATH = "/rpc/run1/agent1"
 MCP_PATH = "/mcp/run1/agent1"
@@ -123,8 +135,15 @@ class FakeHub(BaseHTTPRequestHandler):
     def answer_rpc(self, request):
         self.server.calls.append(request)
         name, arguments = request["tool"], request.get("arguments", {})
-        if name not in {t["name"] for t in TOOLS}:
+        tool = next((t for t in TOOLS if t["name"] == name), None)
+        if tool is None:
             return self.send_json(400, {"error": f"unknown tool {name!r}"})
+        missing = [n for n in tool["inputSchema"].get("required", []) if n not in arguments]
+        if missing:
+            # As the team arm's handlers refuse a missing argument: in
+            # argparse's words, exiting 2, before anything is done.
+            return self.send_json(200, {"text": f"the following arguments are required: {missing[0]}",
+                                        "isError": True, "exitCode": 2})
         if name == "refuse":
             # Without a code the answer has no exitCode, as from a hub
             # that predates it; with one, the code is sent as given.
@@ -215,6 +234,17 @@ class HubTestCase(unittest.TestCase):
     def tearDown(self):
         self.server.shutdown()
         self.server.server_close()
+
+    def run_cli_process(self, *argv, cwd=None):
+        """cli.py as drivers.py runs a command in a container: a process of
+        its own with stdin at /dev/null, which is no terminal and holds no
+        text, where a patched sys.stdin in this process is one or the
+        other by the test's choice."""
+        return subprocess.run([sys.executable, str(COORDBENCH / "cli.py"), "--url", self.rpc_url, *argv],
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30, cwd=cwd)
+
+    def sent_arguments(self):
+        return [call.get("arguments") for call in self.server.calls]
 
 
 class TerminalInput(io.StringIO):
@@ -324,8 +354,72 @@ class CommandTest(HubTestCase):
         self.assertEqual(self.call_arguments(err), {"to": "agent2"})
 
     def test_alias_run_reads_no_stdin_while_an_earlier_word_is_missing(self):
-        code, _, err = run_cli("--url", self.rpc_url, "alias-run", "send_message", stdin="text")
-        self.assertEqual(self.call_arguments(err), {})
+        # `coop-send` alone: the recipient is missing, so the text is not
+        # read either, and the hub refuses as argparse does.
+        code, out, err = run_cli("--url", self.rpc_url, "alias-run", "send_message", stdin="text")
+        self.assertEqual((code, out, err), (2, "", "the following arguments are required: to\n"))
+        self.assertEqual(self.sent_arguments(), [{}])
+
+    def test_a_required_last_word_is_not_read_from_stdin(self):
+        # drivers.py hands every command a stdin at /dev/null, which is no
+        # terminal, so the old rule read "" from it for any missing last
+        # word: coop-task-create made a task titled "" where coop_task.py
+        # exits 2, coop-task-claim asked after task "" and exited 1, and
+        # coop-task-update <id> sent status "" and exited 4. A word the
+        # schema requires is left missing for the hub to refuse.
+        for words, missing in ((["task_create"], "title"), (["task_create", "--assign", "agent2"], "title"),
+                               (["claim_task"], "task_id"), (["task_update", "3"], "status")):
+            with self.subTest(words=words):
+                done = self.run_cli_process("alias-run", *words)
+                self.assertEqual((done.returncode, done.stdout), (2, ""))
+                self.assertEqual(done.stderr, f"the following arguments are required: {missing}\n")
+        self.assertEqual(self.sent_arguments(), [{}, {"assign": "agent2"}, {}, {"task_id": "3"}])
+        # An optional last word still comes from stdin, "" at /dev/null's
+        # end, as coop_msg.py's content and coop_task.py's body do.
+        sent = self.run_cli_process("alias-run", "send_message", "agent2")
+        self.assertEqual((sent.returncode, sent.stdout), (0, ""), sent.stderr)
+        self.assertEqual(json.loads(sent.stderr)["arguments"], {"to": "agent2", "text": ""})
+        asked = self.run_cli_process("alias-run", "request", "agent1", "review")
+        self.assertEqual(asked.returncode, 0, asked.stderr)
+        self.assertEqual(json.loads(asked.stdout)["arguments"], {"recipient": "agent1", "kind": "review", "body": ""})
+
+    def test_a_word_that_is_true_false_or_null_is_refused_where_a_number_is_wanted(self):
+        # coop_task.py's --wait has type=float, which exits 2 on these
+        # words; parsed as JSON they reached the hub as True, False and
+        # None, which float() read as 1.0 and 0.0, and None as no wait.
+        for words, wording in (
+                (["request", "agent1", "review", "look", "--wait", "true"], "--wait: invalid float value: 'true'"),
+                (["request", "agent1", "review", "look", "--wait=false"], "--wait: invalid float value: 'false'"),
+                (["request", "agent1", "review", "--wait", "null", "look"], "--wait: invalid float value: 'null'"),
+                (["claim_task", "true"], "task_id: invalid int value: 'true'")):
+            with self.subTest(words=words):
+                done = self.run_cli_process("alias-run", *words)
+                self.assertEqual((done.returncode, done.stdout), (2, ""))
+                self.assertEqual(done.stderr, f"coordbench: argument {wording}\n")
+        keyed = self.run_cli_process("call", "request", "recipient=agent1", "kind=review", "wait=null")
+        self.assertEqual((keyed.returncode, keyed.stderr),
+                         (2, "coordbench: argument wait: invalid float value: 'null'\n"))
+        self.assertEqual(self.server.calls, [])
+        # A number still goes through; so does a word that is no JSON,
+        # which the hub refuses in the same words.
+        done = self.run_cli_process("alias-run", "request", "agent1", "review", "look", "--wait", "2.5")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)["arguments"]["wait"], 2.5)
+        self.assertEqual(json.loads(self.run_cli_process("alias-run", "claim_task", "7").stdout)["arguments"],
+                         {"task_id": 7})
+
+    def test_coerce_keeps_a_boolean_or_null_the_schema_allows_beside_a_number(self):
+        tool = {"inputSchema": {"properties": {"wait": {"type": ["number", "null"]},
+                                               "limit": {"type": ["integer", "boolean"]}}}}
+        self.assertIsNone(cli.coerce(tool, "wait", "null"))
+        self.assertEqual(cli.coerce(tool, "wait", "2"), 2)
+        self.assertIs(cli.coerce(tool, "limit", "true"), True)
+        with self.assertRaises(cli.Failure) as refused:
+            cli.coerce(tool, "wait", "true", label="--wait")
+        self.assertEqual(str(refused.exception), "argument --wait: invalid float value: 'true'")
+        with self.assertRaises(cli.Failure) as refused:
+            cli.coerce(tool, "limit", "null")
+        self.assertEqual(str(refused.exception), "argument limit: invalid int value: 'null'")
 
     def test_alias_run_refuses_extra_words(self):
         code, out, err = run_cli("--url", self.rpc_url, "alias-run", "claim_task", "7", "8")
@@ -481,19 +575,18 @@ class InstallTest(HubTestCase):
         self.addCleanup(scratch.cleanup)
         self.bin_dir = Path(scratch.name) / "bin"
 
-    def run_command(self, name, *words, stdin="", rpc_url=None):
+    def run_command(self, name, *words, stdin="", rpc_url=None, cwd=None):
         environment = {k: v for k, v in os.environ.items() if k not in ("COORD_RPC_URL", "COORD_AGENT_TOKEN")}
         if rpc_url:
             environment["COORD_RPC_URL"] = rpc_url
         return subprocess.run([str(self.bin_dir / name), *words], input=stdin, env=environment,
-                              capture_output=True, text=True, timeout=30)
+                              capture_output=True, text=True, timeout=30, cwd=cwd)
 
     def test_install_writes_one_wrapper_per_alias_and_per_tool(self):
         code, _, _ = run_cli("install", str(self.bin_dir), "--url", self.rpc_url)
         self.assertEqual(code, 0)
         names = {p.name for p in self.bin_dir.iterdir()}
-        aliases = {"coop-send", "coop-broadcast", "coop-recv", "coop-task-update", "coop-task-list", "coop-request"}
-        self.assertEqual(names, aliases | {f"coord-{t['name']}" for t in TOOLS})
+        self.assertEqual(names, ALIASES | {f"coord-{t['name']}" for t in TOOLS})
         for path in self.bin_dir.iterdir():
             self.assertTrue(os.access(path, os.X_OK), path)
         script = (self.bin_dir / "coop-send").read_text().splitlines()
@@ -557,6 +650,25 @@ class InstallTest(HubTestCase):
         refused = self.run_command("coop-recv")
         self.assertEqual((refused.returncode, refused.stdout), (2, ""))
         self.assertIn(f"HTTP 401: {REFUSED}", refused.stderr)
+
+    def test_install_makes_a_relative_token_file_absolute_so_the_wrappers_work_from_anywhere(self):
+        # `install --token-file token` used to bake `cat token` into the
+        # wrappers, which found the file only from install's own directory
+        # and answered the hub's 401 from any other.
+        self.server.token = AGENT_TOKEN
+        home = self.bin_dir.parent
+        home.mkdir(parents=True, exist_ok=True)
+        (home / "token").write_text(AGENT_TOKEN + "\n")
+        done = self.run_cli_process("install", str(self.bin_dir), "--token-file", "token", cwd=home)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        script = (self.bin_dir / "coop-send").read_text()
+        self.assertIn(f'\nexport COORD_AGENT_TOKEN="$(cat {home.resolve() / "token"})"\n', script)
+        self.assertNotIn("$(cat token)", script)
+        self.assertNotIn(AGENT_TOKEN, script)
+        sent = self.run_command("coop-send", "agent2", "hello", cwd="/")
+        self.assertEqual((sent.returncode, sent.stdout), (0, ""), sent.stderr)
+        self.assertEqual(json.loads(sent.stderr)["arguments"], {"to": "agent2", "text": "hello"})
+        self.assertEqual(self.server.authorizations[-2:], [f"Bearer {AGENT_TOKEN}"] * 2)
 
     def test_a_token_file_that_cannot_be_read_is_exit_2(self):
         code, _, err = run_cli("install", str(self.bin_dir), "--url", self.rpc_url,

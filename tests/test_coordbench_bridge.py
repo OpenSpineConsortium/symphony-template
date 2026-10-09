@@ -3,8 +3,11 @@ has no session of its own, so these pin what the transport asks of such
 a client when the hub forgets the session: a 404 to a request sent with
 Mcp-Session-Id starts a new session (initialize again, then
 notifications/initialized, neither shown to the stdio client) and the
-request is sent once more. The fake hub here does one thing the real
-hub's tests cannot make it do on cue: forget its session."""
+request is sent once more; and what the client hears when the hub
+refuses a message it cannot read (400 with an id-less JSON-RPC error):
+the hub's own error under each id it sent. The fake hub here does one
+thing the real hub's tests cannot make it do on cue: forget its
+session."""
 
 import json
 import queue
@@ -41,10 +44,21 @@ def tool_call(request_id, name):
     return request(request_id, "tools/call", {"name": name, "arguments": {}})
 
 
+def unreadable(message):
+    """Whether the hub could not answer the message under an id: a batch
+    any of whose requests has an id that is null or a boolean, or one
+    such request on its own (MCP allows no null id, and bool is no int)."""
+    members = message if isinstance(message, list) else [message]
+    return any(isinstance(m, dict) and "method" in m and "id" in m
+               and (m["id"] is None or isinstance(m["id"], bool)) for m in members)
+
+
 class ForgetfulHub(BaseHTTPRequestHandler):
     """Just enough of hub.py's /mcp: a session per initialize, 404 for a
     request carrying a session it does not know (the hub's own words),
-    and a counter of tool calls on which it forgets its session first."""
+    400 with an id-less JSON-RPC error for a request it cannot answer
+    under an id, 400 with a plain body when told to refuse plainly, and
+    a counter of tool calls on which it forgets its session first."""
 
     def log_message(self, *args):
         pass
@@ -65,6 +79,13 @@ class ForgetfulHub(BaseHTTPRequestHandler):
         self.server.authorizations.append(self.headers.get("Authorization"))
         if self.path != MCP_PATH:
             return self.send_json(404, {"error": "no run or agent at this path"})
+        if self.server.refuses_plainly and message.get("method") == "tools/call":
+            return self.send_json(400, {"error": "the body is not a request"})
+        if unreadable(message):
+            # As the real hub: a message it cannot answer under an id is
+            # 400 with a JSON-RPC error that names no id.
+            return self.send_json(400, {"jsonrpc": "2.0", "error": {
+                "code": -32600, "message": "the id must be a string or an integer"}})
         method = message.get("method")
         if method == "initialize":
             return self.open_session(message)
@@ -113,6 +134,7 @@ class ReinitializeTest(unittest.TestCase):
         self.server.seen, self.server.sessions, self.server.session = [], 0, None
         self.server.authorizations = []
         self.server.forget_calls = 0
+        self.server.refuses_plainly = False
         threading.Thread(target=self.server.serve_forever, args=(0.05,), daemon=True).start()
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}{MCP_PATH}"
         self.out = QueuedOutput()
@@ -133,7 +155,9 @@ class ReinitializeTest(unittest.TestCase):
         return json.loads(self.out.lines.get(timeout=timeout))
 
     def methods_seen(self):
-        return [m.get("method") for _, m in self.server.seen]
+        """Every method the hub saw, a batch's members one by one."""
+        return [m.get("method") for _, message in self.server.seen
+                for m in (message if isinstance(message, list) else [message])]
 
     def test_a_forgotten_session_is_reopened_and_the_request_retried(self):
         self.server.forget_calls = 1
@@ -190,6 +214,38 @@ class ReinitializeTest(unittest.TestCase):
         self.assertEqual(self.server.authorizations, ["Bearer the-agent-s-token"] * 5)
         for plain in (bridge_module.Bridge(self.url), bridge_module.Bridge(self.url, token="")):
             self.assertNotIn("Authorization", plain.headers())
+
+    def test_a_400_carrying_the_hubs_jsonrpc_error_reaches_the_client_as_that_error(self):
+        """The hub refuses a request it cannot answer under an id with a
+        JSON-RPC error of its own and no id; the stdio client waits on
+        the ids it sent, so it hears the hub's code and message under
+        each of them, as it would from the hub on stdio, rather than an
+        internal error quoting HTTP 400."""
+        self.send(request(1, "initialize", INIT_PARAMS))
+        self.receive()
+        self.send(tool_call(None, "send_message"))
+        self.assertEqual(self.receive(), {"jsonrpc": "2.0", "id": None, "error": {
+            "code": -32600, "message": "the id must be a string or an integer"}})
+        self.send([tool_call(True, "send_message"), request(7, "ping"), {"jsonrpc": "2.0", "method": "note"}])
+        answers = self.receive()
+        self.assertEqual([a["id"] for a in answers], [True, 7])
+        for answer in answers:
+            self.assertEqual(answer["error"], {"code": -32600, "message": "the id must be a string or an integer"})
+        self.assertEqual(self.methods_seen()[1:], ["tools/call", "tools/call", "ping", "note"])
+        self.assertTrue(self.out.lines.empty())
+
+    def test_a_400_without_a_jsonrpc_body_is_a_hub_failure(self):
+        self.server.refuses_plainly = True
+        self.send(request(1, "initialize", INIT_PARAMS))
+        self.receive()
+        self.send(tool_call(2, "send_message"))
+        answer = self.receive()
+        self.assertEqual((answer["id"], answer["error"]["code"]), (2, -32603))
+        self.assertIn("HTTP 400 Bad Request", answer["error"]["message"])
+        self.assertIn("the body is not a request", answer["error"]["message"])
+        self.assertIsNone(bridge_module.jsonrpc_error_in('{"error": "plain"}'))
+        self.assertIsNone(bridge_module.jsonrpc_error_in('[{"jsonrpc": "2.0", "error": {"code": 1, "message": "m"}}]'))
+        self.assertIsNone(bridge_module.jsonrpc_error_in("not json"))
 
     def test_parallel_requests_that_lose_the_session_share_one_reopen(self):
         self.server.forget_calls = 1

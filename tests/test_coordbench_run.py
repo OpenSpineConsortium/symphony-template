@@ -21,6 +21,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -74,6 +75,7 @@ SAMPLE_STREAM = "\n".join(json.dumps(event) for event in [
     {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "Working."}]}},
     "not json at all",
     {"type": "result", "subtype": "success", "is_error": False, "num_turns": 12, "total_cost_usd": 0.42,
+     "duration_ms": 95000, "duration_api_ms": 61000,
      "result": "Done.", "usage": {"input_tokens": 1200, "output_tokens": 340,
                                   "cache_read_input_tokens": 50000, "cache_creation_input_tokens": 7000}},
 ]) + "\n"
@@ -90,10 +92,13 @@ SOLO_RESULT = {"setting": "solo", "patch_lines": 6, "feature1": {"passed": True,
 # runner adds the arm, the driver and the hub's metrics.
 RESULT_KEYS = {"repo", "task_id", "features", "setting", "run_id", "run_name", "agent_framework", "model", "arm",
                "driver", "started_at", "ended_at", "duration_seconds", "agents", "total_cost", "total_steps",
-               "metrics"}
+               "metrics", "timings"}
 AGENT_KEYS = {"feature_id", "role", "status", "cost", "steps", "input_tokens", "output_tokens",
-              "cache_read_tokens", "cache_write_tokens", "patch_lines", "error"}
+              "cache_read_tokens", "cache_write_tokens", "duration_ms", "api_duration_ms", "patch_lines", "error"}
 USAGE_KEYS = {"cost", "steps", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"}
+# Claude Code's own wall and API time for the agent, from its result event.
+DURATION_KEYS = {"duration_ms", "api_duration_ms"}
+TIMING_KEYS = {"phase", "agent", "started", "ended", "seconds"}
 COOP_EVAL_KEYS = ["repo", "task_id", "features", "setting", "apply_status", "merge", "feature1", "feature2",
                   "both_passed", "error", "evaluated_at"]
 SOLO_EVAL_KEYS = ["repo", "task_id", "features", "setting", "merge", "feature1", "feature2", "both_passed",
@@ -126,6 +131,18 @@ def call_tool(rpc_url, tool, arguments, token=None):
 
 def pairs(arguments):
     return [arguments[i:i + 2] for i in range(len(arguments) - 1)]
+
+
+def phases(timings):
+    """Each timing as (phase, agent), in the order they were recorded."""
+    return [(record["phase"], record["agent"]) for record in timings]
+
+
+def timing(phase, agent, started, seconds):
+    """A timing record as the runner writes one, for a summary's test."""
+    began = datetime(2026, 10, 9, 12, 0, 0) + timedelta(seconds=started)
+    return {"phase": phase, "agent": agent, "started": began.isoformat(),
+            "ended": (began + timedelta(seconds=seconds)).isoformat(), "seconds": float(seconds)}
 
 
 def git_answer(command, url, agent):
@@ -361,6 +378,18 @@ class RunnerCase(unittest.TestCase):
             for text in said:
                 self.assertNotIn(secret, text)
 
+    def assert_timings_well_formed(self, timings):
+        """Every record has the contract's five fields, ISO 8601 times
+        that do not run backwards, and seconds that agree with them."""
+        self.assertTrue(timings)
+        for record in timings:
+            self.assertEqual(set(record), TIMING_KEYS, record)
+            started, ended = datetime.fromisoformat(record["started"]), datetime.fromisoformat(record["ended"])
+            self.assertLessEqual(started, ended, record)
+            self.assertAlmostEqual(record["seconds"], (ended - started).total_seconds(), places=3)
+            self.assertIn(record["phase"], runner.PHASES)
+            self.assertEqual(record["agent"] is not None, record["phase"] in ("provision", "agent"), record)
+
     def assert_tokens_kept_private(self, plan, *said):
         """Each agent's hub token is on no docker command line, in nothing
         piped to docker, in nothing the runner printed, and in no file but
@@ -551,6 +580,11 @@ class Provisioning(RunnerCase):
             self.assertIn(f"Your branch: `{job.agent}` (already created and pushed)", job.prompt)
         self.assertEqual(runner.arm_needs(runner.find_arm("coop"), {"shared_dir": "/x"}), ["shared_volume"])
         self.assertEqual(runner.arm_needs(runner.find_arm("coop"), {"git_remote": ""}), [])
+        # What the runner provisioned is timed, need by need, before the
+        # run is created and each agent's container set up.
+        self.assert_timings_well_formed(plan["timings"])
+        self.assertEqual(phases(plan["timings"]), [("git_remote", None), ("shared_volume", None), ("run_create", None),
+                                                   ("provision", "agent1"), ("provision", "agent2")])
 
     def test_a_git_set_up_that_leaves_a_promise_unkept_fails_the_pair(self):
         self.docker.git_breaks = True
@@ -661,6 +695,11 @@ class Provisioning(RunnerCase):
         self.assertFalse((self.pair() / "eval.json").exists())
         self.assertTrue([c for c in self.docker.commands() if c[:4] == ["exec", "coordbench-git", "rm", "-rf"]])
         self.assertEqual(self.scorer.calls, [])
+        # The phase that failed is still timed, and so is the teardown
+        # after it; the summary names what happened and nothing else.
+        self.assert_timings_well_formed(result["timings"])
+        self.assertEqual(phases(result["timings"]), [("hub", None), ("git_remote", None), ("teardown", None)])
+        self.assertRegex(err, r"timings: hub [0-9.]+ s, git_remote [0-9.]+ s, teardown [0-9.]+ s\n")
 
 
 class TheClaudeCliDriver(RunnerCase):
@@ -707,6 +746,7 @@ class TheClaudeCliDriver(RunnerCase):
         self.assertEqual(outcome.status, "Submitted")
         self.assertEqual((outcome.input_tokens, outcome.output_tokens, outcome.steps), (1200, 340, 12))
         self.assertEqual(outcome.cost, 0.42)
+        self.assertEqual((outcome.duration_ms, outcome.api_duration_ms), (95000, 61000))
         self.assertEqual(outcome.patch, PATCHES["agent1"])
         self.assertIn(["exec", "c-agent1", "cat", "/workspace/repo/patch.txt"], self.docker.commands())
         self.assert_secret_nowhere()
@@ -805,6 +845,17 @@ class StreamParsing(unittest.TestCase):
     def test_a_stream_without_a_result_is_an_error_with_nothing_counted(self):
         outcome = drivers.summarize_stream('{"type": "assistant"}\ngarbage\n')
         self.assertEqual((outcome.status, outcome.input_tokens, outcome.steps, outcome.cost), ("Error", 0, 0, 0.0))
+        self.assertEqual((outcome.duration_ms, outcome.api_duration_ms), (None, None))
+
+    def test_the_result_event_s_durations_are_read_and_unknown_when_it_lacks_them(self):
+        """Claude Code's result event carries duration_ms, the agent's wall
+        time, and duration_api_ms, the part spent on the API; a result
+        event without them (an older CLI) leaves both unknown, not zero."""
+        timed = drivers.summarize_stream(self.result(duration_ms=123456, duration_api_ms=98765))
+        self.assertEqual((timed.duration_ms, timed.api_duration_ms), (123456, 98765))
+        untimed = drivers.summarize_stream(self.result())
+        self.assertEqual((untimed.duration_ms, untimed.api_duration_ms), (None, None))
+        self.assertEqual(drivers.summarize_stream(self.result(duration_ms=0, duration_api_ms=0)).duration_ms, 0)
 
     def test_patches_are_normalized_as_cooperbench_normalizes_them(self):
         self.assertEqual(drivers.normalize_patch("\n\ndiff\n \n\n"), "diff\n \n")
@@ -846,6 +897,8 @@ class TheSessionDriver(RunnerCase):
         (Path(job.workspace) / ".coordbench-done").touch()
         outcome = driver.wait(handle)
         self.assertEqual((outcome.status, outcome.patch), ("Submitted", PATCHES["agent1"]))
+        # A subagent leaves no result event, so its durations are unknown.
+        self.assertEqual((outcome.duration_ms, outcome.api_duration_ms), (None, None))
         logged = json.loads(Path(job.log_path).read_text().splitlines()[-1])
         self.assertEqual(logged["status"], "Submitted")
 
@@ -899,9 +952,22 @@ class Runs(RunnerCase):
                              (feature, "Submitted", 1200, 12))
             # The fields CooperBench's coop.py writes and its summary reads.
             self.assertEqual((record["cost"], record["patch_lines"]), (0.42, 6))
+            # Claude Code's own clock for the agent, from the result event.
+            self.assertEqual((record["duration_ms"], record["api_duration_ms"]), (95000, 61000))
         self.assertAlmostEqual(result["total_cost"], 0.84)
         self.assertEqual(result["total_steps"], 24)
         self.assertEqual(result["metrics"]["messages_sent"], 1)
+        # Every phase of the pair is timed, the agents and their
+        # provisioning one by one, and the score and the teardown are in
+        # result.json though it was written before them.
+        self.assert_timings_well_formed(result["timings"])
+        self.assertEqual(phases(result["timings"]),
+                         [("hub", None), ("run_create", None), ("provision", "agent1"), ("provision", "agent2"),
+                          ("agent", "agent1"), ("agent", "agent2"), ("close", None), ("teardown", None),
+                          ("score", None)])
+        self.assertRegex(err, r"timings: hub [0-9.]+ s, run_create [0-9.]+ s, provision [0-9.]+ s, "
+                              r"agents [0-9.]+ s \(agent1 [0-9.]+ s, agent2 [0-9.]+ s\), close [0-9.]+ s, "
+                              r"score [0-9.]+ s, teardown [0-9.]+ s\n")
         self.assertEqual(json.loads((pair / "metrics.json").read_text()), result["metrics"])
         events = [json.loads(line) for line in (pair / "events.jsonl").read_text().splitlines()]
         self.assertIn("message", [event["kind"] for event in events])
@@ -939,6 +1005,53 @@ class Runs(RunnerCase):
         self.assertEqual(result["metrics"]["messages_sent"], 0)
         self.assertEqual(json.loads((self.pair() / "eval.json").read_text())["both_passed"], True)
         self.assertTrue(self.hub.runs[result["run_id"]].run.closed)
+
+    def test_a_hub_that_closed_the_run_but_cannot_give_its_events_keeps_the_metrics(self):
+        """Only the events failed: the metrics the close returned are the
+        run's, the warning says what is missing and nothing else, and the
+        run is released all the same (it used to stay on the hub, with
+        its metrics dropped under a warning that said closing failed)."""
+        with mock.patch.object(runner.HubClient, "events",
+                               side_effect=runner.HubError("GET /api/runs/x/events: HTTP 500: no", 500)):
+            code, _, err = self.main(*self.run_arguments("coop", "--features", "1,6"))
+        self.assertEqual(code, 0, err)
+        self.assertIn("fetching the run's events from the hub failed", err)
+        self.assertIn("HTTP 500", err)
+        self.assertNotIn("closing the run on the hub failed", err)
+        result = json.loads((self.pair() / "result.json").read_text())
+        self.assertNotIn("error", result)
+        self.assertEqual(result["metrics"]["messages_sent"], 0)
+        self.assertIn("tool_calls", result["metrics"])
+        self.assertEqual((self.pair() / "events.jsonl").read_text(), "")
+        self.assertEqual(self.hub.run_count(), 0)
+        self.assertEqual(phases(result["timings"]).count(("close", None)), 1)
+
+    def test_a_hub_that_cannot_close_the_run_leaves_it_unreleased_with_empty_metrics(self):
+        with mock.patch.object(runner.HubClient, "close_run",
+                               side_effect=runner.HubError("POST /api/runs/x/close: HTTP 500: no", 500)):
+            code, _, err = self.main(*self.run_arguments("coop", "--features", "1,6"))
+        self.assertEqual(code, 0, err)
+        self.assertIn("closing the run on the hub failed", err)
+        self.assertNotIn("fetching the run's events", err)
+        result = json.loads((self.pair() / "result.json").read_text())
+        self.assertEqual(result["metrics"], {})
+        self.assertEqual(self.hub.run_count(), 1)
+
+    def test_the_summary_line_reads_the_phases_that_happened_and_tells_the_agents_apart(self):
+        """The agents run at once, so their phase is the span from the
+        first start to the last end, each agent's own time in brackets;
+        a run's own phase is its seconds; what did not happen is absent."""
+        plan = {"timings": [
+            timing("provision", "agent1", 0, 20), timing("provision", "agent2", 20, 22),
+            timing("agent", "agent1", 42, 1030), timing("agent", "agent2", 102, 980),
+            timing("score", None, 1100, 95), timing("teardown", None, 1195, 6),
+        ]}
+        self.assertEqual(runner.timings_summary(plan),
+                         "timings: provision 42 s, agents 1040 s (agent1 1030 s, agent2 980 s), score 95 s, "
+                         "teardown 6.0 s")
+        solo = {"timings": [timing("hub", None, 0, 0.25), timing("agent", "agent1", 1, 300)]}
+        self.assertEqual(runner.timings_summary(solo), "timings: hub 0.2 s, agents 300 s")
+        self.assertEqual(runner.timings_summary({}), "timings: nothing recorded")
 
     def test_release_asks_the_hub_to_forget_the_run_and_an_unknown_run_is_404(self):
         client = runner.HubClient(self.hub_url, ADMIN_SECRET)
@@ -1040,13 +1153,28 @@ class Runs(RunnerCase):
         result = json.loads((pair / "result.json").read_text())
         self.assertEqual((result["driver"], result["agent_framework"]), ("session", "claude_code_subagent"))
         self.assertEqual({a["status"] for a in result["agents"].values()}, {"Submitted"})
-        # A subagent's usage is not measured, so it is unknown, not zero.
+        # A subagent's usage is not measured, so it is unknown, not zero,
+        # and so are the durations Claude Code's result event would give.
         for record in result["agents"].values():
             self.assertEqual(set(record), AGENT_KEYS)
-            self.assertEqual({record[name] for name in USAGE_KEYS}, {None})
+            self.assertEqual({record[name] for name in USAGE_KEYS | DURATION_KEYS}, {None})
             self.assertEqual(record["patch_lines"], 6)
         self.assertEqual((result["total_cost"], result["total_steps"]), (None, None))
         self.assertEqual(result["metrics"]["messages_sent"], 1)
+        # The agent's phase runs from prepare's start, kept in the plan,
+        # to the marker finish saw: one record across the two processes.
+        self.assert_timings_well_formed(result["timings"])
+        self.assertEqual(phases(result["timings"]),
+                         [("hub", None), ("run_create", None), ("provision", "agent1"), ("provision", "agent2"),
+                          ("agent", "agent1"), ("agent", "agent2"), ("close", None), ("teardown", None),
+                          ("score", None)])
+        for agent, record in zip(saved["agents"], [r for r in result["timings"] if r["phase"] == "agent"]):
+            self.assertEqual(record["started"], agent["started_at"])
+            self.assertGreater(record["seconds"], 0)
+        prepared = phases(saved["timings"])
+        self.assertEqual(result["timings"][:len(prepared)], saved["timings"])
+        self.assertRegex(err, r"timings: .*agents [0-9.]+ s \(agent1 [0-9.]+ s, agent2 [0-9.]+ s\).*teardown")
+        self.assertEqual(json.loads((pair / "plan.json").read_text())["timings"], result["timings"])
         # Released after its metrics and events were fetched; finish saves
         # the plan last, so it says the hub holds the run no more.
         self.assertEqual(self.hub.run_count(), 0)

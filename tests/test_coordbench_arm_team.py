@@ -5,11 +5,12 @@ makes it so: the lead is chosen and the list seeded as runner/team.py
 does, a claim is atomic and refuses another agent's task as coop_task.py
 does, updates, listing and typed requests behave, print and exit as the
 in-container commands do (checked against coop_task.py itself when
-CooperBench's source is at hand), each tool answers to CooperBench's
-command and options, the prompt is build_team_instruction's text
-(checked against CooperBench's own function likewise), the metrics are
-metrics.py's, and the directory is a well-formed Claude Code plugin as
-well as an arm."""
+CooperBench's source is at hand), a request's wait is booked as time
+spent on another agent for the hub's tool_done event, each tool answers
+to CooperBench's command and options, the prompt is
+build_team_instruction's text (checked against CooperBench's own
+function likewise), the metrics are metrics.py's, and the directory is a
+well-formed Claude Code plugin as well as an arm."""
 
 import contextlib
 import importlib.util
@@ -17,9 +18,11 @@ import io
 import json
 import os
 import re
+import shutil
 import sys
 import tempfile
 import threading
+import time
 import types
 import unittest
 import urllib.error
@@ -35,7 +38,7 @@ sys.path.insert(0, str(COORDBENCH))
 import cli  # noqa: E402
 import hub as hub_module  # noqa: E402
 import mcp  # noqa: E402
-from arm import SUBMISSION_BLOCK, Run, find_arm  # noqa: E402
+from arm import SUBMISSION_BLOCK, Call, Run, find_arm  # noqa: E402
 
 RULE = "\n\n---\n\n"
 DASH = "\u2014"
@@ -264,7 +267,7 @@ def shell_arguments(description, words, stdin=None):
         elif properties.get(name, {}).get("type") == "boolean":
             arguments[name] = True
         elif queue:
-            arguments[name] = cli.coerce(description, name, queue.pop(0))
+            arguments[name] = cli.coerce(description, name, queue.pop(0), label=word)
         else:
             raise cli.Failure(f"{word} takes a value")
     with mock.patch.object(cli, "stdin_has_text", return_value=stdin is not None), \
@@ -1061,6 +1064,178 @@ class Mirror(unittest.TestCase):
         with mock.patch.dict(type(run.arm).setup.__globals__, {"mirror_task_list": mirror}):
             tasks_of(run)
         mirror.assert_not_called()
+
+    def test_a_close_that_lands_after_the_read_still_gets_one_mirror_and_no_more(self):
+        # The run is read as open under the lock and the writes happen
+        # outside it: a close that lands between the two gets this one
+        # mirror, into a volume the runner removes only once the close has
+        # answered, and the next listing writes nothing.
+        with tempfile.TemporaryDirectory() as shared:
+            _, run = new_run(options={"shared_dir_host": shared})
+            module_globals = type(run.arm).setup.__globals__
+            original = module_globals["open_tasks_directory"]
+
+            def close_then_open(path):
+                with run.lock:
+                    run.closed = True
+                return original(path)
+
+            with mock.patch.dict(module_globals, {"open_tasks_directory": close_then_open}):
+                listed = tasks_of(run, "agent2")
+            mirror = Path(shared) / "tasks"
+            self.assertEqual(sorted(p.name for p in mirror.iterdir()),
+                             sorted([f"{t['id']}.json" for t in listed] + ["_index.json", "_log.jsonl"]))
+            shutil.rmtree(mirror)
+            self.assertEqual(len(tasks_of(run, "agent2")), 3)
+            self.assertEqual(list(Path(shared).iterdir()), [])
+
+    def test_a_close_and_the_volumes_removal_in_the_window_leave_nothing_behind(self):
+        # The same window, with the runner's removal of the volume already
+        # done when the writes come: only the tasks leaf is ever made, so
+        # the mirror lands nowhere and the volume's root stays gone.
+        with tempfile.TemporaryDirectory() as parent:
+            shared = Path(parent) / "volume"
+            shared.mkdir()
+            _, run = new_run(options={"shared_dir_host": str(shared)})
+            module_globals = type(run.arm).setup.__globals__
+            original = module_globals["open_tasks_directory"]
+
+            def close_remove_then_open(path):
+                with run.lock:
+                    run.closed = True
+                shutil.rmtree(shared)
+                return original(path)
+
+            with mock.patch.dict(module_globals, {"open_tasks_directory": close_remove_then_open}):
+                self.assertEqual(len(tasks_of(run, "agent2")), 3)
+            self.assertEqual(list(Path(parent).iterdir()), [])
+
+
+class BlockedTime(unittest.TestCase):
+    """A request's wait is time spent on another agent, not on the hub:
+    await_response books it on the Call, and the hub's tool_done event
+    carries it as blocked_ms beside the handler's wall time, so a reader
+    of events.jsonl can tell a slow hub from an agent that chose to wait."""
+
+    def setUp(self):
+        _, self.run = new_run()
+
+    def tool_done(self, agent, tool):
+        events = [e for e in self.run.events
+                  if e["kind"] == "tool_done" and e["agent"] == agent and e["tool"] == tool]
+        self.assertEqual(len(events), 1, events)
+        return events[0]
+
+    def test_await_response_books_its_wait_on_the_call(self):
+        team = board(self.run)
+        request_id = team.request("agent2", "agent1", "k", "b")
+        waiting = Call(self.run, "agent2", {})
+        self.assertIsNone(team.await_response(request_id, 0.2, waiting))
+        self.assertGreaterEqual(waiting.blocked_s, 0.15)
+        self.assertLess(waiting.blocked_s, 5)
+
+    def test_a_wait_that_runs_out_is_reported_as_blocked_time(self):
+        calls = []
+        request = {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+                   "params": {"name": "request", "arguments": {"recipient": "agent1", "kind": "k", "wait": 0.2}}}
+        answer = mcp.handle(request, self.run, "agent2", sink=calls)["result"]
+        self.assertEqual(answer["_meta"]["coordbench/exitCode"], 5)
+        self.assertEqual(len(calls), 1)
+        self.assertGreaterEqual(calls[0].blocked_s, 0.15)
+        done = self.tool_done("agent2", "request")
+        self.assertEqual((done["is_error"], done["cancelled"]), (True, False))
+        self.assertGreaterEqual(done["blocked_ms"], 150)
+        self.assertLessEqual(done["blocked_ms"], done["duration_ms"])
+
+    def test_a_wait_answered_by_a_peer_is_blocked_until_the_response(self):
+        answers = {}
+        waiting = threading.Thread(target=lambda: answers.update(call(
+            self.run, "agent2", "request", recipient="agent1", kind="k", body="b", wait=10)))
+        waiting.start()
+        self.assertTrue(self.run.wait_until(lambda: bool(board(self.run).requests), 5))
+        time.sleep(0.15)
+        request_id = next(iter(board(self.run).requests))
+        text_of(self.run, "agent1", "respond", request_id=request_id, body="approved")
+        waiting.join(5)
+        self.assertFalse(answers["isError"], answers)
+        done = self.tool_done("agent2", "request")
+        self.assertGreaterEqual(done["blocked_ms"], 100)
+        self.assertLessEqual(done["blocked_ms"], done["duration_ms"])
+        self.assertLess(done["duration_ms"], 5000)
+
+    def test_a_request_without_a_wait_blocks_for_nothing(self):
+        text_of(self.run, "agent2", "request", recipient="agent1", kind="k", body="b")
+        self.assertEqual(self.tool_done("agent2", "request")["blocked_ms"], 0)
+
+
+class LateCancel(unittest.TestCase):
+    def test_a_wait_cancelled_after_the_take_puts_the_response_back(self):
+        # The cancel lands after await_response popped the response and
+        # before the reply is written: the hub sees it as the handler
+        # returns (mcp.settle) and runs the undo send_request registered,
+        # so the response is back on the board for the next wait, while
+        # the answer, which the client discards, still carries it.
+        _, run = new_run()
+        in_flight, answers = {}, {}
+        request = {"jsonrpc": "2.0", "id": 8, "method": "tools/call",
+                   "params": {"name": "request", "arguments": {"recipient": "agent1", "kind": "k", "wait": 10}}}
+        cancel = {"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": 8}}
+        board_class = type(board(run))
+        original = board_class.await_response
+
+        def take_then_cancel(team, request_id, seconds, call=None):
+            response = original(team, request_id, seconds, call)
+            mcp.handle(cancel, run, "agent2", in_flight=in_flight)
+            return response
+
+        with mock.patch.object(board_class, "await_response", take_then_cancel):
+            waiting = threading.Thread(target=lambda: answers.update(
+                mcp.handle(request, run, "agent2", in_flight=in_flight)["result"]))
+            waiting.start()
+            self.assertTrue(run.wait_until(lambda: bool(board(run).requests), 5))
+            request_id = next(iter(board(run).requests))
+            text_of(run, "agent1", "respond", request_id=request_id, body="approved")
+            waiting.join(5)
+        self.assertFalse(waiting.is_alive(), "the wait slept on")
+        self.assertEqual(json.loads(answers["content"][0]["text"])["body"], "approved")
+        self.assertEqual([r["body"] for r in board(run).responses[request_id]], ["approved"])
+        self.assertEqual(in_flight, {})
+        done = [e for e in run.events if e["kind"] == "tool_done" and e["tool"] == "request"]
+        self.assertEqual([e["cancelled"] for e in done], [True])
+
+
+class ShellRefusals(unittest.TestCase):
+    """What the arm's docstring says exits 2 as argparse makes coop_task.py
+    exit: a required positional with no word, which the shell command
+    leaves missing rather than reading from a stdin at /dev/null, and a
+    --wait of true, false or null, which the command refuses itself since
+    the handler would read them as numbers."""
+
+    def test_a_required_positional_with_no_word_is_refused_not_read_from_stdin(self):
+        # drivers.py hands docker a stdin at /dev/null: no text, yet not a
+        # terminal, so a command that read its last word from it would
+        # make a task titled "" where coop_task.py exits 2.
+        _, run = new_run()
+        task_id = task_titled(run, "Implement feature 7")["id"]
+        for tool, words, missing in (("task_create", (), "title"),
+                                     ("task_create", ("--assign", "agent2"), "title"),
+                                     ("task_claim", (), "task_id"),
+                                     ("task_update", (task_id,), "status")):
+            with self.subTest(tool=tool, words=words):
+                self.assertEqual(shell(run, "agent2", tool, *words, stdin=""),
+                                 refusal(f"the following arguments are required: {missing}", 2))
+        self.assertEqual(len(board(run).tasks), 3)
+        self.assertEqual(board(run).tasks[task_id]["status"], "open")
+
+    def test_a_wait_of_true_false_or_null_is_refused_by_the_command_as_no_number(self):
+        _, run = new_run()
+        for word in ("true", "false", "null"):
+            with self.subTest(word=word):
+                with self.assertRaises(cli.Failure) as refused:
+                    shell(run, "agent2", "request", "agent1", "review", "look", "--wait", word)
+                self.assertEqual(str(refused.exception), f"argument --wait: invalid float value: {word!r}")
+        self.assertEqual(cli.FAILURE, 2)
+        self.assertEqual(board(run).requests, {})
 
 
 class PluginFiles(unittest.TestCase):

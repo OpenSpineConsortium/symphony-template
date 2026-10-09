@@ -5,9 +5,12 @@ queued, an empty or missing text is sent, a missing recipient is refused
 as argparse refuses it, "sent to" is marked for stderr and broadcast says
 nothing, every entry has timestamp_iso), the long poll's text and schema
 against mcp_server.py's (read from CooperBench's source when it is at
-hand), and the long poll's safety: the wait and the pop in one hold of the
+hand), the long poll's safety: the wait and the pop in one hold of the
 lock, a closed run that wakes it, and a timeout refused rather than
-crashed on."""
+crashed on; and what a reader of the events needs: the time a wait spent
+blocked booked on its Call, the cap above the schema's maximum, and the
+undo that puts back what a drain or a wait took for a reply the hub could
+not write."""
 
 import ast
 import json
@@ -37,6 +40,20 @@ COOPERBENCH_TIMEOUT = {"type": "integer", "minimum": 100, "maximum": 30000, "def
                        "description": "How long to block before giving up."}
 MARKER = "(no message arrived within the timeout)"
 ENTRY_KEYS = {"from", "to", "content", "timestamp", "timestamp_iso"}
+# What every arm's .mcp.json lets one call to the hub run, in milliseconds;
+# a wait the hub holds longer than this answers nobody.
+CLIENT_TIMEOUT_MS = 330000
+TEAM_ARM = COORDBENCH / "arms" / "team" / "arm.py"
+
+
+def module_constant(path, name):
+    """The value a module file assigns to a top-level name, read with ast
+    rather than imported, so the test needs none of the module's imports."""
+    module = ast.parse(path.read_text(encoding="utf-8"))
+    for node in module.body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            return ast.literal_eval(node.value)
+    raise AssertionError(f"{path} assigns no {name}")
 
 
 def cooperbench_wait_tool():
@@ -198,9 +215,14 @@ class WaitTest(KitTest):
     behaviour, and safe under concurrent calls."""
 
     def test_the_tool_is_cooperbenchs_in_text_and_schema(self):
+        # The schema differs from mcp_server.py's by "required": [] alone,
+        # which kit.schema always adds; the maximum stays CooperBench's
+        # advertised 30000 whatever the handler takes.
         tool = tools()["wait_for_message"]
         self.assertEqual(tool.description, COOPERBENCH_DESCRIPTION)
-        self.assertEqual(tool.input_schema["properties"], {"timeout_ms": COOPERBENCH_TIMEOUT})
+        self.assertEqual(tool.input_schema, {"type": "object", "properties": {"timeout_ms": COOPERBENCH_TIMEOUT},
+                                             "required": []})
+        self.assertEqual(kit.ADVERTISED_LONGEST_WAIT_MS, 30000)
         self.assertNotIn("wait_for_message", tools(wait=False))
 
     @unittest.skipIf(COOPERBENCH_TOOL is None,
@@ -209,7 +231,20 @@ class WaitTest(KitTest):
         tool = tools()["wait_for_message"]
         self.assertEqual(COOPERBENCH_TOOL["name"], tool.name)
         self.assertEqual(COOPERBENCH_TOOL["description"], tool.description)
-        self.assertEqual(COOPERBENCH_TOOL["inputSchema"]["properties"], tool.input_schema["properties"])
+        theirs = {key: value for key, value in tool.input_schema.items() if key != "required"}
+        self.assertEqual(COOPERBENCH_TOOL["inputSchema"], theirs)
+
+    def test_the_cap_is_the_team_arms_300_seconds_under_the_client_timeout(self):
+        # The handler honours a timeout_ms past the schema's maximum, up to
+        # the team arm's cap on a request's wait; both sit under the 330 s
+        # the arms' .mcp.json gives one call, so the hub answers first.
+        self.assertEqual(kit.LONGEST_WAIT_MS, 300000)
+        self.assertEqual(kit.LONGEST_WAIT_MS, module_constant(TEAM_ARM, "LONGEST_WAIT_SECONDS") * 1000)
+        self.assertLess(kit.LONGEST_WAIT_MS, CLIENT_TIMEOUT_MS)
+        self.assertGreater(kit.LONGEST_WAIT_MS, kit.ADVERTISED_LONGEST_WAIT_MS)
+        self.assertEqual(kit.wait_seconds(30001), 30.001)
+        self.assertEqual(kit.wait_seconds(300000), 300.0)
+        self.assertEqual(kit.wait_seconds("1e9"), 300.0)
 
     def test_the_marker_is_cooperbenchs(self):
         self.assertEqual(kit.NO_MESSAGE, MARKER)
@@ -248,6 +283,45 @@ class WaitTest(KitTest):
         self.assertFalse(thread.is_alive(), "the wait slept on past the close")
         self.assertEqual(outcome[0], MARKER)
         self.assertLess(outcome[1], 5)
+
+    def test_a_closed_run_hands_over_a_message_the_inbox_already_holds(self):
+        # The close ends the wait, not the inbox: what is there is handed
+        # over, and only an empty inbox gives the marker.
+        self.call("agent2", "send_message", to="agent1", text="before the close")
+        with self.run.lock:
+            self.run.closed = True
+            self.run.lock.notify_all()
+        started = time.monotonic()
+        handed = json.loads(self.call("agent1", "wait_for_message", timeout_ms=10000))
+        self.assertEqual(handed["content"], "before the close")
+        self.assertEqual(self.call("agent1", "wait_for_message", timeout_ms=10000), MARKER)
+        self.assertLess(time.monotonic() - started, 5)
+
+    def test_the_time_spent_waiting_is_booked_on_the_call(self):
+        # The hub's tool_done event carries blocked_ms from call.blocked_s,
+        # which is how a reader tells a wait on the other agent from a hub
+        # that was slow to answer: a wait that ran out booked its whole
+        # timeout, one woken by a message the time until it came, and one
+        # that found a message waiting next to nothing.
+        wait = tools()["wait_for_message"].handler
+        ran_out = Call(self.run, "agent1", {"timeout_ms": 200})
+        self.assertEqual(wait(ran_out), MARKER)
+        self.assertGreaterEqual(ran_out.blocked_s, 0.19)
+        self.assertLess(ran_out.blocked_s, 5)
+        woken = Call(self.run, "agent1", {"timeout_ms": 10000})
+        outcome = []
+        thread = threading.Thread(target=lambda: outcome.append(wait(woken)), daemon=True)
+        thread.start()
+        time.sleep(0.2)
+        self.call("agent2", "send_message", to="agent1", text="wake")
+        thread.join(timeout=5)
+        self.assertEqual(json.loads(outcome[0])["content"], "wake")
+        self.assertGreaterEqual(woken.blocked_s, 0.15)
+        self.assertLess(woken.blocked_s, 5)
+        self.call("agent2", "send_message", to="agent1", text="ready")
+        at_once = Call(self.run, "agent1", {"timeout_ms": 10000})
+        self.assertEqual(json.loads(wait(at_once))["content"], "ready")
+        self.assertLess(at_once.blocked_s, 0.1)
 
     def test_an_inbox_drained_between_the_wait_and_the_pop_gives_the_marker(self):
         # The wait and the pop used to be two holds of the lock, and a
@@ -311,16 +385,48 @@ class WaitTest(KitTest):
         self.assertEqual(wait(empty), MARKER)
         self.assertEqual(empty.undos, [])
 
+    def test_a_drain_whose_reply_was_never_written_puts_the_messages_back_in_order(self):
+        # In the pilot the reply to a coop-recv met a broken pipe and the
+        # drained messages went with it. The drain now registers the same
+        # undo as a wait: the hub runs it, the messages go back at the
+        # head of the inbox in their order, ahead of what arrived since,
+        # the run is woken for whoever waits, and the record keeps the
+        # handover and its loss with one count.
+        receive = tools()["receive_messages"].handler
+        for text in ("one", "two"):
+            self.call("agent2", "send_message", to="agent1", text=text)
+        drain = Call(self.run, "agent1", {})
+        self.assertEqual([m["content"] for m in json.loads(receive(drain))], ["one", "two"])
+        self.assertEqual(self.contents("agent1"), [])
+        self.call("agent3", "send_message", to="agent1", text="three")
+        woken = []
+        waiter = threading.Thread(target=lambda: woken.append(
+            self.run.wait_until(lambda: len(self.contents("agent1")) == 3, 5)), daemon=True)
+        waiter.start()
+        time.sleep(0.2)
+        drain.lost()
+        waiter.join(timeout=5)
+        self.assertEqual(self.contents("agent1"), ["one", "two", "three"])
+        self.assertEqual(woken, [True])
+        self.assertEqual([(e["kind"], e["agent"], e["count"]) for e in self.run.events
+                          if e["kind"].startswith("receive")],
+                         [("receive", "agent1", 2), ("receive_lost", "agent1", 2)])
+        self.assertEqual([m["content"] for m in json.loads(self.call("agent1", "receive_messages"))],
+                         ["one", "two", "three"])
+        empty = Call(self.run, "agent3", {})
+        self.assertEqual(json.loads(receive(empty)), [])
+        self.assertEqual(empty.undos, [])
+
     def test_a_timeout_that_is_not_a_finite_number_is_refused(self):
         for value in ("soon", "", float("inf"), float("-inf"), "nan", [5000], {"ms": 5000}):
             with self.subTest(timeout_ms=value):
                 self.refused("agent1", "wait_for_message", timeout_ms=value)
 
-    def test_the_timeout_is_read_as_a_number_and_held_to_the_schemas_range(self):
+    def test_the_timeout_is_read_as_a_number_and_held_between_the_bounds(self):
         self.assertEqual(kit.wait_seconds("5000.0"), 5.0)
         self.assertEqual(kit.wait_seconds(2500), 2.5)
         self.assertEqual(kit.wait_seconds(10), 0.1)
-        self.assertEqual(kit.wait_seconds("1e9"), 30.0)
+        self.assertEqual(kit.wait_seconds(-5), 0.1)
         started = time.monotonic()
         self.assertEqual(self.call("agent1", "wait_for_message", timeout_ms="0.5"), MARKER)
         self.assertGreaterEqual(time.monotonic() - started, 0.09)
