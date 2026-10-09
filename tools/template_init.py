@@ -203,20 +203,51 @@ def create_labels(token, repo):
     return lines
 
 
-def setup_issue_body(repo, default_branch):
-    """The checklist the person works through after the template has landed;
-    the links are absolute because an issue body is not in the tree. The
-    first two boxes are the automated forms: an imported ruleset and one
-    OAuth flow; only the two toggles GitHub reserves for a person remain
-    typed by hand."""
+# The Claude GitHub App's install page. GitHub documents a form of an app's
+# install URL that preselects the account and the repositories, with
+# suggested_target_id and repository_ids[] (its page on migrating an OAuth
+# app to a GitHub App); the plain page is what the issue links when the ids
+# could not be read.
+APP_INSTALL = "https://github.com/apps/claude/installations/new"
+
+
+def app_install_link(owner_id, repository_id):
+    """The install page with this owner and this repository preselected."""
+    return f"{APP_INSTALL}/permissions?suggested_target_id={owner_id}&repository_ids[]={repository_id}"
+
+
+def repository_ids(token, repo):
+    """The owner's id and the repository's id from one GET, or None when the
+    call fails or answers something else; the issue then links the plain
+    install page. The ids come from the API, which GITHUB_TOKEN may read on
+    its own repository, and not from the workflow's event, so
+    .github/workflows/template-init.yml passes nothing new and is unchanged."""
+    status, found = request(token, "GET", f"/repos/{repo}")
+    if status != 200 or not isinstance(found, dict):
+        return None
+    try:
+        return int(found["owner"]["id"]), int(found["id"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def setup_issue_body(repo, default_branch, app_link=APP_INSTALL):
+    """The checklist the person works through after the template has landed,
+    with one absolute link per remaining step, because an issue body is not
+    in the tree. The first box is the one command, scripts/setup-repo.sh,
+    with the settings pages behind it for whoever does it by hand; the second
+    is the one OAuth flow, with the app's install page and the new-secret
+    form behind it. GitHub's secret and variable forms take no prefill, so
+    those links open the form and the text names what to type."""
     base = f"https://github.com/{repo}/blob/{default_branch}"
+    settings = f"https://github.com/{repo}/settings"
     return "\n".join([
         "This repository was made from the SDLC template. Finish setting it up:",
         "",
-        f"- [ ] Import the branch rules: Settings, Rules, Rulesets, Import a ruleset, pick docs/setup/ruleset-main.json from your clone; then turn on \"Automatically delete head branches\" (General) and secret scanning with push protection (Code security) ([docs/setup/github.md]({base}/docs/setup/github.md)).",
-        f"- [ ] One OAuth flow for the Claude side: from Claude Code signed in as the main account, run /install-github-app and pick this repository; it installs the Claude GitHub App and writes the secret CLAUDE_CODE_OAUTH_TOKEN, which turns on @claude ([docs/setup/claude-action.md]({base}/docs/setup/claude-action.md)).",
+        f"- [ ] Run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand: import the branch rules under [Rules]({settings}/rules) (New ruleset, Import a ruleset, docs/setup/ruleset-main.json from your clone), tick \"Automatically delete head branches\" and \"Allow auto-merge\" under [General]({settings}), turn on secret scanning and push protection under [Code security]({settings}/security_analysis), and check the seven labels under [Labels](https://github.com/{repo}/labels) ([docs/setup/github.md]({base}/docs/setup/github.md)).",
+        f"- [ ] One OAuth flow for the Claude side: from Claude Code signed in as the main account, run /install-github-app and pick this repository; it installs the Claude GitHub App and writes the secret CLAUDE_CODE_OAUTH_TOKEN, which turns on @claude. By hand: [install the app]({app_link}), then run `claude setup-token` and paste the token as a [new repository secret]({settings}/secrets/actions/new) named CLAUDE_CODE_OAUTH_TOKEN ([docs/setup/claude-action.md]({base}/docs/setup/claude-action.md)).",
         f"- [ ] Make the thin Project for each Claude account ([docs/setup/claude-project.md]({base}/docs/setup/claude-project.md)).",
-        f"- [ ] Make the worker routine in the main account's Project ([docs/agents/routines/worker.md]({base}/docs/agents/routines/worker.md)), or set the repository variable CLAUDE_WORKER to true to run it from Actions instead, and CLAUDE_TEAM to a list of member names to run a team with a lead ([docs/agents/TEAM.md]({base}/docs/agents/TEAM.md)); the coordinator ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)) joins once a second account does.",
+        f"- [ ] Make the worker routine in the main account's Project ([docs/agents/routines/worker.md]({base}/docs/agents/routines/worker.md)), or run it from Actions instead: a [new repository variable]({settings}/variables/actions/new) named CLAUDE_WORKER with the value true, and another named CLAUDE_TEAM with a JSON list of member names to run a team with a lead ([docs/agents/TEAM.md]({base}/docs/agents/TEAM.md)); the coordinator ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)) joins once a second account does.",
         f"- [ ] Fill in [docs/project.md]({base}/docs/project.md) and [docs/agents/OWNERSHIP.md]({base}/docs/agents/OWNERSHIP.md), and pick the spending profile in [docs/setup/tiers.md]({base}/docs/setup/tiers.md).",
         "- [ ] Run `bash scripts/check.sh` once locally.",
         "",
@@ -232,9 +263,11 @@ def open_setup_issue(token, repo, default_branch):
     for issue in found or []:
         if issue.get("title") == SETUP_ISSUE_TITLE and "pull_request" not in issue:
             return f"issue #{issue['number']}: exists"
+    ids = repository_ids(token, repo)
+    app_link = app_install_link(*ids) if ids else APP_INSTALL
     status, made = request(
         token, "POST", f"/repos/{repo}/issues",
-        {"title": SETUP_ISSUE_TITLE, "body": setup_issue_body(repo, default_branch)},
+        {"title": SETUP_ISSUE_TITLE, "body": setup_issue_body(repo, default_branch, app_link)},
     )
     if status != 201:
         raise InitError(f"POST /repos/{repo}/issues: HTTP {status}")

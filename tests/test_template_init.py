@@ -4,11 +4,13 @@ The placeholders are assembled at run time so this file survives an init of
 the repository it lives in."""
 
 import io
+import re
 import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
@@ -201,6 +203,65 @@ class Labels(unittest.TestCase):
         self.assertIn("ruleset-main.json", body)
         self.assertIn("/install-github-app", body)
         self.assertEqual(body.count("- [ ]"), 6)
+
+    def test_the_setup_issue_opens_with_the_one_command_and_links_every_settings_page(self):
+        body = template_init.setup_issue_body("octo/widgets", "main")
+        self.assertTrue(body.splitlines()[2].startswith("- [ ] Run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand:"))
+        settings = "https://github.com/octo/widgets/settings"
+        for page in (f"{settings}/rules", f"{settings})", f"{settings}/security_analysis", "https://github.com/octo/widgets/labels",
+                     f"{settings}/secrets/actions/new", f"{settings}/variables/actions/new", template_init.APP_INSTALL):
+            self.assertIn(page, body)
+        for target in re.findall(r"\]\(([^)]+)\)", body):
+            self.assertTrue(target.startswith("https://"), target)
+
+    def test_the_app_link_preselects_the_owner_and_the_repository(self):
+        link = template_init.app_install_link(285817514, 1411163972)
+        self.assertEqual(link, "https://github.com/apps/claude/installations/new/permissions?suggested_target_id=285817514&repository_ids[]=1411163972")
+        self.assertIn(f"[install the app]({link})", template_init.setup_issue_body("octo/widgets", "main", link))
+
+
+class FakeRequest:
+    """Stands in for template_init.request: answers by method and path, and
+    remembers every call; a path it has no answer for is a 404."""
+
+    def __init__(self, answers):
+        self.answers = answers
+        self.calls = []
+
+    def __call__(self, token, method, path, body=None, params=None):
+        self.calls.append((method, path, body))
+        return self.answers.get((method, path), (404, None))
+
+
+class SetupIssue(unittest.TestCase):
+    OPENED = (201, {"number": 1})
+    REPO = (200, {"id": 1411163972, "owner": {"id": 285817514}})
+
+    def open_with(self, answers):
+        fake = FakeRequest({("GET", "/repos/octo/widgets/issues"): (200, []), ("POST", "/repos/octo/widgets/issues"): self.OPENED, **answers})
+        with patch.object(template_init, "request", fake):
+            line = template_init.open_setup_issue("t", "octo/widgets", "main")
+        posted = [body for method, path, body in fake.calls if method == "POST"]
+        return line, fake.calls, posted[0]["body"] if posted else None
+
+    def test_one_get_of_the_repository_gives_the_preselected_install_link(self):
+        line, calls, body = self.open_with({("GET", "/repos/octo/widgets"): self.REPO})
+        self.assertEqual(line, "issue #1: opened")
+        self.assertEqual([(m, p) for m, p, _ in calls], [("GET", "/repos/octo/widgets/issues"), ("GET", "/repos/octo/widgets"), ("POST", "/repos/octo/widgets/issues")])
+        self.assertIn(template_init.app_install_link(285817514, 1411163972), body)
+
+    def test_a_failed_get_falls_back_to_the_plain_install_link(self):
+        for answer in ((404, None), (200, {"id": 1}), (200, "not json we expect")):
+            line, _, body = self.open_with({("GET", "/repos/octo/widgets"): answer})
+            self.assertEqual(line, "issue #1: opened")
+            self.assertIn(f"[install the app]({template_init.APP_INSTALL})", body)
+            self.assertNotIn("suggested_target_id", body)
+
+    def test_an_open_setup_issue_is_not_opened_again(self):
+        fake = FakeRequest({("GET", "/repos/octo/widgets/issues"): (200, [{"number": 4, "title": template_init.SETUP_ISSUE_TITLE}])})
+        with patch.object(template_init, "request", fake):
+            self.assertEqual(template_init.open_setup_issue("t", "octo/widgets", "main"), "issue #4: exists")
+        self.assertEqual(len(fake.calls), 1)
 
 
 if __name__ == "__main__":

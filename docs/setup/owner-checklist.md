@@ -6,11 +6,44 @@ built it. Sessions cannot do these steps themselves: they need the owner's
 own accounts. Never paste a token into a chat or commit one to the
 repository; each one goes only where this page says.
 
+## One command for the GitHub side
+
+Every repository setting of section 3 and the variables of section 4 are
+one run of `bash scripts/setup-repo.sh` from a clone, on your own
+computer, with the GitHub CLI signed in (`gh auth login`) as a user with
+admin rights on the repository; a cloud session cannot run it, having
+neither gh nor admin rights. The script creates the ruleset
+docs/setup/ruleset-main.json unless one of that name is already listed
+for the repository, turns on "Automatically delete head branches" and
+"Allow auto-merge", turns on secret scanning and then push protection
+(and says so and carries on where the plan or the visibility offers
+neither: a Free organization's private repository has no Secret
+Protection), creates or updates the seven labels from the one list in
+tools/template_init.py, sets each variable given as `--var NAME=VALUE`,
+and with `--token` stores the secret CLAUDE_CODE_OAUTH_TOKEN from gh's
+hidden prompt, so the token is never on a command line, in a file or on
+the screen. Each step prints one line; run it again at any time, and
+nothing is done twice. The ruleset goes in whatever the plan, but on
+GitHub Free a private repository's ruleset is written and not enforced
+(docs/setup/tiers.md); the script says so when the repository is private.
+
+Two things it cannot do. The token itself: only `claude setup-token`,
+run by you and signed in to the account whose subscription the runs
+should draw on, makes one, so the script asks you to run that in another
+terminal and paste the result (or run `/install-github-app` in Claude
+Code instead, which installs the app and stores the secret in one OAuth
+flow, docs/setup/claude-action.md). And anything outside the repository:
+the Claude GitHub App's installation, the organization's rulesets,
+secrets and variables (below), the cloud environment's variable
+(section 2) and the claude.ai Projects (section 5) are pages you open,
+from the links that follow.
+
 ## One-click links
 
 Each opens the exact page; the sections below say what to do there.
 
 - Install the Claude GitHub App: https://github.com/apps/claude/installations/new
+- The same, with this organization and repository preselected (the form GitHub documents for an app's install URL, with the ids the API reports for OpenSpineConsortium/sdlc-template, not tried live from a session): https://github.com/apps/claude/installations/new/permissions?suggested_target_id=285817514&repository_ids[]=1411163972
 - Connect GitHub to Claude: https://claude.ai/settings/connectors
 - Claude Code in the cloud (sessions, environment settings): https://claude.ai/code
 - How cloud environments, variables and network access work: https://code.claude.com/docs/en/cloud-environments
@@ -23,10 +56,68 @@ Each opens the exact page; the sections below say what to do there.
 - Organization rulesets (applied to every repository of the organization): https://github.com/organizations/OpenSpineConsortium/settings/rules
 - claude.ai Projects: https://claude.ai/projects
 
-A template copies files only, never settings, secrets or variables. The
-next session's checkpoint (claude/10's .claude/session.md, task 2) turns
-the GitHub steps into one command the owner runs once, and checks which
-settings an organization can set once for every repository it makes.
+A template copies files only, never settings, secrets or variables: the
+command above sets the repository's, and the next section says what an
+organization can set once for every repository it makes.
+
+## What an organization can set once for every repository it makes
+
+Three things an organization sets once reach every repository it makes
+afterwards, copies of this template included, with no step in the new
+repository; each needs the plan named. Checked against GitHub's own
+documentation and REST description on 2026-10-09; where a sentence
+could not be read from a primary source, it says so.
+
+- **Organization rulesets** need GitHub Team or Enterprise; a Free
+  organization has none. A ruleset targets all repositories (`~ALL`),
+  the repositories matching a name pattern, or a chosen list; the first
+  two are evaluated against the organization as it stands, so a
+  repository made later from the template is covered without a step (by
+  construction; the documentation never says "new repositories" in so
+  many words). docs/setup/ruleset-org.json is ruleset-main.json in the
+  shape the organization level needs, the repository_name condition
+  beside ref_name, targeting `~ALL`: import it at the organization's
+  rules page (New ruleset, Import a ruleset). Only the organization's
+  owners can edit it afterwards; a repository's admins may add rulesets
+  of their own, which aggregate with it, and the one command above
+  skips its own ruleset when one of that name is already listed. Whether
+  the import page accepts the repository-shaped file and asks for
+  targets was not verified, which is why the second file exists.
+- **Organization Actions secrets and variables** can be made on any
+  plan, with a policy of all repositories, private repositories only, or
+  a chosen list; "all" and "private only" cover a repository made later,
+  a list does not until the repository is added. On GitHub Free a private
+  repository cannot read them at all, so there they serve only the
+  organization's public repositories. From the command line:
+  `gh secret set CLAUDE_CODE_OAUTH_TOKEN --org ORG --visibility all` and
+  `gh variable set CLAUDE_WORKER --org ORG --visibility all --body true`;
+  gh's default visibility is "private", which on a Free organization
+  would make the value readable nowhere. One organization-wide
+  CLAUDE_CODE_OAUTH_TOKEN means every repository draws on the main
+  account's subscription; Claude Code's own documentation suggests an API
+  key for a secret shared across repositories, which this project's rule
+  of no API billing rules out.
+- **Settings as code**, a settings file an app applies, is not a GitHub
+  feature but one of two community apps. github/safe-settings keeps every
+  repository's settings in one admin repository of the organization and
+  applies them when a repository is created, but needs a GitHub App of
+  your own and your own hosting (no hosted instance exists, and whether
+  GitHub supports it as a product is unverified). The Repository Settings
+  App (repository-settings/app, formerly probot/settings) is hosted and
+  reads .github/settings.yml from each repository, but it makes anyone
+  with push rights an admin in effect, and whether it writes rulesets
+  rather than branch protection is unverified. Both need an app
+  installation, a new dependency, so by .claude/rules/writing.md it is an
+  issue first: "Settings as code", opened by the session that wrote this
+  page. The native equivalents are the two bullets above and, for secret
+  scanning and push protection, the organization's security
+  configurations.
+
+One observation for the owner to confirm: the API reports this
+repository's visibility as "internal", which GitHub offers only to
+organizations owned by an enterprise account, so the organization's plan
+may not be the Free plan this page otherwise assumes, and the Team-and-up
+items above may already be open to it.
 
 ## 1. To continue the work on a new Claude account
 
@@ -81,7 +172,8 @@ about 42 sessions.
 
 ## 3. The repository's GitHub settings (sdlc-template and every copy)
 
-Under Settings of the repository, as docs/setup/github.md describes:
+`bash scripts/setup-repo.sh` does 1 to 4 in one run (above). By hand,
+under Settings of the repository, as docs/setup/github.md describes:
 
 1. **Rules**: Rules, Rulesets, New ruleset, Import a ruleset, and choose
    docs/setup/ruleset-main.json (protects the default branch, requires the
@@ -106,7 +198,7 @@ Under Settings of the repository, as docs/setup/github.md describes:
    `CLAUDE_CODE_OAUTH_TOKEN`. Replace it when it expires (about a year).
    docs/setup/claude-action.md has the details.
 2. **Repository variables** (Settings, Secrets and variables, Actions,
-   Variables), each optional:
+   Variables, or `scripts/setup-repo.sh --var NAME=VALUE`), each optional:
    - `CLAUDE_WORKER` = `true`: the scheduled worker in Actions. Pick it or
      the worker routine in a claude.ai Project, not both.
    - `CLAUDE_TEAM` = a JSON list of member names, as `["w1","w2","w3"]`:
@@ -132,6 +224,6 @@ beta on Pro and Max.
 - claude/10, draft pull request #13 (issue #10): the experiment kit and
   coordbench; its .claude/session.md is the full checkpoint and
   experiment/coordbench/REVIEW.md the 28 findings to fix first.
-- claude/11, draft pull request #12 (issue #11): the push guard's rewrite,
-  work in progress.
+- claude/11, pull request #12 (issue #11): the push guard's newline fix
+  alone, rebased on main, 52 lines over main, ready for review.
 - The main account's weekly Claude usage resets on 2026-10-15 at 11:00 UTC.
