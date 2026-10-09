@@ -28,12 +28,15 @@ import cli  # noqa: E402
 TEXT = {"type": "string"}
 BOOLEAN = {"type": "boolean"}
 TOOLS = [
+    # send_message takes one word per name and is marked for stderr, as
+    # kit lists it, so its echo lands on stderr in the tests of it.
     {"name": "send_message", "description": "Send a message to one peer, by agent id.",
-     "inputSchema": {"type": "object", "properties": {"to": TEXT, "text": TEXT}},
-     "alias": "coop-send", "argv": ["to", "text..."]},
+     "inputSchema": {"type": "object", "properties": {"to": TEXT, "text": TEXT},
+                     "x-coordbench-prints": "stderr"},
+     "alias": "coop-send", "argv": ["to", "text"]},
     {"name": "broadcast", "description": "Send a message to every other agent.",
      "inputSchema": {"type": "object", "properties": {"text": TEXT}},
-     "alias": "coop-broadcast", "argv": ["text..."]},
+     "alias": "coop-broadcast", "argv": ["text"]},
     {"name": "receive_messages", "description": "Drain your inbox.",
      "inputSchema": {"type": "object", "properties": {}}, "alias": "coop-recv", "argv": []},
     {"name": "claim_task", "description": "Claim a task by number.",
@@ -46,8 +49,11 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {"code": {"type": "integer"}}},
      "alias": "", "argv": ["code"]},
     # The tools above are listed as by a hub that lists no flags, which
-    # must read as tools without any; these carry coop_task.py's options,
-    # as the team arm lists them.
+    # must read as tools without any; these carry coop_task.py's options
+    # the way the team arm lists them, except that request's "body..."
+    # keeps cli.py's rest-of-line form under test: the team arm now reads
+    # one word per positional, as coop_task.py does, and no shipped arm
+    # uses "..." any more.
     {"name": "task_update", "description": "Set the status of a task you own.",
      "inputSchema": {"type": "object", "properties": {"task_id": TEXT, "status": TEXT, "note": TEXT}},
      "alias": "coop-task-update", "argv": ["task_id", "status"], "flags": {"-n": "note", "--note": "note"}},
@@ -210,18 +216,31 @@ class CommandTest(HubTestCase):
         return json.loads(stdout)["arguments"]
 
     def test_call_with_a_json_object(self):
-        code, out, err = run_cli("--url", self.rpc_url, "call", "send_message",
-                                 '{"to": "agent2", "text": "hi there"}')
+        code, out, err = run_cli("--url", self.rpc_url, "call", "receive_messages", '{"all": true}')
         self.assertEqual((code, err), (0, ""))
-        self.assertEqual(json.loads(out), {"tool": "send_message",
-                                           "arguments": {"to": "agent2", "text": "hi there"}})
+        self.assertEqual(json.loads(out), {"tool": "receive_messages", "arguments": {"all": True}})
 
     def test_call_with_key_value_words_typed_by_the_schema(self):
-        code, out, _ = run_cli("--url", self.rpc_url, "call", "send_message", "to=agent2", "text=a=b")
+        code, _, err = run_cli("--url", self.rpc_url, "call", "send_message", "to=agent2", "text=a=b")
         self.assertEqual(code, 0)
-        self.assertEqual(self.call_arguments(out), {"to": "agent2", "text": "a=b"})
+        self.assertEqual(self.call_arguments(err), {"to": "agent2", "text": "a=b"})
         code, out, _ = run_cli("--url", self.rpc_url, "call", "wait_for_message", "timeout_ms=1500")
         self.assertEqual(self.call_arguments(out), {"timeout_ms": 1500})
+
+    def test_a_tools_text_goes_to_stderr_when_its_schema_says_so(self):
+        # coop-send says "sent to agent2" on stderr in coop_msg.py and
+        # nothing on stdout; the mark in the schema is how the command
+        # knows, whether the tool is called by its alias or by name.
+        for words in (["alias-run", "send_message", "agent2", "hi"],
+                      ["call", "send_message", '{"to": "agent2", "text": "hi"}'],
+                      ["call", "send_message", "to=agent2", "text=hi"]):
+            with self.subTest(words=words):
+                code, out, err = run_cli("--url", self.rpc_url, *words)
+                self.assertEqual((code, out), (0, ""))
+                self.assertEqual(self.call_arguments(err), {"to": "agent2", "text": "hi"})
+        code, out, err = run_cli("--url", self.rpc_url, "alias-run", "broadcast", "hi")
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(self.call_arguments(out), {"text": "hi"})
 
     def test_call_takes_the_url_from_the_environment(self):
         os.environ["COORD_RPC_URL"] = self.rpc_url
@@ -231,7 +250,7 @@ class CommandTest(HubTestCase):
     def test_tools_lists_each_tool_with_its_command_and_description(self):
         code, out, _ = run_cli("--url", self.rpc_url, "tools")
         self.assertEqual(code, 0)
-        self.assertIn("send_message  (shell: coop-send <to> <text...>)\n"
+        self.assertIn("send_message  (shell: coop-send <to> <text>)\n"
                       "    Send a message to one peer, by agent id.", out)
         self.assertIn("claim_task  (shell: coord-claim_task <task_id>)", out)
         self.assertIn("wait_for_message  (shell: coord-wait_for_message [key=value ...])\n"
@@ -256,33 +275,54 @@ class CommandTest(HubTestCase):
     def test_prompt_prints_the_agents_prompt(self):
         self.assertEqual(run_cli("--url", self.rpc_url, "prompt"), (0, PROMPT + "\n", ""))
 
-    def test_alias_run_maps_words_onto_argv_and_joins_the_rest(self):
-        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "send_message",
-                               "agent2", "hello", "there", "-n")
+    def test_alias_run_maps_words_onto_argv_and_a_trailing_name_joins_the_rest(self):
+        # -x is not one of request's flags, so it is part of the body.
+        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "request",
+                               "agent2", "review", "hello", "there", "-x")
         self.assertEqual(code, 0)
-        self.assertEqual(self.call_arguments(out), {"to": "agent2", "text": "hello there -n"})
+        self.assertEqual(self.call_arguments(out), {"recipient": "agent2", "kind": "review",
+                                                    "body": "hello there -x"})
         code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "claim_task", "7")
         self.assertEqual(self.call_arguments(out), {"task_id": 7})
 
-    def test_alias_run_reads_missing_text_from_stdin(self):
-        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "send_message", "agent2",
+    def test_alias_run_reads_the_last_names_missing_word_from_stdin(self):
+        # coop_msg.py's content is one optional word read from stdin when
+        # missing, so the last argv name reads stdin whether or not it
+        # ends in "...".
+        code, _, err = run_cli("--url", self.rpc_url, "alias-run", "send_message", "agent2",
                                stdin="from stdin\n")
         self.assertEqual(code, 0)
-        self.assertEqual(self.call_arguments(out), {"to": "agent2", "text": "from stdin\n"})
+        self.assertEqual(self.call_arguments(err), {"to": "agent2", "text": "from stdin\n"})
+        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "broadcast", stdin="to all\n")
+        self.assertEqual(self.call_arguments(out), {"text": "to all\n"})
+        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "request", "agent1", "review",
+                               stdin="the body\n")
+        self.assertEqual(self.call_arguments(out), {"recipient": "agent1", "kind": "review", "body": "the body\n"})
 
     def test_alias_run_leaves_a_terminal_alone(self):
-        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "send_message", "agent2",
+        code, _, err = run_cli("--url", self.rpc_url, "alias-run", "send_message", "agent2",
                                stdin="typed", tty=True)
-        self.assertEqual(self.call_arguments(out), {"to": "agent2"})
+        self.assertEqual(self.call_arguments(err), {"to": "agent2"})
 
     def test_alias_run_reads_no_stdin_while_an_earlier_word_is_missing(self):
-        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "send_message", stdin="text")
-        self.assertEqual(self.call_arguments(out), {})
+        code, _, err = run_cli("--url", self.rpc_url, "alias-run", "send_message", stdin="text")
+        self.assertEqual(self.call_arguments(err), {})
 
     def test_alias_run_refuses_extra_words(self):
         code, out, err = run_cli("--url", self.rpc_url, "alias-run", "claim_task", "7", "8")
         self.assertEqual((code, out), (2, ""))
         self.assertIn("too many words; usage: coord-claim_task <task_id>", err)
+        self.assertEqual(self.server.calls, [])
+
+    def test_an_unquoted_message_is_a_word_too_many_as_argparse_says(self):
+        # coop_msg.py's argparse refuses `coop-send agent2 hello there`
+        # with exit 2; joining the words would send what argparse refused.
+        code, out, err = run_cli("--url", self.rpc_url, "alias-run", "send_message", "agent2", "hello", "there")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("too many words; usage: coop-send <to> <text>", err)
+        code, out, err = run_cli("--url", self.rpc_url, "alias-run", "broadcast", "hello", "there")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("too many words; usage: coop-broadcast <text>", err)
         self.assertEqual(self.server.calls, [])
 
     def test_flags_set_their_arguments_before_among_or_after_the_words(self):
@@ -328,9 +368,8 @@ class CommandTest(HubTestCase):
                                "-x", "--note", "--waiting=5", "-1")
         self.assertEqual(code, 0)
         self.assertEqual(self.call_arguments(out)["body"], "-x --note --waiting=5 -1")
-        code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "send_message", "agent2",
-                               "--wait", "for", "me")
-        self.assertEqual(self.call_arguments(out), {"to": "agent2", "text": "--wait for me"})
+        code, _, err = run_cli("--url", self.rpc_url, "alias-run", "send_message", "agent2", "--wait")
+        self.assertEqual(self.call_arguments(err), {"to": "agent2", "text": "--wait"})
         code, out, _ = run_cli("--url", self.rpc_url, "alias-run", "task_update", "3", "-blocked")
         self.assertEqual(self.call_arguments(out), {"task_id": "3", "status": "-blocked"})
 
@@ -416,10 +455,14 @@ class InstallTest(HubTestCase):
 
     def test_wrappers_with_a_baked_url_reach_the_hub(self):
         run_cli("install", str(self.bin_dir), "--url", self.rpc_url)
-        sent = self.run_command("coop-send", "agent2", "hello", "from", "a", "wrapper")
-        self.assertEqual(sent.returncode, 0, sent.stderr)
-        self.assertEqual(json.loads(sent.stdout)["arguments"],
+        # coop-send's text goes to stderr and stdout stays empty, as with
+        # coop_msg.py's "sent to agent2".
+        sent = self.run_command("coop-send", "agent2", "hello from a wrapper")
+        self.assertEqual((sent.returncode, sent.stdout), (0, ""), sent.stderr)
+        self.assertEqual(json.loads(sent.stderr)["arguments"],
                          {"to": "agent2", "text": "hello from a wrapper"})
+        unquoted = self.run_command("coop-send", "agent2", "hello", "there")
+        self.assertEqual((unquoted.returncode, unquoted.stdout), (2, ""))
         piped = self.run_command("coop-broadcast", stdin="piped text\n")
         self.assertEqual(json.loads(piped.stdout)["arguments"], {"text": "piped text\n"})
         refused = self.run_command("coord-refuse")

@@ -7,8 +7,10 @@ import contextlib
 import http.client
 import io
 import json
-import re
 import select
+import shutil
+import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -16,6 +18,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -23,7 +26,7 @@ COORDBENCH = ROOT / "experiment" / "coordbench"
 sys.path.insert(0, str(COORDBENCH))
 
 import hub as hub_module  # noqa: E402
-from arm import Arm, Tool, ToolError  # noqa: E402
+from arm import Arm, Run, Tool, ToolError  # noqa: E402
 
 ARM_JSON = {"entry": "arm.py:TestArm", "name": "testarm", "description": "messages and two odd tools",
             "needs": [], "plugins": [], "mcp_servers": {}}
@@ -47,6 +50,11 @@ class TestArm(Arm):
     def tools(self, run, agent):
         return kit.messaging_tools() + [Tool("refuse", "Always refuses.", refuse),
                                         Tool("crash", "Always crashes.", crash)]
+
+    def instructions(self, run, agent):
+        # No built-in arm sends any; this one does, to show the hook reaches
+        # the client through initialize.
+        return f"testarm run {run.id}: you are {agent}"
 
     def metrics(self, run):
         return {**super().metrics(run), **kit.message_metrics(run)}
@@ -211,6 +219,29 @@ class ApiTest(HubServerCase):
         self.assertEqual([e["kind"] for e in events], ["tool", "message"])
         self.assertEqual(events[1]["to"], "agent2")
 
+    def test_delete_releases_the_run(self):
+        # A released run is gone from the hub: its events, prompts and
+        # sessions with it, so a long-lived hub does not keep every run.
+        self.create()
+        self.rpc("send_message", {"to": "agent2", "text": "hi"})
+        released = self.request("DELETE", "/api/runs/pair1")
+        self.assertEqual(released.status, 200, released.raw)
+        self.assertEqual(released.json, {"run_id": "pair1", "released": True})
+        self.assertEqual(self.request("GET", "/api/runs/pair1").status, 404)
+        self.assertEqual(self.request("DELETE", "/api/runs/pair1").status, 404)
+        self.assertEqual(self.rpc("peek_messages", agent="agent2").status, 404)
+        self.assertEqual(self.request("GET", "/api/health").json["runs"], 0)
+        self.assertEqual(self.create()["run_id"], "pair1")
+
+    def test_repeated_or_too_many_features_are_400(self):
+        for features in ([1, 1], [1, 2, 1], list(range(1, hub_module.MAX_FEATURES + 2))):
+            specs = {str(number): f"Add feature {number}." for number in features}
+            body = {"arm": str(self.arm_dir), "features": features, "specs": specs}
+            answer = self.request("POST", "/api/runs", body)
+            self.assertEqual(answer.status, 400, features)
+            self.assertIn("error", answer.json)
+        self.assertEqual(self.request("GET", "/api/health").json["runs"], 0)
+
 
 class McpTest(HubServerCase):
     def setUp(self):
@@ -224,8 +255,8 @@ class McpTest(HubServerCase):
         result = hello.json["result"]
         self.assertEqual(result["protocolVersion"], "2025-06-18")
         self.assertIn("tools", result["capabilities"])
-        self.assertIn("agent1", result["instructions"])
-        self.assertIn("testarm", result["instructions"])
+        # The test arm's own instructions, through Arm.instructions.
+        self.assertEqual(result["instructions"], "testarm run pair1: you are agent1")
         with_session = {"Mcp-Session-Id": session}
         initialized = self.mcp(rpc_message("notifications/initialized", request_id=None),
                                headers=with_session)
@@ -346,9 +377,130 @@ class McpTest(HubServerCase):
         finally:
             connection.close()
 
-    def test_a_body_that_is_not_json_is_a_parse_error(self):
+    def test_a_body_that_is_not_json_is_a_parse_error_with_status_400(self):
+        # Input the hub cannot read gets an HTTP error status, as the
+        # transport asks, and the error names no id: there is none to
+        # name, and MCP allows no null id.
         answer = self.mcp(b"{not json")
+        self.assertEqual(answer.status, 400)
         self.assertEqual(answer.json["error"]["code"], -32700)
+        self.assertNotIn("id", answer.json)
+
+    def test_a_lone_message_that_is_no_request_is_400(self):
+        for body in ([], {"hello": "hub"}, rpc_message("ping", request_id=None) | {"id": None},
+                     rpc_message("ping", request_id=True), rpc_message("ping", request_id=1.5)):
+            answer = self.mcp(body)
+            self.assertEqual(answer.status, 400, body)
+            self.assertEqual(answer.json["error"]["code"], -32600, body)
+            self.assertNotIn("id", answer.json, body)
+
+    def test_a_request_with_a_bad_shape_is_refused_with_its_id(self):
+        # Each of these is -32600 or -32602 with the request's id, where
+        # the hub used to fail on them inside a handler (-32603).
+        not_a_string = self.mcp({"jsonrpc": "2.0", "id": 5, "method": ["tools/list"]})
+        self.assertEqual((not_a_string.status, not_a_string.json["id"]), (200, 5))
+        self.assertEqual(not_a_string.json["error"]["code"], -32600)
+        for method in ("initialize", "tools/call"):
+            listed = self.mcp({"jsonrpc": "2.0", "id": 6, "method": method, "params": [1]})
+            self.assertEqual((listed.status, listed.json["id"]), (200, 6), method)
+            self.assertEqual(listed.json["error"]["code"], -32602, method)
+        named_by_list = self.call_tool(["send_message"], request_id=8)
+        self.assertEqual((named_by_list.status, named_by_list.json["id"]), (200, 8))
+        self.assertEqual(named_by_list.json["error"]["code"], -32602)
+        self.assertEqual(self.mcp(rpc_message("ping") | {"params": None}).status, 200)
+
+    def test_a_bad_batch_member_fails_alone(self):
+        # The tool call before the bad member ran and is answered as such;
+        # a client that saw -32603 for it would retry a message already sent.
+        batch = [rpc_message("tools/call", {"name": "send_message",
+                                            "arguments": {"to": "agent2", "text": "once"}}, 1),
+                 rpc_message("ping", request_id=True),
+                 {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": [1]},
+                 rpc_message("ping", request_id=3)]
+        answer = self.mcp(batch)
+        self.assertEqual(answer.status, 200)
+        answers = answer.json
+        self.assertEqual([a.get("id") for a in answers], [1, None, 2, 3])
+        self.assertEqual(answers[0]["result"]["content"][0]["text"], "sent to agent2")
+        self.assertNotIn("id", answers[1])
+        self.assertEqual(answers[1]["error"]["code"], -32600)
+        self.assertEqual(answers[2]["error"]["code"], -32602)
+        self.assertEqual(answers[3]["result"], {})
+        self.assertEqual(self.rpc("peek_messages", agent="agent2").json["text"], "1")
+
+    def test_a_hub_failure_answers_only_the_request_it_failed_on(self):
+        batch = [rpc_message("ping", request_id=1), rpc_message("tools/list", request_id=2),
+                 rpc_message("ping", request_id=3)]
+        broken = mock.patch.object(type(self.hub.hosted("pair1").run.arm), "tools_for",
+                                   side_effect=RuntimeError("a bug in the arm's listing"))
+        with broken, contextlib.redirect_stderr(io.StringIO()) as log:
+            answers = self.mcp(batch).json
+        self.assertEqual([a["id"] for a in answers], [1, 2, 3])
+        self.assertEqual(answers[0]["result"], {})
+        self.assertEqual(answers[1]["error"]["code"], -32603)
+        self.assertEqual(answers[2]["result"], {})
+        self.assertIn("a bug in the arm's listing", log.getvalue())
+
+    def test_an_initialize_refused_for_its_shape_opens_no_session(self):
+        refused = self.mcp({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": [1]})
+        self.assertEqual(refused.status, 200)
+        self.assertIn("error", refused.json)
+        self.assertNotIn("Mcp-Session-Id", refused.headers)
+        unnamed = self.mcp({"jsonrpc": "2.0", "id": None, "method": "initialize", "params": INIT_PARAMS})
+        self.assertEqual(unnamed.status, 400)
+        self.assertNotIn("Mcp-Session-Id", unnamed.headers)
+
+    def test_initialize_carries_no_instructions_unless_the_arm_gives_some(self):
+        # CooperBench's agents get no server instructions (its team server
+        # sends none, its other modes have no server), so neither do the
+        # built-in arms: the key is left out, not sent empty.
+        created = self.request("POST", "/api/runs", {"arm": "coop", "run_id": "plain", "features": [1, 2],
+                                                     "specs": SPECS})
+        self.assertEqual(created.status, 201, created.raw)
+        hello = self.mcp(rpc_message("initialize", INIT_PARAMS), run_id="plain")
+        self.assertEqual(hello.status, 200)
+        self.assertNotIn("instructions", hello.json["result"])
+
+    def test_an_unsupported_protocol_version_is_400_except_on_initialize(self):
+        # Claude Code probes with a newer binding's version first and reads
+        # a 4xx as "this server wants the initialize handshake".
+        probe = self.mcp(rpc_message("ping"), headers={"MCP-Protocol-Version": "2026-07-28"})
+        self.assertEqual(probe.status, 400)
+        self.assertEqual(probe.json["error"]["code"], -32600)
+        self.assertNotIn("id", probe.json)
+        self.assertIn("2026-07-28", probe.json["error"]["message"])
+        hello = self.mcp(rpc_message("initialize", INIT_PARAMS),
+                         headers={"MCP-Protocol-Version": "2026-07-28"})
+        self.assertEqual(hello.status, 200)
+        self.assertEqual(hello.json["result"]["protocolVersion"], "2025-06-18")
+        for version in ("2025-06-18", "2025-03-26", "2024-11-05"):
+            answer = self.mcp(rpc_message("ping"), headers={"MCP-Protocol-Version": version})
+            self.assertEqual(answer.status, 200, version)
+
+    def test_a_dropped_connection_leaves_no_traceback(self):
+        # Claude Code drops its keep-alive connection each time it exits;
+        # the reset lands in the handler's wait for the next request line,
+        # which only the server's handle_error sees. The hub log must not
+        # read as if the hub had failed.
+        handled = threading.Event()
+        original = hub_module.HubServer.handle_error
+
+        def watched(server, request, client_address):
+            try:
+                original(server, request, client_address)
+            finally:
+                handled.set()
+
+        with mock.patch.object(hub_module.HubServer, "handle_error", watched), \
+                contextlib.redirect_stderr(io.StringIO()) as log:
+            client = socket.create_connection(("127.0.0.1", self.port), timeout=10)
+            client.sendall(b"POST /mcp/pair1/agent1 HTTP/1.1\r\nContent-Len")
+            # Closing with a zero linger sends a reset instead of a FIN.
+            client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            client.close()
+            self.assertTrue(handled.wait(timeout=10), "the server never saw the dropped connection")
+        self.assertEqual(log.getvalue(), "")
+        self.assertEqual(self.mcp(rpc_message("ping")).status, 200)
 
     def test_wait_for_message_blocks_only_its_caller(self):
         self.initialize("agent2")
@@ -389,8 +541,10 @@ class RpcTest(HubServerCase):
         tools = {tool["name"]: tool for tool in described["tools"]}
         send = tools["send_message"]
         self.assertEqual(send["alias"], "coop-send")
-        self.assertEqual(send["argv"], ["to", "text..."])
-        self.assertEqual(send["inputSchema"]["required"], ["to", "text"])
+        # As coop_msg.py's argparse: one word of text, and only the
+        # recipient required (kit.py ports it; an empty text is accepted).
+        self.assertEqual(send["argv"], ["to", "text"])
+        self.assertEqual(send["inputSchema"]["required"], ["to"])
         self.assertTrue(send["description"])
         self.assertEqual(tools["refuse"]["alias"], "")
 
@@ -403,12 +557,20 @@ class RpcTest(HubServerCase):
         self.assertEqual(self.rpc("refuse").json, {"text": "refused on purpose", "isError": True, "exitCode": 1})
         missing = self.rpc("send_message", {"text": "to nobody"}).json
         self.assertTrue(missing["isError"])
-        self.assertIn("to is required", missing["text"])
+        # kit.py refuses a missing recipient in argparse's words, as
+        # coop-send does.
+        self.assertIn("required: recipient", missing["text"])
 
     def test_unknown_tool_is_400(self):
         answer = self.rpc("no_such_tool")
         self.assertEqual(answer.status, 400)
         self.assertIn("error", answer.json)
+
+    def test_a_tool_name_that_is_not_a_string_is_400(self):
+        for name in (["send_message"], {"name": "send_message"}, 7, None):
+            answer = self.rpc(name)
+            self.assertEqual(answer.status, 400, name)
+            self.assertIn("error", answer.json)
 
     def test_unknown_run_or_agent_is_404(self):
         self.assertEqual(self.rpc("list_agents", agent="agent9").status, 404)
@@ -460,6 +622,49 @@ class InProcessTest(unittest.TestCase):
         created = hub.create_run(str(self.arm_dir), [1], {"1": "spec"}, run_id="y1")
         self.assertEqual(created["run_id"], "y1")
 
+    def test_an_arm_directory_is_loaded_once_and_instantiated_per_run(self):
+        # Running arm.py for every run grew a long-lived hub without bound;
+        # the class is kept per directory, the arm object is fresh per run.
+        hub = hub_module.Hub(arm_dirs=[self.arm_dir])
+        hub.create_run(str(self.arm_dir), [1], {"1": "spec"}, run_id="a1")
+        hub.create_run(str(self.arm_dir), [1], {"1": "spec"}, run_id="a2")
+        hub.create_run("coop", [1, 2], SPECS, run_id="c1")
+        hub.create_run("coop", [1, 2], SPECS, run_id="c2")
+        first, second = hub.hosted("a1").run.arm, hub.hosted("a2").run.arm
+        self.assertIs(type(first), type(second))
+        self.assertIsNot(first, second)
+        self.assertEqual(first.root, second.root)
+        self.assertIs(type(hub.hosted("c1").run.arm), type(hub.hosted("c2").run.arm))
+        self.assertEqual(len(hub.arm_classes), 2)
+
+
+class EmitTest(unittest.TestCase):
+    """The events log is a side record: the runner reads events from memory,
+    so a disk that refuses the log must not fail the tool call or leave
+    the tools waiting on the run asleep."""
+
+    def test_a_failed_log_write_keeps_the_event_wakes_waiters_and_complains_once(self):
+        with tempfile.TemporaryDirectory() as logs:
+            path = Path(logs) / "gone" / "events.jsonl"
+            path.parent.mkdir()
+            run = Run("r1", Arm(), [], events_path=path)
+            run.emit("first")
+            shutil.rmtree(path.parent)
+            woke = []
+            waiter = threading.Thread(target=lambda: woke.append(
+                run.wait_until(lambda: len(run.events) > 1, 10)))
+            waiter.start()
+            time.sleep(0.2)
+            with contextlib.redirect_stderr(io.StringIO()) as log:
+                event = run.emit("second", "agent1")
+                run.emit("third")
+            waiter.join(timeout=10)
+        self.assertEqual(event["kind"], "second")
+        self.assertEqual([e["kind"] for e in run.events], ["first", "second", "third"])
+        self.assertEqual(woke, [True])
+        self.assertEqual(log.getvalue().count("cannot write"), 1)
+        self.assertIn("r1", log.getvalue())
+
 
 class GuardTest(unittest.TestCase):
     """Loading an arm runs its code in the hub, and agents can reach the
@@ -506,20 +711,46 @@ class GuardTest(unittest.TestCase):
         hub.close_run("t1")
         self.assertEqual(calls, [("setup", {1: "spec"}), ("teardown", "t1")])
 
+    def test_a_release_closes_an_open_run_first_and_tears_down_once(self):
+        calls = []
+
+        class Holding(Arm):
+            def teardown(self, run):
+                calls.append(run.id)
+
+        hub = hub_module.Hub()
+        hub.create_run(Holding(), [1], {"1": "spec"}, run_id="t2")
+        self.assertEqual(hub.release_run("t2"), {"run_id": "t2", "released": True})
+        self.assertEqual(calls, ["t2"])
+        self.assertEqual(hub.run_count(), 0)
+        for forgotten in (hub.release_run, hub.close_run, hub.get_run):
+            with self.assertRaises(hub_module.HubError) as unknown:
+                forgotten("t2")
+            self.assertEqual(unknown.exception.status, 404)
+        hub.create_run(Holding(), [1], {"1": "spec"}, run_id="t3")
+        hub.close_run("t3")
+        hub.release_run("t3")
+        self.assertEqual(calls, ["t2", "t3"])
+
     def test_the_management_api_wants_the_token_when_one_is_set(self):
         hub = hub_module.Hub(admin_token="s3cret")
         server = hub_module.serve_in_background(hub, "127.0.0.1", 0)
         try:
-            def post(headers):
+            def send(method, path, headers, body=None):
                 connection = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=10)
-                body = json.dumps({"arm": "coop", "features": [1, 2], "specs": SPECS})
-                connection.request("POST", "/api/runs", body, {"Content-Type": "application/json", **headers})
+                connection.request(method, path, body, {"Content-Type": "application/json", **headers})
                 status = connection.getresponse().status
                 connection.close()
                 return status
+
+            def post(headers):
+                body = json.dumps({"arm": "coop", "run_id": "guarded", "features": [1, 2], "specs": SPECS})
+                return send("POST", "/api/runs", headers, body)
             self.assertEqual(post({}), 401)
             self.assertEqual(post({"Authorization": "Bearer wrong"}), 401)
             self.assertEqual(post({"Authorization": "Bearer s3cret"}), 201)
+            self.assertEqual(send("DELETE", "/api/runs/guarded", {}), 401)
+            self.assertEqual(send("DELETE", "/api/runs/guarded", {"Authorization": "Bearer s3cret"}), 200)
         finally:
             server.shutdown()
             server.server_close()

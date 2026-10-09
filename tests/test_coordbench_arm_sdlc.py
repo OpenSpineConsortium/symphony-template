@@ -30,7 +30,10 @@ import hub as hub_module  # noqa: E402
 import mcp  # noqa: E402
 from arm import SUBMISSION_BLOCK, AgentSpec, Call, Run, ToolError, find_arm  # noqa: E402
 
-MCP_JSON = {"mcpServers": {"coordbench": {"type": "http", "url": "${COORD_MCP_URL}"}}}
+# Claude Code aborts an HTTP MCP tool call after 60 s unless the server's
+# config sets "timeout"; every built-in arm carries the same value, above
+# the longest wait any arm's tool advertises (the team arm's 300 s).
+MCP_JSON = {"mcpServers": {"coordbench": {"type": "http", "url": "${COORD_MCP_URL}", "timeout": 330000}}}
 ARM_JSON_KEYS = {"entry", "name", "description", "needs", "plugins", "mcp_servers"}
 ALIASES = {"board": "sdlc-board", "claim_issue": "sdlc-claim", "open_pull_request": "sdlc-pr",
            "mark_ready": "sdlc-ready", "pull_request_status": "sdlc-status", "send_message": "coop-send",
@@ -172,7 +175,11 @@ class ArmFilesTest(unittest.TestCase):
         self.assertEqual(plugin["version"], "0.1.0")
         self.assertTrue(plugin["description"].strip())
 
-    def test_mcp_json_is_exactly_the_contracts(self):
+    def test_mcp_json_is_exactly_the_contracts_with_the_timeout(self):
+        """Renamed from test_mcp_json_is_exactly_the_contracts when the
+        timeout was added: without it Claude Code gives up on a tool call,
+        such as a long wait_for_message, after 60 s while the hub answers
+        it anyway, and the answer is lost."""
         self.assertEqual(self.read_json(ARM_DIR / ".mcp.json"), MCP_JSON)
 
     def test_arm_json_agrees_with_the_arm(self):
@@ -268,6 +275,22 @@ class ClaimTest(unittest.TestCase):
         _, run = new_run()
         self.assertIn("claimed #1", call(run, "agent1", "claim_issue", issue="#1"))
         self.assertIn("claimed #2", call(run, "agent2", "claim_issue", issue="2"))
+
+    def test_an_issue_is_ascii_digits_only_and_padding_is_forgiven(self):
+        """str.isdigit took a superscript two, which int() then crashed on,
+        and an Arabic-Indic three, which int() read as 3 and claimed #3; a
+        5000-digit string crashed on int()'s digit limit. Each is refused
+        with exit 1 now, and the issue stays unclaimed, while "#3" and
+        " 3 " still read as 3."""
+        _, run = new_run((1, 2, 3), {"open_queue": True})
+        for odd in ("\u00b2", "\u0663", "1" * 5000, "#", "3.0", "-3", "3 #"):
+            with self.subTest(issue=odd[:12]):
+                refusal = refused(run, "agent1", "claim_issue", issue=odd)
+                self.assertIn("issue must be an issue number", str(refusal))
+                self.assertEqual(refusal.exit_code, 1)
+        self.assertEqual(run.state["sdlc_queue"].issues[3].claimant, "", "the Arabic-Indic three claimed nothing")
+        self.assertIn("claimed #3", call(run, "agent1", "claim_issue", issue=" #3 "))
+        self.assertIn("claimed #1", call(run, "agent2", "claim_issue", issue=" 1 "))
 
     def test_an_open_queue_is_first_come_first_served(self):
         _, run = new_run(options={"open_queue": True})

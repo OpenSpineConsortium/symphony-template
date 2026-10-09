@@ -24,9 +24,17 @@ import mcp  # noqa: E402
 from arm import SUBMISSION_BLOCK, AgentSpec, Call, Run, ToolError, find_arm  # noqa: E402
 
 ARM_NAMES = ("solo", "coop", "coop-git")
+# The arms with tools ship a skill and an MCP config; solo, with none,
+# ships neither, as CooperBench's solo agent had neither.
+ARMS_WITH_TOOLS = ("coop", "coop-git")
+SOLO_FILES = {".claude-plugin/plugin.json", "arm.json", "arm.py"}
 CLASSES = {"solo": "SoloArm", "coop": "CoopArm", "coop-git": "CoopGitArm"}
 NEEDS = {"solo": (), "coop": (), "coop-git": ("git_remote",)}
-MCP_JSON = {"mcpServers": {"coordbench": {"type": "http", "url": "${COORD_MCP_URL}"}}}
+# Claude Code gives up on an HTTP MCP call after 60 s unless the server's
+# config says otherwise; 330 s is past the longest wait any built-in arm
+# allows (300 s).
+MCP_JSON = {"mcpServers": {"coordbench": {"type": "http", "url": "${COORD_MCP_URL}", "timeout": 330000}}}
+LONGEST_ARM_WAIT_MS = 300 * 1000
 ARM_JSON_KEYS = {"entry", "name", "description", "needs", "plugins", "mcp_servers"}
 ALIASES = {"send_message": "coop-send", "broadcast": "coop-broadcast", "receive_messages": "coop-recv",
            "peek_messages": "coop-peek", "list_agents": "coop-agents"}
@@ -123,10 +131,21 @@ class ArmFilesTest(unittest.TestCase):
                 self.assertEqual(plugin["version"], "0.1.0")
                 self.assertTrue(plugin["description"].strip())
 
-    def test_mcp_json_is_exactly_the_contracts(self):
-        for name in ARM_NAMES:
+    def test_mcp_json_names_the_hub_with_a_timeout_past_the_longest_wait(self):
+        for name in ARMS_WITH_TOOLS:
             with self.subTest(arm=name):
-                self.assertEqual(self.read_json(ARMS / name / ".mcp.json"), MCP_JSON)
+                config = self.read_json(ARMS / name / ".mcp.json")
+                self.assertEqual(config, MCP_JSON)
+                self.assertGreater(config["mcpServers"]["coordbench"]["timeout"], LONGEST_ARM_WAIT_MS)
+
+    def test_solo_ships_only_the_plugins_name_the_arm_and_its_code(self):
+        # No skill and no .mcp.json: a Claude Code that loads the plugin
+        # sees what CooperBench's solo agent saw, the prompt and nothing more.
+        files = {str(p.relative_to(ARMS / "solo")) for p in (ARMS / "solo").rglob("*")
+                 if p.is_file() and "__pycache__" not in p.parts}
+        self.assertEqual(files, SOLO_FILES)
+        self.assertFalse((ARMS / "solo" / ".mcp.json").exists())
+        self.assertFalse((ARMS / "solo" / "skills").exists())
 
     def test_arm_json_agrees_with_the_arm(self):
         for name in ARM_NAMES:
@@ -143,7 +162,7 @@ class ArmFilesTest(unittest.TestCase):
                 self.assertEqual(config["mcp_servers"], {})
 
     def test_skill_frontmatter_names_the_skill(self):
-        for name in ARM_NAMES:
+        for name in ARMS_WITH_TOOLS:
             with self.subTest(arm=name):
                 skill = ARMS / name / "skills" / f"coordbench-{name}" / "SKILL.md"
                 fields, body = frontmatter(skill.read_text(encoding="utf-8"))
@@ -157,7 +176,7 @@ class ArmFilesTest(unittest.TestCase):
                 self.assertTrue(body.strip())
 
     def test_skills_name_every_tool_and_its_shell_alias(self):
-        for name in ARM_NAMES:
+        for name in ARMS_WITH_TOOLS:
             with self.subTest(arm=name):
                 arm, run = new_run(name)
                 body = (ARMS / name / "skills" / f"coordbench-{name}" / "SKILL.md").read_text(encoding="utf-8")
@@ -165,6 +184,16 @@ class ArmFilesTest(unittest.TestCase):
                     for tool in arm.tools_for(run, agent).values():
                         self.assertIn(f"`{tool.name}`", body)
                         self.assertIn(f"`{tool.alias}", body)
+
+    def test_coop_skills_tell_the_agent_nothing_the_prompt_does_not(self):
+        # The skills restate CooperBench's prompt; the sentence about
+        # messages never being pushed into the conversation was coordbench's
+        # own addition, which the authors' agents never read.
+        for name in ARMS_WITH_TOOLS:
+            with self.subTest(arm=name):
+                body = (ARMS / name / "skills" / f"coordbench-{name}" / "SKILL.md").read_text(encoding="utf-8")
+                self.assertNotIn("never pushed", body)
+                self.assertNotIn("only when you receive them", body)
 
     def test_coop_git_skill_gives_the_merge_sequence(self):
         body = (ARMS / "coop-git" / "skills" / "coordbench-coop-git" / "SKILL.md").read_text(encoding="utf-8")
@@ -318,9 +347,11 @@ class MessagingTest(unittest.TestCase):
                 self.assertEqual(call(run, "agent2", "peek_messages"), "0")
                 self.assertEqual(json.loads(call(run, "agent2", "receive_messages")), [])
 
-    def test_broadcast_reaches_every_peer_but_the_sender(self):
+    def test_broadcast_reaches_every_peer_but_the_sender_and_says_nothing(self):
+        # coop-broadcast prints nothing in coop_msg.py, so the tool's text
+        # is empty and the command stays silent.
         _, run = new_run("coop", (1, 2, 3))
-        self.assertEqual(call(run, "agent2", "broadcast", text="config.py is mine"), "sent to agent1, agent3")
+        self.assertEqual(call(run, "agent2", "broadcast", text="config.py is mine"), "")
         self.assertEqual([call(run, a, "peek_messages") for a in run.agents], ["1", "0", "1"])
         message = json.loads(call(run, "agent3", "receive_messages"))[0]
         self.assertEqual((message["from"], message["content"]), ("agent2", "config.py is mine"))
@@ -336,13 +367,29 @@ class MessagingTest(unittest.TestCase):
         _, run = new_run("coop-git")
         self.assertEqual(call(run, "agent1", "list_agents"), "agent1\nagent2")
 
-    def test_a_send_to_nobody_or_of_nothing_is_refused(self):
+    def test_a_send_to_any_name_or_of_nothing_is_queued_as_coop_msg_queues_it(self):
+        # coop_msg.py checks neither the recipient's name nor the text: a
+        # message to a name not in the run waits in an inbox nobody reads,
+        # and a missing text is sent as "" (what stdin gives at its end).
         _, run = new_run("coop")
-        with self.assertRaises(ToolError):
-            call(run, "agent1", "send_message", to="agent9", text="hello")
-        with self.assertRaises(ToolError):
-            call(run, "agent1", "send_message", to="agent2")
+        self.assertEqual(call(run, "agent1", "send_message", to="agent9", text="hello"), "sent to agent9")
+        self.assertEqual(call(run, "agent1", "send_message", to="agent2"), "sent to agent2")
+        self.assertEqual(call(run, "agent2", "peek_messages"), "1")
+        self.assertEqual([m["content"] for m in json.loads(call(run, "agent2", "receive_messages"))], [""])
+        self.assertEqual(run.state["inboxes"]["agent9"][0]["content"], "hello")
+
+    def test_a_send_without_a_recipient_is_refused_with_argparses_code(self):
+        _, run = new_run("coop")
+        with self.assertRaises(ToolError) as caught:
+            call(run, "agent1", "send_message", text="hello")
+        self.assertEqual(caught.exception.exit_code, 2)
         self.assertEqual(call(run, "agent2", "peek_messages"), "0")
+
+    def test_each_entry_carries_cooperbenchs_fields(self):
+        _, run = new_run("coop")
+        call(run, "agent1", "send_message", to="agent2", text="hello")
+        entry = json.loads(call(run, "agent2", "receive_messages"))[0]
+        self.assertEqual(set(entry), {"from", "to", "content", "timestamp", "timestamp_iso"})
 
 
 class MetricsTest(unittest.TestCase):
@@ -355,7 +402,7 @@ class MetricsTest(unittest.TestCase):
                 call_over_mcp(run, "agent2", "broadcast", text="ok")
                 call_over_mcp(run, "agent2", "peek_messages")
                 call_over_mcp(run, "agent2", "receive_messages")
-                refused = call_over_mcp(run, "agent2", "send_message", to="agent9", text="lost")
+                refused = call_over_mcp(run, "agent2", "send_message", to="agent1", text=5)
                 self.assertTrue(refused["isError"])
                 metrics = arm.metrics(run)
                 self.assertEqual(metrics["messages_sent"], 3)
@@ -402,7 +449,7 @@ class HubTest(unittest.TestCase):
         hub.create_run("coop", [1, 2], {"1": SPECS[1], "2": SPECS[2]}, None, "r-tools")
         run = hub.hosted("r-tools").run
         described = {t["name"]: (t["alias"], t["argv"]) for t in hub.describe_tools(run, "agent1")}
-        self.assertEqual(described["send_message"], ("coop-send", ["to", "text..."]))
+        self.assertEqual(described["send_message"], ("coop-send", ["to", "text"]))
         self.assertEqual({name: alias for name, (alias, _) in described.items()}, ALIASES)
         answer = hub.call(run, "agent1", "send_message", {"to": "agent2", "text": "hi"})
         self.assertEqual(answer, {"text": "sent to agent2", "isError": False})

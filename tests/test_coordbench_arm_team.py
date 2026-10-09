@@ -53,9 +53,10 @@ ALIASES = {"task_create": "coop-task-create", "task_claim": "coop-task-claim",
            "receive_messages": "coop-recv", "peek_messages": "coop-peek",
            "list_agents": "coop-agents", "wait_for_message": ""}
 # coop_task.py's positionals and options, by the tool that stands in for
-# each of its subcommands.
-ARGV = {"task_create": ["title..."], "task_claim": ["task_id"], "task_update": ["task_id", "status"],
-        "task_list": [], "request": ["recipient", "kind", "body..."], "respond": ["request_id", "body..."],
+# each of its subcommands: one word each, none taking the rest of the
+# line, so a title of several words wants its quotes as it does there.
+ARGV = {"task_create": ["title"], "task_claim": ["task_id"], "task_update": ["task_id", "status"],
+        "task_list": [], "request": ["recipient", "kind", "body"], "respond": ["request_id", "body"],
         "pending": []}
 FLAGS = {"task_create": {"--assign": "assign"}, "task_claim": {},
          "task_update": {"-n": "note", "--note": "note"}, "task_list": {"--mine": "mine", "--open": "open"},
@@ -453,7 +454,6 @@ class MissingArguments(unittest.TestCase):
         task_id = task_titled(run, "Implement feature 7")["id"]
         for tool, arguments, missing in (
                 ("task_create", {"assign": "agent2"}, "title"),
-                ("task_create", {"title": ""}, "title"),
                 ("task_claim", {}, "task_id"),
                 ("task_update", {"status": "done"}, "task_id"),
                 ("task_update", {"task_id": task_id}, "status"),
@@ -465,6 +465,17 @@ class MissingArguments(unittest.TestCase):
                                  refusal(f"the following arguments are required: {missing}", 2))
         self.assertEqual(len(board(run).tasks), 3)
         self.assertEqual(board(run).requests, {})
+
+    def test_an_empty_title_or_body_is_a_value_as_it_is_to_argparse(self):
+        # coop_task.py's parser takes "" for a positional and stores it;
+        # only an absent one is refused, so the arm refuses only None.
+        _, run = new_run()
+        task_id = text_of(run, "agent1", "task_create", title="")
+        self.assertEqual(board(run).tasks[task_id]["title"], "")
+        request_id = text_of(run, "agent2", "request", recipient="agent1", kind="review", body="")
+        self.assertEqual(board(run).requests[request_id]["body"], "")
+        self.assertEqual(text_of(run, "agent1", "respond", request_id=request_id, body=""), "")
+        self.assertEqual(board(run).responses[request_id][0]["body"], "")
 
 
 class ShellCommands(unittest.TestCase):
@@ -494,7 +505,7 @@ class ShellCommands(unittest.TestCase):
         _, run = new_run()
         for words, owner in ((["Write the parser"], ""),
                              (["--assign", "agent2", "Write the parser"], "agent2"),
-                             (["Write", "the", "parser", "--assign", "agent3"], "agent3")):
+                             (["Write the parser", "--assign", "agent3"], "agent3")):
             answer = shell(run, "agent1", "task_create", *words)
             self.assertFalse(answer["isError"], answer)
             task = board(run).tasks[answer["text"]]
@@ -505,6 +516,29 @@ class ShellCommands(unittest.TestCase):
         _, run = new_run()
         self.assertEqual(shell(run, "agent1", "task_create", "--assign", "agent2"),
                          refusal("the following arguments are required: title", 2))
+
+    def test_an_empty_title_from_the_shell_makes_a_task(self):
+        _, run = new_run()
+        answer = shell(run, "agent1", "task_create", "")
+        self.assertFalse(answer["isError"], answer)
+        self.assertEqual(board(run).tasks[answer["text"]]["title"], "")
+
+    def test_unquoted_words_are_refused_as_argparse_refuses_them(self):
+        # coop_task.py takes one word per positional and argparse exits 2
+        # on "unrecognized arguments"; the arm no longer joins the words,
+        # so an agent that forgot its quotes is told, as in CooperBench.
+        _, run = new_run()
+        request_id = board(run).request("agent2", "agent1", "review", "x")
+        for tool, words in (("task_create", ("Write", "the", "parser")),
+                            ("task_create", ("--assign", "agent2", "Write", "the", "parser")),
+                            ("request", ("agent1", "review", "may I", "take cli.py?")),
+                            ("respond", (request_id, "yes,", "take it"))):
+            with self.subTest(tool=tool), self.assertRaises(cli.Failure) as refused:
+                shell(run, "agent2", tool, *words)
+            self.assertIn("too many words", str(refused.exception))
+        self.assertEqual(len(board(run).tasks), 3)
+        self.assertEqual(list(board(run).requests), [request_id])
+        self.assertEqual(board(run).responses, {})
 
     def test_update_takes_its_note_anywhere_and_by_either_name(self):
         _, run = new_run()
@@ -547,17 +581,17 @@ class ShellCommands(unittest.TestCase):
         self.assertEqual([t["title"] for t in both], ["Implement feature 7"])
         self.assertEqual(len(json.loads(shell(run, "agent2", "task_list")["text"])), 3)
 
-    def test_request_with_a_body_of_many_words_and_a_wait(self):
+    def test_request_with_a_quoted_body_and_a_wait(self):
         _, run = new_run()
         answers = {}
         waiting = threading.Thread(target=lambda: answers.update(shell(
-            run, "agent2", "request", "agent1", "plan_approval", "may I", "take", "cli.py?", "--wait", "10")))
+            run, "agent2", "request", "agent1", "plan_approval", "may I take cli.py?", "--wait", "10")))
         waiting.start()
         self.assertTrue(run.wait_until(lambda: bool(board(run).requests), 5))
         pending = json.loads(shell(run, "agent1", "pending")["text"])
         self.assertEqual([(p["from"], p["kind"], p["body"]) for p in pending],
                          [("agent2", "plan_approval", "may I take cli.py?")])
-        self.assertEqual(shell(run, "agent1", "respond", pending[0]["id"], "yes,", "take", "it"),
+        self.assertEqual(shell(run, "agent1", "respond", pending[0]["id"], "yes, take it"),
                          {"text": "", "isError": False})
         waiting.join(10)
         response = json.loads(answers["text"])
@@ -638,9 +672,21 @@ class Requests(unittest.TestCase):
         self.assertEqual((answers["isError"], answers["exitCode"]), (True, 5))
         self.assertTrue(answers["text"].startswith("timed out waiting for response to "))
 
-    def test_a_request_to_nobody_or_with_a_bad_wait_is_refused(self):
-        answer = call(self.run, "agent2", "request", recipient="agent9", kind="k", body="b")
-        self.assertEqual(answer, refusal("no agent named 'agent9'; the agents are agent1, agent2, agent3", 1))
+    def test_a_request_to_a_name_not_in_the_run_is_queued_as_cooperbench_queues_it(self):
+        # protocol.py's request checks the recipient against nobody: the
+        # request is stored under the name given and a wait on it BLPOPs a
+        # list nobody pushes to, so it runs out. The arm used to refuse the
+        # name, a difference the agent could see.
+        request_id = text_of(self.run, "agent2", "request", recipient="agent9", kind="k", body="b")
+        self.assertEqual(board(self.run).requests[request_id]["to"], "agent9")
+        for agent in self.run.agents:
+            self.assertEqual(json.loads(text_of(self.run, agent, "pending")), [])
+        answer = call(self.run, "agent2", "request", recipient="agent9", kind="k", body="b", wait=0.1)
+        self.assertEqual(exit_code(answer), 5)
+        self.assertTrue(answer["text"].startswith("timed out waiting for response to "))
+        self.assertEqual(len(board(self.run).requests), 2)
+
+    def test_a_bad_wait_is_refused_before_anything_is_queued(self):
         answer = call(self.run, "agent2", "request", recipient="agent1", kind="k", wait="soon")
         self.assertEqual(answer, refusal("argument --wait: invalid float value: 'soon'", 2))
         self.assertEqual(board(self.run).requests, {})
@@ -688,6 +734,8 @@ PARITY_SESSION = [
     ("agent2", ("request", "agent1", "review")),
     ("agent2", ("request", "agent1", "review", "look", "--wait", "0.05")),
     ("agent1", ("create", "--assign", "agent2", "Write the parser")),
+    ("agent1", ("create", "")),
+    ("agent2", ("request", "agent9", "review", "nobody reads this")),
 ]
 
 TEN_HEX = re.compile(r"\b[0-9a-f]{10}\b")
@@ -902,6 +950,62 @@ class Mirror(unittest.TestCase):
             self.assertEqual(json.loads((mirror / "_index.json").read_text())["ids"], [t["id"] for t in listed])
             self.assertEqual(len((mirror / "_log.jsonl").read_text().splitlines()), 3)
 
+    def test_a_stale_task_file_is_removed_through_the_directory_not_by_its_path(self):
+        with tempfile.TemporaryDirectory() as shared:
+            _, run = new_run(options={"shared_dir_host": shared})
+            (Path(shared) / "tasks").mkdir()
+            (Path(shared) / "tasks" / "stale.json").write_text("{}", encoding="utf-8")
+            tasks_of(run, "agent2")
+            self.assertFalse((Path(shared) / "tasks" / "stale.json").exists())
+
+    def test_a_symlink_planted_as_tasks_is_not_followed(self):
+        # The hub writes the mirror on its host, as root when the volume's
+        # path asks for it, and the agents own the volume's contents: a
+        # symlink named tasks would have it write into, and delete *.json
+        # from, whatever directory an agent chose. The kernel refuses the
+        # link as the directory is opened (O_NOFOLLOW), so the mirror is
+        # skipped and the target is left as it was.
+        with tempfile.TemporaryDirectory() as shared, tempfile.TemporaryDirectory() as elsewhere:
+            victim = Path(elsewhere) / "precious.json"
+            victim.write_text("keep me", encoding="utf-8")
+            (Path(shared) / "tasks").symlink_to(elsewhere, target_is_directory=True)
+            _, run = new_run(options={"shared_dir_host": shared})
+            listed = tasks_of(run, "agent2")
+            self.assertEqual(len(listed), 3)
+            self.assertTrue((Path(shared) / "tasks").is_symlink())
+            self.assertEqual(sorted(p.name for p in Path(elsewhere).iterdir()), ["precious.json"])
+            self.assertEqual(victim.read_text(encoding="utf-8"), "keep me")
+            self.assertEqual(sorted(p.name for p in Path(shared).iterdir()), ["tasks"])
+
+    def test_a_file_in_the_place_of_tasks_skips_the_mirror(self):
+        with tempfile.TemporaryDirectory() as shared:
+            (Path(shared) / "tasks").write_text("not a directory", encoding="utf-8")
+            _, run = new_run(options={"shared_dir_host": shared})
+            self.assertEqual(len(tasks_of(run, "agent2")), 3)
+            self.assertEqual((Path(shared) / "tasks").read_text(encoding="utf-8"), "not a directory")
+            self.assertEqual(sorted(p.name for p in Path(shared).iterdir()), ["tasks"])
+
+    def test_a_closed_run_mirrors_nothing(self):
+        # The runner removes the volume after closing the run, while the
+        # hub keeps answering tools; a late listing must not put a tasks
+        # directory back where the volume was.
+        with tempfile.TemporaryDirectory() as shared:
+            _, run = new_run(options={"shared_dir_host": shared})
+            with run.lock:
+                run.closed = True
+            self.assertEqual(len(tasks_of(run, "agent2")), 3)
+            self.assertEqual(list(Path(shared).iterdir()), [])
+
+    def test_a_removed_volume_root_is_not_made_again(self):
+        # Only the tasks leaf is made, never its parents, so a volume that
+        # docker has removed stays removed instead of leaving a root-owned
+        # directory under docker's volume root.
+        with tempfile.TemporaryDirectory() as parent:
+            gone = Path(parent) / "volumes" / "coordbench-shared-r1" / "_data"
+            _, run = new_run(options={"shared_dir_host": str(gone)})
+            self.assertEqual(len(tasks_of(run, "agent2")), 3)
+            self.assertEqual(list(Path(parent).iterdir()), [])
+
     def test_without_a_shared_directory_nothing_is_written(self):
         _, run = new_run()
         mirror = mock.Mock()
@@ -921,9 +1025,15 @@ class PluginFiles(unittest.TestCase):
         self.assertEqual((plugin["name"], plugin["version"]), ("coordbench-team", "0.1.0"))
         self.assertTrue(plugin["description"])
 
-    def test_mcp_json_points_at_this_agents_hub_endpoint(self):
-        self.assertEqual(self.read_json(".mcp.json"),
-                         {"mcpServers": {"coordbench": {"type": "http", "url": "${COORD_MCP_URL}"}}})
+    def test_mcp_json_points_at_this_agents_hub_endpoint_with_a_timeout_above_the_longest_wait(self):
+        # Claude Code aborts an HTTP MCP call after 60 s unless the server's
+        # config sets "timeout" (milliseconds); the request tool waits up
+        # to LONGEST_WAIT_SECONDS, so the config must outlast it.
+        config = self.read_json(".mcp.json")
+        self.assertEqual(config, {"mcpServers": {"coordbench": {
+            "type": "http", "url": "${COORD_MCP_URL}", "timeout": 330000}}})
+        self.assertGreater(config["mcpServers"]["coordbench"]["timeout"],
+                           TEAM_MODULE.LONGEST_WAIT_SECONDS * 1000)
 
     def test_arm_json(self):
         config = self.read_json("arm.json")

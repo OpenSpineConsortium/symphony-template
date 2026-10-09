@@ -83,10 +83,14 @@ MERGED_RESULT = {
 }
 SOLO_RESULT = {"setting": "solo", "patch_lines": 6, "feature1": {"passed": True, "test_output": "ok"},
                "feature2": {"passed": False, "test_output": "1 failed"}, "both_passed": False, "error": None}
+# CooperBench's coop.py writes these, plus log_dir and messages_sent; the
+# runner adds the arm, the driver and the hub's metrics.
 RESULT_KEYS = {"repo", "task_id", "features", "setting", "run_id", "run_name", "agent_framework", "model", "arm",
-               "driver", "started_at", "ended_at", "duration_seconds", "agents", "metrics"}
-AGENT_KEYS = {"feature_id", "role", "status", "input_tokens", "output_tokens", "cache_read_tokens",
-              "cache_write_tokens", "steps", "error"}
+               "driver", "started_at", "ended_at", "duration_seconds", "agents", "total_cost", "total_steps",
+               "metrics"}
+AGENT_KEYS = {"feature_id", "role", "status", "cost", "steps", "input_tokens", "output_tokens",
+              "cache_read_tokens", "cache_write_tokens", "patch_lines", "error"}
+USAGE_KEYS = {"cost", "steps", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"}
 COOP_EVAL_KEYS = ["repo", "task_id", "features", "setting", "apply_status", "merge", "feature1", "feature2",
                   "both_passed", "error", "evaluated_at"]
 SOLO_EVAL_KEYS = ["repo", "task_id", "features", "setting", "merge", "feature1", "feature2", "both_passed",
@@ -495,7 +499,9 @@ class Provisioning(RunnerCase):
             self.assertIn(promise, result["error"])
         self.assertIn("left its git block untrue", err)
         self.assertEqual({a["status"] for a in result["agents"].values()}, {"Error"})
-        self.assertTrue(self.hub.runs[result["run_id"]].run.closed)
+        self.assertNotIn(result["run_id"], self.hub.runs)  # closed, then released
+        self.assertEqual((result["total_cost"], result["total_steps"]), (0, 0))
+        self.assertEqual({a["patch_lines"] for a in result["agents"].values()}, {0})
         self.assertIn(["rm", "-f", f"coordbench-{result['run_id']}-agent1"], self.docker.commands())
         self.assertEqual(self.scorer.calls, [])
         self.assert_secret_nowhere(out, err)
@@ -508,15 +514,76 @@ class Provisioning(RunnerCase):
         plan, _, driver = self.prepare(str(arm_dir))
         container = plan["agents"][0]["container"]
         commands = self.docker.commands()
-        self.assertIn(["cp", f"{arm_dir}/.", f"{container}:/opt/coordbench/arms/myarm"], commands)
+        inside = f"/opt/coordbench-arms/{drivers.safe_name(arm_dir.resolve())}"
+        self.assertIn(["exec", container, "mkdir", "-p", "/opt", "/opt/coordbench-plugins", "/opt/coordbench-arms"],
+                      commands)
+        self.assertIn(["cp", f"{arm_dir}/.", f"{container}:{inside}"], commands)
         self.assertIn(["cp", f"{arm_dir / 'extra-plugin'}/.", f"{container}:/opt/coordbench-plugins/0-extra-plugin"],
                       commands)
         job = driver.jobs[0]
         self.assertEqual(job.plugins, ["/opt/coordbench-plugins/0-extra-plugin"])
+        self.assertEqual(job.plugin_urls, [])
         self.assertEqual(job.mcp_servers, servers)
         flags = drivers.claude_flags(job)
-        self.assertIn("/opt/coordbench/arms/myarm", flags)
+        self.assertIn(inside, flags)
         self.assertIn("/opt/coordbench-plugins/0-extra-plugin", flags)
+        self.assertNotIn("--plugin-url", flags)
+
+    def test_an_arm_from_elsewhere_named_like_a_built_in_arm_is_not_copied_over_the_built_in_one(self):
+        """The copy of coordbench fills /opt/coordbench/arms/coop in every
+        container; an arm from elsewhere called coop copied there too would
+        merge with it, and Claude would load a mix of the two."""
+        arm_dir = self.copy_arm("coop")
+        self.assertFalse(drivers.arm_is_builtin(arm_dir))
+        self.assertTrue(drivers.arm_is_builtin(COORDBENCH / "arms" / "coop"))
+        self.assertEqual(drivers.container_arm_dir(COORDBENCH / "arms" / "coop"), "/opt/coordbench/arms/coop")
+        plan, _, driver = self.prepare(str(arm_dir))
+        copies = [c for c in self.docker.matching("cp") if c[1] == f"{arm_dir}/."]
+        self.assertEqual(len(copies), 2)
+        for copy in copies:
+            self.assertTrue(copy[2].endswith(f":/opt/coordbench-arms/{drivers.safe_name(arm_dir.resolve())}"), copy)
+            self.assertNotIn("/opt/coordbench/arms/", copy[2])
+        self.assertNotIn("/opt/coordbench/arms/coop", drivers.claude_flags(driver.jobs[0]))
+
+    def test_a_plugin_zip_url_is_handed_to_claude_as_plugin_url_and_a_git_url_is_cloned_here(self):
+        """--plugin-url takes a .zip and nothing else, so a .zip URL is not
+        cloned; any other URL is a git repository, cloned on this host and
+        copied into the container like a directory."""
+        zip_url = "https://plugins.example/review/latest.ZIP?channel=stable"
+        git_url = "https://git.example/org/memory.git"
+        arm_dir = self.copy_arm("myarm", plugins=[zip_url, git_url, "extra-plugin"])
+        (arm_dir / "extra-plugin").mkdir()
+
+        def clone(url, destination):
+            destination.mkdir(parents=True)
+            (destination / "cloned-from").write_text(url)
+            return destination
+
+        with mock.patch.object(runner, "fetch_plugin", side_effect=clone) as fetch:
+            plan, _, driver = self.prepare(str(arm_dir))
+        self.assertEqual([call.args[0] for call in fetch.call_args_list], [git_url])
+        cloned = plan["run_dir"] + "/plugins/1-memory"
+        self.assertEqual(plan["plugins"], [
+            {"url": zip_url},
+            {"source": cloned, "container": "/opt/coordbench-plugins/1-1-memory"},
+            {"source": str(arm_dir / "extra-plugin"), "container": "/opt/coordbench-plugins/2-extra-plugin"}])
+        copied = [c[1] for c in self.docker.matching("cp")]
+        self.assertIn(f"{cloned}/.", copied)
+        self.assertFalse([source for source in copied if "latest" in source or "plugins.example" in source])
+        job = driver.jobs[0]
+        self.assertEqual(job.plugins, ["/opt/coordbench-plugins/1-1-memory", "/opt/coordbench-plugins/2-extra-plugin"])
+        self.assertEqual(job.plugin_urls, [zip_url])
+        flags = drivers.claude_flags(job)
+        self.assertEqual(flags[flags.index("--plugin-url") + 1], zip_url)
+        self.assertNotIn(zip_url, [flags[i + 1] for i, flag in enumerate(flags[:-1]) if flag == "--plugin-dir"])
+        self.assertFalse(runner.is_zip_url("git@github.com:org/plugin.zip"))
+        self.assertFalse(runner.is_zip_url("https://git.example/org/memory.git"))
+
+    def test_a_driver_that_does_not_say_it_measures_usage_is_taken_not_to(self):
+        plan, _, _ = self.prepare("coop")
+        self.assertFalse(plan["measures_usage"])
+        self.assertTrue(drivers.ClaudeCliDriver.measures_usage)
+        self.assertFalse(drivers.SessionDriver.measures_usage)
 
     def test_a_failed_provision_is_recorded_as_an_error_and_torn_down(self):
         self.docker.fail_seed = True
@@ -561,6 +628,10 @@ class TheClaudeCliDriver(RunnerCase):
                             ("IS_SANDBOX", "1"), ("COORD_MCP_URL", "http://h:1/mcp/r1/agent1"),
                             ("COORD_RPC_URL", "http://h:1/rpc/r1/agent1")):
             self.assertEqual(env_value(arguments, name), value)
+        # The team arm's request tool waits up to 300 s; Claude Code's own
+        # limit on an HTTP MCP tool call is 60 s unless this says otherwise.
+        self.assertEqual(env_value(arguments, "MCP_TOOL_TIMEOUT"), "330000")
+        self.assertGreater(int(env_value(arguments, "MCP_TOOL_TIMEOUT")), 300 * 1000)
         self.assertIn(["-e", "CLAUDE_CODE_OAUTH_TOKEN"], [arguments[i:i + 2] for i in range(len(arguments) - 1)])
         script = arguments[-1]
         self.assertIn("claude --verbose --output-format=stream-json --permission-mode=bypassPermissions "
@@ -570,9 +641,47 @@ class TheClaudeCliDriver(RunnerCase):
         self.assertIn("cd /workspace/repo", script)
         self.assertEqual(outcome.status, "Submitted")
         self.assertEqual((outcome.input_tokens, outcome.output_tokens, outcome.steps), (1200, 340, 12))
+        self.assertEqual(outcome.cost, 0.42)
         self.assertEqual(outcome.patch, PATCHES["agent1"])
         self.assertIn(["exec", "c-agent1", "cat", "/workspace/repo/patch.txt"], self.docker.commands())
         self.assert_secret_nowhere()
+
+    def test_claude_runs_under_timeout_inside_the_container_and_the_shell_leaves_its_pid_first(self):
+        """The task images have no pkill, so the time limit has to hold
+        inside the container on its own, and stopping early needs a pid."""
+        script = drivers.claude_script(self.job(timeout_s=90.5))
+        self.assertIn("echo $$ > /tmp/coord-claude.pid; cd /workspace/repo && exec timeout -k 30 90 claude --verbose",
+                      script)
+        self.assertLess(script.index("echo $$ >"), script.index("exec timeout"))
+        self.assertTrue(script.endswith('--print -- "$(cat /tmp/coord-prompt.txt)" 2>&1'))
+        self.assertIn("timeout -k 30 1 claude", drivers.claude_script(self.job(timeout_s=0.2)))
+
+    @unittest.skipUnless(shutil.which("bash") and shutil.which("timeout"), "needs bash and coreutils timeout")
+    def test_the_pid_the_shell_leaves_is_one_the_stop_script_s_kill_ends_claude_through(self):
+        """The script's head run by a real shell, with sleep in claude's
+        place: after exec the pid in the file is the timeout's, and the
+        stop script's builtin kill, through it, ends the command."""
+        paths = {"CONTAINER_REPO": str(self.tmp), "CONTAINER_CLAUDE_CONFIG_DIR": str(self.tmp / "cfg"),
+                 "CONTAINER_PID_FILE": str(self.tmp / "claude.pid")}
+        with mock.patch.multiple(drivers, **paths):
+            head = drivers.claude_script(self.job(timeout_s=60)).split("claude --verbose", 1)[0]
+            stop = drivers.stop_script()
+        self.assertNotIn("pkill", stop)
+        agent = subprocess.Popen(["bash", "-c", head + "sleep 60"], stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(agent.kill)
+        deadline = time.time() + 10
+        while not (self.tmp / "claude.pid").exists() and time.time() < deadline:
+            time.sleep(0.02)
+        self.assertEqual(int((self.tmp / "claude.pid").read_text()), agent.pid)
+        time.sleep(0.2)
+        stopped = subprocess.run(["sh", "-c", stop], capture_output=True, text=True, timeout=30)
+        self.assertEqual((stopped.returncode, stopped.stdout, stopped.stderr), (0, "", ""))
+        agent.wait(10)
+        self.assertNotEqual(agent.returncode, 0)
+        (self.tmp / "claude.pid").unlink()
+        gone = subprocess.run(["sh", "-c", stop], capture_output=True, text=True, timeout=30)
+        self.assertEqual((gone.returncode, gone.stdout, gone.stderr), (0, "", ""))
 
     def test_the_token_is_not_passed_when_it_is_not_set(self):
         os.environ.pop("CLAUDE_CODE_OAUTH_TOKEN")
@@ -584,14 +693,20 @@ class TheClaudeCliDriver(RunnerCase):
         self.assertNotIn("--max-turns", arguments[-1])
         self.assertEqual(len(self.docker.matching("exec", "-i", "c-agent1")), 1)
 
-    def test_an_agent_past_its_time_is_an_error_and_is_stopped(self):
+    def test_an_agent_past_its_time_is_an_error_and_is_stopped_by_pid_since_the_images_have_no_pkill(self):
+        """pkill -f 'claude --verbose' used to be the stop; no Debian-slim
+        task image has pkill, so the agent kept running after the timeout."""
         self.docker.claude_times_out = True
         driver = drivers.ClaudeCliDriver()
         outcome = driver.wait(driver.start(self.job()))
         self.assertEqual(outcome.status, "Error")
         self.assertIn("timed out", outcome.error)
-        self.assertTrue([c for c in self.docker.matching("exec", "c-agent1", "sh", "-c") if "pkill" in c[-1]])
-
+        scripts = [c[-1] for c in self.docker.matching("exec", "c-agent1", "sh", "-c")]
+        self.assertFalse([script for script in scripts if "pkill" in script])
+        stops = [script for script in scripts if "/tmp/coord-claude.pid" in script]
+        self.assertEqual(len(stops), 1)
+        self.assertIn("cat /tmp/coord-claude.pid", stops[0])
+        self.assertIn('kill "$pid"', stops[0])
 
     def test_a_stream_cut_short_keeps_its_last_line_as_the_error(self):
         self.docker.stream = '{"type": "system"}\nInvalid API key. Please run /login\n'
@@ -606,12 +721,14 @@ class StreamParsing(unittest.TestCase):
         return json.dumps({"type": "result", "subtype": "success", "num_turns": 3,
                            "usage": {"input_tokens": 10, "output_tokens": 5}, **fields}) + "\n"
 
-    def test_the_final_result_event_gives_usage_and_turns(self):
+    def test_the_final_result_event_gives_usage_cost_and_turns(self):
         outcome = drivers.summarize_stream(SAMPLE_STREAM)
         self.assertEqual(outcome.status, "Submitted")
         self.assertEqual((outcome.input_tokens, outcome.output_tokens, outcome.cache_read_tokens,
                           outcome.cache_write_tokens, outcome.steps), (1200, 340, 50000, 7000, 12))
+        self.assertEqual(outcome.cost, 0.42)
         self.assertIsNone(outcome.error)
+        self.assertEqual(drivers.summarize_stream(self.result(total_cost_usd=None)).cost, 0.0)
 
     def test_a_turn_limit_is_limits_exceeded_and_other_failures_are_errors(self):
         limited = drivers.summarize_stream(self.result(subtype="error_max_turns", is_error=True))
@@ -622,7 +739,7 @@ class StreamParsing(unittest.TestCase):
 
     def test_a_stream_without_a_result_is_an_error_with_nothing_counted(self):
         outcome = drivers.summarize_stream('{"type": "assistant"}\ngarbage\n')
-        self.assertEqual((outcome.status, outcome.input_tokens, outcome.steps), ("Error", 0, 0))
+        self.assertEqual((outcome.status, outcome.input_tokens, outcome.steps, outcome.cost), ("Error", 0, 0, 0.0))
 
     def test_patches_are_normalized_as_cooperbench_normalizes_them(self):
         self.assertEqual(drivers.normalize_patch("\n\ndiff\n \n\n"), "diff\n \n")
@@ -712,6 +829,10 @@ class Runs(RunnerCase):
             self.assertEqual(set(record), AGENT_KEYS)
             self.assertEqual((record["feature_id"], record["status"], record["input_tokens"], record["steps"]),
                              (feature, "Submitted", 1200, 12))
+            # The fields CooperBench's coop.py writes and its summary reads.
+            self.assertEqual((record["cost"], record["patch_lines"]), (0.42, 6))
+        self.assertAlmostEqual(result["total_cost"], 0.84)
+        self.assertEqual(result["total_steps"], 24)
         self.assertEqual(result["metrics"]["messages_sent"], 1)
         self.assertEqual(json.loads((pair / "metrics.json").read_text()), result["metrics"])
         events = [json.loads(line) for line in (pair / "events.jsonl").read_text().splitlines()]
@@ -728,8 +849,43 @@ class Runs(RunnerCase):
         self.assertEqual(cooperbench_dir, str(self.cooperbench))
         containers = [c["container"] for c in json.loads((pair / "plan.json").read_text())["agents"]]
         self.assertIn(["rm", "-f", *containers], self.docker.commands())
-        self.assertTrue(self.hub.runs[result["run_id"]].run.closed)
+        # Once the metrics and the events are in hand the run is released,
+        # so the hub no longer holds it (it used to keep every run closed).
+        self.assertNotIn(result["run_id"], self.hub.runs)
+        self.assertEqual(self.hub.run_count(), 0)
+        self.assertNotIn("releasing the run", err)
         self.assert_secret_nowhere()
+
+    def test_a_hub_that_cannot_release_a_run_leaves_a_warning_and_the_pair_its_verdict(self):
+        """A hub without the DELETE route answers 405; the run then stays
+        on it, which costs memory and nothing else."""
+        with mock.patch.object(runner.HubClient, "release",
+                               side_effect=runner.HubError("DELETE /api/runs/x: HTTP 405: no", 405)):
+            code, _, err = self.main(*self.run_arguments("coop", "--features", "1,6"))
+        self.assertEqual(code, 0, err)
+        self.assertIn("releasing the run on the hub failed: DELETE /api/runs/x: HTTP 405", err)
+        self.assertNotIn("closing the run on the hub failed", err)
+        result = json.loads((self.pair() / "result.json").read_text())
+        self.assertNotIn("error", result)
+        self.assertEqual(result["metrics"]["messages_sent"], 0)
+        self.assertEqual(json.loads((self.pair() / "eval.json").read_text())["both_passed"], True)
+        self.assertTrue(self.hub.runs[result["run_id"]].run.closed)
+
+    def test_release_asks_the_hub_to_forget_the_run_and_an_unknown_run_is_404(self):
+        client = runner.HubClient(self.hub_url, ADMIN_SECRET)
+        answer = client.create_run("coop", "r-release", [1, 6], {1: "Do 1.", 6: "Do 6."}, {})
+        self.assertEqual(len(answer["agents"]), 2)
+        self.assertEqual(client.release("r-release"), {"run_id": "r-release", "released": True})
+        self.assertEqual(self.hub.run_count(), 0)
+        with self.assertRaises(runner.HubError) as refused:
+            client.release("r-release")
+        self.assertEqual(refused.exception.status, 404)
+        with self.assertRaises(runner.HubError) as refused:
+            client.close_run("r-release")
+        self.assertEqual(refused.exception.status, 404)
+        plan = {"hub_run": False, "run_id": "r-release", "warnings": []}
+        self.assertEqual(runner.close_run(plan, client), ({}, []))
+        self.assertEqual(plan["warnings"], [])
 
     def test_a_solo_pair_is_scored_as_one_patch(self):
         code, _, err = self.main(*self.run_arguments("solo", "--features", "1,6"))
@@ -788,7 +944,8 @@ class Runs(RunnerCase):
             self.assertIn("Do 1." if agent["id"] == "agent1" else "Do 6.", Path(entry["prompt_file"]).read_text())
             wrapper = pair / "bin" / agent["id"] / "coop-send"
             self.assertIn(f"{self.hub_url}/rpc/{saved['run_id']}/{agent['id']}", wrapper.read_text())
-        sent = subprocess.run([str(pair / "bin" / "agent1" / "coop-send"), "agent2", "hello", "there"],
+        # One word of text: coop-send refuses more, as coop_msg.py's argparse does.
+        sent = subprocess.run([str(pair / "bin" / "agent1" / "coop-send"), "agent2", "hello there"],
                               capture_output=True, text=True, timeout=60)
         self.assertEqual(sent.returncode, 0, sent.stderr)
         for agent in saved["agents"]:
@@ -803,7 +960,17 @@ class Runs(RunnerCase):
         result = json.loads((pair / "result.json").read_text())
         self.assertEqual((result["driver"], result["agent_framework"]), ("session", "claude_code_subagent"))
         self.assertEqual({a["status"] for a in result["agents"].values()}, {"Submitted"})
+        # A subagent's usage is not measured, so it is unknown, not zero.
+        for record in result["agents"].values():
+            self.assertEqual(set(record), AGENT_KEYS)
+            self.assertEqual({record[name] for name in USAGE_KEYS}, {None})
+            self.assertEqual(record["patch_lines"], 6)
+        self.assertEqual((result["total_cost"], result["total_steps"]), (None, None))
         self.assertEqual(result["metrics"]["messages_sent"], 1)
+        # Released after its metrics and events were fetched; finish saves
+        # the plan last, so it says the hub holds the run no more.
+        self.assertEqual(self.hub.run_count(), 0)
+        self.assertFalse(json.loads((pair / "plan.json").read_text())["hub_run"])
         self.assertEqual((pair / "agent6.patch").read_text(), PATCHES["agent2"])
         self.assertEqual(list(json.loads((pair / "eval.json").read_text())), COOP_EVAL_KEYS)
         self.assertFalse((pair / "workspaces").exists())
@@ -879,6 +1046,28 @@ class Runs(RunnerCase):
             time.sleep(0.05)
         self.assertFalse(runner.is_hub(pid, url))
         self.assert_secret_nowhere(said, out, err, sent.stdout, sent.stderr, secrets=(token,))
+
+
+class TheCommandLine(unittest.TestCase):
+    def settings(self, *extra):
+        args = runner.parser().parse_args(["run", "--arm", "coop", "--repo", REPO, "--task", str(TASK),
+                                           "--features", "1,6", "--name", "t", *extra])
+        return runner.settings_from(args, "claude-cli")
+
+    def test_relative_directories_are_made_absolute_once_for_docker_and_the_scorer(self):
+        """docker reads a relative path in -v as a volume name, and the
+        scorer runs with CooperBench's checkout as its working directory
+        while being handed paths under it, so both are resolved here."""
+        settings = self.settings("--cooperbench-dir", "rel/cooperbench", "--log-dir", "rel/logs")
+        self.assertEqual(settings["cooperbench_dir"], Path.cwd() / "rel" / "cooperbench")
+        self.assertEqual(settings["log_dir"], Path.cwd() / "rel" / "logs")
+        settings = self.settings("--cooperbench-dir", "rel/cooperbench")
+        self.assertEqual(settings["log_dir"], Path.cwd() / "rel" / "cooperbench" / "logs")
+        with mock.patch.dict(os.environ, {"COOPERBENCH_DIR": "rel/from-env"}):
+            self.assertEqual(runner.cooperbench_home(), Path.cwd() / "rel" / "from-env")
+            self.assertEqual(self.settings()["cooperbench_dir"], Path.cwd() / "rel" / "from-env")
+        with mock.patch.dict(os.environ, {"COOPERBENCH_DIR": ""}):
+            self.assertEqual(runner.cooperbench_home(), Path.home().resolve() / "cooperbench")
 
 
 class Scoring(unittest.TestCase):
