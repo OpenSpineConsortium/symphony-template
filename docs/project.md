@@ -24,6 +24,12 @@ Every account's Project uses the same model and the same effort, so the work rea
 - Model: not yet chosen.
 - Effort: not yet chosen.
 
+## Worker routine
+
+The first thread of each account's Project makes the worker routine (docs/agents/routines/worker.md, .claude/skills/bootstrap) unless the line below says none.
+
+- Worker routine: hourly
+
 ## Owners
 
 - Repository owner: {{OWNER}}, who merges to {{DEFAULT_BRANCH}}; .github/CODEOWNERS names the same login.

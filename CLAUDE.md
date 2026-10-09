@@ -10,6 +10,10 @@ This repository is a Claude project kept as files: its instructions, its goal, i
 
 Before any work: fetch, read the board, check the claim on the issue you mean to take. One issue, one branch `claude/<issue>`, one pull request.
 
+## When this repository is linked to a Project
+
+If you are a thread of a claude.ai Project whose instructions do not contain "Read CLAUDE.md first", the Project was just linked and is not set up yet: run the bootstrap skill (.claude/skills/bootstrap) before anything else, then carry on with what you were started for. It writes the Project's instructions and makes the worker routine from the repository, so the person types nothing. A terminal session has no Project and skips this.
+
 ## Shared memory
 
 @docs/memory/MEMORY.md
@@ -21,7 +25,7 @@ A fact worth keeping is one file under docs/memory/ with one index line in MEMOR
 - The board first (.claude/rules/board.md): fetch, read the board (STATE.md on the branch `board`) and PROTOCOL.md, check the claim; never push to another account's branch; never force-push the default branch or any branch that is not your own claim.
 - Memory (.claude/rules/memory.md): one fact per file, a kebab-case name, a one-line description first, one index line; never a secret.
 - Writing (.claude/rules/writing.md): plain prose that says why, short functions, names that read as English, no emoji, ASCII and LF, no new dependencies; tag a durable fact in conversation as Decision: or Constraint: so a checkpoint keeps it.
-- Skills: .claude/skills/claim, .claude/skills/remember and .claude/skills/checkpoint are the three procedures, in the order a piece of work meets them.
+- Skills: .claude/skills/bootstrap sets a Project up from the repository; .claude/skills/claim, .claude/skills/remember and .claude/skills/checkpoint are the three procedures a piece of work meets, in that order.
 - The block at the end of this file, between the cswap markers, is rewritten by the checkpoint skill and by `cswap checkpoint write`; do not edit it by hand.
 
 ## Checks
