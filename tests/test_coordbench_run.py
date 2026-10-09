@@ -12,12 +12,14 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import threading
 import time
 import unittest
+import urllib.error
 import urllib.request
 from pathlib import Path
 from unittest import mock
@@ -38,6 +40,7 @@ REAL_START_HUB = runner.start_hub
 # real credential, so the repository's own secret check lets them be.
 SECRET = "coordbench-fake-oauth-token-7f3a9c2e51d0"
 ADMIN_SECRET = "coordbench-fake-admin-token-4b8d1e6a90c3"
+AGENT_SECRET = "coordbench-fake-agent-token-2c7e5a1f93b6"
 BASE = "0123456789abcdef0123456789abcdef01234567"
 GIT_EMAIL = "agent@cooperbench.local"
 HAS_PROC = Path("/proc/self/environ").exists()
@@ -111,11 +114,18 @@ def quietly():
     return contextlib.redirect_stderr(io.StringIO())
 
 
-def call_tool(rpc_url, tool, arguments):
+def call_tool(rpc_url, tool, arguments, token=None):
     body = json.dumps({"tool": tool, "arguments": arguments}).encode()
-    request = urllib.request.Request(rpc_url, data=body, method="POST", headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(rpc_url, data=body, method="POST", headers=headers)
     with NO_PROXY.open(request, timeout=10) as response:
         return json.loads(response.read())
+
+
+def pairs(arguments):
+    return [arguments[i:i + 2] for i in range(len(arguments) - 1)]
 
 
 def git_answer(command, url, agent):
@@ -139,7 +149,9 @@ class FakeDocker:
     ones whose output the runner reads, the way docker would. Its git
     remembers each container's set-up and answers the read-back as git
     would; with git_breaks the set-up does nothing, as when git refuses
-    the repository, and says why."""
+    the repository, and says why. A container keeps the environment the
+    docker client had when it was started (extra_env), and the claude
+    run in it is handed that, as an exec inherits it from docker."""
 
     def __init__(self, python=True, mountpoint="/var/lib/docker/volumes/v/_data", fail_seed=False):
         self.stream = SAMPLE_STREAM
@@ -152,11 +164,14 @@ class FakeDocker:
         self.on_claude = None
         self.git_setups = {}
         self.git_breaks = False
+        self.environments = {}
 
-    def __call__(self, *args, input=None, timeout=None, output=None):
+    def __call__(self, *args, input=None, timeout=None, output=None, extra_env=None):
         args = [str(arg) for arg in args]
         with self.lock:
-            self.calls.append({"args": args, "input": input, "output": output})
+            self.calls.append({"args": args, "input": input, "output": output, "extra_env": extra_env})
+            if args[:3] == ["run", "-d", "--name"]:
+                self.environments[args[3]] = dict(extra_env or {})
         code, out = self.answer(args, output)
         return subprocess.CompletedProcess(["docker", *args], code, out, "" if code == 0 else "fake failure")
 
@@ -198,7 +213,7 @@ class FakeDocker:
         if self.claude_times_out:
             raise subprocess.TimeoutExpired(args, 1)
         if self.on_claude:
-            self.on_claude(args)
+            self.on_claude(args, self.environments.get(args[-4], {}))
         Path(output).write_text(self.stream, encoding="utf-8")
         return 0, None
 
@@ -346,6 +361,29 @@ class RunnerCase(unittest.TestCase):
             for text in said:
                 self.assertNotIn(secret, text)
 
+    def assert_tokens_kept_private(self, plan, *said):
+        """Each agent's hub token is on no docker command line, in nothing
+        piped to docker, in nothing the runner printed, and in no file but
+        plan.json and the session driver's token files, which are the
+        owner's alone."""
+        tokens = [agent["token"] for agent in plan["agents"]]
+        self.assertTrue(all(tokens), plan["agents"])
+        run_dir = Path(plan["run_dir"])
+        allowed = {run_dir / "plan.json"}
+        allowed |= {drivers.session_bin_dir(run_dir, agent["id"]) / "token" for agent in plan["agents"]}
+        for path in allowed:
+            if path.exists():
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600, str(path))
+        for token in tokens:
+            for call in self.docker.calls:
+                self.assertNotIn(token, " ".join(call["args"]))
+                self.assertNotIn(token, call["input"] or "")
+            for path in self.tmp.rglob("*"):
+                if path.is_file() and path not in allowed:
+                    self.assertNotIn(token.encode(), path.read_bytes(), str(path))
+            for text in said:
+                self.assertNotIn(token, text)
+
 
 class TheDataset(RunnerCase):
     def test_specs_are_read_from_each_features_feature_md(self):
@@ -397,6 +435,33 @@ class Provisioning(RunnerCase):
         self.assertEqual(driver.jobs[0].env, {"COORD_MCP_URL": plan["agents"][0]["mcp_url"],
                                               "COORD_RPC_URL": plan["agents"][0]["rpc_url"]})
         self.assertIn("Feature 1", driver.jobs[0].prompt)
+
+    def test_each_agent_gets_a_hub_token_that_reaches_its_container_by_name_alone(self):
+        """The runner asks the hub for agent tokens, so the run refuses a
+        call without the agent's own. The token goes to the container in
+        the docker client's environment for the one docker run that
+        starts it, named by -e and never on a command line; the plan that
+        keeps it is the owner's alone."""
+        plan, _, _ = self.prepare("coop")
+        tokens = {agent["id"]: agent["token"] for agent in plan["agents"]}
+        self.assertEqual(tokens, self.hub.runs[plan["run_id"]].tokens)
+        self.assertEqual(len(set(tokens.values())), 2)
+        for agent in plan["agents"]:
+            started, = [call for call in self.docker.calls
+                        if call["args"][:4] == ["run", "-d", "--name", agent["container"]]]
+            self.assertIn(["-e", "COORD_AGENT_TOKEN"], pairs(started["args"]))
+            self.assertIsNone(env_value(started["args"], "COORD_AGENT_TOKEN"))
+            self.assertEqual(started["extra_env"], {"COORD_AGENT_TOKEN": agent["token"]})
+            with self.assertRaises(urllib.error.HTTPError) as refused:
+                call_tool(agent["rpc_url"], "peek_messages", {})
+            self.assertEqual(refused.exception.code, 401)
+            self.assertEqual(call_tool(agent["rpc_url"], "peek_messages", {}, token=agent["token"])["text"], "0")
+        others = [call for call in self.docker.calls if call["args"][:2] != ["run", "-d"]]
+        self.assertTrue(others)
+        self.assertFalse([call for call in others if call["extra_env"]])
+        saved = json.loads((Path(plan["run_dir"]) / "plan.json").read_text())
+        self.assertEqual([agent["token"] for agent in saved["agents"]], list(tokens.values()))
+        self.assert_tokens_kept_private(plan)
 
     def test_an_image_without_python_runs_without_shell_commands(self):
         self.docker.python = False
@@ -804,9 +869,12 @@ class TheSessionDriver(RunnerCase):
 
 class Runs(RunnerCase):
     def test_a_coop_pair_leaves_cooperbench_s_layout(self):
-        def agent_sends_a_message(arguments):
+        def agent_sends_a_message(arguments, environment):
+            # As claude in the container would: the hub's token from the
+            # container's environment, which the exec inherits.
             if env_value(arguments, "COORD_RPC_URL").endswith("/agent1"):
-                call_tool(env_value(arguments, "COORD_RPC_URL"), "send_message", {"to": "agent2", "text": "hi"})
+                call_tool(env_value(arguments, "COORD_RPC_URL"), "send_message", {"to": "agent2", "text": "hi"},
+                          token=environment["COORD_AGENT_TOKEN"])
 
         self.docker.on_claude = agent_sends_a_message
         code, _, err = self.main(*self.run_arguments("coop", "--features", "6,1"))
@@ -855,6 +923,7 @@ class Runs(RunnerCase):
         self.assertEqual(self.hub.run_count(), 0)
         self.assertNotIn("releasing the run", err)
         self.assert_secret_nowhere()
+        self.assert_tokens_kept_private(json.loads((pair / "plan.json").read_text()), err)
 
     def test_a_hub_that_cannot_release_a_run_leaves_a_warning_and_the_pair_its_verdict(self):
         """A hub without the DELETE route answers 405; the run then stays
@@ -931,7 +1000,9 @@ class Runs(RunnerCase):
         pair = self.pair()
         self.assertEqual(plan["run_dir"], str(pair))
         self.assertEqual([a["id"] for a in plan["agents"]], ["agent1", "agent2"])
+        self.assertEqual(set(plan["agents"][0]), {"id", "prompt_file"})
         saved = json.loads((pair / "plan.json").read_text())
+        self.assertTrue(self.hub.runs[saved["run_id"]].tokens)
         for agent, entry in zip(saved["agents"], plan["agents"]):
             workspace = Path(agent["workspace"])
             self.assertEqual(workspace, pair / "workspaces" / agent["id"])
@@ -944,9 +1015,18 @@ class Runs(RunnerCase):
             self.assertIn("Do 1." if agent["id"] == "agent1" else "Do 6.", Path(entry["prompt_file"]).read_text())
             wrapper = pair / "bin" / agent["id"] / "coop-send"
             self.assertIn(f"{self.hub_url}/rpc/{saved['run_id']}/{agent['id']}", wrapper.read_text())
-        # One word of text: coop-send refuses more, as coop_msg.py's argparse does.
+            # The agent's token is in a file of its own beside the wrappers,
+            # which read it when they run; the wrapper's text has none.
+            token_file = pair / "bin" / agent["id"] / "token"
+            self.assertEqual(stat.S_IMODE(token_file.stat().st_mode), 0o600)
+            self.assertEqual(token_file.read_text(), agent["token"] + "\n")
+            self.assertIn(f'export COORD_AGENT_TOKEN="$(cat {token_file})"\n', wrapper.read_text())
+            self.assertNotIn(agent["token"], wrapper.read_text())
+        # One word of text: coop-send refuses more, as coop_msg.py's argparse
+        # does. The wrapper brings the token itself; the environment has none.
+        without_token = {name: value for name, value in os.environ.items() if name != "COORD_AGENT_TOKEN"}
         sent = subprocess.run([str(pair / "bin" / "agent1" / "coop-send"), "agent2", "hello there"],
-                              capture_output=True, text=True, timeout=60)
+                              capture_output=True, text=True, timeout=60, env=without_token)
         self.assertEqual(sent.returncode, 0, sent.stderr)
         for agent in saved["agents"]:
             workspace = Path(agent["workspace"])
@@ -976,6 +1056,7 @@ class Runs(RunnerCase):
         self.assertFalse((pair / "workspaces").exists())
         self.assertIn(["rm", "-f", *[a["container"] for a in saved["agents"]]], self.docker.commands())
         self.assert_secret_nowhere(said, out, err)
+        self.assert_tokens_kept_private(saved, said, out, err, sent.stdout, sent.stderr)
 
     def test_a_hub_named_by_hub_is_asked_for_its_token_before_anything_is_provisioned(self):
         os.environ.pop("COORD_ADMIN_TOKEN")
@@ -1260,37 +1341,47 @@ class TheGitSetUp(unittest.TestCase):
 
 
 class SecretsInTheDrivers(unittest.TestCase):
-    def test_the_docker_client_holds_the_agents_credential_but_never_the_admin_token(self):
-        environment = {"CLAUDE_CODE_OAUTH_TOKEN": SECRET, "COORD_ADMIN_TOKEN": ADMIN_SECRET}
+    def test_the_docker_client_holds_the_agents_credential_but_never_the_tokens_of_the_runner(self):
+        # A COORD_AGENT_TOKEN in the runner's own environment is nobody's
+        # agent's, so it is held back like the admin token; an agent's own
+        # goes with extra_env, for that one call.
+        environment = {"CLAUDE_CODE_OAUTH_TOKEN": SECRET, "COORD_ADMIN_TOKEN": ADMIN_SECRET,
+                       "COORD_AGENT_TOKEN": "the-runner-s-own"}
         with mock.patch.dict(os.environ, environment), mock.patch.object(drivers.subprocess, "run") as run:
             REAL_DOCKER("ps")
             REAL_DOCKER("ps", input="text")
             REAL_DOCKER("ps", output=os.devnull)
-        self.assertEqual(len(run.call_args_list), 3)
+            REAL_DOCKER("run", "-e", "COORD_AGENT_TOKEN", extra_env={"COORD_AGENT_TOKEN": AGENT_SECRET})
+            REAL_DOCKER("ps")
+        self.assertEqual(len(run.call_args_list), 5)
         for call in run.call_args_list:
             self.assertEqual(call.kwargs["env"].get("CLAUDE_CODE_OAUTH_TOKEN"), SECRET)
             self.assertNotIn("COORD_ADMIN_TOKEN", call.kwargs["env"])
+        for call in run.call_args_list[:3] + run.call_args_list[4:]:
+            self.assertNotIn("COORD_AGENT_TOKEN", call.kwargs["env"])
+        self.assertEqual(run.call_args_list[3].kwargs["env"].get("COORD_AGENT_TOKEN"), AGENT_SECRET)
 
     def test_a_secret_in_a_job_s_environment_never_reaches_the_command_line(self):
         job = drivers.AgentJob(run_id="r1", agent="agent1", role="peer", features=(1,), container="c-agent1",
                                prompt="p", arm_dir=str(COORDBENCH / "arms" / "coop"),
                                env={"COORD_RPC_URL": "http://h:1/rpc/r1/agent1", "CLAUDE_CODE_OAUTH_TOKEN": SECRET,
-                                    "COORD_ADMIN_TOKEN": ADMIN_SECRET})
+                                    "COORD_ADMIN_TOKEN": ADMIN_SECRET, "COORD_AGENT_TOKEN": AGENT_SECRET})
         with mock.patch.dict(os.environ, {"CLAUDE_CODE_OAUTH_TOKEN": SECRET}):
             arguments = drivers.claude_exec_arguments(job)
         line = " ".join(arguments)
-        for unwanted in (SECRET, ADMIN_SECRET, "COORD_ADMIN_TOKEN"):
+        for unwanted in (SECRET, ADMIN_SECRET, AGENT_SECRET, "COORD_ADMIN_TOKEN", "COORD_AGENT_TOKEN"):
             self.assertNotIn(unwanted, line)
-        self.assertIn(["-e", "CLAUDE_CODE_OAUTH_TOKEN"], [arguments[i:i + 2] for i in range(len(arguments) - 1)])
+        self.assertIn(["-e", "CLAUDE_CODE_OAUTH_TOKEN"], pairs(arguments))
         self.assertEqual(env_value(arguments, "COORD_RPC_URL"), "http://h:1/rpc/r1/agent1")
 
-    def test_the_scorer_the_hub_and_git_get_neither_secret(self):
-        environment = {"CLAUDE_CODE_OAUTH_TOKEN": SECRET, "COORD_ADMIN_TOKEN": ADMIN_SECRET, "KEEP": "1"}
+    def test_the_scorer_the_hub_and_git_get_no_secret(self):
+        environment = {"CLAUDE_CODE_OAUTH_TOKEN": SECRET, "COORD_ADMIN_TOKEN": ADMIN_SECRET,
+                       "COORD_AGENT_TOKEN": AGENT_SECRET, "KEEP": "1"}
         with mock.patch.dict(os.environ, environment):
             cleaned = runner.environment_without_secrets()
         self.assertEqual(cleaned.get("KEEP"), "1")
-        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", cleaned)
-        self.assertNotIn("COORD_ADMIN_TOKEN", cleaned)
+        for name in ("CLAUDE_CODE_OAUTH_TOKEN", "COORD_ADMIN_TOKEN", "COORD_AGENT_TOKEN"):
+            self.assertNotIn(name, cleaned)
 
 
 if __name__ == "__main__":

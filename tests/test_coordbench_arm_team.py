@@ -672,6 +672,53 @@ class Requests(unittest.TestCase):
         self.assertEqual((answers["isError"], answers["exitCode"]), (True, 5))
         self.assertTrue(answers["text"].startswith("timed out waiting for response to "))
 
+    def test_a_cancelled_wait_exits_5_and_takes_no_response(self):
+        # Claude Code gives up on a request's wait with a
+        # notifications/cancelled; the hub finds the call among those in
+        # flight on the session, and the wait ends as coop-request's does
+        # when it runs out, taking nothing: a response that came with the
+        # cancellation stays on the board.
+        in_flight, answers = {}, {}
+        request = {"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+                   "params": {"name": "request", "arguments": {"recipient": "agent1", "kind": "k", "wait": 30}}}
+        waiting = threading.Thread(target=lambda: answers.update(
+            mcp.handle(request, self.run, "agent2", in_flight=in_flight)["result"]))
+        waiting.start()
+        self.assertTrue(self.run.wait_until(lambda: bool(board(self.run).requests), 5))
+        self.assertEqual(list(in_flight), [4])
+        request_id = next(iter(board(self.run).requests))
+        cancel = {"jsonrpc": "2.0", "method": "notifications/cancelled",
+                  "params": {"requestId": 4, "reason": "the agent moved on"}}
+        with self.run.lock:
+            text_of(self.run, "agent1", "respond", request_id=request_id, body="with the cancellation")
+            self.assertIsNone(mcp.handle(cancel, self.run, "agent2", in_flight=in_flight))
+        waiting.join(5)
+        self.assertFalse(waiting.is_alive(), "the wait slept on past the cancellation")
+        self.assertEqual(answers["content"][0]["text"], f"timed out waiting for response to {request_id}")
+        self.assertEqual(answers["_meta"]["coordbench/exitCode"], 5)
+        self.assertEqual(in_flight, {})
+        self.assertEqual([r["body"] for r in board(self.run).responses[request_id]], ["with the cancellation"])
+
+    def test_a_response_taken_for_a_reply_never_written_goes_back_on_the_board(self):
+        # The hub could not write the answer that carried the response,
+        # so it runs the call's undo: the response is back at the head of
+        # its request's queue, as it was before the wait took it.
+        calls, answers = [], {}
+        request = {"jsonrpc": "2.0", "id": 5, "method": "tools/call",
+                   "params": {"name": "request", "arguments": {"recipient": "agent1", "kind": "k", "wait": 10}}}
+        waiting = threading.Thread(target=lambda: answers.update(
+            mcp.handle(request, self.run, "agent2", sink=calls)["result"]))
+        waiting.start()
+        self.assertTrue(self.run.wait_until(lambda: bool(board(self.run).requests), 5))
+        request_id = next(iter(board(self.run).requests))
+        text_of(self.run, "agent1", "respond", request_id=request_id, body="approved")
+        waiting.join(5)
+        self.assertEqual(json.loads(answers["content"][0]["text"])["body"], "approved")
+        self.assertEqual(board(self.run).responses[request_id], [])
+        self.assertEqual(len(calls), 1)
+        hub_module.undo_lost(calls)
+        self.assertEqual([r["body"] for r in board(self.run).responses[request_id]], ["approved"])
+
     def test_a_request_to_a_name_not_in_the_run_is_queued_as_cooperbench_queues_it(self):
         # protocol.py's request checks the recipient against nobody: the
         # request is stored under the name given and a wait on it BLPOPs a
@@ -1028,10 +1075,13 @@ class PluginFiles(unittest.TestCase):
     def test_mcp_json_points_at_this_agents_hub_endpoint_with_a_timeout_above_the_longest_wait(self):
         # Claude Code aborts an HTTP MCP call after 60 s unless the server's
         # config sets "timeout" (milliseconds); the request tool waits up
-        # to LONGEST_WAIT_SECONDS, so the config must outlast it.
+        # to LONGEST_WAIT_SECONDS, so the config must outlast it. The
+        # header carries the agent's own hub token, which a run the runner
+        # creates wants on every request.
         config = self.read_json(".mcp.json")
         self.assertEqual(config, {"mcpServers": {"coordbench": {
-            "type": "http", "url": "${COORD_MCP_URL}", "timeout": 330000}}})
+            "type": "http", "url": "${COORD_MCP_URL}", "timeout": 330000,
+            "headers": {"Authorization": "Bearer ${COORD_AGENT_TOKEN:-}"}}}})
         self.assertGreater(config["mcpServers"]["coordbench"]["timeout"],
                            TEAM_MODULE.LONGEST_WAIT_SECONDS * 1000)
 

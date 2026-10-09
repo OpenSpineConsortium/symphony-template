@@ -62,6 +62,7 @@ class ForgetfulHub(BaseHTTPRequestHandler):
     def do_POST(self):
         message = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
         self.server.seen.append((self.headers.get("Mcp-Session-Id"), message))
+        self.server.authorizations.append(self.headers.get("Authorization"))
         if self.path != MCP_PATH:
             return self.send_json(404, {"error": "no run or agent at this path"})
         method = message.get("method")
@@ -110,6 +111,7 @@ class ReinitializeTest(unittest.TestCase):
     def setUp(self):
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), ForgetfulHub)
         self.server.seen, self.server.sessions, self.server.session = [], 0, None
+        self.server.authorizations = []
         self.server.forget_calls = 0
         threading.Thread(target=self.server.serve_forever, args=(0.05,), daemon=True).start()
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}{MCP_PATH}"
@@ -172,6 +174,22 @@ class ReinitializeTest(unittest.TestCase):
         self.assertEqual((answer["id"], answer["error"]["code"]), (1, -32603))
         self.assertIn("HTTP 404", answer["error"]["message"])
         self.assertEqual(self.methods_seen(), ["tools/list"])
+
+    def test_the_agents_token_goes_with_every_post_the_reopening_handshake_included(self):
+        # A run the hub made with agent tokens wants the token on every
+        # request, so the handshake the bridge repeats on its own carries
+        # it too; without a token no Authorization header is sent.
+        self.server.forget_calls = 1
+        self.bridge = bridge_module.Bridge(self.url, out=self.out, token="the-agent-s-token")
+        self.send(request(1, "initialize", INIT_PARAMS))
+        self.receive()
+        self.send(tool_call(2, "send_message"))
+        self.assertEqual(self.receive(), reply(2, text_result("ran send_message")))
+        self.assertEqual(self.methods_seen(),
+                         ["initialize", "tools/call", "initialize", "notifications/initialized", "tools/call"])
+        self.assertEqual(self.server.authorizations, ["Bearer the-agent-s-token"] * 5)
+        for plain in (bridge_module.Bridge(self.url), bridge_module.Bridge(self.url, token="")):
+            self.assertNotIn("Authorization", plain.headers())
 
     def test_parallel_requests_that_lose_the_session_share_one_reopen(self):
         self.server.forget_calls = 1

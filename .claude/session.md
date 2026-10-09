@@ -2,9 +2,8 @@
 
 Written 2026-10-09 by the main account's cloud session. This is the full
 checkpoint of the work on claude/10; main's own .claude/session.md points
-here. Read this first, then experiment/README.md,
-experiment/coordbench/README.md (the plug-in contract) and
-experiment/coordbench/REVIEW.md (what to fix first). The owner's
+here. Read this first, then experiment/README.md and
+experiment/coordbench/README.md (the plug-in contract). The owner's
 steps (accounts, tokens, secrets, variables) are in
 docs/setup/owner-checklist.md.
 
@@ -31,7 +30,7 @@ docs/setup/owner-checklist.md.
 - #10, on claude/10 (draft pull request #13), all pushed, `bash scripts/check.sh` green (414 tests):
   - experiment/: the kit that runs CooperBench's four-arm ablation in one cloud session with CooperBench's own runner (setup.sh, prepare_task.sh, run_arms.sh, report.py). The whole flash subset was prepared and its gold patches checked: 42 of 50 pairs grade here; 7 need hosts the network policy blocks (README table).
   - experiment/coordbench/: coordination as a plug-in. An arm is a Claude Code plugin plus arm.py; the hub serves its tools over MCP (HTTP), a stdio bridge and shell commands; built-in arms solo, coop, coop-git, team (CooperBench's, prompt-parity tested) and sdlc (this repository's claim protocol with a real merge gate); drivers claude-cli and session; scoring by CooperBench's own evaluation. README.md is the contract.
-  - experiment/coordbench/REVIEW.md: 28 confirmed review findings, not yet fixed.
+  - The earlier review's 28 findings are fixed on this branch, each with a test, and the file that listed them is deleted.
 - Nothing has run an agent on a task yet. The claude-cli driver needs CLAUDE_CODE_OAUTH_TOKEN in the environment's settings and a new session.
 - The plan's usage ran out on 2026-10-09 (weekly limit resets 2026-10-15, 11:00 UTC).
 - #11 (draft #12) is unchanged.
@@ -43,10 +42,10 @@ both open pull requests; it does not stop after the first. The flash
 gradeability survey is finished (experiment/README.md has its table) and
 needs no more work.
 
-1. claude/10 (#13): fix the 28 findings in experiment/coordbench/REVIEW.md,
-   blocking ones first; tests with each fix; then delete REVIEW.md. The
-   review's usability lens (a newcomer writing a new arm from the README)
-   produced findings that could not be verified before usage ran out:
+1. claude/10 (#13): the 28 review findings are fixed, with a test each,
+   and the file that listed them is deleted. Still open from that review
+   is its usability lens (a newcomer writing a new arm from the README),
+   whose findings could not be verified before usage ran out:
    re-run that one lens cheaply (one agent writes a "pair-review" arm from
    the README alone and reports friction) and fix what it finds.
 2. Make the owner's checklist (docs/setup/owner-checklist.md) as close to

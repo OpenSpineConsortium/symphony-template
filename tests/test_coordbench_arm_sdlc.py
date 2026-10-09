@@ -32,8 +32,11 @@ from arm import SUBMISSION_BLOCK, AgentSpec, Call, Run, ToolError, find_arm  # n
 
 # Claude Code aborts an HTTP MCP tool call after 60 s unless the server's
 # config sets "timeout"; every built-in arm carries the same value, above
-# the longest wait any arm's tool advertises (the team arm's 300 s).
-MCP_JSON = {"mcpServers": {"coordbench": {"type": "http", "url": "${COORD_MCP_URL}", "timeout": 330000}}}
+# the longest wait any arm's tool advertises (the team arm's 300 s). The
+# header carries the agent's own hub token, which a run the runner
+# creates wants on every request.
+MCP_JSON = {"mcpServers": {"coordbench": {"type": "http", "url": "${COORD_MCP_URL}", "timeout": 330000,
+                                           "headers": {"Authorization": "Bearer ${COORD_AGENT_TOKEN:-}"}}}}
 ARM_JSON_KEYS = {"entry", "name", "description", "needs", "plugins", "mcp_servers"}
 ALIASES = {"board": "sdlc-board", "claim_issue": "sdlc-claim", "open_pull_request": "sdlc-pr",
            "mark_ready": "sdlc-ready", "pull_request_status": "sdlc-status", "send_message": "coop-send",

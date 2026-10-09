@@ -222,8 +222,7 @@ beta on Pro and Max.
 
 - main: the template, released; .claude/session.md points at the work.
 - claude/10, draft pull request #13 (issue #10): the experiment kit and
-  coordbench; its .claude/session.md is the full checkpoint and
-  experiment/coordbench/REVIEW.md the 28 findings to fix first.
+  coordbench; its .claude/session.md is the full checkpoint.
 - claude/11, pull request #12 (issue #11): the push guard's newline fix
   alone, rebased on main, 52 lines over main, ready for review.
 - The main account's weekly Claude usage resets on 2026-10-15 at 11:00 UTC.

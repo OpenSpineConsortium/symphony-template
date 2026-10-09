@@ -4,6 +4,7 @@ One line per fact under docs/memory/: a dash, the fact's title as a link to its 
 
 - [A template copies no settings](a-template-copies-no-settings.md): what "Use this template" leaves to the owner (one run of scripts/setup-repo.sh, the token from claude setup-token) and what an organization on Team or above can set once for every repository it makes.
 - [CI runs Python 3.12](ci-python-is-3-12.md): the checks run on GitHub's 3.12, so tools and tests use no API newer than that; test with python3.12 where it exists.
+- [Claude Code aborts MCP tool calls after 60 seconds](claude-code-aborts-mcp-tool-calls-after-60-seconds.md): an HTTP MCP server's config needs "timeout" (ms) or MCP_TOOL_TIMEOUT for a tool that blocks longer; every coordbench arm's .mcp.json and drivers.CLAUDE_ENVIRONMENT set 330000.
 - [@claude runs on the main account's subscription](claude-mentions-run-on-the-main-accounts-subscription.md): mentions run .github/workflows/claude.yml on the token from `claude setup-token`, spending plan limits, never an API key.
 - [How this repository works](how-this-repository-works.md): the repository is the shared plane for every Claude account and session; what lives where.
 - [Team mode](team-mode.md): a lead plans an epic into pre-assigned tasks, members work them in parallel and land by auto-merge; the lead integrates; switched on by CLAUDE_TEAM with CLAUDE_WORKER.

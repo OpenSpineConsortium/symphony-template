@@ -26,7 +26,8 @@ COORDBENCH = ROOT / "experiment" / "coordbench"
 sys.path.insert(0, str(COORDBENCH))
 
 import hub as hub_module  # noqa: E402
-from arm import Arm, Run, Tool, ToolError  # noqa: E402
+import kit  # noqa: E402
+from arm import Arm, Call, Run, Tool, ToolError  # noqa: E402
 
 ARM_JSON = {"entry": "arm.py:TestArm", "name": "testarm", "description": "messages and two odd tools",
             "needs": [], "plugins": [], "mcp_servers": {}}
@@ -87,6 +88,25 @@ class Answer:
     @property
     def json(self):
         return json.loads(self.raw)
+
+
+@contextlib.contextmanager
+def dropped_replies(gone):
+    """The hub's reply failing with ConnectionResetError, as a write to a
+    client that closed its connection does, for every payload gone() picks."""
+    original = hub_module.HubHandler.reply
+
+    def reply(handler, status, payload=None, headers=None):
+        if gone(payload):
+            raise ConnectionResetError("the client closed the connection")
+        return original(handler, status, payload, headers)
+
+    with mock.patch.object(hub_module.HubHandler, "reply", reply):
+        yield
+
+
+def contents(messages_json):
+    return [message["content"] for message in json.loads(messages_json)]
 
 
 class HubServerCase(unittest.TestCase):
@@ -526,6 +546,149 @@ class McpTest(HubServerCase):
         message = json.loads(outcome["answer"]["result"]["content"][0]["text"])
         self.assertEqual((message["from"], message["content"]), ("agent1", "done with parser.py"))
 
+    def test_a_cancelled_wait_gives_the_marker_at_once_and_takes_nothing(self):
+        # Claude Code gives up on a call with notifications/cancelled, a
+        # second POST on the same session. The wait ends with the marker,
+        # well before its timeout, and a message sent afterwards is still
+        # in the inbox for the next call. A cancellation for an id not in
+        # flight, or on another session, is taken in (202) and changes
+        # nothing, as the specification allows: its answer may have
+        # crossed it.
+        session = {"Mcp-Session-Id": self.initialize("agent2").headers["Mcp-Session-Id"]}
+        run = self.hub.hosted("pair1").run
+        outcome = {}
+
+        def wait():
+            started = time.monotonic()
+            wait_call = rpc_message("tools/call", {"name": "wait_for_message",
+                                                   "arguments": {"timeout_ms": 20000}}, request_id=11)
+            answer = self.mcp(wait_call, agent="agent2", headers=session)
+            outcome["elapsed"] = time.monotonic() - started
+            outcome["answer"] = answer.json
+
+        def cancel(request_id, headers):
+            notice = rpc_message("notifications/cancelled", {"requestId": request_id, "reason": "gave up"},
+                                 request_id=None)
+            return self.mcp(notice, agent="agent2", headers=headers)
+
+        waiter = threading.Thread(target=wait)
+        waiter.start()
+        # The "tool" event is emitted once the call is in flight.
+        self.assertTrue(run.wait_until(lambda: bool(run.events), 5))
+        for stray in (cancel(999, session), cancel(11, {})):
+            self.assertEqual((stray.status, stray.raw), (202, b""))
+        time.sleep(0.3)
+        self.assertTrue(waiter.is_alive(), "a cancellation of another id or session ended the wait")
+        self.assertEqual(cancel(11, session).status, 202)
+        waiter.join(timeout=5)
+        self.assertFalse(waiter.is_alive(), "the cancellation did not end the wait")
+        self.assertLess(outcome["elapsed"], 5.0)
+        self.assertEqual(outcome["answer"]["result"]["content"][0]["text"], kit.NO_MESSAGE)
+        self.assertEqual(self.rpc("send_message", {"to": "agent2", "text": "after"}).status, 200)
+        self.assertEqual(contents(self.rpc("receive_messages", agent="agent2").json["text"]), ["after"])
+        kinds = [event["kind"] for event in self.hub.events("pair1")]
+        self.assertEqual(kinds.count("receive"), 1)
+
+    def test_a_lost_reply_puts_the_messages_back_at_the_head_of_the_inbox(self):
+        # The client dropped its connection while two waits of one batch
+        # took the first two messages; the write of the answer fails, the
+        # hub runs the calls' undos newest first, and the next call reads
+        # the inbox in its old order. The hub itself goes on, and logs
+        # nothing: the drop was the client's doing.
+        for text in ("first", "second", "third"):
+            self.rpc("send_message", {"to": "agent2", "text": text})
+        batch = [rpc_message("tools/call", {"name": "wait_for_message", "arguments": {"timeout_ms": 1000}},
+                             request_id=request_id) for request_id in (11, 12)]
+        with dropped_replies(lambda payload: isinstance(payload, list) and payload[0].get("id") == 11), \
+                contextlib.redirect_stderr(io.StringIO()) as log, self.assertRaises(ConnectionError):
+            self.mcp(batch, agent="agent2")
+        self.assertEqual(log.getvalue(), "")
+        self.assertEqual(contents(self.rpc("receive_messages", agent="agent2").json["text"]),
+                         ["first", "second", "third"])
+        kinds = [event["kind"] for event in self.hub.events("pair1") if event["kind"].startswith("receive")]
+        self.assertEqual(kinds, ["receive", "receive", "receive_lost", "receive_lost", "receive"])
+
+
+class AgentTokenTest(HubServerCase):
+    """A run made with agent_tokens wants each agent's own bearer token on
+    its /mcp and /rpc: the transport asks a local server to authenticate
+    every connection, and by URL alone one agent could speak as another."""
+
+    def setUp(self):
+        super().setUp()
+        created = self.request("POST", "/api/runs", {"arm": str(self.arm_dir), "run_id": "pair1",
+                                                     "features": [1, 2], "specs": SPECS, "agent_tokens": True})
+        self.assertEqual(created.status, 201, created.raw)
+        self.tokens = {agent["id"]: agent["token"] for agent in created.json["agents"]}
+
+    def bearer(self, agent):
+        return {"Authorization": f"Bearer {self.tokens[agent]}"}
+
+    def test_the_create_answer_alone_carries_the_tokens(self):
+        self.assertEqual(set(self.tokens), {"agent1", "agent2"})
+        self.assertNotEqual(self.tokens["agent1"], self.tokens["agent2"])
+        for token in self.tokens.values():
+            self.assertRegex(token, r"^[A-Za-z0-9_-]{40,}$")
+        self.assertEqual(self.hub.hosted("pair1").tokens, self.tokens)
+        state = self.request("GET", "/api/runs/pair1")
+        self.assertEqual(state.status, 200)
+        self.assertFalse([agent for agent in state.json["agents"] if "token" in agent])
+        described = self.request("GET", "/rpc/pair1/agent1", headers=self.bearer("agent1"))
+        self.assertEqual(described.status, 200)
+        for answer in (state, described, self.request("GET", "/api/runs/pair1/events")):
+            for token in self.tokens.values():
+                self.assertNotIn(token.encode(), answer.raw)
+
+    def test_mcp_and_rpc_want_this_agents_own_token(self):
+        wrong = ({}, {"Authorization": "Bearer "}, {"Authorization": "Bearer wrong"},
+                 {"Authorization": f"bearer {self.tokens['agent1']}"}, self.bearer("agent2"))
+        for headers in wrong:
+            refused = self.mcp(rpc_message("ping"), headers=headers)
+            self.assertEqual(refused.status, 401, headers)
+            self.assertIn("agent1", refused.json["error"])
+            self.assertEqual(self.request("GET", "/rpc/pair1/agent1", headers=headers).status, 401, headers)
+            self.assertEqual(self.request("POST", "/rpc/pair1/agent1", {"tool": "peek_messages"}, headers).status,
+                             401, headers)
+            # /mcp takes POST only; a GET is 405 for the method, token or no token.
+            self.assertEqual(self.request("GET", "/mcp/pair1/agent1", headers=headers).status, 405, headers)
+        self.assertEqual(self.request("GET", "/mcp/pair1/agent1", headers=self.bearer("agent1")).status, 405)
+        self.assertEqual(self.mcp(rpc_message("ping"), headers=self.bearer("agent1")).status, 200)
+        hello = self.mcp(rpc_message("initialize", INIT_PARAMS), headers=self.bearer("agent1"))
+        self.assertEqual(hello.status, 200)
+        self.assertIn("Mcp-Session-Id", hello.headers)
+        self.assertEqual(self.request("GET", "/rpc/pair1/agent1", headers=self.bearer("agent1")).status, 200)
+        sent = self.request("POST", "/rpc/pair1/agent1",
+                            {"tool": "send_message", "arguments": {"to": "agent2", "text": "hi"}},
+                            self.bearer("agent1"))
+        self.assertEqual(sent.json, {"text": "sent to agent2", "isError": False})
+        peeked = self.request("POST", "/rpc/pair1/agent2", {"tool": "peek_messages"}, self.bearer("agent2"))
+        self.assertEqual(peeked.json["text"], "1")
+
+    def test_the_token_is_checked_after_the_origin_and_before_the_body(self):
+        hostile = self.mcp(rpc_message("ping"), headers={"Origin": "http://evil.example", **self.bearer("agent1")})
+        self.assertEqual(hostile.status, 403)
+        self.assertEqual(self.mcp(b"{not json").status, 401)
+        self.assertEqual(self.mcp(b"{not json", headers=self.bearer("agent1")).status, 400)
+        self.assertEqual(self.request("POST", "/rpc/pair1/agent1", b"{not json").status, 401)
+        self.assertEqual(self.mcp(rpc_message("ping"), agent="agent9", headers=self.bearer("agent1")).status, 404)
+
+    def test_a_run_made_without_agent_tokens_stays_open(self):
+        created = self.create("open")
+        self.assertFalse([agent for agent in created["agents"] if "token" in agent])
+        self.assertEqual(self.hub.hosted("open").tokens, {})
+        for headers in ({}, {"Authorization": "Bearer "}, {"Authorization": "Bearer anything"}):
+            self.assertEqual(self.mcp(rpc_message("ping"), run_id="open", headers=headers).status, 200, headers)
+            self.assertEqual(self.request("GET", "/rpc/open/agent1", headers=headers).status, 200, headers)
+
+    def test_agent_tokens_must_be_true_or_false(self):
+        for value in ("yes", 1, None, [True]):
+            body = {"arm": str(self.arm_dir), "run_id": "typed", "features": [1], "specs": SPECS,
+                    "agent_tokens": value}
+            answer = self.request("POST", "/api/runs", body)
+            self.assertEqual(answer.status, 400, value)
+            self.assertIn("agent_tokens", answer.json["error"])
+        self.assertEqual(self.request("GET", "/api/health").json["runs"], 1)
+
 
 class RpcTest(HubServerCase):
     def setUp(self):
@@ -583,6 +746,45 @@ class RpcTest(HubServerCase):
         self.assertEqual(answer.status, 200)
         self.assertTrue(answer.json["isError"])
         self.assertNotIn(b"Traceback", answer.raw)
+
+    def test_a_lost_reply_puts_the_message_back_at_the_head_of_the_inbox(self):
+        # A shell command's wait took a message and its caller was gone
+        # before the answer could be written: the message goes back
+        # first, and the next command reads it.
+        for text in ("first", "second"):
+            self.rpc("send_message", {"to": "agent2", "text": text})
+
+        def took_first(payload):
+            return isinstance(payload, dict) and "first" in payload.get("text", "")
+
+        with dropped_replies(took_first), self.assertRaises(ConnectionError):
+            self.rpc("wait_for_message", {"timeout_ms": 1000}, agent="agent2")
+        self.assertEqual(contents(self.rpc("receive_messages", agent="agent2").json["text"]), ["first", "second"])
+
+
+class CallTest(unittest.TestCase):
+    """What a Call carries for a tool that blocks: lost() runs the undos
+    newest first under the run's lock, wakes the run, and lets a failing
+    undo cost a traceback rather than the others."""
+
+    def test_lost_runs_the_undos_newest_first_wakes_the_run_and_survives_a_bad_one(self):
+        run = Run("r1", Arm(), [])
+        call = Call(run, "agent1", {})
+        done = []
+        call.on_lost(lambda: done.append("first"))
+        call.on_lost(lambda: 1 / 0)
+        call.on_lost(lambda: done.append("last"))
+        woken = []
+        waiter = threading.Thread(target=lambda: woken.append(run.wait_until(lambda: len(done) == 2, 5)))
+        waiter.start()
+        time.sleep(0.2)
+        with contextlib.redirect_stderr(io.StringIO()) as log:
+            call.lost()
+        waiter.join(timeout=5)
+        self.assertEqual(done, ["last", "first"])
+        self.assertEqual(woken, [True])
+        self.assertIn("ZeroDivisionError", log.getvalue())
+        self.assertFalse(call.cancelled.is_set())
 
 
 class InProcessTest(unittest.TestCase):

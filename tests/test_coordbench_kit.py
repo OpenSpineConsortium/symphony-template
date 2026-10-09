@@ -256,6 +256,61 @@ class WaitTest(KitTest):
         self.call("agent2", "send_message", to="agent1", text="gone")
         self.assertEqual(self.call("agent1", "wait_for_message", timeout_ms=100), MARKER)
 
+    def test_a_cancelled_call_gives_the_marker_at_once_and_takes_nothing(self):
+        # The client gave up on the wait (notifications/cancelled): the
+        # hub sets the call's event and wakes the run. A message that
+        # arrives with the cancellation, or was there before the call,
+        # stays for the next call, since this one's answer reaches nobody.
+        wait = tools()["wait_for_message"].handler
+        call = Call(self.run, "agent1", {"timeout_ms": 10000})
+        outcome = []
+        thread = threading.Thread(target=lambda: outcome.append(wait(call)), daemon=True)
+        started = time.monotonic()
+        thread.start()
+        time.sleep(0.2)
+        with self.run.lock:
+            self.call("agent2", "send_message", to="agent1", text="kept")
+            call.cancelled.set()
+            self.run.lock.notify_all()
+        thread.join(timeout=5)
+        self.assertFalse(thread.is_alive(), "the wait slept on past the cancellation")
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual(outcome, [MARKER])
+        self.assertEqual(self.contents("agent1"), ["kept"])
+        cancelled_before = Call(self.run, "agent1", {"timeout_ms": 100})
+        cancelled_before.cancelled.set()
+        self.assertEqual(wait(cancelled_before), MARKER)
+        self.assertEqual(self.contents("agent1"), ["kept"])
+        self.assertEqual([e for e in self.run.events if e["kind"].startswith("receive")], [])
+        self.assertEqual((call.undos, cancelled_before.undos), ([], []))
+
+    def test_a_message_taken_for_a_reply_never_written_goes_back_at_the_head(self):
+        # The hub runs the call's undo when it could not write the answer:
+        # the message goes back first, the run is woken for whoever waits
+        # on the inbox, and the record keeps both the handover and its
+        # loss, so the receive is not counted as one the agent saw.
+        wait = tools()["wait_for_message"].handler
+        for text in ("one", "two"):
+            self.call("agent2", "send_message", to="agent1", text=text)
+        call = Call(self.run, "agent1", {"timeout_ms": 100})
+        self.assertEqual(json.loads(wait(call))["content"], "one")
+        self.assertEqual(self.contents("agent1"), ["two"])
+        woken = []
+        waiter = threading.Thread(target=lambda: woken.append(
+            self.run.wait_until(lambda: len(self.contents("agent1")) == 2, 5)), daemon=True)
+        waiter.start()
+        time.sleep(0.2)
+        call.lost()
+        waiter.join(timeout=5)
+        self.assertEqual(self.contents("agent1"), ["one", "two"])
+        self.assertEqual(woken, [True])
+        self.assertEqual([(e["kind"], e["agent"], e["count"]) for e in self.run.events
+                          if e["kind"].startswith("receive")],
+                         [("receive", "agent1", 1), ("receive_lost", "agent1", 1)])
+        empty = Call(self.run, "agent3", {"timeout_ms": 100})
+        self.assertEqual(wait(empty), MARKER)
+        self.assertEqual(empty.undos, [])
+
     def test_a_timeout_that_is_not_a_finite_number_is_refused(self):
         for value in ("soon", "", float("inf"), float("-inf"), "nan", [5000], {"ms": 5000}):
             with self.subTest(timeout_ms=value):

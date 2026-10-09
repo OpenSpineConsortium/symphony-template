@@ -69,11 +69,16 @@ PROMPT = "You are agent1. Implement feature 1."
 RPC_PATH = "/rpc/run1/agent1"
 MCP_PATH = "/mcp/run1/agent1"
 SESSION_ID = "session-abc"
+AGENT_TOKEN = "coordbench-fake-agent-token-2c7e5a1f93b6"
+REFUSED = "run run1 wants agent1's bearer token in Authorization"
 
 
 class FakeHub(BaseHTTPRequestHandler):
     """Just enough of hub.py's HTTP API to exercise the clients: /rpc
-    echoes each call back as JSON, and /mcp answers by tool name."""
+    echoes each call back as JSON, and /mcp answers by tool name. With a
+    token set on the server, /rpc wants it as the hub does, 401 in the
+    hub's own words otherwise; the Authorization header of every /rpc
+    request is kept, so a test sees what the command sent."""
 
     def log_message(self, *args):
         pass
@@ -91,14 +96,26 @@ class FakeHub(BaseHTTPRequestHandler):
     def body(self):
         return self.rfile.read(int(self.headers.get("Content-Length") or 0))
 
+    def authorized(self):
+        self.server.authorizations.append(self.headers.get("Authorization"))
+        wanted = self.server.token
+        if wanted and self.headers.get("Authorization") != f"Bearer {wanted}":
+            self.send_json(401, {"error": REFUSED})
+            return False
+        return True
+
     def do_GET(self):
         if self.path != RPC_PATH:
             return self.send_json(404, {"error": "no run or agent at this path"})
-        self.send_json(200, {"agent": "agent1", "role": "peer", "tools": TOOLS, "prompt": PROMPT})
+        if self.authorized():
+            self.send_json(200, {"agent": "agent1", "role": "peer", "tools": TOOLS, "prompt": PROMPT})
 
     def do_POST(self):
         if self.path == RPC_PATH:
-            return self.answer_rpc(json.loads(self.body()))
+            request = json.loads(self.body())
+            if self.authorized():
+                self.answer_rpc(request)
+            return
         if self.path == MCP_PATH:
             return self.answer_mcp(json.loads(self.body()))
         self.send_json(404, {"error": "no run or agent at this path"})
@@ -183,7 +200,8 @@ def closed_port_url(path):
 class HubTestCase(unittest.TestCase):
     def setUp(self):
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), FakeHub)
-        self.server.calls, self.server.mcp_requests = [], []
+        self.server.calls, self.server.mcp_requests, self.server.authorizations = [], [], []
+        self.server.token = None
         self.server.release = threading.Event()
         threading.Thread(target=self.server.serve_forever, args=(0.05,), daemon=True).start()
         base = f"http://127.0.0.1:{self.server.server_address[1]}"
@@ -191,6 +209,7 @@ class HubTestCase(unittest.TestCase):
         environment = mock.patch.dict(os.environ)
         environment.start()
         os.environ.pop("COORD_RPC_URL", None)
+        os.environ.pop("COORD_AGENT_TOKEN", None)
         self.addCleanup(environment.stop)
 
     def tearDown(self):
@@ -425,6 +444,35 @@ class CommandTest(HubTestCase):
         self.assertEqual(code, 2)
         self.assertIn("COORD_RPC_URL", err)
 
+    def test_the_agents_token_goes_with_every_request_when_set_and_nothing_otherwise(self):
+        # A command asks the hub to describe the agent, then calls: both
+        # requests carry the token, from COORD_AGENT_TOKEN; unset or blank,
+        # no Authorization header is sent at all.
+        code, _, _ = run_cli("--url", self.rpc_url, "call", "receive_messages")
+        self.assertEqual((code, self.server.authorizations), (0, [None, None]))
+        self.server.token = AGENT_TOKEN
+        os.environ["COORD_AGENT_TOKEN"] = AGENT_TOKEN
+        code, out, _ = run_cli("--url", self.rpc_url, "call", "receive_messages")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.call_arguments(out), {})
+        self.assertEqual(self.server.authorizations[2:], [f"Bearer {AGENT_TOKEN}"] * 2)
+        self.server.token = None
+        os.environ["COORD_AGENT_TOKEN"] = " "
+        self.assertEqual(run_cli("--url", self.rpc_url, "prompt")[0], 0)
+        self.assertIsNone(self.server.authorizations[-1])
+
+    def test_a_hub_that_refuses_the_token_is_reported_in_its_own_words_with_exit_2(self):
+        self.server.token = AGENT_TOKEN
+        code, out, err = run_cli("--url", self.rpc_url, "call", "receive_messages")
+        self.assertEqual((code, out), (2, ""))
+        self.assertEqual(err, f"coordbench: the coordbench hub at {self.rpc_url} answered HTTP 401: {REFUSED}\n")
+        self.assertEqual(self.server.calls, [])
+        os.environ["COORD_AGENT_TOKEN"] = "not-this-agent-s"
+        code, _, err = run_cli("--url", self.rpc_url, "alias-run", "send_message", "agent2", "hi")
+        self.assertEqual(code, 2)
+        self.assertIn(f"HTTP 401: {REFUSED}", err)
+        self.assertEqual(self.server.calls, [])
+
 
 class InstallTest(HubTestCase):
     def setUp(self):
@@ -434,7 +482,7 @@ class InstallTest(HubTestCase):
         self.bin_dir = Path(scratch.name) / "bin"
 
     def run_command(self, name, *words, stdin="", rpc_url=None):
-        environment = {k: v for k, v in os.environ.items() if k != "COORD_RPC_URL"}
+        environment = {k: v for k, v in os.environ.items() if k not in ("COORD_RPC_URL", "COORD_AGENT_TOKEN")}
         if rpc_url:
             environment["COORD_RPC_URL"] = rpc_url
         return subprocess.run([str(self.bin_dir / name), *words], input=stdin, env=environment,
@@ -484,6 +532,38 @@ class InstallTest(HubTestCase):
         lost = self.run_command("coop-recv", rpc_url=closed_port_url(RPC_PATH))
         self.assertEqual(lost.returncode, 2)
         self.assertIn("cannot reach", lost.stderr)
+        self.assertNotIn("COORD_AGENT_TOKEN", (self.bin_dir / "coop-recv").read_text())
+
+    def test_install_with_a_token_file_writes_wrappers_that_read_it_when_they_run(self):
+        # The hub wants the token from install's own request too, which
+        # takes it from the file; the wrappers read the file with cat at
+        # run time, so the token is in no wrapper and on no command line.
+        self.server.token = AGENT_TOKEN
+        token_file = self.bin_dir.parent / "token"
+        token_file.parent.mkdir(parents=True, exist_ok=True)
+        token_file.write_text(AGENT_TOKEN + "\n")
+        code, _, err = run_cli("install", str(self.bin_dir), "--url", self.rpc_url,
+                               "--token-file", str(token_file))
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.server.authorizations, [f"Bearer {AGENT_TOKEN}"])
+        script = (self.bin_dir / "coop-send").read_text()
+        self.assertIn(f'\nexport COORD_AGENT_TOKEN="$(cat {token_file})"\n', script)
+        self.assertNotIn(AGENT_TOKEN, script)
+        sent = self.run_command("coop-send", "agent2", "hello")
+        self.assertEqual((sent.returncode, sent.stdout), (0, ""), sent.stderr)
+        self.assertEqual(json.loads(sent.stderr)["arguments"], {"to": "agent2", "text": "hello"})
+        self.assertEqual(self.server.authorizations[-2:], [f"Bearer {AGENT_TOKEN}"] * 2)
+        token_file.unlink()
+        refused = self.run_command("coop-recv")
+        self.assertEqual((refused.returncode, refused.stdout), (2, ""))
+        self.assertIn(f"HTTP 401: {REFUSED}", refused.stderr)
+
+    def test_a_token_file_that_cannot_be_read_is_exit_2(self):
+        code, _, err = run_cli("install", str(self.bin_dir), "--url", self.rpc_url,
+                               "--token-file", str(self.bin_dir / "no-such-file"))
+        self.assertEqual(code, 2)
+        self.assertIn("cannot read the token file", err)
+        self.assertEqual(self.server.authorizations, [])
 
 
 class BridgeProcess:
@@ -566,8 +646,21 @@ class BridgeTest(HubTestCase):
         self.assertEqual(second_headers["MCP-Protocol-Version"], "2025-03-26")
         self.assertEqual(second_headers["Content-Type"], "application/json")
         self.assertEqual(second_headers["Accept"], "application/json, text/event-stream")
+        self.assertNotIn("Authorization", first_headers)
+        self.assertNotIn("Authorization", second_headers)
         self.assertEqual(bridge.finish(), [])
         self.assertEqual(bridge.process.returncode, 0)
+
+    def test_the_agents_token_goes_with_every_post_when_set(self):
+        os.environ["COORD_AGENT_TOKEN"] = AGENT_TOKEN
+        bridge = self.start_bridge()
+        self.initialize(bridge)
+        bridge.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        bridge.send(tool_call(4, "anything"))
+        self.assertEqual(bridge.receive(), reply(4, text_result("ran anything")))
+        self.assertEqual(bridge.finish(), [])
+        self.assertEqual([headers["Authorization"] for headers, _ in self.server.mcp_requests],
+                         [f"Bearer {AGENT_TOKEN}"] * 3)
 
     def test_a_notification_writes_nothing(self):
         bridge = self.start_bridge()

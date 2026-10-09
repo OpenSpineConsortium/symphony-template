@@ -32,8 +32,11 @@ CLASSES = {"solo": "SoloArm", "coop": "CoopArm", "coop-git": "CoopGitArm"}
 NEEDS = {"solo": (), "coop": (), "coop-git": ("git_remote",)}
 # Claude Code gives up on an HTTP MCP call after 60 s unless the server's
 # config says otherwise; 330 s is past the longest wait any built-in arm
-# allows (300 s).
-MCP_JSON = {"mcpServers": {"coordbench": {"type": "http", "url": "${COORD_MCP_URL}", "timeout": 330000}}}
+# allows (300 s). The header carries the agent's own hub token, which a
+# run the runner creates wants on every request; with the variable unset
+# it reads "Bearer ", which an open run ignores.
+MCP_JSON = {"mcpServers": {"coordbench": {"type": "http", "url": "${COORD_MCP_URL}", "timeout": 330000,
+                                           "headers": {"Authorization": "Bearer ${COORD_AGENT_TOKEN:-}"}}}}
 LONGEST_ARM_WAIT_MS = 300 * 1000
 ARM_JSON_KEYS = {"entry", "name", "description", "needs", "plugins", "mcp_servers"}
 ALIASES = {"send_message": "coop-send", "broadcast": "coop-broadcast", "receive_messages": "coop-recv",
