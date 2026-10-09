@@ -87,6 +87,26 @@ class RefusalTest(unittest.TestCase):
         self.assertIsNone(refusal(["--force-with-lease", "--exec", "/usr/bin/git-receive-pack",
                                    "origin", "claude/7"]))
 
+    def test_long_options_may_be_abbreviated_as_git_allows(self):
+        self.assertIsNone(refusal(["--dry", "origin", "main"]))
+        self.assertIsNotNone(refusal(["--mir", "origin"]))
+        self.assertIsNotNone(refusal(["--force-w", "origin", "feature"], current="feature"))
+
+    def test_a_short_cluster_with_n_is_a_dry_run(self):
+        self.assertIsNone(refusal(["-nv", "origin", "main"]))
+
+    def test_at_sign_is_head(self):
+        self.assertIsNone(refusal(["--force-with-lease", "origin", "@"]))
+        self.assertIsNotNone(refusal(["origin", "@"], current="main"))
+
+    def test_a_destination_the_shell_expands_cannot_be_judged(self):
+        for spec in ("$BRANCH", "$", "$b", "HEAD:$BRANCH", "${BRANCH}", "`git branch --show-current`"):
+            self.assertIsNone(refusal(["--force-with-lease", "origin", spec]), spec)
+
+    def test_a_refusal_of_an_implied_branch_says_how_to_name_one(self):
+        self.assertIn("name the branch you push", refusal([], current="main"))
+        self.assertNotIn("name the branch you push", refusal(["origin", "main"]))
+
 
 class ShellTest(unittest.TestCase):
     def test_compound_command(self):
@@ -161,6 +181,26 @@ class ShellTest(unittest.TestCase):
         self.assertIn((["origin", "main"], None), pushes("cat <<<word\ngit push origin main"))
         self.assertIn((["origin", "main"], None), pushes("echo $((1<<2))\ngit push origin main"))
 
+    def test_an_opener_that_never_closes_cuts_nothing(self):
+        for command in ("echo $((1<<n)) &&\ngit push origin main",
+                        "(( x <<= 1 ))\ngit push origin main",
+                        "x=a; echo ${x//<<b/c};\ngit push origin main",
+                        'echo "$(echo "<<EOF")" &&\ngit push origin main',
+                        "x=$(cat <<EOF\nhi\nEOF) && git push origin main",
+                        "cat <<$'E'\nbody\nE\ntrue; git push origin main"):
+            self.assertIn((["origin", "main"], None), pushes(command), command)
+
+    def test_quotes_inside_a_heredoc_in_a_substitution_are_data(self):
+        for body in ('Refuse "git fetch && git push -f" as before',
+                     '- [x] "git switch main && git push -f origin main" is refused',
+                     'Allow "git fetch && git push --force-with-lease origin main" nowhere'):
+            command = f"git commit -m \"$(cat <<'EOF'\n{body}\n\nEOF\n)\" && git push -u origin claude/7"
+            self.assertEqual(pushes(command), [(["-u", "origin", "claude/7"], None)], body)
+
+    def test_a_hash_after_an_escaped_break_is_not_a_comment(self):
+        for command in ("echo \\;#; git push origin main", "echo x\\&#&& git push origin main"):
+            self.assertIn((["origin", "main"], None), pushes(command), command)
+
     def test_an_unclosed_quote_yields_nothing(self):
         self.assertEqual(commands("git push 'unclosed"), [])
 
@@ -176,17 +216,6 @@ class InvocationTest(unittest.TestCase):
     def test_other_git_verbs_are_not_pushes(self):
         self.assertIsNone(guard_push.push_invocation(["git", "pull", "origin", "main"]))
 
-    def test_switched_branch(self):
-        cases = ((["git", "switch", "-c", "claude/9", "origin/main"], "claude/9"),
-                 (["git", "switch", "claude/7"], "claude/7"),
-                 (["git", "checkout", "-b", "claude/9"], "claude/9"),
-                 (["git", "checkout", "claude/7"], None),
-                 (["git", "switch", "-"], None),
-                 (["git", "switch", "--detach", "origin/main"], None),
-                 (["git", "status"], None))
-        for argv, expected in cases:
-            self.assertEqual(guard_push.switched_branch(argv), expected, argv)
-
 
 class DirectoryTest(unittest.TestCase):
     def setUp(self):
@@ -198,7 +227,7 @@ class DirectoryTest(unittest.TestCase):
         os.mkdir(self.other)
 
     def where(self, command):
-        return [os.path.normpath(where) for _, where, _ in guard_push.judged_pushes(command, self.work)]
+        return [os.path.normpath(where) for _, where in guard_push.judged_pushes(command, self.work)]
 
     def test_a_leading_literal_cd_is_followed(self):
         self.assertEqual(self.where("cd ../other && git push"), [self.other])
@@ -216,7 +245,8 @@ class DirectoryTest(unittest.TestCase):
                         "cd ../other | true; git push",
                         'cd "$PWD" && git push',
                         "cd -P ../other && git push",
-                        "cd ./no-such-dir; git push"):
+                        "cd ./no-such-dir; git push",
+                        "cd ../other && pushd ../work && git push"):
             self.assertEqual(self.where(command), [self.work], command)
 
     def test_git_dash_c_is_followed_only_to_a_literal_directory(self):
@@ -224,9 +254,6 @@ class DirectoryTest(unittest.TestCase):
         self.assertEqual(self.where('git -C "$PWD" push'), [self.work])
         self.assertEqual(self.where("git -C ../no-such-dir push"), [self.work])
 
-    def test_a_switch_names_the_branch_a_later_push_sends(self):
-        found = guard_push.judged_pushes("git switch -c claude/9 && git push -u origin HEAD", self.work)
-        self.assertEqual([switched for _, _, switched in found], ["claude/9"])
 
 
 class MainTest(unittest.TestCase):
@@ -254,10 +281,15 @@ class MainTest(unittest.TestCase):
     def test_claim_push_then_a_fetch_of_main_passes(self):
         self.assertEqual(self.run_main("git push -u origin claude/7\ngit fetch origin main")[0], 0)
 
-    def test_switching_before_a_plain_push_names_its_branch(self):
-        self.assertEqual(self.run_main("git switch -c claude/9 && git push -u origin HEAD",
-                                       ("main", "main"))[0], 0)
-        self.assertEqual(self.run_main("git switch main && git push", ("claude/7", "main"))[0], 2)
+    def test_a_plain_push_is_judged_on_the_branch_the_command_starts_on(self):
+        for command in ("git switch main && git pull --ff-only && git switch - && git push",
+                        "git switch main && git pull && git checkout claude/7 && git rebase main"
+                        " && git push --force-with-lease",
+                        "git checkout -b backup-7 && git checkout claude/7 && git push"
+                        " --force-with-lease origin HEAD"):
+            self.assertEqual(self.run_main(command, ("claude/7", "main"))[0], 0, command)
+        self.assertEqual(self.run_main("git checkout -b claude/9 && git checkout main && git push",
+                                       ("main", "main"))[0], 2)
 
     def test_a_subshell_cd_does_not_move_the_judged_repository(self):
         with tempfile.TemporaryDirectory() as base:
@@ -275,7 +307,7 @@ class MainTest(unittest.TestCase):
 
     def test_payloads_this_hook_does_not_read_pass(self):
         for text in ("not json", "[1, 2]", '{"tool_input": "git push origin main"}',
-                     '{"tool_input": {"command": ["git", "push"]}}'):
+                     '{"tool_input": {"command": ["git", "push"]}}', "[" * 100000):
             with mock.patch.object(sys, "stdin", io.StringIO(text)):
                 self.assertEqual(guard_push.main(), 0, text)
 

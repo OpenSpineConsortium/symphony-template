@@ -25,9 +25,9 @@ name: Board
 #
 # The checkout is the default branch itself, whatever event started the
 # run, so the board describes that branch's head (git rev-parse HEAD
-# below). The branch's name comes from the event's repository object; a
-# scheduled run carries no such object, and there GITHUB_REF_NAME is that
-# branch. A branch made or deleted starts a run too, so a claim shows the
+# below). The branch's name comes from the event's repository object,
+# which every trigger here carries, scheduled runs included;
+# GITHUB_REF_NAME stands behind it only as a fallback. A branch made or deleted starts a run too, so a claim shows the
 # moment it is pushed and a merged claim's branch leaves the board when it
 # goes. The job is skipped in the template repository itself, for a push
 # to any other branch, and for a pull request from a fork, whose token is

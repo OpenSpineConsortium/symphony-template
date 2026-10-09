@@ -16,15 +16,16 @@ the session: an unparseable command, a broken payload or a git that
 answers nothing all pass, and GitHub still refuses what matters.
 
 The command is read the way the shell would split it: a small scanner
-drops comments, joins a backslash-newline, cuts here-document bodies out
-and keeps all of that from happening inside quotes, and shlex then splits
-words and operators, a newline among them. A push is judged in the
-directory the session runs in, or in the one a leading literal `cd DIR &&`
-or a literal `git -C DIR` names. A cd anywhere else is not followed,
-since following it through a subshell, a pipeline or `cd -` needs a
-shell. A `git switch` or `git checkout -b` earlier in the command names
-the branch a later plain push sends, since a branch, unlike a directory,
-outlives any subshell.
+drops comments, joins a backslash-newline and cuts out each here-document
+body whose closing line it finds, keeping track of quotes and of the
+fresh quoting inside "$(...)" and backquotes; shlex then splits words and
+operators, a newline among them. A push is judged against the branch
+checked out when the command starts, in the directory the session runs
+in, or in the one a leading literal `cd DIR &&` or a literal `git -C DIR`
+names. Nothing the command does before the push is followed beyond that,
+neither another cd nor a git switch, since following either needs a
+shell; a refusal of a push that names no branch says so. A destination
+the shell would expand ($, a backquote) cannot be judged and passes.
 """
 
 import json
@@ -33,9 +34,20 @@ import shlex
 import subprocess
 import sys
 
-# Options of git push that take their value as a separate word; the value
-# must not be read as a refspec.
-VALUE_OPTIONS = {"--receive-pack", "--exec", "--repo", "-o", "--push-option"}
+# git push's long options (git push -h, git 2.43); git takes any
+# unambiguous prefix of one, so --dry is --dry-run and --mir is --mirror.
+PUSH_LONG_OPTIONS = (
+    "--all", "--atomic", "--branches", "--delete", "--dry-run", "--exec",
+    "--follow-tags", "--force", "--force-if-includes", "--force-with-lease",
+    "--ipv4", "--ipv6", "--mirror", "--no-verify", "--porcelain", "--progress",
+    "--prune", "--push-option", "--quiet", "--receive-pack",
+    "--recurse-submodules", "--repo", "--set-upstream", "--signed", "--tags",
+    "--thin", "--verbose", "--verify",
+)
+
+# Long options of git push that take their value as a separate word; the
+# value must not be read as a refspec. The short -o does too.
+VALUE_OPTIONS = {"--receive-pack", "--exec", "--repo", "--push-option"}
 
 # Global options of git itself that take a separate value, between "git"
 # and the verb, as in "git -C clone push".
@@ -49,12 +61,11 @@ OPERATOR_CHARS = "();<>|&\n"
 # here-document's delimiter word stops at one.
 WORD_BREAKS = " \t\n;&|()<>"
 
-# Options that name the branch a git switch or git checkout creates.
-SWITCH_NAME_OPTIONS = {"-c", "-C", "--create", "--force-create", "--orphan"}
-CHECKOUT_NAME_OPTIONS = {"-b", "-B"}
+# Commands that change the directory; a leading cd is followed only when
+# the command holds no other.
+DIRECTORY_CHANGES = ("cd", "pushd", "popd")
 
 LEADING_CD_ENDS = {"&&", ";", "\n"}
-DRY_RUN = {"-n", "--dry-run"}
 WHOLESALE = ("--all", "--branches", "--mirror")
 
 
@@ -82,71 +93,129 @@ def heredoc_delimiter(text, i):
     return "".join(word), dash, i
 
 
+def closing_line_end(text, i, delimiter, dash):
+    """The index just past the line that closes a here-document whose body
+    starts at i, or None when no line does."""
+    while i < len(text):
+        end = text.find("\n", i)
+        line = text[i:] if end == -1 else text[i:end]
+        following = len(text) if end == -1 else end + 1
+        if (line.lstrip("\t") if dash else line) == delimiter:
+            return following
+        i = following
+    return None
+
+
 def after_heredoc_bodies(text, start, pending):
     """Where the text resumes once the bodies of the pending here-documents,
-    which begin at start, have run one after another to their closing
-    lines. A body never closed runs to the end, as in the shell."""
+    which begin at start and close one after another, are cut out. A body
+    whose closing line never comes is left in place: its << may not have
+    opened a here-document at all (an arithmetic shift, a nested quote),
+    and reading its lines as commands keeps a real push in sight."""
     i = start
     for delimiter, dash in pending:
-        while i < len(text):
-            end = text.find("\n", i)
-            line = text[i:] if end == -1 else text[i:end]
-            i = len(text) if end == -1 else end + 1
-            if (line.lstrip("\t") if dash else line) == delimiter:
-                break
+        closed = closing_line_end(text, i, delimiter, dash)
+        if closed is None:
+            return i
+        i = closed
     return i
+
+
+class ShellScan:
+    """One pass over a command that turns it into plain shell for shlex: a
+    stack of open contexts keeps quoting right, and inside "...", a $( )
+    or a backquote opens a fresh context in which quotes, comments and
+    here-documents mean what they mean at the top."""
+
+    def __init__(self, command):
+        self.text = command.replace("\r\n", "\n")
+        self.out, self.pending, self.stack = [], [], []
+        self.i, self.word_start = 0, True
+
+    def run(self):
+        while self.i < len(self.text):
+            context = self.stack[-1] if self.stack else None
+            if context == "'":
+                self.single_quoted()
+            elif self.text[self.i] == "\\":
+                self.escaped()
+            elif context == '"':
+                self.double_quoted()
+            else:
+                self.unquoted(context)
+        return "".join(self.out)
+
+    def emit(self, piece, length, word_start):
+        self.out.append(piece)
+        self.i += length
+        self.word_start = word_start
+
+    def single_quoted(self):
+        if self.text[self.i] == "'":
+            self.stack.pop()
+        self.emit(self.text[self.i], 1, False)
+
+    def escaped(self):
+        if self.text.startswith("\n", self.i + 1):
+            self.i += 2
+        else:
+            self.emit(self.text[self.i:self.i + 2], 2, False)
+
+    def double_quoted(self):
+        if self.text[self.i] == '"':
+            self.stack.pop()
+            self.emit('"', 1, False)
+        elif self.text.startswith("$(", self.i) or self.text[self.i] == "`":
+            self.open_substitution()
+        else:
+            self.emit(self.text[self.i], 1, False)
+
+    def open_substitution(self):
+        opener = "$(" if self.text.startswith("$(", self.i) else "`"
+        self.stack.append(opener)
+        self.emit(opener, len(opener), True)
+
+    def unquoted(self, context):
+        text, i = self.text, self.i
+        ch = text[i]
+        if ch in "'\"":
+            self.stack.append(ch)
+            self.emit(ch, 1, False)
+        elif (ch == "`" and context == "`") or (ch == ")" and context == "$("):
+            self.stack.pop()
+            self.emit(ch, 1, False)
+        elif text.startswith("$(", i) or ch == "`":
+            self.open_substitution()
+        elif ch == "#" and self.word_start:
+            end = text.find("\n", i)
+            self.i = len(text) if end == -1 else end
+        elif text.startswith("<<<", i):
+            self.emit("<<<", 3, True)
+        elif text.startswith("<<", i):
+            self.heredoc_opener()
+        elif ch == "\n":
+            self.out.append(" \n ")
+            self.i = after_heredoc_bodies(text, i + 1, self.pending)
+            self.pending, self.word_start = [], True
+        else:
+            self.emit(ch, 1, ch in WORD_BREAKS)
+
+    def heredoc_opener(self):
+        delimiter, dash, end = heredoc_delimiter(self.text, self.i + 2)
+        if not delimiter or delimiter[:1].isdigit():
+            self.emit("<<", 2, True)
+            return
+        self.pending.append((delimiter, dash))
+        self.out.append(" << heredoc ")
+        self.i, self.word_start = end, True
 
 
 def plain_shell(command):
     """The command as plain shell for shlex: comments dropped, a
-    backslash-newline joined, here-document bodies cut out (a body is
-    data, and a line in it that reads like a push is not one), and each
-    newline set apart so it stands alone as an operator. None of this
-    happens inside quotes. A << whose word starts with a digit, as in
-    $((1<<2)), is a shift, not a here-document."""
-    text = command.replace("\r\n", "\n")
-    out, pending, quote, i = [], [], None, 0
-    while i < len(text):
-        ch = text[i]
-        if quote == "'":
-            out.append(ch)
-            quote = None if ch == "'" else quote
-            i += 1
-        elif ch == "\\":
-            if not text.startswith("\n", i + 1):
-                out.append(text[i:i + 2])
-            i += 2
-        elif quote == '"':
-            out.append(ch)
-            quote = None if ch == '"' else quote
-            i += 1
-        elif ch in "'\"":
-            out.append(ch)
-            quote = ch
-            i += 1
-        elif ch == "#" and (not out or out[-1][-1:] in WORD_BREAKS):
-            end = text.find("\n", i)
-            i = len(text) if end == -1 else end
-        elif text.startswith("<<<", i):
-            out.append("<<<")
-            i += 3
-        elif text.startswith("<<", i):
-            delimiter, dash, end = heredoc_delimiter(text, i + 2)
-            if delimiter[:1].isdigit() or not delimiter:
-                out.append("<<")
-                i += 2
-            else:
-                pending.append((delimiter, dash))
-                out.append(" << heredoc ")
-                i = end
-        elif ch == "\n":
-            out.append(" \n ")
-            i = after_heredoc_bodies(text, i + 1, pending)
-            pending = []
-        else:
-            out.append(ch)
-            i += 1
-    return "".join(out)
+    backslash-newline joined, the here-document bodies that close cut out
+    (a body is data, and a line in it that reads like a push is not one),
+    and each newline set apart so it stands alone as an operator."""
+    return ShellScan(command).run()
 
 
 def shell_tokens(command):
@@ -221,133 +290,137 @@ def push_invocation(argv):
     return None
 
 
-def switched_branch(argv):
-    """The branch a git switch, or a git checkout -b, leaves checked out;
-    None for any other command or when the branch is not certain."""
-    if not is_git(argv) or len(argv) < 3 or argv[1] not in ("switch", "checkout"):
-        return None
-    rest = argv[2:]
-    names = SWITCH_NAME_OPTIONS if argv[1] == "switch" else CHECKOUT_NAME_OPTIONS
-    for option, value in zip(rest, rest[1:]):
-        if option in names:
-            return value
-    if argv[1] == "checkout" or "--detach" in rest or "-d" in rest:
-        return None
-    words = [word for word in rest if not word.startswith("-")]
-    return words[0] if words else None
-
-
 def literal_directory(word, base):
     """The directory a literal path word names, or None when the word
     needs a shell to expand it ($, a backquote), is an option, or names
     no directory."""
     if not word or word.startswith("-") or any(ch in word for ch in "$`"):
         return None
-    path = os.path.join(base, os.path.expanduser(word))
-    return path if os.path.isdir(path) else None
+    try:
+        path = os.path.join(base, os.path.expanduser(word))
+        return path if os.path.isdir(path) else None
+    except ValueError:
+        return None
 
 
 def starting_directory(tokens, cwd):
     """The directory the command's pushes run in: the one a leading
     literal `cd DIR &&` (or `cd DIR;`) names, when the command holds no
-    other cd; otherwise the session's own."""
+    other cd, pushd or popd; otherwise the session's own."""
     if len(tokens) < 3 or tokens[0] != "cd" or tokens[2] not in LEADING_CD_ENDS:
         return cwd
-    if tokens.count("cd") != 1:
+    if sum(token in DIRECTORY_CHANGES for token in tokens) != 1:
         return cwd
     return literal_directory(tokens[1], cwd) or cwd
 
 
 def judged_pushes(command, cwd):
-    """Each git push in the command, with the directory it runs in and the
-    branch a git switch before it left checked out there (None: ask git)."""
+    """Each git push in the command with the directory it runs in."""
     tokens = shell_tokens(command) or []
     base = starting_directory(tokens, cwd)
-    found, switched = [], None
+    found = []
     for argv in commands_from(tokens):
-        branch = switched_branch(argv)
-        if branch:
-            switched = branch
-            continue
         invocation = push_invocation(argv)
-        if invocation is None:
-            continue
-        args, directory = invocation
-        where = (literal_directory(directory, base) if directory else None) or base
-        found.append((args, where, switched if where == base else None))
+        if invocation is not None:
+            args, directory = invocation
+            where = (literal_directory(directory, base) if directory else None) or base
+            found.append((args, where))
     return found
 
 
-def is_short_cluster_with_f(arg):
-    """Whether a cluster of short options, as in -uf, carries -f. An -o
-    cluster is left alone, since what follows the o is its value."""
-    return (arg.startswith("-") and not arg.startswith("--") and len(arg) > 2
-            and not arg.startswith("-o") and "f" in arg[1:])
+def long_option(arg):
+    """The git push long option an argument names, its =value set aside;
+    git takes any unambiguous prefix, so --dry names --dry-run."""
+    name = arg.split("=", 1)[0]
+    if name in PUSH_LONG_OPTIONS:
+        return name
+    matches = [option for option in PUSH_LONG_OPTIONS if option.startswith(name)]
+    return matches[0] if len(matches) == 1 else name
+
+
+def short_option_letters(arg):
+    """The letters of a cluster of short options, as in -nv, and whether
+    its last letter is an o that takes the next word as its value; what
+    follows an o inside the cluster is that value, not more letters."""
+    letters, _, value = arg[1:].partition("o")
+    takes_next = "o" in arg[1:] and not value
+    return set(letters), takes_next
 
 
 def push_options(args):
-    """The options of a git push that matter here, as a set of names, and
-    its positional words: the remote, then the refspecs."""
+    """The options of a git push that matter here, as a set of long names
+    (-f counts as --force, -n as --dry-run), and its positional words: the
+    remote, then the refspecs."""
     seen, positionals, skip = set(), [], False
     for arg in args:
         if skip:
             skip = False
-        elif arg in VALUE_OPTIONS:
-            skip = True
-        elif arg.startswith("--force-with-lease"):
-            seen.add("lease")
-        elif arg in ("-f", "--force") or is_short_cluster_with_f(arg):
-            seen.add("force")
-        elif arg in DRY_RUN or arg in WHOLESALE or arg == "--tags":
-            seen.add(arg)
-        elif not arg.startswith("-"):
+        elif arg.startswith("--"):
+            option = long_option(arg)
+            seen.add(option)
+            skip = option in VALUE_OPTIONS and "=" not in arg
+        elif arg.startswith("-") and len(arg) > 1:
+            letters, skip = short_option_letters(arg)
+            seen.update(name for letter, name in (("f", "--force"), ("n", "--dry-run"))
+                        if letter in letters)
+        else:
             positionals.append(arg)
     if any(spec.startswith("+") for spec in positionals[1:]):
-        seen.add("force")
+        seen.add("--force")
     return seen, positionals
 
 
 def destinations(positionals, current_branch, tags_only):
-    """The branch names a push writes: each refspec's destination, or the
-    current branch when no refspec is given and --tags is not either."""
-    names = []
+    """The branches a push writes, each with whether it was named or only
+    implied by the branch checked out (no refspec, HEAD or @). A name the
+    shell would expand ($, a backquote) cannot be judged and is left out."""
+    found = []
     for spec in positionals[1:]:
         name = spec.lstrip("+")
         if ":" in name:
             name = name.split(":", 1)[1]
         name = name.removeprefix("refs/heads/")
-        if name in ("", "HEAD"):
-            name = current_branch
-        if name:
-            names.append(name)
+        implied = name in ("", "HEAD", "@")
+        name = current_branch if implied else name
+        if name and not any(ch in name for ch in "$`"):
+            found.append((name, implied))
     if not positionals[1:] and current_branch and not tags_only:
-        names.append(current_branch)
-    return names
+        found.append((current_branch, True))
+    return found
+
+
+def default_branch_refusal(name, implied):
+    reason = (f"a push to {name} is refused: the default branch takes only pull "
+              "requests (.claude/rules/board.md)")
+    if implied:
+        reason += (f". The push names no branch, and {name} was checked out when this "
+                   "command started; if the command switches branches first, name the "
+                   "branch you push, as in git push -u origin claude/N")
+    return reason
 
 
 def refusal(args, current_branch, default_branch):
     """Why this push is refused, or None when it is allowed."""
     seen, positionals = push_options(args)
-    if seen & DRY_RUN:
+    if "--dry-run" in seen:
         return None
     wholesale = next((option for option in WHOLESALE if option in seen), None)
     if wholesale:
         return (f"a push with {wholesale} moves branches wholesale; "
                 "push your own claim branch alone (.claude/rules/board.md)")
-    if "force" in seen:
+    if "--force" in seen:
         return ("a forced push (--force, -f or a +refspec) overwrites history another account "
                 "may hold; the one forced push the protocol allows is --force-with-lease on "
                 "your own claude/ branch after a rebase (.claude/rules/board.md)")
     names = destinations(positionals, current_branch, "--tags" in seen)
-    for name in names:
+    for name, implied in names:
         if name == default_branch:
-            return (f"a push to {name} is refused: the default branch takes only "
-                    "pull requests (.claude/rules/board.md)")
+            return default_branch_refusal(name, implied)
         if name == "board":
             return ("a push to board is refused: only the board workflow writes that "
                     "branch (.claude/rules/board.md)")
-    strays = [name for name in names if not name.startswith("claude/")]
-    if "lease" in seen and strays:
+    strays = [name for name, _ in names if not name.startswith("claude/")]
+    if "--force-with-lease" in seen and strays:
         return (f"--force-with-lease to {', '.join(strays)} is refused: a forced push "
                 "is for your own claude/ branch only (.claude/rules/board.md)")
     return None
@@ -389,14 +462,14 @@ def command_and_cwd(payload):
 def main():
     try:
         payload = json.load(sys.stdin)
-    except ValueError:
+    except (ValueError, RecursionError):
         return 0
     command, cwd = command_and_cwd(payload)
     if not command or "push" not in command:
         return 0
-    for args, where, switched in judged_pushes(command, cwd):
+    for args, where in judged_pushes(command, cwd):
         current, default = branches(where)
-        reason = refusal(args, switched or current, default)
+        reason = refusal(args, current, default)
         if reason:
             print(reason, file=sys.stderr)
             return 2
