@@ -895,12 +895,31 @@ class TheSessionDriver(RunnerCase):
         handle = driver.start(job)
         (Path(job.workspace) / "patch.txt").write_text("\n" + PATCHES["agent1"] + "\n\n")
         (Path(job.workspace) / ".coordbench-done").touch()
+        # The marker's own time is when the agent stopped, however late
+        # finish looks at it.
+        os.utime(Path(job.workspace) / ".coordbench-done", (1_700_000_000, 1_700_000_000))
         outcome = driver.wait(handle)
         self.assertEqual((outcome.status, outcome.patch), ("Submitted", PATCHES["agent1"]))
+        self.assertEqual(outcome.ended_at, 1_700_000_000)
         # A subagent leaves no result event, so its durations are unknown.
         self.assertEqual((outcome.duration_ms, outcome.api_duration_ms), (None, None))
         logged = json.loads(Path(job.log_path).read_text().splitlines()[-1])
         self.assertEqual(logged["status"], "Submitted")
+
+    def test_an_agents_phase_ends_when_the_driver_says_the_agent_stopped(self):
+        """finish may run long after the marker appeared; the recorded wall
+        time is the agent's, not the delay."""
+        started = runner.now()
+        plan = {"agents": [{"id": "agent1", "started_at": started.isoformat()}], "timings": []}
+
+        class Stub:
+            def wait(self, handle):
+                return drivers.AgentOutcome(status="Submitted", ended_at=started.timestamp() + 90)
+
+        runner.wait_agents(plan, Stub(), {"agent1": {}})
+        record = plan["timings"][0]
+        self.assertEqual((record["phase"], record["agent"]), ("agent", "agent1"))
+        self.assertAlmostEqual(record["seconds"], 90, places=3)
 
     def test_wait_gives_up_at_the_deadline(self):
         driver = drivers.SessionDriver(poll_seconds=0.01)
