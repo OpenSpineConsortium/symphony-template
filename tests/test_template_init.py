@@ -169,12 +169,14 @@ class Labels(unittest.TestCase):
         self.assertFalse(template_init.already_exists({"errors": [{"code": "invalid"}]}))
         self.assertFalse(template_init.already_exists(None))
 
-    def test_the_setup_issue_links_the_six_pages(self):
+    def test_the_setup_issue_links_the_eight_pages(self):
         body = template_init.setup_issue_body("octo/widgets", "main")
-        for page in ("docs/setup/github.md", "docs/setup/claude-project.md", "docs/agents/routines/worker.md", "docs/agents/routines/coordinator.md", "docs/project.md", "docs/agents/OWNERSHIP.md"):
+        for page in ("docs/setup/github.md", "docs/setup/claude-action.md", "docs/setup/claude-project.md", "docs/agents/routines/worker.md", "docs/agents/routines/coordinator.md", "docs/project.md", "docs/agents/OWNERSHIP.md", "docs/setup/tiers.md"):
             self.assertIn(f"https://github.com/octo/widgets/blob/main/{page}", body)
         self.assertIn("bash scripts/check.sh", body)
-        self.assertEqual(body.count("- [ ]"), 5)
+        self.assertIn("ruleset-main.json", body)
+        self.assertIn("/install-github-app", body)
+        self.assertEqual(body.count("- [ ]"), 6)
 
 
 if __name__ == "__main__":

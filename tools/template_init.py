@@ -186,15 +186,19 @@ def create_labels(token, repo):
 
 def setup_issue_body(repo, default_branch):
     """The checklist the person works through after the template has landed;
-    the links are absolute because an issue body is not in the tree."""
+    the links are absolute because an issue body is not in the tree. The
+    first two boxes are the automated forms: an imported ruleset and one
+    OAuth flow; only the two toggles GitHub reserves for a person remain
+    typed by hand."""
     base = f"https://github.com/{repo}/blob/{default_branch}"
     return "\n".join([
         "This repository was made from the SDLC template. Finish setting it up:",
         "",
-        f"- [ ] Protect the default branch `{default_branch}` ([docs/setup/github.md]({base}/docs/setup/github.md)).",
+        f"- [ ] Import the branch rules: Settings, Rules, Rulesets, Import a ruleset, pick docs/setup/ruleset-main.json from your clone; then turn on \"Automatically delete head branches\" (General) and secret scanning with push protection (Code security) ([docs/setup/github.md]({base}/docs/setup/github.md)).",
+        f"- [ ] One OAuth flow for the Claude side: from Claude Code signed in as the main account, run /install-github-app and pick this repository; it installs the Claude GitHub App and writes the secret CLAUDE_CODE_OAUTH_TOKEN, which turns on @claude ([docs/setup/claude-action.md]({base}/docs/setup/claude-action.md)).",
         f"- [ ] Make the thin Project for each Claude account ([docs/setup/claude-project.md]({base}/docs/setup/claude-project.md)).",
-        f"- [ ] Make the worker routine in the main account's Project ([docs/agents/routines/worker.md]({base}/docs/agents/routines/worker.md)), and the coordinator ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)) once a second account joins.",
-        f"- [ ] Fill in [docs/project.md]({base}/docs/project.md) and [docs/agents/OWNERSHIP.md]({base}/docs/agents/OWNERSHIP.md).",
+        f"- [ ] Make the worker routine in the main account's Project ([docs/agents/routines/worker.md]({base}/docs/agents/routines/worker.md)), or set the repository variable CLAUDE_WORKER to true to run it from Actions instead; the coordinator ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)) joins once a second account does.",
+        f"- [ ] Fill in [docs/project.md]({base}/docs/project.md) and [docs/agents/OWNERSHIP.md]({base}/docs/agents/OWNERSHIP.md), and pick the spending profile in [docs/setup/tiers.md]({base}/docs/setup/tiers.md).",
         "- [ ] Run `bash scripts/check.sh` once locally.",
         "",
         "Close this issue when every box is ticked.",

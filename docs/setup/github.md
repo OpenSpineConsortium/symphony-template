@@ -4,7 +4,9 @@ A template repository copies files only. The new repository gets none of the tem
 
 ## 1. Protect the default branch
 
-{{DEFAULT_BRANCH}} takes only pull requests. Under Branches (a branch protection rule) or under Rules (a ruleset), for {{DEFAULT_BRANCH}} and that branch only:
+{{DEFAULT_BRANCH}} takes only pull requests, and the template ships the whole rule as a file: under Rules, Rulesets, New ruleset, Import a ruleset, pick docs/setup/ruleset-main.json from your clone. It targets ~DEFAULT_BRANCH (whatever yours is named), requires a pull request and the check named "check" on an up-to-date branch, and blocks force pushes and deletions. Imported, you are done with this step.
+
+Writing the same rule by hand, under Branches or Rules, for {{DEFAULT_BRANCH}} and that branch only:
 
 - Require a pull request before merging.
 - Require status checks to pass, and pick the check named "check", the job .github/workflows/ci.yml runs on every pull request. It appears in the list once the first pull request has run it; if it is not in the list yet, type the name check, which both a ruleset and a branch protection rule accept.
@@ -23,7 +25,7 @@ template-init created five labels: todo (the queue), claimed, in-review, blocker
 
 ## 3. Install the Claude GitHub App
 
-Install the Claude GitHub App on the repository and grant it this repository; every thread of a claude.ai Project that works here needs it. The installation starts from claude.ai/code: when you link the repository to a Project (docs/setup/claude-project.md, step 2), Claude sends you to GitHub to install the app and pick this repository. Afterwards it is listed under Integrations, GitHub Apps.
+Install the Claude GitHub App on the repository and grant it this repository; every thread of a claude.ai Project that works here needs it. One flow does this and the @claude secret together: from Claude Code signed in as the main account, run `/install-github-app` and pick this repository; the browser OAuth it opens installs the app and writes the repository secret CLAUDE_CODE_OAUTH_TOKEN (docs/setup/claude-action.md). The installation can also start from claude.ai/code: when you link the repository to a Project (docs/setup/claude-project.md, step 2), Claude sends you to GitHub to install the app and pick this repository; the secret then takes the by-hand path on docs/setup/claude-action.md. Afterwards the app is listed under Integrations, GitHub Apps.
 
 ## 4. The coordinator routine and its trigger
 
