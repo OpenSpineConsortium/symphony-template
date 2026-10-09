@@ -49,16 +49,39 @@ needs no more work.
    produced findings that could not be verified before usage ran out:
    re-run that one lens cheaply (one agent writes a "pair-review" arm from
    the README alone and reports friction) and fix what it finds.
-2. claude/11 (#12, issue #11): cut the push guard rewrite back to the
+2. Make the owner's checklist (docs/setup/owner-checklist.md) as close to
+   one click as GitHub and Claude allow, and keep the page in step:
+   - scripts/setup-repo.sh, run once by the owner on their own computer
+     with the GitHub CLI signed in (`gh auth login`): imports
+     docs/setup/ruleset-main.json, turns on delete-branch-on-merge,
+     auto-merge, secret scanning and push protection, creates the seven
+     labels, sets the optional variables it is asked for, and stores the
+     repository secret CLAUDE_CODE_OAUTH_TOKEN straight from
+     `claude setup-token` without the token ever being shown or saved.
+     The cloud session cannot run it: it has no gh and no admin rights.
+   - Preshipped settings: a template copies files, never settings, so
+     check and document the ways settings can still arrive with zero
+     steps: organization rulesets and organization Actions secrets and
+     variables (every repository OpenSpineConsortium makes, copies
+     included, inherits them; say which GitHub plan each needs), and
+     settings-as-code (.github/settings.yml read by a settings app,
+     which is a new dependency, so an issue first).
+   - template-init's setup issue: one link per remaining step, prefilled
+     where GitHub allows (settings pages, the app install, new-secret
+     and new-variable pages).
+   - Claude side: /install-github-app already does the app and the
+     secret in one OAuth flow; the cloud-environment variable and the
+     claude.ai Project have no API, so they stay links with exact steps.
+3. claude/11 (#12, issue #11): cut the push guard rewrite back to the
    newline fix with its tests and finish that pull request, or close it
    and issue #11 with a note that branch protection covers the case.
    Decide by whether the newline fix stands alone in under ~100 lines.
-3. Session-driver pilot, needs no token: run one pair (pallets_click 2068,
+4. Session-driver pilot, needs no token: run one pair (pallets_click 2068,
    features 1,6) through coordbench with --driver session for the arms
    coop and team: `run.py prepare`, spawn one subagent per prompt file
    (Workflow tool), `run.py finish`. This is the owner's original ask:
    every arm evaluated by one session's own subagents.
-4. When the owner has added CLAUDE_CODE_OAUTH_TOKEN (docs/setup/
+5. When the owner has added CLAUDE_CODE_OAUTH_TOKEN (docs/setup/
    owner-checklist.md, section 2) and opened a new session: the pilot on
    pallets_click 2068 with CooperBench's own runner (experiment/run_arms.sh)
    and with coordbench's claude-cli driver for the same arms, to measure
@@ -66,20 +89,20 @@ needs no more work.
    coop, coop-git, team, sdlc) on the 42 gradable pairs, one task at a
    time; experiment/report.py; a second seed on the pairs where arms
    disagree.
-5. Write up the result for the owner: does the PR-gated way of working
+6. Write up the result for the owner: does the PR-gated way of working
    (the sdlc arm, this template's protocol) beat or trail shared
    collaboration (coop-git, team) and solo, at what usage. That answers
    the question the template was built for.
-6. Before #13 merges: condense or delete docs/history/experiment-research/;
+7. Before #13 merges: condense or delete docs/history/experiment-research/;
    ask the owner whether experiment/ (with coordbench) should move to a
    repository of its own, since everything on main ships in every copy of
    the template; then delete the claim file, mark ready, merge.
-7. Team mode live run on a repository made from the template, once the
+8. Team mode live run on a repository made from the template, once the
    owner has set CLAUDE_WORKER, CLAUDE_TEAM and auto-merge (checklist,
    section 4).
-8. Re-make the test repository (sdlc-template-test) from the current
+9. Re-make the test repository (sdlc-template-test) from the current
    template.
-9. Owner's own steps, which no session can do: docs/setup/owner-checklist.md.
+10. Owner's own steps, which no session can do: docs/setup/owner-checklist.md.
 
 ## Decisions
 

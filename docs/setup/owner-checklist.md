@@ -6,6 +6,28 @@ built it. Sessions cannot do these steps themselves: they need the owner's
 own accounts. Never paste a token into a chat or commit one to the
 repository; each one goes only where this page says.
 
+## One-click links
+
+Each opens the exact page; the sections below say what to do there.
+
+- Install the Claude GitHub App: https://github.com/apps/claude/installations/new
+- Connect GitHub to Claude: https://claude.ai/settings/connectors
+- Claude Code in the cloud (sessions, environment settings): https://claude.ai/code
+- How cloud environments, variables and network access work: https://code.claude.com/docs/en/cloud-environments
+- The repository's rulesets (New ruleset, Import): https://github.com/OpenSpineConsortium/sdlc-template/settings/rules
+- The repository's general settings (auto-delete, auto-merge): https://github.com/OpenSpineConsortium/sdlc-template/settings
+- Secret scanning and push protection: https://github.com/OpenSpineConsortium/sdlc-template/settings/security_analysis
+- New repository secret: https://github.com/OpenSpineConsortium/sdlc-template/settings/secrets/actions/new
+- New repository variable: https://github.com/OpenSpineConsortium/sdlc-template/settings/variables/actions/new
+- Organization secrets and variables (shared by every repository of the organization): https://github.com/organizations/OpenSpineConsortium/settings/secrets/actions
+- Organization rulesets (applied to every repository of the organization): https://github.com/organizations/OpenSpineConsortium/settings/rules
+- claude.ai Projects: https://claude.ai/projects
+
+A template copies files only, never settings, secrets or variables. The
+next session's checkpoint (claude/10's .claude/session.md, task 2) turns
+the GitHub steps into one command the owner runs once, and checks which
+settings an organization can set once for every repository it makes.
+
 ## 1. To continue the work on a new Claude account
 
 1. **Claude plan.** A Pro or Max subscription on the new account. No API
