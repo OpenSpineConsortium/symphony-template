@@ -1,10 +1,11 @@
 # Session checkpoint
 
-Written 2026-10-09 by the main account's cloud session, before the owner
-moved the work to another account to save this one's usage. Read this
-first, then docs/history/experiment-research/README.md.
+Written 2026-10-09 by the main account's cloud session. Read this first,
+then experiment/README.md and docs/history/experiment-research/README.md.
 
 ## Completed work
+
+- Merged to main: #15, team mode (#14), with the fixes from its review.
 
 - Merged to main, in order: #3 (push guard hook, edit check, permission
   allowlist, /board, tidy workflow, @claude on the subscription OAuth
@@ -21,34 +22,44 @@ first, then docs/history/experiment-research/README.md.
 
 ## Current state
 
-- #10, the experiment harness: claimed on claude/10 with a draft pull
-  request. Only research so far: docs/history/experiment-research/ holds
-  the summary, every claim with its source and verdicts (claims.json) and
-  the workflow script. The run was stopped part way: CooperBench and the
-  related evidence are fully verified, GitHub mechanics partly, Claude
-  mechanics not at all. Nothing of the harness is built.
-- #11, the push guard's newline hole: claimed on claude/11 with a draft
-  pull request (#12) that carries a rewrite as work in progress and every
-  finding of four adversarial rounds. main still has the guard from #3,
-  which lets a push to main through when it sits on a later line of a
-  multi-line command; branch protection still stops it on GitHub.
-- No background workflow is running; both were stopped.
+- Team mode (#14) is merged to main (#15): a lead plans an epic into
+  pre-assigned sub-issues, members work them in parallel and land by
+  auto-merge, the lead unblocks and integrates. A review in three lenses
+  with two skeptics per finding confirmed 13 defects; all are fixed in
+  the merged code. Not yet run live on a repository.
+- #10, on claude/10 (draft pull request #13), now has experiment/: a kit
+  that runs CooperBench's four-arm ablation in one Claude Code cloud
+  session with CooperBench's own runner and scorer under Docker inside
+  the session's container. Checked in this session with no Claude usage:
+  dockerd runs; images pull from mirror.gcr.io (Docker Hub answers 429);
+  the overlay adds claude, the redis client and the proxy CA; the gold
+  patches grade (click 2068 12/12, jinja 1621 10/10); a team run with a
+  shared remote came up whole and stopped only at the API's 401 for a
+  placeholder token. experiment/README.md has the steps, cost and
+  differences from the authors' run.
+- The kit needs CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) in the
+  cloud environment's settings, and a new session started after it is
+  added. Nothing has spent usage on the experiment yet.
+- #11 (draft #12) is unchanged: the guard rewrite as work in progress.
 
 ## Remaining tasks
 
-1. #10: decide the arms with the owner in light of the research (see
-   below), then build: a task suite with acceptance tests, a seeding
-   tool, per-arm worker prompts and workflow, auto-merge for the PR-gated
-   arm, usage capture from claude-code-action, and a deterministic report
-   tool. Finish verifying the Claude-side mechanics first, cheaply.
-2. #11: cut the rewrite back to the newline fix alone with its tests, or
-   close the issue and rely on branch protection.
-3. Owner's settings, by hand: import docs/setup/ruleset-main.json, turn on
+1. Owner: create the token, add it to the environment as
+   CLAUDE_CODE_OAUTH_TOKEN, start a new session on this repository.
+2. In that session: `bash experiment/setup.sh`, then the pilot on
+   pallets_click/2068 (prepare_task.sh, run_arms.sh), read the four
+   summary.json files and the usage it took, and only then the rest of
+   the flash subset, one task at a time.
+3. A report tool that puts the four arms' results side by side per pair,
+   with the authors' numbers for comparison.
+4. #11: cut the rewrite back to the newline fix with its tests, or close
+   it and rely on branch protection.
+5. Owner's settings, by hand: import docs/setup/ruleset-main.json, turn on
    "Automatically delete head branches", secret scanning and push
-   protection; run /install-github-app as the main account to turn on
-   @claude; optionally set CLAUDE_WORKER=true.
-4. Re-make the test repository (sdlc-template-test) from the current
-   template rather than back-porting; it came from an older layer.
+   protection; run /install-github-app; for team mode set CLAUDE_WORKER
+   and CLAUDE_TEAM and allow auto-merge.
+6. Re-make the test repository (sdlc-template-test) from the current
+   template.
 
 ## Decisions
 
