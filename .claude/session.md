@@ -38,11 +38,48 @@ docs/setup/owner-checklist.md.
 
 ## Remaining tasks
 
-1. Fix experiment/coordbench/REVIEW.md, blocking ones first, then delete it; run check.sh; push.
-2. Owner: every authorization, token, secret, variable and setting is in docs/setup/owner-checklist.md (for the experiment: `claude setup-token`, CLAUDE_CODE_OAUTH_TOKEN as an environment variable of the cloud environment, a new session).
-3. Pilot on pallets_click/2068: CooperBench's runner (experiment/run_arms.sh) and coordbench (run.py) for the same arm, to calibrate the harness; then the arms on the 42 pairs; experiment/report.py.
-4. #11: cut the guard rewrite to the newline fix, or close it.
-5. Owner's settings by hand: import docs/setup/ruleset-main.json, auto-delete head branches, secret scanning and push protection, /install-github-app; for team mode CLAUDE_WORKER, CLAUDE_TEAM and auto-merge.
+A session told to "continue" works through ALL of these, in order, across
+both open pull requests; it does not stop after the first. The flash
+gradeability survey is finished (experiment/README.md has its table) and
+needs no more work.
+
+1. claude/10 (#13): fix the 28 findings in experiment/coordbench/REVIEW.md,
+   blocking ones first; tests with each fix; then delete REVIEW.md. The
+   review's usability lens (a newcomer writing a new arm from the README)
+   produced findings that could not be verified before usage ran out:
+   re-run that one lens cheaply (one agent writes a "pair-review" arm from
+   the README alone and reports friction) and fix what it finds.
+2. claude/11 (#12, issue #11): cut the push guard rewrite back to the
+   newline fix with its tests and finish that pull request, or close it
+   and issue #11 with a note that branch protection covers the case.
+   Decide by whether the newline fix stands alone in under ~100 lines.
+3. Session-driver pilot, needs no token: run one pair (pallets_click 2068,
+   features 1,6) through coordbench with --driver session for the arms
+   coop and team: `run.py prepare`, spawn one subagent per prompt file
+   (Workflow tool), `run.py finish`. This is the owner's original ask:
+   every arm evaluated by one session's own subagents.
+4. When the owner has added CLAUDE_CODE_OAUTH_TOKEN (docs/setup/
+   owner-checklist.md, section 2) and opened a new session: the pilot on
+   pallets_click 2068 with CooperBench's own runner (experiment/run_arms.sh)
+   and with coordbench's claude-cli driver for the same arms, to measure
+   how much the harness itself moves the scores; then all five arms (solo,
+   coop, coop-git, team, sdlc) on the 42 gradable pairs, one task at a
+   time; experiment/report.py; a second seed on the pairs where arms
+   disagree.
+5. Write up the result for the owner: does the PR-gated way of working
+   (the sdlc arm, this template's protocol) beat or trail shared
+   collaboration (coop-git, team) and solo, at what usage. That answers
+   the question the template was built for.
+6. Before #13 merges: condense or delete docs/history/experiment-research/;
+   ask the owner whether experiment/ (with coordbench) should move to a
+   repository of its own, since everything on main ships in every copy of
+   the template; then delete the claim file, mark ready, merge.
+7. Team mode live run on a repository made from the template, once the
+   owner has set CLAUDE_WORKER, CLAUDE_TEAM and auto-merge (checklist,
+   section 4).
+8. Re-make the test repository (sdlc-template-test) from the current
+   template.
+9. Owner's own steps, which no session can do: docs/setup/owner-checklist.md.
 
 ## Decisions
 
