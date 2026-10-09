@@ -82,14 +82,21 @@ def main(argv=None):
             file=sys.stderr,
         )
         return 2
-    existing = path.read_text(encoding="utf-8", newline="") if path.is_file() else None
+    # open() with newline="" keeps the file's own line endings on every
+    # Python this project supports; Path.read_text() takes newline only from
+    # 3.13, and GitHub's runners carry 3.12.
+    existing = None
+    if path.is_file():
+        with open(path, encoding="utf-8", newline="") as handle:
+            existing = handle.read()
     try:
         updated = upsert_marked_section(existing, section)
     except ValueError as problem:
         print(f"{path}: {problem}", file=sys.stderr)
         return 1
     if updated != existing:
-        path.write_text(updated, encoding="utf-8", newline="")
+        with open(path, "w", encoding="utf-8", newline="") as handle:
+            handle.write(updated)
     print(f"{path}: section {outcome(existing, updated)}")
     return 0
 
