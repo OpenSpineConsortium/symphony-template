@@ -20,7 +20,7 @@ ORG = ROOT / "docs" / "setup" / "ruleset-org.json"
 GH_CALLS = (
     "rulesets", "--input", "repo edit", "--delete-branch-on-merge", "--enable-auto-merge",
     "--enable-secret-scanning", "--enable-secret-scanning-push-protection",
-    "label create", "variable set", "secret set",
+    "label create", "variable set", "secret set", "codeowners/errors",
 )
 
 

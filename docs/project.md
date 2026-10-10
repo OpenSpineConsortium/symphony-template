@@ -30,6 +30,6 @@ Every account's Project uses the same model and the same effort, so the work rea
 
 ## Owners
 
-- Repository owner: {{OWNER}}, who merges to {{DEFAULT_BRANCH}}; .github/CODEOWNERS names the same login.
+- Repository owner: {{OWNER}}, who merges to {{DEFAULT_BRANCH}}; .github/CODEOWNERS names {{CODE_OWNER}}, the owner's own login, or in an organization's copy the person who made the copy, because GitHub asks a user or a team for review and never an organization (docs/setup/github.md, section 7).
 - Main Claude account: the first account, whose Project runs the worker routine (docs/agents/routines/worker.md) and, once a second account joins, the coordinator (docs/agents/routines/coordinator.md); its label is account:main.
 - Other accounts: none yet. Each gets a label of its own (docs/setup/github.md, Labels) and a row in docs/agents/OWNERSHIP.md.
