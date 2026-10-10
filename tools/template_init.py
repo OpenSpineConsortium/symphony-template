@@ -3,8 +3,11 @@
 "Use this template" copies the files with their placeholders still in them.
 This script, run once by .github/workflows/template-init.yml on the first
 push, fills the six placeholders in every text file outside
-.github/workflows/, removes the marker folder .template/ and, with a token,
-makes the labels the board uses and opens the "Set up this project" issue.
+.github/workflows/, removes the marker folder .template/, starts the copy
+with a blank checkpoint (.claude/session.md, and the decisions and
+constraints in the block at the end of CLAUDE.md, which are the template's
+own) and, with a token, makes the labels the board uses and opens the "Set
+up this project" issue.
 The code owner .github/CODEOWNERS names is the owner in a personal copy and,
 in an organization's copy, the user whose push made it, read from the event
 that started the run: GitHub asks a user or a team for review, never an
@@ -28,6 +31,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+
+import marked_section
 
 API = "https://api.github.com"
 API_VERSION = "2022-11-28"
@@ -195,6 +200,51 @@ def reset_checkpoint(root):
         return []
     path.write_text(BLANK_CHECKPOINT, encoding="utf-8")
     return [CHECKPOINT]
+
+
+# The block at the end of CLAUDE.md, between the cswap markers, holds the
+# template's own durable decisions and constraints, which are about building
+# the template and not about a copy. A copy starts with the block's empty
+# form: its heading and intro kept, and each list holding the one line the
+# checkpoint skill (.claude/skills/checkpoint) writes for an empty list.
+CLAUDE_MD = "CLAUDE.md"
+BLANK_LISTS = "### Durable decisions\n- (none recorded)\n### Constraints\n- (none recorded)"
+
+
+def blank_block(block):
+    """The checkpoint block with both lists emptied. What stands before its
+    first ### heading, the begin marker, the heading and the intro, is kept
+    as it is; a block with no such heading keeps all it holds, and the
+    lists follow it."""
+    cut = block.find("\n### ")
+    if cut != -1:
+        head = block[:cut + 1]
+    else:
+        head = block[:-len(marked_section.MARK_END)].rstrip("\n") + "\n\n"
+    return head + BLANK_LISTS + "\n" + marked_section.MARK_END
+
+
+def reset_checkpoint_block(root):
+    """Empty the lists of CLAUDE.md's checkpoint block through the block's
+    own helper, which keeps the rest of the file byte for byte and a CRLF
+    file CRLF; the path when it changed. A file without the marker pair is
+    left alone: the docs check reports it."""
+    path = root / CLAUDE_MD
+    if not path.is_file():
+        return []
+    with open(path, encoding="utf-8", newline="") as handle:
+        text = handle.read()
+    begin = text.find(marked_section.MARK_BEGIN)
+    end = text.find(marked_section.MARK_END, begin) if begin != -1 else -1
+    if begin == -1 or end == -1:
+        return []
+    block = text[begin:end + len(marked_section.MARK_END)].replace("\r\n", "\n")
+    updated = marked_section.upsert_marked_section(text, blank_block(block))
+    if updated == text:
+        return []
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        handle.write(updated)
+    return [CLAUDE_MD]
 
 
 def remove_template_files(root):
@@ -370,6 +420,8 @@ def main(argv=None):
             print(f"{path}: deleted")
         for path in reset_checkpoint(root):
             print(f"{path}: reset to a blank checkpoint")
+        for path in reset_checkpoint_block(root):
+            print(f"{path}: checkpoint block emptied of the template's decisions and constraints")
         token = os.environ.get("GITHUB_TOKEN")
         if (args.create_labels or args.open_issue) and not token:
             raise InitError("GITHUB_TOKEN is not set; labels and the issue need it")

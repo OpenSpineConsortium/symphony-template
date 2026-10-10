@@ -199,6 +199,66 @@ class Checkpoint(unittest.TestCase):
             self.assertNotIn(".claude/session.md: reset to a blank checkpoint", lines)
 
 
+BEGIN, END = template_init.marked_section.MARK_BEGIN, template_init.marked_section.MARK_END
+INTRO = "## Session checkpoint (kept by cswap)\n\nRead `.claude/session.md` first.\n\n"
+TEMPLATE_BLOCK = (BEGIN + "\n" + INTRO + "### Durable decisions\n- The template's own decision.\n"
+                  "### Constraints\n- The template's own constraint.\n" + END)
+EMPTY_BLOCK = BEGIN + "\n" + INTRO + template_init.BLANK_LISTS + "\n" + END
+CLAUDE_TEXT = "# {name}\n\nThe project's own instructions.\n\n{block}\n"
+
+
+class CheckpointBlock(unittest.TestCase):
+    """The decisions and constraints at the end of CLAUDE.md are the
+    template's; a copy keeps the block's heading and intro and starts with
+    both lists empty, in the shape the checkpoint skill writes."""
+
+    def init_with(self, text, newline="\n"):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tiny_tree(root)
+            write(root, "CLAUDE.md", text.replace("\n", newline))
+            code, lines = run_init(root)
+            after = (root / "CLAUDE.md").read_bytes().decode("utf-8")
+            again = run_init(root)[1]
+        return code, lines, after, again
+
+    def test_a_copy_starts_with_the_empty_lists_and_keeps_the_rest(self):
+        code, lines, after, again = self.init_with(CLAUDE_TEXT.format(name="x", block=TEMPLATE_BLOCK))
+        self.assertEqual(code, 0)
+        self.assertEqual(after, CLAUDE_TEXT.format(name="x", block=EMPTY_BLOCK))
+        self.assertIn("CLAUDE.md: checkpoint block emptied of the template's decisions and constraints", lines)
+        self.assertEqual(again, [])
+
+    def test_the_empty_form_is_the_checkpoint_skills(self):
+        self.assertEqual(template_init.BLANK_LISTS,
+                         "### Durable decisions\n- (none recorded)\n### Constraints\n- (none recorded)")
+        skill = (ROOT / ".claude" / "skills" / "checkpoint" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("`### Durable decisions` and `### Constraints`, each followed by one `- ` line per item, "
+                      "or `- (none recorded)`", skill)
+
+    def test_a_crlf_file_stays_crlf(self):
+        _, _, after, _ = self.init_with(CLAUDE_TEXT.format(name="x", block=TEMPLATE_BLOCK), newline="\r\n")
+        self.assertEqual(after, CLAUDE_TEXT.format(name="x", block=EMPTY_BLOCK).replace("\n", "\r\n"))
+
+    def test_a_file_without_the_markers_is_left_alone(self):
+        text = "# x\n\nNo checkpoint block here.\n"
+        _, lines, after, _ = self.init_with(text)
+        self.assertEqual(after, text)
+        self.assertFalse([line for line in lines if line.startswith("CLAUDE.md:")])
+
+    def test_the_templates_own_block_empties_to_the_skills_shape(self):
+        text = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder) / "CLAUDE.md").write_text(text, encoding="utf-8")
+            self.assertEqual(template_init.reset_checkpoint_block(Path(folder)), ["CLAUDE.md"])
+            after = (Path(folder) / "CLAUDE.md").read_text(encoding="utf-8")
+        begin = text.index(BEGIN)
+        self.assertEqual(after[:begin], text[:begin])
+        block = after[begin:]
+        self.assertTrue(block.startswith(BEGIN + "\n## Session checkpoint (kept by cswap)\n\nRead `.claude/session.md`"))
+        self.assertTrue(block.endswith("\n\n" + template_init.BLANK_LISTS + "\n" + END + "\n"))
+
+
 class Init(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
