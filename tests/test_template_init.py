@@ -1,9 +1,11 @@
 """template_init fills every placeholder outside the workflows, removes the
-marker folder, leaves the workflows alone, and does nothing the second time.
-The placeholders are assembled at run time so this file survives an init of
-the repository it lives in."""
+marker folder, leaves the workflows alone, and does nothing the second time;
+in an organization's copy CODEOWNERS names the user who made it. The
+placeholders are assembled at run time so this file survives an init of the
+repository it lives in."""
 
 import io
+import json
 import re
 import sys
 import tempfile
@@ -21,7 +23,7 @@ from template_init import placeholder  # noqa: E402
 P = {name: placeholder(name) for name in template_init.PLACEHOLDER_NAMES}
 README = f"# {P['PROJECT_NAME']}\n\nClone {P['REPO']}; the default branch is {P['DEFAULT_BRANCH']}.\n"
 LICENSE = f"MIT License\n\nCopyright (c) {P['YEAR']} {P['OWNER']}\n"
-CODEOWNERS = f"* @{P['OWNER']}\n"
+CODEOWNERS = f"* @{P['CODE_OWNER']}\n"
 HOOK = f"#!/usr/bin/env bash\nprintf '%s\\n' \"{P['DEFAULT_BRANCH']}\"\n"
 # A workflow that carries a placeholder anyway: the run must leave it as it
 # is, since GITHUB_TOKEN could not push the change.
@@ -55,10 +57,20 @@ def tiny_tree(root):
 
 
 def run_init(root, extra=()):
+    # No event unless a test passes one: on CI, GITHUB_EVENT_PATH names the
+    # check's own event, which must not leak into these runs.
     held = io.StringIO()
     with redirect_stdout(held):
-        code = template_init.main(["--repo", "octo/widgets", "--default-branch", "main", "--year", "2026", "--root", str(root), *extra])
+        code = template_init.main(["--repo", "octo/widgets", "--default-branch", "main", "--year", "2026", "--root", str(root), "--event", "", *extra])
     return code, held.getvalue().splitlines()
+
+
+def push_event(owner_type, sender_login="mona", sender_type="User", full_name="octo/widgets"):
+    """The parts of a push event code_owner reads."""
+    return {
+        "repository": {"full_name": full_name, "owner": {"login": full_name.partition("/")[0], "type": owner_type}},
+        "sender": {"login": sender_login, "type": sender_type},
+    }
 
 
 class Values(unittest.TestCase):
@@ -67,8 +79,14 @@ class Values(unittest.TestCase):
         self.assertEqual(mapping[P["PROJECT_NAME"]], "widgets")
         self.assertEqual(mapping[P["REPO"]], "octo/widgets")
         self.assertEqual(mapping[P["OWNER"]], "octo")
+        self.assertEqual(mapping[P["CODE_OWNER"]], "octo")
         self.assertEqual(mapping[P["DEFAULT_BRANCH"]], "main")
         self.assertEqual(mapping[P["YEAR"]], "2026")
+
+    def test_a_code_owner_given_replaces_the_owner_in_codeowners_only(self):
+        mapping = template_init.values("octo/widgets", "main", 2026, "mona")
+        self.assertEqual(mapping[P["CODE_OWNER"]], "mona")
+        self.assertEqual(mapping[P["OWNER"]], "octo")
 
     def test_a_bad_repo_is_refused(self):
         for bad in ("widgets", "octo/", "/widgets", "a/b/c"):
@@ -90,6 +108,72 @@ class Values(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             for marker in P.values():
                 self.assertNotIn(marker, text, path.name)
+
+
+class CodeOwner(unittest.TestCase):
+    """GitHub asks a user or a team for review, never an organization, so
+    an organization's copy names the user whose push made it."""
+
+    def test_a_personal_copy_names_its_owner(self):
+        self.assertEqual(template_init.code_owner("octo/widgets", push_event("User", "octo")), "octo")
+
+    def test_an_organizations_copy_names_the_user_who_made_it(self):
+        self.assertEqual(template_init.code_owner("octo/widgets", push_event("Organization")), "mona")
+
+    def test_an_organizations_copy_made_by_an_app_names_nobody(self):
+        self.assertIsNone(template_init.code_owner("octo/widgets", push_event("Organization", "maker[bot]", "Bot")))
+
+    def test_without_an_event_or_with_another_repositorys_the_owner_stays(self):
+        self.assertEqual(template_init.code_owner("octo/widgets", {}), "octo")
+        self.assertEqual(template_init.code_owner("octo/widgets", push_event("Organization", full_name="octo/other")), "octo")
+
+    def test_the_repository_is_matched_without_regard_to_case(self):
+        self.assertEqual(template_init.code_owner("octo/widgets", push_event("Organization", full_name="Octo/Widgets")), "mona")
+
+    def test_read_event_reads_a_json_object_and_nothing_else(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "event.json"
+            path.write_text(json.dumps(push_event("Organization")))
+            self.assertEqual(template_init.read_event(str(path)), push_event("Organization"))
+            path.write_text("[1, 2]")
+            self.assertEqual(template_init.read_event(str(path)), {})
+            path.write_text("not json")
+            self.assertEqual(template_init.read_event(str(path)), {})
+            self.assertEqual(template_init.read_event(str(Path(folder) / "missing.json")), {})
+        self.assertEqual(template_init.read_event(""), {})
+
+    def init_with(self, event):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tiny_tree(root)
+            path = root.parent / (root.name + "-event.json")
+            path.write_text(json.dumps(event))
+            try:
+                code, lines = run_init(root, ["--event", str(path)])
+            finally:
+                path.unlink()
+            return code, lines, (root / ".github" / "CODEOWNERS").read_text(), (root / "LICENSE").read_text()
+
+    def test_an_organizations_copy_gets_a_codeowners_github_resolves(self):
+        code, lines, codeowners, license_text = self.init_with(push_event("Organization"))
+        self.assertEqual(code, 0)
+        self.assertEqual(codeowners, "* @mona\n")
+        self.assertEqual(license_text, "MIT License\n\nCopyright (c) 2026 octo\n")
+        self.assertNotIn(template_init.NO_CODE_OWNER_NOTE, lines)
+
+    def test_an_organizations_copy_made_by_an_app_keeps_the_owner_and_says_so(self):
+        code, lines, codeowners, _ = self.init_with(push_event("Organization", "maker[bot]", "Bot"))
+        self.assertEqual(code, 0)
+        self.assertEqual(codeowners, "* @octo\n")
+        self.assertIn(template_init.NO_CODE_OWNER_NOTE, lines)
+        self.assertIn("docs/setup/github.md", template_init.NO_CODE_OWNER_NOTE)
+
+    def test_the_repositorys_own_codeowners_never_names_the_bare_owner(self):
+        # In the template the line carries the code owner's placeholder; in a
+        # copy, a login. Either way never the owner's placeholder, which an
+        # organization's copy would turn into a line GitHub cannot resolve.
+        text = (ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
+        self.assertNotIn("@" + P["OWNER"], text)
 
 
 class Checkpoint(unittest.TestCase):
@@ -202,6 +286,7 @@ class Labels(unittest.TestCase):
         self.assertIn("bash scripts/check.sh", body)
         self.assertIn("ruleset-main.json", body)
         self.assertIn("/install-github-app", body)
+        self.assertIn("https://github.com/octo/widgets/blob/main/.github/CODEOWNERS", body)
         self.assertEqual(body.count("- [ ]"), 6)
 
     def test_the_setup_issue_opens_with_the_one_command_and_links_every_settings_page(self):

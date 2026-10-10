@@ -22,7 +22,8 @@ Protection), creates or updates the seven labels from the one list in
 tools/template_init.py, sets each variable given as `--var NAME=VALUE`,
 and with `--token` stores the secret CLAUDE_CODE_OAUTH_TOKEN from gh's
 hidden prompt, so the token is never on a command line, in a file or on
-the screen. Each step prints one line; run it again at any time, and
+the screen, and last prints any line of .github/CODEOWNERS that GitHub
+cannot resolve. Each step prints one line; run it again at any time, and
 nothing is done twice. The ruleset goes in whatever the plan, but on
 GitHub Free a private repository's ruleset is written and not enforced
 (docs/setup/tiers.md); the script says so when the repository is private.
@@ -177,8 +178,9 @@ about 42 sessions.
 
 ## 3. The repository's GitHub settings (sdlc-template and every copy)
 
-`bash scripts/setup-repo.sh` does 1 to 4 in one run (above). By hand,
-under Settings of the repository, as docs/setup/github.md describes:
+`bash scripts/setup-repo.sh` does 1 to 4 and checks 5 in one run
+(above). By hand, under Settings of the repository, as
+docs/setup/github.md describes:
 
 1. **Rules**: Rules, Rulesets, New ruleset, Import a ruleset, and choose
    docs/setup/ruleset-main.json (protects the default branch, requires the
@@ -191,7 +193,13 @@ under Settings of the repository, as docs/setup/github.md describes:
    in-review, blocker, account:main, epic, blocked). The template
    repository itself has none; add them by hand only if this repository's
    own issues should be labelled.
-5. **Template**: sdlc-template is already marked as a template repository.
+5. **Code owners**: open .github/CODEOWNERS on GitHub and see that no
+   line is marked as an error. template-init names the owner there, or in
+   an organization's copy the person who made it, since GitHub asks a user
+   or a team for review and never an organization; a copy made by an app
+   still names the organization, so change that line by pull request
+   (docs/setup/github.md, section 7).
+6. **Template**: sdlc-template is already marked as a template repository.
 
 ## 4. Claude inside GitHub Actions (optional; @claude, the worker, team mode)
 

@@ -39,7 +39,12 @@
 #      a file and never in this script's output: gh reads it without echo
 #      (or from standard input when no terminal is attached), encrypts it on
 #      your machine and sends only the sealed value. Without --token the
-#      step prints the alternative, /install-github-app in Claude Code.
+#      step prints the alternative, /install-github-app in Claude Code;
+#   8. reads GitHub's own list of the errors in .github/CODEOWNERS and
+#      prints each one, since a line GitHub cannot resolve (an
+#      organization's name, a user or a team without Write) asks nobody for
+#      review and says so nowhere else; it changes nothing, the fix is a
+#      pull request (docs/setup/github.md, section 7).
 #
 # Usage: bash scripts/setup-repo.sh [OWNER/NAME] [--var NAME=VALUE]... [--token]
 set -euo pipefail
@@ -55,8 +60,9 @@ Usage: bash scripts/setup-repo.sh [OWNER/NAME] [--var NAME=VALUE]... [--token]
 Sets up the GitHub side of a repository made from this template: the
 default branch's ruleset, delete-branch-on-merge, auto-merge, secret
 scanning with push protection, the labels, the variables asked for and,
-with --token, the secret CLAUDE_CODE_OAUTH_TOKEN. Needs the GitHub CLI
-signed in (gh auth login) with admin rights on the repository.
+with --token, the secret CLAUDE_CODE_OAUTH_TOKEN; then prints any line of
+.github/CODEOWNERS GitHub cannot resolve. Needs the GitHub CLI signed in
+(gh auth login) with admin rights on the repository.
 
   OWNER/NAME        the repository; by default the one this clone's
                     remote points at
@@ -170,4 +176,18 @@ if [ "$TOKEN" = yes ]; then
   printf 'secret %s: set\n' "$SECRET"
 else
   printf 'secret %s: skipped; run again with --token, or run /install-github-app in Claude Code, which installs the app and stores the secret in one OAuth flow (docs/setup/claude-action.md)\n' "$SECRET"
+fi
+
+# 8. GitHub's reading of .github/CODEOWNERS, after the secret's prompt so
+# its lines are the last on the screen. A failed read (no such file on the
+# default branch) is reported, not fatal: everything above is done.
+if errors=$(gh api "repos/$REPO/codeowners/errors" --jq '.errors[] | "  line \(.line): \(.kind): \(.source)"' 2>&1); then
+  if [ -z "$errors" ]; then
+    echo "code owners: GitHub resolves every owner in .github/CODEOWNERS"
+  else
+    echo "code owners: GitHub cannot resolve these lines of .github/CODEOWNERS, so they ask nobody for review; name a user or a team with Write instead (docs/setup/github.md, section 7)"
+    printf '%s\n' "$errors"
+  fi
+else
+  printf 'code owners: could not read GitHub'"'"'s list (%s); open .github/CODEOWNERS on GitHub, which marks the lines it cannot resolve\n' "$(tr '\n' ' ' <<<"$errors")"
 fi
