@@ -1,135 +1,214 @@
 # Session checkpoint
 
-Written 2026-10-09 by the main account's cloud session, at the end of the
-session that finished the harness as a working prototype. This is the
-full checkpoint of the work on claude/10; main's own .claude/session.md
-points here. Read this first, then experiment/README.md and
-experiment/coordbench/README.md (the plug-in contract). The owner's steps
-(accounts, tokens, secrets, variables) are in docs/setup/owner-checklist.md.
+Written 2026-10-10 by the main account's cloud session, in a hurry: the
+owner's usage ran out while four pieces of work were in flight. This is
+the full checkpoint of claude/10 and of the split into five repositories;
+main's own .claude/session.md points here. A session told to "continue"
+starts at "Remaining tasks", in order. The owner's steps are in
+docs/setup/owner-checklist.md.
 
 ## Completed work
 
-- Merged to main, in order: #3 (push guard hook, edit check, permission
-  allowlist, /board, tidy workflow, @claude on the subscription OAuth
-  token), #5 (claim protocol checked in CI, opt-in Actions worker), #7
-  (the plan ladder), #9 (the default branch's ruleset as a file, the
-  Claude side in one OAuth flow, release-audit fixes), #15 (team mode).
-- claude/11, pull request #12 (issue #11): the push guard's rewrite was
-  cut back to the newline fix alone (52 lines over main, 29 tests),
-  rebased on main, its claim file removed, marked ready; CI is green. It
-  waits on the owner's merge.
-- claude/10, draft pull request #13 (issue #10), all pushed and green:
-  - experiment/: the kit that runs CooperBench's four-arm ablation in one
-    cloud session with CooperBench's own runner; 42 of the 50 flash pairs
-    grade here (experiment/README.md).
-  - experiment/coordbench/: coordination as a plug-in; README.md is the
-    contract. The review's 28 findings are fixed, each with a test; a
-    verification round of five skeptics found the residue (races, exit
-    codes, docstrings), fixed in the final round with the pilot's bugs.
-  - Logging that tells infrastructure time from agent time: every tool
-    call leaves a tool_done event with its duration and the part spent
-    blocked on a peer; result.json carries per-phase timings (hub,
-    provisioning per agent, agents, close, score, teardown) and Claude
-    Code's duration and API duration per agent; experiment/coordbench/
-    timeline.py prints the breakdown for one run directory.
-  - The arm archetype: experiment/coordbench/new_arm.py writes a complete,
-    loadable arm from a name and checks it in-process (--check);
-    experiment/coordbench/examples/board/ is the generated example, pinned
-    byte for byte by a test.
-  - The owner's checklist is one command for the GitHub side
-    (scripts/setup-repo.sh) plus the pages a template cannot reach;
-    docs/setup/owner-checklist.md says what an organization can preship
-    and on which plan; template-init's setup issue links every step,
-    the Claude App install preselected. Settings as code is issue #18.
-  - docs/history/experiment-research/ is condensed to its record.
-- The pilot, the owner's original ask, ran: one pair (pallets_click 2068,
-  features 1 and 6) through coordbench with the session driver under the
-  coop and the team arms, one subagent of this session per agent, scored
-  by CooperBench's own evaluation. Both pairs passed (both features' tests
-  on the merged code). Logs: ~/cooperbench/logs/pilot-session-coop and
-  pilot-session-team in this session's container only; result.json,
-  eval.json, events.jsonl and the patches are there. A second coop pair
-  ran after the final round as the demo of the timing breakdown
-  it passed too, and experiment/coordbench/timeline.py on it shows where the
-  1017 s went: 16.7 s of harness (provisioning under 2 s, scoring 14 s), 2 ms of
-  hub handling, no time blocked on a peer (coop has no blocking tool), the
-  rest the agents' own work, with idle stretches of up to 380 s between
-  coordination calls. Logs: ~/cooperbench/logs/demo-session-coop, this
-  session's container only..
+- Merged to main: #3, #5, #7, #9, #15 (push guard, claim protocol in CI,
+  the plan ladder, the ruleset and one-flow Claude setup, team mode).
+- claude/11, pull request #12: the push guard's newline fix alone (52 lines
+  over main), rebased, ready, CI green. Waits on the owner's merge.
+- claude/10, draft pull request #13 (issue #10), pushed and green at the
+  commit before the trace work: experiment/ (CooperBench kit, 42 of 50
+  flash pairs grade here) and experiment/coordbench/ (coordination as a
+  plug-in; README.md is the contract). The review's 28 findings fixed,
+  a skeptic round's residue fixed, the pilot's three bugs fixed. Timings
+  per phase and per tool call (tool_done with blocked_ms), timeline.py,
+  the arm archetype (new_arm.py, examples/board). Owner's checklist with
+  scripts/setup-repo.sh; settings as code is issue #18; research folder
+  condensed. 603 tests at that commit.
+- The pilot ran: pallets_click 2068 features 1 and 6 through coordbench
+  with the session driver under coop and team, scored by CooperBench's
+  evaluation, both pairs passed; a third coop pair passed as the demo of
+  the timing breakdown (1017 s wall, 16.7 s harness, 2 ms hub, no time
+  blocked, the rest the agents). Logs lived only in that session's
+  container (~/cooperbench/logs) and are gone.
+- Decided with the owner (see Decisions): experiment/ ships as its own
+  repository; five repositories in all; the gate policy lives in the
+  shared core and the "world" in adapters; coordination CI is excluded
+  from agentic behaviour and optimised separately; the Claude Code plugin
+  marketplace is the client-side artifact for now.
+- The owner created, and this session cloned and registered, four empty
+  repositories under OpenSpineConsortium: sdlc-protocol, coordbench,
+  sdlc-marketplace, sdlc-app (private). A new session must add each with
+  the add_repo tool before it can push to them.
+- Research saved under docs/history/split-research/: GitHub settings a
+  template cannot copy (github-settings-notes.md) and the Claude Code
+  plugin marketplace format (marketplace-notes.md). A third fact check,
+  on the GitHub App (manifest flow, create-github-app-token, check runs,
+  rulesets, webhooks), was still running and its notes may be missing.
 
-## Current state
+## Current state (in flight when the session stopped)
 
-- #13 is a draft on purpose: the owner decides whether experiment/ (with
-  coordbench) moves to a repository of its own before it merges, since
-  everything on main ships in every copy of the template. Nothing else
-  blocks marking it ready: `bash scripts/check.sh` is green
-  (603 tests), the claim file docs/agents/claims/10.md still
-  exists and goes with the ready mark.
-- No agent has run through the claude-cli driver yet: that needs
-  CLAUDE_CODE_OAUTH_TOKEN in the cloud environment (owner's checklist,
-  section 2) and a new session. The session driver needs no token and is
-  what the pilot used.
-- Usage is not measured for the session driver (null in result.json, '-'
-  in the report); time is, in every phase.
-- The main account's weekly Claude usage resets on 2026-10-15 at 11:00 UTC.
+- Trace instrumentation on claude/10: four build agents finished green
+  (trace.py; hub and arm; runner and drivers; cli and bridge); the
+  integrator was mid-run. The working tree was committed as it stood,
+  so the suite may not be green and the README's "Adding logging"
+  paragraph may be missing. First job: run the checks and finish it.
+- sdlc-protocol extraction: five builders and an integrator were running
+  in /home/user/sdlc-protocol; whatever existed was pushed to the branch
+  wip/extract of OpenSpineConsortium/sdlc-protocol. The design is in
+  "The sdlc-protocol design" below, since the workflow script died with
+  the container. Parity tests against the old tools were the integrator's
+  step and may be missing.
+- sdlc-marketplace, sdlc-app, the coordbench split: not started; the
+  facts and the plan are below.
+- #13 stays a draft until the split is done; #12 waits on the owner.
 
 ## Remaining tasks
 
-The owner asked that the prototype be delivered as it stands and not
-improved further on a session's own initiative. What remains is the
-owner's, or waits for the owner's word:
+1. claude/10: `python3.12 -m unittest discover -s tests` and
+   `bash scripts/check.sh`; finish the trace integration (contract below:
+   trace.py levels off|prod|debug from COORD_TRACE, event/debug/span/
+   debug_span, listen/unlisten, JsonLines and Memory listeners; hub and
+   runner --debug; prod registers no process listener; README "Adding
+   logging" paragraph in the Running section; timeline.py still reads the
+   pilot format). Commit, push.
+2. sdlc-protocol: finish the library to the design below on wip/extract,
+   parity tests (board render byte-equal on the template's fixtures;
+   guard exit codes and messages equal to claude/11's tools/guard_push.py;
+   check_protocol and team on their fixtures), CI green, merge to main,
+   tag 0.1.0.
+3. sdlc-template: open an issue "Vendor sdlc-protocol", claim it, run
+   sdlc-protocol's scripts/vendor.sh into tools/sdlc_protocol with
+   tools/VENDORED, turn tools/board.py, check_protocol.py, team.py,
+   guard_push.py into thin shims (or switch the workflows to
+   `python3 -m sdlc_protocol board|check|team|guard` with PYTHONPATH=tools),
+   add a test that the vendored copy matches VENDORED's version; keep
+   check_docs, check_edit, marked_section, template_init in the template.
+4. coordbench: `git subtree split -P experiment -b coordbench-split` on
+   claude/10 (history kept), push to OpenSpineConsortium/coordbench main,
+   then reshape: experiment/coordbench/* to the repository root as the
+   package, experiment/*.sh and report.py under bench/cooperbench/ as the
+   first adapter behind a small adapter interface (tasks, scoring, log
+   layout) that run.py calls; the sdlc arm imports sdlc_protocol.gate and
+   adapters.bare_git instead of its own Gate; docs/history research page
+   moves with it; make the repository a copy of the template (CLAUDE.md,
+   docs/project.md, .claude/, workflows) so it dogfoods use 1; move
+   tests/test_coordbench_* and test_experiment_report.py with it; then on
+   claude/10 delete experiment/ and those tests, update README.md and
+   docs/memory (the MCP timeout fact moves to coordbench), and mark #13
+   ready (delete docs/agents/claims/10.md in that commit).
+5. sdlc-marketplace (facts in docs/history/split-research/marketplace-notes.md):
+   .claude-plugin/marketplace.json (name sdlc-marketplace, owner
+   OpenSpineConsortium, one plugin "sdlc" with source "./plugins/sdlc");
+   plugins/sdlc/.claude-plugin/plugin.json (name sdlc, version 0.1.0);
+   skills/ copied from the template's .claude/skills (claim, remember,
+   checkpoint, board); commands/board.md from .claude/commands/board.md;
+   hooks/hooks.json with the PreToolUse Bash guard and the Edit/Write
+   check_edit, each running `python3 "${CLAUDE_PLUGIN_ROOT}/vendor/..."`
+   over a vendored copy of sdlc_protocol (rules, CLAUDE.md fragments and
+   permissions cannot ship in a plugin; they stay in the template). In
+   the template, .claude/settings.json gets extraKnownMarketplaces
+   {"sdlc-marketplace": {"source": {"source": "github", "repo":
+   "OpenSpineConsortium/sdlc-marketplace"}}} and enabledPlugins
+   {"sdlc@sdlc-marketplace": true}; `claude plugin validate` must pass.
+6. sdlc-app, stage 1 (no hosting): the owner registers a GitHub App "sdlc"
+   on the organisation (permissions Contents, Issues, Pull requests read
+   and write, Checks write, Metadata read; events issues, issue_comment,
+   pull_request, push, check_suite, installation; webhook off), installs
+   it on the repositories, sets the variable SDLC_APP_ID and the secret
+   SDLC_APP_PRIVATE_KEY; the template's workflows mint an installation
+   token with actions/create-github-app-token (pinned to a major tag) and
+   use it instead of GITHUB_TOKEN where a push or comment should trigger
+   workflows. Stage 2: in sdlc-app a Python standard-library webhook
+   receiver (HMAC X-Hub-Signature-256 check), the App manifest JSON, check
+   runs on pull requests as the gate (sdlc_protocol.gate with the GitHub
+   world adapter), board and release on webhooks, an installation-token
+   client (RS256 JWT, PyJWT is a dependency decision: an issue first, or
+   hand-rolled RS256 with the standard library is not possible, so decide),
+   a Dockerfile, and a smee.io channel for local testing. Later: an MCP
+   server in the App for the claude.ai directory.
+7. Owner's items: merge #12; decide #18; the owner-checklist steps (one run
+   of scripts/setup-repo.sh, the token, the Claude App); add
+   CLAUDE_CODE_OAUTH_TOKEN to the cloud environment for the claude-cli
+   driver.
+8. With the token: the pilot through CooperBench's own runner and through
+   coordbench's claude-cli driver on the same pair; then the five arms on
+   the 42 gradable pairs; report.py and timeline.py; the write-up on
+   whether the PR-gated way of working beats shared collaboration and solo.
 
-1. Merge #12. Decide the experiment/ question and tell a session to mark
-   #13 ready (delete docs/agents/claims/10.md in that commit) or to move
-   experiment/ out first.
-2. Decide #18 (settings as code) and the owner's steps in
-   docs/setup/owner-checklist.md: one run of scripts/setup-repo.sh, the
-   token, the Claude GitHub App.
-3. With CLAUDE_CODE_OAUTH_TOKEN in the environment and a new session: the
-   pilot on pallets_click 2068 with CooperBench's own runner
-   (experiment/run_arms.sh) and with coordbench's claude-cli driver for
-   the same arms, to measure how much the harness itself moves the
-   scores; then the five arms on the 42 gradable pairs, one task at a
-   time; experiment/report.py; experiment/coordbench/timeline.py per pair
-   for where the time went.
-4. The write-up for the owner: does the PR-gated way of working (the sdlc
-   arm) beat or trail shared collaboration (coop-git, team) and solo, at
-   what usage and time.
-5. Team mode live run on a repository made from the template, and the
-   re-made test repository, once the owner has set the variables.
+## The sdlc-protocol design
+
+Package sdlc_protocol, Python 3.12 standard library only.
+- labels.py: LABELS from template_init, prefixes account: and agent:.
+- claims.py: branch claude/<n>, claim file docs/agents/claims/<n>.md,
+  claim parsing (account line, files to touch), release_due (24 h idle).
+- board.py: Snapshot dataclasses with from_dict/to_dict; render(snapshot,
+  default_branch) byte-identical to tools/board.py; comments_due for
+  "main moved" and idle comments; no API calls.
+- protocol_check.py: problems_for(pull, claim_file_exists).
+- team.py: the clerk's rules (route, next_for, owners_for, seed, Snapshot)
+  over an injected Client protocol.
+- guard.py: plain_shell, simple_commands, push_arguments, refusal,
+  branches, from claude/11's guard; run(payload, cwd) for the CLI.
+- gate.py: Policy (claim_prefix, required_check, bring_main_in "rebase" for
+  accounts or "merge" for team members, who_merges owner|gate|auto-merge,
+  idle_after); World protocol (main_sha, branch_sha, standing clean|behind|
+  conflicting|unknown, check green|red|pending|none, merge -> sha or
+  MainMoved/GateFailed, now); decisions claim, can_open_pull, open_pull,
+  mark_ready -> Outcome, pull_status, board_text; exit codes 1 refused,
+  2 someone else's, 3 main moved, 4 gate failed; main_moved_instruction.
+- adapters/bare_git.py (the sdlc arm's Gate over a bare repository),
+  adapters/memory.py (tests), adapters/github.py (REST client from
+  board.py and team.py, token from argument or GITHUB_TOKEN, World for a
+  repository: standing from mergeable_state, check from check-runs, merge
+  only when who_merges is gate).
+- cli.py and __main__.py: python3 -m sdlc_protocol board|check|team|guard
+  with the old tools' argument shapes.
+- spec/PROTOCOL.md (generalised), tests/ with the template's tests ported,
+  scripts/vendor.sh <target> (copies to <target>/tools/sdlc_protocol and
+  writes tools/VENDORED), CI on python3.12.
 
 ## Decisions
 
 Stated by the owner in conversation, recorded here and not in CLAUDE.md:
 
-- Prefer GitHub's native settings over workflows wherever they cover the
-  case, to save CI minutes and Claude usage.
-- No API billing: Claude in CI runs on a subscription OAuth token.
-- A claude.ai Project's own fields stay blank; the repository is the one
-  source of instructions, goal and memory.
-- The template should serve the owner's experiment: PR-gated agents
-  against a shared project, after CooperBench.
-- Deliver the prototype working; fix the bugs found, demo it, generate the
-  archetype, and stop improving it without the owner's word (2026-10-09).
-- Logging must tell infrastructure inefficiency from agent inefficiency:
-  per-phase timings and per-call durations with the blocked part apart.
-
-Decisions taken by the session that fixed the review, each written where
-it applies (experiment/coordbench/README.md): the team arm's
-wait_for_message works where CooperBench's never returned a message, a
-documented deviation; the messaging commands match coop_msg.py's output,
-arguments and exit codes; no built-in arm sends MCP server instructions;
-the solo arm ships no skill and no .mcp.json; every arm's .mcp.json sets a
-330 s timeout; agents authenticate with per-agent bearer tokens.
+- Prefer GitHub's native settings over workflows, to save CI minutes and
+  Claude usage. No API billing: Claude in CI runs on a subscription OAuth
+  token. A claude.ai Project's own fields stay blank. The template serves
+  the owner's experiment: PR-gated agents against a shared project.
+- Deliver the prototype working; fix the bugs, demo it, generate the
+  archetype, and do not improve it further without the owner's word.
+- Logging tells infrastructure inefficiency from agent inefficiency, grows
+  piecewise (one line to add an event or a span), has a passive production
+  listener that costs one serialisation per event, and a debug mode for
+  the playground that is never a default.
+- experiment/ ships as its own repository (coordbench). Five repositories:
+  sdlc-protocol (core, public), sdlc-template (free tier, public),
+  coordbench (public, itself a template copy), sdlc-marketplace (public,
+  the Claude Code plugin), sdlc-app (private, the GitHub App).
+- The gate policy lives in the core; the world (GitHub, bare git, memory)
+  in adapters; experimental gate variants live in coordbench as policy
+  objects behind the same interface.
+- Coordination CI is harness cost, excluded from agentic behaviour and
+  optimised toward zero; verification CI (the project's tests) is the
+  project's cost and agents do not wait on it; the simulated world
+  carries the check delay as an explicit parameter.
+- The Claude Code plugin marketplace is the client artifact now; a
+  claude.ai directory connector (an MCP server in the App) comes with
+  stage 2.
+- The uploaded "Serverless Multi-Agent GitHub Architecture" document: take
+  ETag, GraphQL batching, backoff with jitter, offline Ed25519 licences and
+  a ruleset that forbids editing the gate workflow; reject IP protection by
+  obfuscation on customer compute, file-level locks through an arbiter
+  Action, heartbeat leases and a long-running coordinator Action.
 
 ## Constraints
 
 - The cloud environment's network policy blocks deb.debian.org,
   deb.nodesource.com, huggingface.co, pypi.nvidia.com,
   openaipublic.blob.core.windows.net, docs.github.com and github.blog;
-  Docker Hub rate-limits it, so images come from mirror.gcr.io; GitHub's
-  docs are read from the github/docs source.
-- A session's background command stops after two hours; Docker's daemon
-  must be started by the session (experiment/setup.sh does).
-- Verify fewer claims with one skeptic unless the owner asks for more:
-  the full three-skeptic research run was the expensive choice.
+  Docker Hub rate-limits it (images from mirror.gcr.io); GitHub's docs are
+  read from the github/docs source. A session's background command stops
+  after two hours; the session starts dockerd itself.
+- The session's git proxy allows two concurrent operations per repository;
+  clone the four repositories one at a time.
+- Verify with one skeptic per claim unless the owner asks for more.
+- The scratchpad and ~/cooperbench die with the container: anything worth
+  keeping goes in a repository.

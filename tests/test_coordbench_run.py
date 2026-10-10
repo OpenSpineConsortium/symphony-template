@@ -29,6 +29,11 @@ ROOT = Path(__file__).resolve().parent.parent
 COORDBENCH = ROOT / "experiment" / "coordbench"
 sys.path.insert(0, str(COORDBENCH))
 
+# coordbench's trace.py shares its name with the standard library's tracer;
+# a process that happened to load that one first gets ours here instead.
+if getattr(sys.modules.get("trace"), "__file__", None) != str(COORDBENCH / "trace.py"):
+    sys.modules.pop("trace", None)
+import trace  # noqa: E402
 import drivers  # noqa: E402
 import hub as hub_module  # noqa: E402
 import run as runner  # noqa: E402
@@ -136,6 +141,36 @@ def pairs(arguments):
 def phases(timings):
     """Each timing as (phase, agent), in the order they were recorded."""
     return [(record["phase"], record["agent"]) for record in timings]
+
+
+def runner_events(memory, kind=None):
+    """The runner's own events among those a listener saw: the hub in this
+    process marks its own with a "run" field, the runner's have none."""
+    return [event for event in memory if "run" not in event and kind in (None, event["kind"])]
+
+
+def trace_lines(run_dir):
+    return [json.loads(line) for line in (Path(run_dir) / "trace.jsonl").read_text().splitlines()]
+
+
+class TracedCase(unittest.TestCase):
+    """Every test starts at trace's prod level with nobody listening and no
+    debug sink open, and leaves it so, since main's --debug sets the
+    process's level and the runner registers listeners for a run."""
+
+    def setUp(self):
+        self.reset_trace()
+        self.addCleanup(self.reset_trace)
+
+    @staticmethod
+    def reset_trace():
+        runner.close_debug_sinks()
+        trace.set_level("prod")
+        for listener in list(trace._listeners):
+            trace.unlisten(listener)
+
+    def memory(self):
+        return runner.listen(trace.Memory())
 
 
 def timing(phase, agent, started, seconds):
@@ -296,13 +331,14 @@ def write_dataset(cooperbench_dir):
     (subsets / "flash.json").write_text(json.dumps(flash), encoding="utf-8")
 
 
-class RunnerCase(unittest.TestCase):
+class RunnerCase(TracedCase):
     """A temporary CooperBench tree, a live hub in this process that wants
     the admin token the runner's environment holds and may load the arms
     under <tmp>/arms, and docker and the scorer replaced by fakes for the
     length of each test."""
 
     def setUp(self):
+        super().setUp()
         self.tmp = Path(tempfile.mkdtemp(prefix="coordbench-run-test-"))
         self.cooperbench = self.tmp / "cooperbench"
         write_dataset(self.cooperbench)
@@ -929,6 +965,30 @@ class TheSessionDriver(RunnerCase):
         self.assertEqual(outcome.status, "Error")
         self.assertIn(".coordbench-done", outcome.error)
 
+    def test_each_look_for_the_marker_is_a_marker_poll_in_debug_alone(self):
+        memory = self.memory()
+        job = self.job()
+        driver = drivers.SessionDriver(poll_seconds=0.01)
+        marker = Path(job.workspace) / ".coordbench-done"
+        marker.touch()
+        self.assertEqual(driver.wait(driver.start(job)).status, "Error", "start removes a marker left over")
+        self.assertEqual(memory, [])
+        trace.set_level("debug")
+        job.timeout_s = 5.0
+        handle = driver.start(job)
+        threading.Timer(0.1, marker.touch).start()
+        outcome = driver.wait(handle)
+        self.assertEqual(outcome.status, "Submitted")
+        polls = [event for event in memory if event["kind"] == "marker_poll"]
+        self.assertGreaterEqual(len(polls), 2)
+        self.assertEqual({event["agent"] for event in polls}, {"agent1"})
+        self.assertEqual([event["found"] for event in polls], [False] * (len(polls) - 1) + [True])
+        for poll in polls:
+            self.assertEqual(set(poll), {"kind", "t", "ts", "agent", "found"})
+        # The prompt it wrote and the line it logged are announced too.
+        self.assertEqual([event["file"] for event in memory if event["kind"] == "wrote"],
+                         ["agent1.session-prompt.md", "agent1_stream.jsonl"])
+
     def test_drivers_load_by_name_or_from_a_file(self):
         self.assertIsInstance(drivers.load_driver("session"), drivers.SessionDriver)
         path = self.tmp / "mine.py"
@@ -1276,7 +1336,246 @@ class Runs(RunnerCase):
         self.assert_secret_nowhere(said, out, err, sent.stdout, sent.stderr, secrets=(token,))
 
 
+class Tracing(RunnerCase):
+    """The phases are also events on trace's stream, for a deployment that
+    listens (run.listen); --debug adds the rest and a trace.jsonl per run,
+    and prod records nothing beyond the phases."""
+
+    DEBUG_KINDS = {"docker", "hub_call", "wrote", "marker_poll"}
+
+    def test_the_phases_are_seen_live_by_a_listener_and_the_timings_keep_their_shape(self):
+        memory = trace.Memory()
+        self.assertIs(runner.listen(memory), memory)
+        code, _, err = self.main(*self.run_arguments("coop", "--features", "1,6"))
+        self.assertEqual(code, 0, err)
+        result = json.loads((self.pair() / "result.json").read_text())
+        self.assert_timings_well_formed(result["timings"])
+        for record in result["timings"]:
+            self.assertEqual(set(record), TIMING_KEYS)
+        # One "phase" as each phase begins and one "phase_done" as it ends,
+        # in the order of the records, the agents' phase among them though
+        # its start and its end are recorded apart.
+        begun, ended = runner_events(memory, "phase"), runner_events(memory, "phase_done")
+        self.assertEqual([(e["phase"], e["agent"]) for e in begun], phases(result["timings"]))
+        self.assertEqual([(e["phase"], e["agent"]) for e in ended], phases(result["timings"]))
+        for event in begun:
+            self.assertEqual(set(event), {"kind", "t", "ts", "phase", "agent"})
+        for event, record in zip(ended, result["timings"]):
+            self.assertEqual(set(event), {"kind", "t", "ts", "duration_ms", "ok", "phase", "agent"})
+            self.assertEqual(event["duration_ms"], round(record["seconds"] * 1000, 3))
+            self.assertIs(event["ok"], True)
+        begins, ends = [e["t"] for e in begun], [e["t"] for e in ended]
+        self.assertEqual(begins, sorted(begins))
+        self.assertTrue(all(begin <= end for begin, end in zip(begins, ends)))
+        # Prod is the phases alone: no file is written for the trace and
+        # nothing debug is recorded, however many listeners there are.
+        self.assertFalse((self.pair() / "trace.jsonl").exists())
+        self.assertEqual({e["kind"] for e in runner_events(memory)} & self.DEBUG_KINDS, set())
+        self.assertEqual(runner.DEBUG_SINKS, {})
+        # The summary line is what it was.
+        self.assertRegex(err, r"timings: hub [0-9.]+ s, run_create [0-9.]+ s, provision [0-9.]+ s, agents ")
+        seen = len(memory)
+        runner.unlisten(memory)
+        trace.event("phase", phase="score", agent=None)
+        self.assertEqual(len(memory), seen)
+
+    def test_a_phase_that_failed_ends_in_a_phase_done_that_is_not_ok(self):
+        memory = self.memory()
+        self.docker.fail_seed = True
+        code, _, _ = self.main(*self.run_arguments("coop-git", "--features", "1,6"))
+        self.assertEqual(code, 1)
+        ended = runner_events(memory, "phase_done")
+        self.assertEqual([(e["phase"], e["ok"]) for e in ended], [("hub", True), ("git_remote", False),
+                                                                 ("teardown", True)])
+        result = json.loads((self.pair() / "result.json").read_text())
+        self.assertEqual(phases(result["timings"]), [(e["phase"], e["agent"]) for e in ended])
+
+    def test_debug_traces_hub_calls_and_files_to_trace_jsonl_and_never_a_secret(self):
+        memory = self.memory()
+        code, _, err = self.main(*self.run_arguments("coop", "--features", "1,6", "--debug"))
+        self.assertEqual(code, 0, err)
+        self.assertEqual(trace.level, "debug")
+        pair = self.pair()
+        events = trace_lines(pair)
+        self.assertEqual(runner.DEBUG_SINKS, {}, "the sink is closed once the pair is over")
+        kinds = {e["kind"] for e in runner_events(events)}
+        self.assertTrue({"phase", "phase_done", "hub_call", "wrote"} <= kinds, kinds)
+        self.assertEqual([e["kind"] for e in runner_events(events, "phase_done")],
+                         ["phase_done"] * 8, "the hub's phase came before the run directory existed")
+        result = json.loads((pair / "result.json").read_text())
+        calls = runner_events(events, "hub_call")
+        for call in calls:
+            self.assertEqual(set(call), {"kind", "t", "ts", "method", "path", "status", "duration_ms"})
+            self.assertGreaterEqual(call["duration_ms"], 0)
+        self.assertEqual([(c["method"], c["path"], c["status"]) for c in calls],
+                         [("POST", "/api/runs", 201), ("POST", f"/api/runs/{result['run_id']}/close", 200),
+                          ("GET", f"/api/runs/{result['run_id']}/events", 200),
+                          ("DELETE", f"/api/runs/{result['run_id']}", 200)])
+        # Every file the run left was announced with its name and its
+        # size, the last announcement of each being the file as it is.
+        written = {}
+        for event in runner_events(events, "wrote"):
+            self.assertEqual(set(event), {"kind", "t", "ts", "file", "bytes"})
+            written[event["file"]] = event["bytes"]
+        self.assertTrue({"plan.json", "agent1_prompt.md", "agent2_prompt.md", "agent1.patch", "agent6.patch",
+                         "result.json", "metrics.json", "events.jsonl", "eval.json"} <= set(written), written)
+        for name, size in written.items():
+            self.assertEqual(size, (pair / name).stat().st_size, name)
+        # The listener a deployment attached saw the same events the file holds.
+        ours = runner_events(events)
+        self.assertEqual([e["kind"] for e in runner_events(memory)][-len(ours):], [e["kind"] for e in ours])
+        self.assert_secret_nowhere(err)
+        self.assert_tokens_kept_private(json.loads((pair / "plan.json").read_text()), err)
+
+    def test_prepare_and_finish_in_debug_append_to_one_trace_file_with_the_marker_polls(self):
+        code, out, err = self.main("prepare", "--arm", "coop", "--repo", REPO, "--task", str(TASK),
+                                   "--features", "1,6", "--hub", self.hub_url, "--name", "t",
+                                   "--cooperbench-dir", str(self.cooperbench), "--debug")
+        self.assertEqual(code, 0, err)
+        pair = self.pair()
+        prepared = trace_lines(pair)
+        self.assertEqual([(e["phase"], e["agent"]) for e in runner_events(prepared, "phase_done")],
+                         [("run_create", None), ("provision", "agent1"), ("provision", "agent2")])
+        self.assertEqual([(e["phase"], e["agent"]) for e in runner_events(prepared, "phase")][-2:],
+                         [("agent", "agent1"), ("agent", "agent2")])
+        written = [e["file"] for e in runner_events(prepared, "wrote")]
+        self.assertIn("agent1.session-prompt.md", written)
+        self.assertIn("token", written)
+        self.assertEqual(runner.DEBUG_SINKS, {})
+        saved = json.loads((pair / "plan.json").read_text())
+        for agent in saved["agents"]:
+            (Path(agent["workspace"]) / "patch.txt").write_text(PATCHES[agent["id"]])
+            (Path(agent["workspace"]) / ".coordbench-done").touch()
+        self.reset_trace()
+
+        code, out, err = self.main("finish", "--run-dir", str(pair), "--debug")
+        self.assertEqual(code, 0, err)
+        finished = trace_lines(pair)
+        self.assertEqual(finished[:len(prepared)], prepared, "finish appends to the file prepare left")
+        later = runner_events(finished[len(prepared):])
+        self.assertEqual([(e["phase"], e["agent"]) for e in later if e["kind"] == "phase_done"],
+                         [("agent", "agent1"), ("agent", "agent2"), ("close", None), ("teardown", None),
+                          ("score", None)])
+        polls = [e for e in later if e["kind"] == "marker_poll"]
+        self.assertEqual([(e["agent"], e["found"]) for e in polls], [("agent1", True), ("agent2", True)])
+        for poll in polls:
+            self.assertEqual(set(poll), {"kind", "t", "ts", "agent", "found"})
+        self.assertIn("result.json", [e["file"] for e in later if e["kind"] == "wrote"])
+        self.assert_secret_nowhere(out, err)
+        self.assert_tokens_kept_private(saved, out, err)
+
+    def test_hub_calls_are_traced_in_debug_alone_with_the_status_the_hub_gave(self):
+        memory = self.memory()
+        client = runner.HubClient(self.hub_url, ADMIN_SECRET)
+        self.assertTrue(client.healthy())
+        self.assertEqual(runner_events(memory, "hub_call"), [])
+        trace.set_level("debug")
+        self.assertTrue(client.healthy())
+        with self.assertRaises(runner.HubError):
+            client.request("GET", "/api/runs/nonesuch")
+        self.assertFalse(runner.HubClient("http://127.0.0.1:1").healthy())
+        calls = runner_events(memory, "hub_call")
+        self.assertEqual([(c["method"], c["path"], c["status"]) for c in calls],
+                         [("GET", "/api/health", 200), ("GET", "/api/runs/nonesuch", 404),
+                          ("GET", "/api/health", None)])
+
+
+class DockerTracing(TracedCase):
+    """drivers.docker in debug records what each command was, how it ended
+    and what it cost, without its command line; in prod it records nothing."""
+
+    def run_docker(self, *args, answer=None, **kwargs):
+        answer = answer or (lambda command, **_: subprocess.CompletedProcess(command, 0, "abc", ""))
+        with mock.patch.object(drivers.subprocess, "run", side_effect=answer):
+            return REAL_DOCKER(*args, **kwargs)
+
+    def test_nothing_is_recorded_in_prod(self):
+        memory = self.memory()
+        self.run_docker("ps")
+        self.run_docker("run", "-d", "--name", "c1", "img", extra_env={"COORD_AGENT_TOKEN": AGENT_SECRET})
+        self.assertEqual(memory, [])
+
+    def test_a_debug_record_names_the_subcommand_and_its_argument_never_the_line(self):
+        memory = self.memory()
+        trace.set_level("debug")
+        done = self.run_docker("run", "-d", "--name", "c1", "-e", "COORD_AGENT_TOKEN", "--network", "net",
+                               "--add-host", "host.docker.internal:host-gateway", "img", "-c", "sleep",
+                               extra_env={"COORD_AGENT_TOKEN": AGENT_SECRET})
+        self.assertEqual(done.returncode, 0)
+        self.assertEqual(len(memory), 1)
+        event = memory[0]
+        self.assertEqual(set(event), {"kind", "t", "ts", "subcommand", "argument", "exit_code", "duration_ms",
+                                      "output_bytes"})
+        self.assertEqual((event["kind"], event["subcommand"], event["argument"], event["exit_code"]),
+                         ("docker", "run", "img", 0))
+        self.assertIsInstance(event["duration_ms"], float)
+        self.assertGreaterEqual(event["duration_ms"], 0)
+        self.assertEqual(event["output_bytes"], 3)
+        dumped = json.dumps(event)
+        for unwanted in (AGENT_SECRET, "COORD_AGENT_TOKEN", "c1", "net", "host-gateway"):
+            self.assertNotIn(unwanted, dumped)
+
+    def test_the_argument_skips_an_option_s_value_and_the_exit_code_is_the_command_s(self):
+        memory = self.memory()
+        trace.set_level("debug")
+
+        def failing(command, **_):
+            return subprocess.CompletedProcess(command, 125, "", "no such container")
+
+        self.run_docker("exec", "-w", "/workspace/repo", "c-agent1", "bash", "-lc", "git diff", answer=failing)
+        self.run_docker("volume", "inspect", "-f", "{{.Mountpoint}}", "vol")
+        self.run_docker("cp", "/here/.", "c-agent1:/opt/coordbench")
+        self.assertEqual([(e["subcommand"], e["argument"], e["exit_code"], e["output_bytes"]) for e in memory],
+                         [("exec", "c-agent1", 125, len("no such container")), ("volume", "inspect", 0, 3),
+                          ("cp", "/here/.", 0, 3)])
+
+    def test_a_command_that_timed_out_is_recorded_without_an_exit_code_and_still_raises(self):
+        memory = self.memory()
+        trace.set_level("debug")
+
+        def too_long(command, **_):
+            raise subprocess.TimeoutExpired(command, 1)
+
+        with self.assertRaises(subprocess.TimeoutExpired):
+            self.run_docker("exec", "c-agent1", "claude", answer=too_long, timeout=1)
+        self.assertEqual((memory[0]["subcommand"], memory[0]["argument"], memory[0]["exit_code"],
+                          memory[0]["output_bytes"]), ("exec", "c-agent1", None, 0))
+
+    def test_a_teed_command_s_output_bytes_are_the_log_s(self):
+        memory = self.memory()
+        trace.set_level("debug")
+        log = Path(tempfile.mkdtemp(prefix="coordbench-docker-test-")) / "agent1_stream.jsonl"
+        self.addCleanup(shutil.rmtree, log.parent, True)
+
+        def tee(command, **kwargs):
+            kwargs["stdout"].write("x" * 5)
+            return subprocess.CompletedProcess(command, 0)
+
+        self.run_docker("exec", "c-agent1", "claude", answer=tee, output=str(log))
+        self.assertEqual((memory[0]["exit_code"], memory[0]["output_bytes"]), (0, 5))
+        self.assertEqual(log.read_text(), "xxxxx")
+
+    def test_write_text_announces_a_file_s_name_and_bytes_in_debug_alone(self):
+        memory = self.memory()
+        directory = Path(tempfile.mkdtemp(prefix="coordbench-write-test-"))
+        self.addCleanup(shutil.rmtree, directory, True)
+        drivers.write_text(directory / "quiet.txt", "nothing said\n")
+        self.assertEqual(memory, [])
+        trace.set_level("debug")
+        drivers.write_text(directory / "plan.json", "{}\n")
+        drivers.write_text(directory / "plan.json", "more\n", append=True)
+        self.assertEqual((directory / "plan.json").read_text(), "{}\nmore\n")
+        self.assertEqual([(e["kind"], e["file"], e["bytes"]) for e in memory],
+                         [("wrote", "plan.json", 3), ("wrote", "plan.json", 5)])
+
+
 class TheCommandLine(unittest.TestCase):
+    def test_debug_is_a_flag_of_run_prepare_and_finish_and_off_by_default(self):
+        pair = ["--arm", "coop", "--repo", REPO, "--task", str(TASK), "--features", "1,6"]
+        for command in (["run", *pair], ["prepare", *pair], ["finish", "--run-dir", "d"]):
+            self.assertFalse(runner.parser().parse_args(command).debug, command)
+            self.assertTrue(runner.parser().parse_args([*command, "--debug"]).debug, command)
+
     def settings(self, *extra):
         args = runner.parser().parse_args(["run", "--arm", "coop", "--repo", REPO, "--task", str(TASK),
                                            "--features", "1,6", "--name", "t", *extra])

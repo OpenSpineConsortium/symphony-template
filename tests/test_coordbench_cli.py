@@ -5,7 +5,9 @@ argument mapping (argv and flags) and exit codes, the wrappers install
 writes, and the bridge's session handling, streaming, and errors. The
 stdin rule and the typing of words are also run as drivers.py runs a
 command, cli.py as a subprocess with stdin at /dev/null, since that is
-where the in-process runs with a patched stdin missed two regressions."""
+where the in-process runs with a patched stdin missed two regressions.
+TraceTest pins what a command records in debug (trace.py beside it) and
+that prod, the default, prints exactly what it printed before."""
 
 import io
 import json
@@ -24,6 +26,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 COORDBENCH = ROOT / "experiment" / "coordbench"
+TRACE_PY = COORDBENCH / "trace.py"
 sys.path.insert(0, str(COORDBENCH))
 
 import cli  # noqa: E402
@@ -824,6 +827,244 @@ class BridgeTest(HubTestCase):
         bridge.send(request(9, "ping"))
         self.assertEqual(bridge.receive()["id"], 9)
         self.assertEqual(bridge.finish(), [])
+
+
+def python_says(code, env=None, cwd=None):
+    """What a fresh, isolated interpreter prints for code; its stderr on failure."""
+    done = subprocess.run([sys.executable, "-I", "-c", code], env=env or os.environ.copy(), cwd=cwd,
+                          capture_output=True, text=True, timeout=30)
+    if done.returncode != 0:
+        raise AssertionError(done.stderr)
+    return done.stdout.strip()
+
+
+class TraceTest(HubTestCase):
+    """In debug a command leaves one "rpc_call" span per request to the hub
+    and one "command" event per alias-run, on stderr or in COORD_TRACE_FILE;
+    in prod it registers nothing and prints what it always printed. The
+    process runs here read COORD_TRACE as the wrappers' environment sets
+    it; the in-process runs set the level on the module cli loaded."""
+
+    def setUp(self):
+        super().setUp()
+        for name in ("COORD_TRACE", "COORD_TRACE_FILE"):
+            os.environ.pop(name, None)
+        scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(scratch.cleanup)
+        self.scratch = Path(scratch.name)
+        self.trace_file = self.scratch / "cli-trace.jsonl"
+        self.trace = cli.coordtrace
+        self.addCleanup(self.reset_trace)
+
+    def reset_trace(self):
+        self.trace.set_level("prod")
+        for listener in list(self.trace._listeners):
+            self.trace.unlisten(listener)
+
+    def memory(self):
+        self.trace.set_level("debug")
+        return self.trace.listen(self.trace.Memory())
+
+    def trace_lines(self, text=None):
+        text = self.trace_file.read_text(encoding="utf-8") if text is None else text
+        return [json.loads(line) for line in text.splitlines()]
+
+    def alone(self):
+        """A directory holding cli.py and nothing else, as a copy of the one
+        file into a container leaves it."""
+        alone = self.scratch / "alone"
+        alone.mkdir()
+        (alone / "cli.py").write_text((COORDBENCH / "cli.py").read_text(encoding="utf-8"), encoding="utf-8")
+        return alone
+
+    def test_cli_loads_coordbench_s_trace_not_the_standard_library_s(self):
+        self.assertTrue(cli.same_file(self.trace, TRACE_PY), self.trace)
+        self.assertTrue(hasattr(self.trace, "JsonLines"))
+        self.assertFalse(cli.same_file(None, TRACE_PY))
+        self.assertFalse(cli.same_file(cli, TRACE_PY))
+
+    def test_in_debug_a_command_writes_its_rpc_calls_and_itself_to_the_trace_file_and_never_a_secret(self):
+        self.server.token = AGENT_TOKEN
+        os.environ.update(COORD_TRACE="debug", COORD_TRACE_FILE=str(self.trace_file), COORD_AGENT_TOKEN=AGENT_TOKEN)
+        done = self.run_cli_process("alias-run", "send_message", "agent2", "a secret plan")
+        # What the command prints is what it was: the tool's text alone.
+        self.assertEqual((done.returncode, done.stdout), (0, ""), done.stderr)
+        self.assertEqual(json.loads(done.stderr)["arguments"], {"to": "agent2", "text": "a secret plan"})
+        self.assertEqual(done.stderr.count("\n"), 1)
+        events = self.trace_lines()
+        self.assertEqual([e["kind"] for e in events],
+                         ["rpc_call", "rpc_call_done", "rpc_call", "rpc_call_done", "command"])
+        describe, described, call, called, command = events
+        for event in events:
+            self.assertIsInstance(event["t"], float)
+            self.assertIsInstance(event["ts"], float)
+        self.assertEqual({k: describe[k] for k in ("method", "path", "tool", "request_bytes")},
+                         {"method": "GET", "path": RPC_PATH, "tool": None, "request_bytes": 0})
+        self.assertEqual(set(describe), {"kind", "t", "ts", "method", "path", "tool", "request_bytes"})
+        self.assertEqual(set(described), set(describe) | {"duration_ms", "ok", "status", "response_bytes"})
+        self.assertEqual((described["status"], described["ok"]), (200, True))
+        self.assertGreater(described["response_bytes"], 0)
+        self.assertIsInstance(described["duration_ms"], float)
+        self.assertEqual(described["duration_ms"], round(described["duration_ms"], 3))
+        sent = {"tool": "send_message", "arguments": {"to": "agent2", "text": "a secret plan"}}
+        self.assertEqual({k: call[k] for k in ("method", "path", "tool", "request_bytes")},
+                         {"method": "POST", "path": RPC_PATH, "tool": "send_message",
+                          "request_bytes": len(json.dumps(sent))})
+        echo = {"text": json.dumps(sent, sort_keys=True), "isError": False}
+        self.assertEqual((called["status"], called["ok"], called["response_bytes"]),
+                         (200, True, len(json.dumps(echo))))
+        self.assertEqual({k: command[k] for k in ("command", "tool", "exit_code")},
+                         {"command": "coop-send", "tool": "send_message", "exit_code": 0})
+        self.assertEqual(set(command), {"kind", "t", "ts", "command", "tool", "exit_code", "duration_ms"})
+        self.assertGreaterEqual(command["duration_ms"], described["duration_ms"] + called["duration_ms"])
+        text = self.trace_file.read_text(encoding="utf-8")
+        for secret in (AGENT_TOKEN, "a secret plan", "agent2"):
+            self.assertNotIn(secret, text)
+
+    def test_in_debug_without_a_file_the_events_go_to_stderr_and_stdout_is_untouched(self):
+        os.environ["COORD_TRACE"] = "debug"
+        sent = self.run_cli_process("alias-run", "send_message", "agent2", "hi")
+        self.assertEqual((sent.returncode, sent.stdout), (0, ""), sent.stderr)
+        lines = [json.loads(line) for line in sent.stderr.splitlines()]
+        events = [line for line in lines if "kind" in line]
+        self.assertEqual([e["kind"] for e in events],
+                         ["rpc_call", "rpc_call_done", "rpc_call", "rpc_call_done", "command"])
+        told = [line for line in lines if "kind" not in line]
+        self.assertEqual(told, [{"tool": "send_message", "arguments": {"to": "agent2", "text": "hi"}}])
+        self.assertEqual(lines.index(told[0]), 4, "the tool's text comes after its call, before the command event")
+        # A tool whose text goes to stdout: stdout is exactly that text.
+        shown = self.run_cli_process("alias-run", "broadcast", "hello")
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        self.assertEqual(json.loads(shown.stdout), {"tool": "broadcast", "arguments": {"text": "hello"}})
+        self.assertEqual(shown.stdout.count("\n"), 1)
+        self.assertEqual([json.loads(line)["kind"] for line in shown.stderr.splitlines()],
+                         ["rpc_call", "rpc_call_done", "rpc_call", "rpc_call_done", "command"])
+        self.assertFalse(self.trace_file.exists())
+
+    def test_in_prod_nothing_is_written_and_stderr_is_what_it_was(self):
+        os.environ["COORD_TRACE_FILE"] = str(self.trace_file)
+        for level in (None, "prod", "off"):
+            with self.subTest(level=level):
+                os.environ.pop("COORD_TRACE", None)
+                if level:
+                    os.environ["COORD_TRACE"] = level
+                sent = self.run_cli_process("alias-run", "send_message", "agent2", "hi")
+                self.assertEqual((sent.returncode, sent.stdout), (0, ""))
+                self.assertEqual(sent.stderr, json.dumps({"arguments": {"to": "agent2", "text": "hi"},
+                                                          "tool": "send_message"}, sort_keys=True) + "\n")
+                shown = self.run_cli_process("call", "receive_messages")
+                self.assertEqual((shown.returncode, shown.stderr), (0, ""))
+                self.assertEqual(json.loads(shown.stdout), {"tool": "receive_messages", "arguments": {}})
+        self.assertFalse(self.trace_file.exists())
+        # The same in-process: a listener hears nothing from a prod command.
+        memory = self.trace.listen(self.trace.Memory())
+        self.assertEqual(run_cli("--url", self.rpc_url, "alias-run", "broadcast", "hi")[0], 0)
+        self.assertEqual(memory, [])
+
+    def test_a_refusal_and_an_unreachable_hub_are_recorded_as_not_ok(self):
+        memory = self.memory()
+        self.server.token = AGENT_TOKEN
+        code, out, err = run_cli("--url", self.rpc_url, "alias-run", "send_message", "agent2", "hi")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("HTTP 401", err)
+        self.assertEqual([e["kind"] for e in memory], ["rpc_call", "rpc_call_done", "command"])
+        refused, command = memory[1], memory[2]
+        self.assertEqual((refused["status"], refused["ok"]), (401, False))
+        self.assertNotIn("response_bytes", refused)
+        self.assertEqual({k: command[k] for k in ("command", "tool", "exit_code")},
+                         {"command": "send_message", "tool": "send_message", "exit_code": 2},
+                         "the hub could not be asked for the alias, so the tool's name stands in")
+        del memory[:]
+        code, _, _ = run_cli("--url", closed_port_url(RPC_PATH), "call", "receive_messages")
+        self.assertEqual(code, 2)
+        self.assertEqual([e["kind"] for e in memory], ["rpc_call", "rpc_call_done"])
+        self.assertIs(memory[1]["ok"], False)
+        self.assertNotIn("status", memory[1])
+        self.assertNotIn("response_bytes", memory[1])
+        # A refusal by the tool is still a call that went through, exit code and all.
+        del memory[:]
+        self.server.token = None
+        self.assertEqual(run_cli("--url", self.rpc_url, "alias-run", "refuse", "7")[0], 7)
+        self.assertEqual([(e["kind"], e.get("status"), e.get("ok")) for e in memory][1::2],
+                         [("rpc_call_done", 200, True), ("rpc_call_done", 200, True)])
+        self.assertEqual((memory[-1]["kind"], memory[-1]["command"], memory[-1]["exit_code"]),
+                         ("command", "coord-refuse", 7))
+
+    def test_configure_trace_listens_in_debug_alone_and_release_takes_it_off(self):
+        self.assertIsNone(cli.configure_trace())
+        self.trace.set_level("debug")
+        os.environ["COORD_TRACE_FILE"] = str(self.trace_file)
+        sink = cli.configure_trace()
+        self.assertIsInstance(sink, self.trace.JsonLines)
+        self.trace.event("probe", n=1)
+        cli.release_trace(sink)
+        cli.release_trace(None)
+        self.trace.event("after")
+        self.assertEqual([e["kind"] for e in self.trace_lines()], ["probe"])
+        os.environ["COORD_TRACE_FILE"] = " "
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            sink = cli.configure_trace()
+            self.trace.event("loud")
+            cli.release_trace(sink)
+        self.assertEqual(json.loads(stderr.getvalue())["kind"], "loud")
+        self.assertFalse(stderr.closed)
+
+    def test_a_copy_of_cli_py_alone_works_and_records_nothing(self):
+        alone = self.alone()
+        os.environ.update(COORD_TRACE="debug", COORD_TRACE_FILE=str(self.trace_file))
+        done = subprocess.run([sys.executable, "-I", str(alone / "cli.py"), "--url", self.rpc_url,
+                               "alias-run", "send_message", "agent2", "hi"],
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+        self.assertEqual((done.returncode, done.stdout), (0, ""), done.stderr)
+        self.assertEqual(json.loads(done.stderr)["arguments"], {"to": "agent2", "text": "hi"})
+        self.assertFalse(self.trace_file.exists())
+        self.assertEqual(python_says(f"""
+import sys
+sys.path.insert(0, {str(alone)!r})
+import cli
+assert cli.coordtrace is cli.NoTrace, cli.coordtrace
+assert cli.coordtrace.level == "off"
+assert "trace" not in sys.modules
+with cli.coordtrace.debug_span("rpc_call", method="GET") as span:
+    span.fields["status"] = 200
+assert span.fields == {{"method": "GET", "status": 200}}
+@cli.coordtrace.debug_span("command")
+def run():
+    return 3
+assert run() == 3 and run.__name__ == "run"
+assert cli.coordtrace.event("k", a=1) is None and cli.coordtrace.debug("k", a=1) is None
+assert cli.configure_trace() is None
+print("stand-in ok")
+"""), "stand-in ok")
+
+    def test_the_standard_library_s_trace_is_left_alone_when_it_got_there_first(self):
+        # A process that imported the standard library's trace, with
+        # coordbench last on sys.path: `import trace` would be the wrong
+        # one, so cli loads its own by location and takes nobody's name.
+        self.assertEqual(python_says(f"""
+import sys, trace
+assert hasattr(trace, "Trace"), "the standard library's"
+sys.path.append({str(COORDBENCH)!r})
+import cli
+assert cli.coordtrace is not trace
+assert hasattr(cli.coordtrace, "JsonLines") and cli.coordtrace.level == "prod"
+assert cli.coordtrace.__file__ == {str(TRACE_PY)!r}
+assert sys.modules["trace"] is trace
+print("own copy")
+""", cwd=self.scratch), "own copy")
+
+    def test_cli_and_the_rest_of_coordbench_share_one_trace_whichever_is_imported_first(self):
+        first = f"import sys; sys.path.insert(0, {str(COORDBENCH)!r}); import trace, cli; " \
+                "print(cli.coordtrace is trace and sys.modules['trace'] is trace)"
+        second = f"import sys; sys.path.insert(0, {str(COORDBENCH)!r}); import cli, trace; " \
+                 "print(cli.coordtrace is trace and sys.modules['trace'] is trace)"
+        self.assertEqual(python_says(first, cwd=self.scratch), "True")
+        self.assertEqual(python_says(second, cwd=self.scratch), "True")
+        # The level the environment sets reaches cli's events.
+        env = dict(os.environ, COORD_TRACE="debug")
+        self.assertEqual(python_says(second.replace("print(", "print(trace.level, ")[:-1] + ")", env=env,
+                                     cwd=self.scratch), "debug True")
 
 
 if __name__ == "__main__":

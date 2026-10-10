@@ -7,8 +7,8 @@ import contextlib
 import http.client
 import io
 import json
+import os
 import select
-import shutil
 import socket
 import struct
 import subprocess
@@ -25,8 +25,15 @@ ROOT = Path(__file__).resolve().parent.parent
 COORDBENCH = ROOT / "experiment" / "coordbench"
 sys.path.insert(0, str(COORDBENCH))
 
+# coordbench's trace.py, which hub.py imports, shares its name with the
+# standard library's tracer; a process that loaded that one first gets
+# ours here instead.
+if getattr(sys.modules.get("trace"), "__file__", None) != str(COORDBENCH / "trace.py"):
+    sys.modules.pop("trace", None)
 import hub as hub_module  # noqa: E402
 import kit  # noqa: E402
+import mcp  # noqa: E402
+import trace  # noqa: E402
 from arm import Arm, Call, Run, Tool, ToolError  # noqa: E402
 
 ARM_JSON = {"entry": "arm.py:TestArm", "name": "testarm", "description": "messages and two odd tools",
@@ -143,6 +150,21 @@ def contents(messages_json):
     return [message["content"] for message in json.loads(messages_json)]
 
 
+def listen_in_test(test, level=None):
+    """A Memory on the trace stream for one test, at the level asked when
+    one is, both undone when the test ends so the next starts as it did."""
+    if level is not None:
+        test.addCleanup(trace.set_level, trace.level)
+        trace.set_level(level)
+    memory = trace.listen(trace.Memory())
+    test.addCleanup(trace.unlisten, memory)
+    return memory
+
+
+def read_jsonl(path):
+    return [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines()]
+
+
 class HubServerCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -156,6 +178,9 @@ class HubServerCase(unittest.TestCase):
     def tearDown(self):
         self.server.shutdown()
         self.server.server_close()
+        for hosted in self.hub.runs.values():
+            if hosted is not None:
+                hosted.run.close_log()
         self.tmp.cleanup()
 
     def request(self, method, path, body=None, headers=None):
@@ -830,6 +855,119 @@ class McpTest(HubServerCase):
         self.assertEqual(kinds, ["receive", "receive", "receive_lost", "receive_lost", "receive"])
 
 
+class TraceTest(HubServerCase):
+    """The hub's events and timings go through trace.py. A run's own record
+    keeps its shape exactly, the hub records nothing of its own in prod,
+    and --debug records every request, wait, cancel and session."""
+
+    def test_a_tool_and_tool_done_pair_is_whole_as_before(self):
+        self.create()
+        self.rpc("poke")
+        started, done = self.hub.events("pair1")
+        self.assertEqual(started, {"seq": 0, "t": started["t"], "kind": "tool", "agent": "agent1", "tool": "poke"})
+        self.assertEqual(done, {"seq": 1, "t": done["t"], "kind": "tool_done", "agent": "agent1", "tool": "poke",
+                                "duration_ms": done["duration_ms"], "blocked_ms": 0, "is_error": False,
+                                "cancelled": False})
+        self.assertEqual(list(done), ["seq", "t", "kind", "agent", "tool", "duration_ms", "blocked_ms",
+                                      "is_error", "cancelled"])
+        self.assertIsInstance(done["duration_ms"], float)
+        self.assertEqual(done["duration_ms"], round(done["duration_ms"], 3))
+        self.assertGreaterEqual(done["t"], started["t"])
+        self.assertIsInstance(started["t"], float)
+
+    def test_events_jsonl_holds_the_runs_events_line_for_line_in_their_shape(self):
+        self.create()
+        self.rpc("send_message", {"to": "agent2", "text": "hi"})
+        self.rpc("poke")
+        events = self.hub.events("pair1")
+        written = read_jsonl(self.dir / "logs" / "pair1" / "events.jsonl")
+        self.assertEqual(written, events)
+        self.assertEqual([list(line) for line in written], [list(event) for event in events])
+        self.assertEqual([e["kind"] for e in written], ["tool", "message", "tool_done", "tool", "tool_done"])
+        for event in written:
+            self.assertEqual(list(event)[:4], ["seq", "t", "kind", "agent"])
+            self.assertNotIn("ts", event)
+            self.assertNotIn("run", event)
+
+    def test_the_runs_events_reach_the_stream_under_its_id_and_prod_adds_nothing(self):
+        self.assertEqual(trace.level, "prod")
+        memory = listen_in_test(self)
+        self.create()
+        self.rpc("poke")
+        self.assertEqual([(e["kind"], e["run"]) for e in memory], [("tool", "pair1"), ("tool_done", "pair1")],
+                         "in prod the stream carries the runs' events and nothing of the hub's own")
+        started = memory[0]
+        self.assertEqual(set(started), {"kind", "t", "ts", "run", "seq", "agent", "tool"})
+        self.assertEqual((started["seq"], started["agent"], started["tool"]), (0, "agent1", "poke"))
+        self.assertEqual(started["t"], self.hub.events("pair1")[0]["t"], "t is the run's clock, not trace's")
+        self.assertEqual(memory[1]["duration_ms"], self.hub.events("pair1")[1]["duration_ms"])
+
+    def test_debug_records_one_http_request_per_request_with_its_fields(self):
+        memory = listen_in_test(self, "debug")
+        health = self.request("GET", "/api/health")
+        self.create()
+        arguments = {"to": "agent2", "text": "hi"}
+        sent = self.rpc("send_message", arguments)
+        self.request("GET", "/nowhere")
+        # Each event is emitted once its reply is on the wire, on the
+        # request's own thread, so the client may hold the answer before
+        # the event lands, and the next request's event may land first:
+        # the test waits for the fourth and reads the events by path.
+        deadline = time.monotonic() + 5
+        while len([e for e in memory if e["kind"] == "http_request"]) < 4 and time.monotonic() < deadline:
+            time.sleep(0.005)
+        requests = {e["path"]: e for e in memory if e["kind"] == "http_request"}
+        self.assertEqual(sorted((e["method"], e["path"], e["status"]) for e in requests.values()),
+                         sorted([("GET", "/api/health", 200), ("POST", "/api/runs", 201),
+                                 ("POST", "/rpc/pair1/agent1", 200), ("GET", "/nowhere", 404)]))
+        self.assertEqual(len([e for e in memory if e["kind"] == "http_request"]), 4)
+        for event in requests.values():
+            self.assertEqual(set(event), {"kind", "t", "ts", "method", "path", "status", "request_bytes",
+                                          "response_bytes", "duration_ms", "thread"})
+            self.assertIsInstance(event["duration_ms"], float)
+            self.assertGreaterEqual(event["duration_ms"], 0)
+            self.assertEqual(event["duration_ms"], round(event["duration_ms"], 3))
+            self.assertTrue(event["thread"])
+        checked, called = requests["/api/health"], requests["/rpc/pair1/agent1"]
+        self.assertEqual((checked["request_bytes"], checked["response_bytes"]), (0, len(health.raw)))
+        self.assertEqual(called["request_bytes"],
+                         len(json.dumps({"tool": "send_message", "arguments": arguments}).encode()))
+        self.assertEqual(called["response_bytes"], len(sent.raw))
+        sizes = [e for e in memory if e["kind"] == "tool_arguments"]
+        self.assertEqual([(e["run"], e["agent"], e["tool"], e["bytes"]) for e in sizes],
+                         [("pair1", "agent1", "send_message", len(json.dumps(arguments)))])
+        self.assertNotIn("hi", json.dumps(sizes[0]), "the arguments' size is recorded, never their content")
+        self.assertEqual([e["kind"] for e in self.hub.events("pair1")], ["tool", "message", "tool_done"],
+                         "debug adds to the hub's stream, never to the run's record")
+        self.assertEqual(read_jsonl(self.dir / "logs" / "pair1" / "events.jsonl"), self.hub.events("pair1"))
+
+    def test_debug_records_each_session_opened_and_each_cancel(self):
+        memory = listen_in_test(self, "debug")
+        self.create()
+        session = self.initialize("agent2").headers["Mcp-Session-Id"]
+        opened = [e for e in memory if e["kind"] == "session_opened"]
+        self.assertEqual([(e["run"], e["agent"], e["session"]) for e in opened], [("pair1", "agent2", session)])
+        notice = rpc_message("notifications/cancelled", {"requestId": 99, "reason": "gave up"}, request_id=None)
+        self.assertEqual(self.mcp(notice, agent="agent2", headers={"Mcp-Session-Id": session}).status, 202)
+        cancels = [e for e in memory if e["kind"] == "cancel"]
+        self.assertEqual([(e["request_id"], e["found"]) for e in cancels], [(99, False)])
+
+    def test_the_log_is_held_open_from_the_first_event_and_closed_when_the_run_is_released(self):
+        self.create()
+        run = self.hub.hosted("pair1").run
+        path = self.dir / "logs" / "pair1" / "events.jsonl"
+        self.assertEqual(path.read_text(encoding="utf-8"), "")
+        self.assertFalse(run.log_file.opened)
+        self.rpc("poke")
+        self.assertTrue(run.log_file.opened)
+        self.assertEqual(self.request("DELETE", "/api/runs/pair1").status, 200)
+        self.assertFalse(run.log_file.opened)
+        self.assertEqual([e["kind"] for e in read_jsonl(path)], ["tool", "tool_done"])
+        run.emit("late")
+        self.assertEqual([e["kind"] for e in read_jsonl(path)], ["tool", "tool_done", "late"])
+        run.close_log()
+
+
 class AgentTokenTest(HubServerCase):
     """A run made with agent_tokens wants each agent's own bearer token on
     its /mcp and /rpc: the transport asks a local server to authenticate
@@ -1093,26 +1231,138 @@ class EmitTest(unittest.TestCase):
     the tools waiting on the run asleep."""
 
     def test_a_failed_log_write_keeps_the_event_wakes_waiters_and_complains_once(self):
+        # The log's directory is not there when the first event comes; the
+        # events stay in memory under one complaint, and once it is there
+        # the next write lands, so a disk that empties again loses only
+        # the events in between.
         with tempfile.TemporaryDirectory() as logs:
             path = Path(logs) / "gone" / "events.jsonl"
-            path.parent.mkdir()
             run = Run("r1", Arm(), [], events_path=path)
-            run.emit("first")
-            shutil.rmtree(path.parent)
             woke = []
             waiter = threading.Thread(target=lambda: woke.append(
                 run.wait_until(lambda: len(run.events) > 1, 10)))
             waiter.start()
             time.sleep(0.2)
             with contextlib.redirect_stderr(io.StringIO()) as log:
+                run.emit("first")
                 event = run.emit("second", "agent1")
-                run.emit("third")
             waiter.join(timeout=10)
-        self.assertEqual(event["kind"], "second")
+            self.assertFalse(path.exists())
+            path.parent.mkdir()
+            with contextlib.redirect_stderr(io.StringIO()) as later:
+                run.emit("third")
+            written = read_jsonl(path)
+            run.close_log()
+        self.assertEqual(event, {"seq": 1, "t": event["t"], "kind": "second", "agent": "agent1"})
         self.assertEqual([e["kind"] for e in run.events], ["first", "second", "third"])
         self.assertEqual(woke, [True])
         self.assertEqual(log.getvalue().count("cannot write"), 1)
         self.assertIn("r1", log.getvalue())
+        self.assertEqual(later.getvalue(), "")
+        self.assertEqual(written, [run.events[2]])
+
+    def test_the_run_keeps_its_record_whatever_the_trace_level(self):
+        # The run's events are its data, not its logging: the stream may
+        # be silent (off) or unheard, and the record is whole either way.
+        self.addCleanup(trace.set_level, trace.level)
+        run = Run("r1", Arm(), [])
+        trace.set_level("off")
+        run.emit("first", "agent1", n=1)
+        trace.set_level("prod")
+        run.emit("second")
+        self.assertEqual(run.events, [{"seq": 0, "t": run.events[0]["t"], "kind": "first", "agent": "agent1", "n": 1},
+                                      {"seq": 1, "t": run.events[1]["t"], "kind": "second", "agent": None}])
+
+
+class WaitTraceTest(unittest.TestCase):
+    def test_lock_wait_records_a_timeout_and_a_wake_in_debug_only(self):
+        run = Run("r1", Arm(), [])
+        memory = listen_in_test(self)
+        self.assertFalse(run.wait_until(lambda: False, 0.01))
+        self.assertEqual(memory, [], "prod records no wait")
+        self.addCleanup(trace.set_level, trace.level)
+        trace.set_level("debug")
+        self.assertFalse(run.wait_until(lambda: False, 0.05))
+        woke = []
+        waiter = threading.Thread(target=lambda: woke.append(
+            run.wait_until(lambda: run.state.get("go"), 10, agent="agent1")))
+        waiter.start()
+        time.sleep(0.05)
+        with run.lock:
+            run.state["go"] = True
+            run.lock.notify_all()
+        waiter.join(timeout=10)
+        self.assertEqual(woke, [True])
+        waits = [e for e in memory if e["kind"] == "lock_wait"]
+        self.assertEqual([(e["run"], e["agent"], e["woke"]) for e in waits],
+                         [("r1", None, False), ("r1", "agent1", True)])
+        timed_out, woken = waits
+        self.assertEqual(set(timed_out), {"kind", "t", "ts", "run", "agent", "waited_ms", "woke"})
+        self.assertGreaterEqual(timed_out["waited_ms"], 50)
+        self.assertLess(timed_out["waited_ms"], 5000)
+        self.assertGreater(woken["waited_ms"], 0)
+        self.assertLess(woken["waited_ms"], 10000)
+        self.assertEqual(run.events, [], "a wait is the hub's event, not the run's")
+
+    def test_a_cancel_that_finds_its_call_is_recorded_in_debug_only(self):
+        run = Run("r1", Arm(), [])
+        memory = listen_in_test(self)
+        call = Call(run, "agent1", {})
+        mcp.cancel({"requestId": 7}, {7: call})
+        self.assertTrue(call.cancelled.is_set())
+        self.assertEqual(memory, [])
+        self.addCleanup(trace.set_level, trace.level)
+        trace.set_level("debug")
+        other = Call(run, "agent2", {})
+        mcp.cancel({"requestId": "b", "reason": "gave up"}, {"b": other})
+        mcp.cancel({"requestId": "b"}, {})
+        self.assertTrue(other.cancelled.is_set())
+        self.assertEqual([(e["kind"], e.get("run"), e.get("agent"), e["request_id"], e["found"]) for e in memory],
+                         [("cancel", "r1", "agent2", "b", True), ("cancel", None, None, "b", False)])
+        self.assertEqual(run.events, [])
+
+
+class ConfigureTraceTest(unittest.TestCase):
+    """hub.py's --debug and the environment's COORD_TRACE meet in
+    configure_trace: debug gets a sink and a note, any other level nothing."""
+
+    def setUp(self):
+        self.addCleanup(trace.set_level, trace.level)
+
+    def test_prod_registers_no_listener_and_says_nothing(self):
+        with contextlib.redirect_stderr(io.StringIO()) as log:
+            self.assertIsNone(hub_module.configure_trace(False, None))
+        self.assertEqual(trace.level, "prod")
+        self.assertEqual(log.getvalue(), "")
+
+    def test_debug_writes_hub_trace_jsonl_under_the_log_dir_and_says_so_once(self):
+        with tempfile.TemporaryDirectory() as logs:
+            log_dir = Path(logs) / "deeper"
+            with contextlib.redirect_stderr(io.StringIO()) as log:
+                sink = hub_module.configure_trace(True, log_dir)
+            self.addCleanup(trace.unlisten, sink)
+            self.assertEqual(trace.level, "debug")
+            self.assertEqual(log.getvalue().count("\n"), 1)
+            self.assertIn(f"tracing at debug to {log_dir / 'hub-trace.jsonl'}", log.getvalue())
+            trace.debug("probe", n=1)
+            sink.close()
+            self.assertEqual([(e["kind"], e["n"]) for e in read_jsonl(log_dir / "hub-trace.jsonl")], [("probe", 1)])
+
+    def test_debug_without_a_log_dir_writes_to_stderr(self):
+        with contextlib.redirect_stderr(io.StringIO()) as log:
+            sink = hub_module.configure_trace(True)
+            self.addCleanup(trace.unlisten, sink)
+            trace.event("probe")
+        notice, line = log.getvalue().splitlines()
+        self.assertIn("tracing at debug to stderr", notice)
+        self.assertEqual(json.loads(line)["kind"], "probe")
+
+    def test_off_is_left_as_the_operator_set_it(self):
+        trace.set_level("off")
+        with contextlib.redirect_stderr(io.StringIO()) as log:
+            self.assertIsNone(hub_module.configure_trace(False, None))
+        self.assertEqual(trace.level, "off")
+        self.assertEqual(log.getvalue(), "")
 
 
 class GuardTest(unittest.TestCase):
@@ -1273,6 +1523,61 @@ class CommandLineTest(unittest.TestCase):
             finally:
                 process.terminate()
                 process.communicate(timeout=10)
+
+    def serve(self, arguments, env=None):
+        """hub.py on a free port with the arguments, and the port it took."""
+        process = subprocess.Popen(
+            [sys.executable, str(COORDBENCH / "hub.py"), "--host", "127.0.0.1", "--port", "0", *arguments],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+        ready, _, _ = select.select([process.stdout], [], [], 20)
+        self.assertTrue(ready, "the hub printed nothing")
+        return process, urlsplit(process.stdout.readline().strip()).port
+
+    def ask(self, port, method, path, body=None):
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        try:
+            data = None if body is None else json.dumps(body).encode()
+            connection.request(method, path, body=data, headers={"Content-Type": "application/json"} if data else {})
+            response = connection.getresponse()
+            return response.status, json.loads(response.read() or b"null")
+        finally:
+            connection.close()
+
+    def test_debug_sets_the_level_says_so_once_and_logs_each_request(self):
+        with tempfile.TemporaryDirectory() as logs:
+            process, port = self.serve(["--log-dir", logs, "--debug"])
+            try:
+                self.assertEqual(self.ask(port, "GET", "/api/health"), (200, {"ok": True, "runs": 0}))
+                # The event is written once the answer is out; the client
+                # may read the answer first.
+                deadline = time.monotonic() + 5
+                path = Path(logs) / "hub-trace.jsonl"
+                while time.monotonic() < deadline and not (path.exists() and path.read_text(encoding="utf-8")):
+                    time.sleep(0.02)
+            finally:
+                process.terminate()
+                _, stderr = process.communicate(timeout=10)
+            self.assertEqual(stderr.count("tracing at debug"), 1, stderr)
+            requests = [e for e in read_jsonl(path) if e["kind"] == "http_request"]
+            self.assertEqual([(e["method"], e["path"], e["status"]) for e in requests], [("GET", "/api/health", 200)])
+
+    def test_off_in_the_environment_silences_the_stream_and_a_run_still_keeps_its_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            arm_dir = Path(tmp) / "testarm"
+            write_test_arm(arm_dir)
+            process, port = self.serve(["--arm-dir", tmp], env={**os.environ, "COORD_TRACE": "off"})
+            try:
+                status, _ = self.ask(port, "POST", "/api/runs", {"arm": str(arm_dir), "run_id": "pair1",
+                                                                 "features": [1, 2], "specs": SPECS})
+                self.assertEqual(status, 201)
+                call = {"tool": "send_message", "arguments": {"to": "agent2", "text": "hi"}}
+                self.assertEqual(self.ask(port, "POST", "/rpc/pair1/agent1", call)[0], 200)
+                _, listed = self.ask(port, "GET", "/api/runs/pair1/events")
+            finally:
+                process.terminate()
+                _, stderr = process.communicate(timeout=10)
+            self.assertEqual([e["kind"] for e in listed["events"]], ["tool", "message", "tool_done"])
+            self.assertEqual(stderr, "")
 
 
 if __name__ == "__main__":
