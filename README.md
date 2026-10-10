@@ -14,6 +14,8 @@ About ten minutes, in this order.
 
 Then open an issue with the Task form (the repository's Issues tab, New issue, Task), which carries the label todo. The worker routine takes it at its next run; to have it taken now, start a thread in the Project with "take the next issue from the board" (a thread clones the repository and reads the board; a plain chat in the Project knows only the pointer text of step 4).
 
+To open the project to volunteers who each work under their own Claude Pro or Max account, docs/setup/crowdsourcing.md is the step-by-step for the owner and for each contributor, and docs/history/crowdsourcing/research.md the evidence behind every step. It starts from what Anthropic's terms allow with contributors' accounts, and it turns off the workflows that run on the owner's own subscription token, which anyone with write access could otherwise start.
+
 For the maintainer of the template itself: mark the repository as a template (Settings, General, "Template repository") before its first push, or the init workflow runs on the template and fills its own placeholders.
 
 ## Where a Project's metadata lives
