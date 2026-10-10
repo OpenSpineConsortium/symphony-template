@@ -21,7 +21,10 @@ name: Checks
 # too, and only that branch, so a repository outside crowd mode loses no
 # run it had: scripts/crowd.py setup pushes crowd/setup with the owner's
 # token through the API and opens its pull request, whose run is the one
-# that counts.
+# that counts. It leaves out metrics as well, the branch that holds only
+# METRICS.json and JUDGE.json: a maintainer's judge pushes JUDGE.json there
+# with their own credentials (docs/setup/metrics.md), which, unlike
+# GITHUB_TOKEN, start this workflow, and the branch has no checks to run.
 # Before the checks the job clones OpenSpineConsortium/sdlc-protocol, which
 # is public, so the clone needs no token, and names the clone to them in
 # SDLC_PROTOCOL. check.sh's vendoring.py verify holds tools/sdlc_protocol to
@@ -63,7 +66,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
   push:
-    branches-ignore: ["claude/**", "sdlc-protocol/**", "crowd/setup"]
+    branches-ignore: ["claude/**", "sdlc-protocol/**", "crowd/setup", "metrics"]
 
 permissions:
   contents: read

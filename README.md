@@ -49,6 +49,10 @@ Three more repositories go with this one: OpenSpineConsortium/coordbench, the be
 
 cswap is the optional multi-account switcher (claude-swap-cloud on PyPI); its `checkpoint write` rewrites the same block at the end of CLAUDE.md as the checkpoint skill does, and nothing in this repository needs it.
 
+## Field metrics
+
+.github/workflows/metrics.yml writes, once a day, how the claim protocol ran here over the last 30 days to METRICS.json on the branch `metrics`: counts of claims, pull requests, merges, reviews, check runs, conflicts and released claims, three waits and two rates, and never a name, a title or any text. OpenSpineConsortium's collector reads that file, and the communication-error counts a maintainer's judge may add beside it, only where the repository installed the OpenSpine SDLC App, and keeps them under a salted hash of the repository, so the protocol can be measured in real projects as coordbench measures it on CooperBench's tasks. Sharing is on by default; the word off in .github/sdlc-metrics, or the repository variable SDLC_METRICS set to off, turns it off. docs/setup/metrics.md says what each number is, how it lines up with the benchmark's, and how a maintainer runs the judge on their own Claude account.
+
 ## What comes next
 
 This is the first layer: the repository as the shared plane, with the board, the claim protocol and the memory as plain files. Nothing below exists yet, and nothing in this layer refers to it.
@@ -62,3 +66,4 @@ This is the first layer: the repository as the shared plane, with the board, the
 - Nothing here scripts claude.ai, and nothing writes into a Project's instructions, description or memory. Anthropic's consumer terms forbid automated access except through an API key or where Anthropic explicitly permits it; routines and cloud threads are Anthropic's own features, used as offered, and Claude Code reads the repository natively. The Project links the repository, and people press the buttons.
 - No credential and no token is kept in the repository. The workflows run on GitHub's own token, and template-init on the sdlc App's token where the App is set up; the optional secrets are the coordinator routine's trigger pair, the main account's subscription token for @claude (docs/setup/claude-action.md) and the App's private key (docs/setup/owner-checklist.md), kept in the repository's settings and never in a file (docs/setup/github.md).
 - No API key anywhere.
+- Nothing of a project's content leaves it: the metrics workflow reads with GitHub's own token and writes aggregates alone, to the project's own branch `metrics`, and the judge's conversations go only to the maintainer's own claude (docs/setup/metrics.md).

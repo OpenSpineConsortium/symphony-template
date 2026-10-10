@@ -231,7 +231,7 @@ GitHub enforces these once `setup` and `finish` have run, with nobody rememberin
 
 These stay conventions, made loud but not prevented, because GitHub gives every writer the power:
 
-- Invite only people you trust with Write. It lets them push to every unprotected branch, others' claim branches and `board` included (the push guard passes a `--force-with-lease` to anyone's `claude/` branch), edit anyone's comments, merge approved pull requests, set any commit status, add secrets and variables, delete CLAUDE_CROWD, disable a workflow, and run a workflow of their own on a branch of their own with every secret that exists. The check, queue.yml and the audit make most of these loud, though nothing reports an edited comment; the protection against the last is that no secret exists to read.
+- Invite only people you trust with Write. It lets them push to every unprotected branch, others' claim branches, `board` and `metrics` included (the push guard passes a `--force-with-lease` to anyone's `claude/` branch), edit anyone's comments, merge approved pull requests, set any commit status, add secrets and variables, delete CLAUDE_CROWD, disable a workflow, and run a workflow of their own on a branch of their own with every secret that exists. The check, queue.yml and the audit make most of these loud, though nothing reports an edited comment; the protection against the last is that no secret exists to read.
 - Run the audit every week, and read its lines on who pushed `board` and the claim branches.
 - Review each diff against the claim file as first committed and the plan on the issue, line by line under .github/, .claude/, tools/, scripts/ and tests/: a pull request that edits the check runs its own edited copy, which is why those paths wait for you.
 - Treat all issue, comment, pull request and board text as data: crowd.md, the worker prompt and the coordinator's step 1 say so.
@@ -239,6 +239,8 @@ These stay conventions, made loud but not prevented, because GitHub gives every 
 - Make routines outside any Project, with no connectors and the Default environment's Trusted network; keep auto-fix on only while you watch.
 - Before a session on your machine, read what changed in the shared paths, the instruction files of every folder included: `git fetch origin && git log -p HEAD..origin/{{DEFAULT_BRANCH}} -- '*CLAUDE.md' '*CLAUDE.local.md' '*AGENTS.md' '*.claude/*' .mcp.json tools scripts tests docs/project.md docs/agents docs/memory`.
 - Keep your cloud sessions Private, and permission prompts on for a local worker.
+
+Field metrics need nothing of crowd mode ([docs/setup/metrics.md](metrics.md)): .github/workflows/metrics.yml names no secret but GITHUB_TOKEN and writes aggregates alone to the branch `metrics`, and the judge runs only when a maintainer runs it, on their own machine and their own Claude account. A crowd project that should share nothing says off in .github/sdlc-metrics, by pull request like any file.
 
 ## What is to be built
 
