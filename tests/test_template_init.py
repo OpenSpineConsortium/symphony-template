@@ -2,7 +2,8 @@
 marker folder, leaves the workflows alone, and does nothing the second time;
 in an organization's copy CODEOWNERS names the user who made it. The
 placeholders are assembled at run time so this file survives an init of the
-repository it lives in."""
+repository it lives in, and the tests that read the template's own files run
+in the template alone."""
 
 import io
 import json
@@ -19,6 +20,13 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import template_init  # noqa: E402
 from template_init import placeholder  # noqa: E402
+
+# A repository made from the template runs these tests too, with the files
+# some of them read already changed: its CLAUDE.md block is empty, and in
+# crowd mode its checkpoint skill is another file. Those tests run in the
+# template alone, where .template/ still is, as tests/test_crowd.py does.
+IN_TEMPLATE = (ROOT / ".template" / "PENDING").is_file()
+template_only = unittest.skipUnless(IN_TEMPLATE, "reads the template's own files, which a copy has changed")
 
 P = {name: placeholder(name) for name in template_init.PLACEHOLDER_NAMES}
 README = f"# {P['PROJECT_NAME']}\n\nClone {P['REPO']}; the default branch is {P['DEFAULT_BRANCH']}.\n"
@@ -197,6 +205,92 @@ class Checkpoint(unittest.TestCase):
             (root / ".claude" / "session.md").write_text(template_init.BLANK_CHECKPOINT)
             code, lines = run_init(root)
             self.assertNotIn(".claude/session.md: reset to a blank checkpoint", lines)
+
+
+BEGIN, END = template_init.marked_section.MARK_BEGIN, template_init.marked_section.MARK_END
+INTRO = "## Session checkpoint (kept by cswap)\n\nRead `.claude/session.md` first.\n\n"
+TEMPLATE_BLOCK = (BEGIN + "\n" + INTRO + "### Durable decisions\n- The template's own decision.\n"
+                  "### Constraints\n- The template's own constraint.\n" + END)
+EMPTY_BLOCK = BEGIN + "\n" + INTRO + template_init.BLANK_LISTS + "\n" + END
+CLAUDE_TEXT = "# {name}\n\nThe project's own instructions.\n\n{block}\n"
+FILLED_LISTS = "### Durable decisions\n- A decision of the template's.\n### Constraints\n- A constraint of the template's."
+
+
+def with_filled_lists(text):
+    """CLAUDE.md as the template has it, its checkpoint block's lists holding
+    an item each, whatever they hold in the repository the tests run in: a
+    copy's are already empty. The heading and the intro are the file's own."""
+    begin = text.index(BEGIN)
+    end = text.index(END, begin) + len(END)
+    head = text[begin:text.index("\n### ", begin) + 1]
+    return text[:begin] + head + FILLED_LISTS + "\n" + END + text[end:]
+
+
+class CheckpointBlock(unittest.TestCase):
+    """The decisions and constraints at the end of CLAUDE.md are the
+    template's; a copy keeps the block's heading and intro and starts with
+    both lists empty, in the shape the checkpoint skill writes."""
+
+    def init_with(self, text, newline="\n"):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tiny_tree(root)
+            write(root, "CLAUDE.md", text.replace("\n", newline))
+            code, lines = run_init(root)
+            after = (root / "CLAUDE.md").read_bytes().decode("utf-8")
+            again = run_init(root)[1]
+        return code, lines, after, again
+
+    def test_a_copy_starts_with_the_empty_lists_and_keeps_the_rest(self):
+        code, lines, after, again = self.init_with(CLAUDE_TEXT.format(name="x", block=TEMPLATE_BLOCK))
+        self.assertEqual(code, 0)
+        self.assertEqual(after, CLAUDE_TEXT.format(name="x", block=EMPTY_BLOCK))
+        self.assertIn("CLAUDE.md: checkpoint block emptied of the template's decisions and constraints", lines)
+        self.assertEqual(again, [])
+
+    def test_the_empty_form_is_one_line_per_list(self):
+        self.assertEqual(template_init.BLANK_LISTS,
+                         "### Durable decisions\n- (none recorded)\n### Constraints\n- (none recorded)")
+
+    @template_only
+    def test_the_empty_form_is_the_checkpoint_skills(self):
+        # Crowd mode ships its own checkpoint skill (docs/setup/crowd/checkpoint-skill.md),
+        # which never edits the block, so only the template's names the empty form.
+        skill = (ROOT / ".claude" / "skills" / "checkpoint" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("`### Durable decisions` and `### Constraints`, each followed by one `- ` line per item, "
+                      "or `- (none recorded)`", skill)
+
+    def test_a_crlf_file_stays_crlf(self):
+        _, _, after, _ = self.init_with(CLAUDE_TEXT.format(name="x", block=TEMPLATE_BLOCK), newline="\r\n")
+        self.assertEqual(after, CLAUDE_TEXT.format(name="x", block=EMPTY_BLOCK).replace("\n", "\r\n"))
+
+    def test_a_file_without_the_markers_is_left_alone(self):
+        text = "# x\n\nNo checkpoint block here.\n"
+        _, lines, after, _ = self.init_with(text)
+        self.assertEqual(after, text)
+        self.assertFalse([line for line in lines if line.startswith("CLAUDE.md:")])
+
+    def empties_to_the_skills_shape(self, text):
+        """reset_checkpoint_block changes a file holding this text, keeps all
+        outside the block and the block's own heading and intro, and ends the
+        block with the empty lists."""
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder) / "CLAUDE.md").write_text(text, encoding="utf-8")
+            self.assertEqual(template_init.reset_checkpoint_block(Path(folder)), ["CLAUDE.md"])
+            after = (Path(folder) / "CLAUDE.md").read_text(encoding="utf-8")
+        begin = text.index(BEGIN)
+        end = text.index(END, begin) + len(END)
+        head = text[begin:text.index("\n### ", begin) + 1]
+        self.assertTrue(head.startswith(BEGIN + "\n## Session checkpoint (kept by cswap)\n\n"))
+        self.assertTrue(head.endswith("\n\n"))
+        self.assertEqual(after, text[:begin] + head + template_init.BLANK_LISTS + "\n" + END + text[end:])
+
+    def test_the_repositorys_block_holding_items_empties_to_the_skills_shape(self):
+        self.empties_to_the_skills_shape(with_filled_lists((ROOT / "CLAUDE.md").read_text(encoding="utf-8")))
+
+    @template_only
+    def test_the_templates_own_block_empties_to_the_skills_shape(self):
+        self.empties_to_the_skills_shape((ROOT / "CLAUDE.md").read_text(encoding="utf-8"))
 
 
 class Init(unittest.TestCase):

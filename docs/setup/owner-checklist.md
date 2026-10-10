@@ -226,6 +226,12 @@ docs/setup/github.md describes:
    still names the organization, so change that line by pull request
    (docs/setup/github.md, section 7).
 6. **Template**: sdlc-template is already marked as a template repository.
+7. **Field metrics**: nothing to set. .github/workflows/metrics.yml writes
+   the project's aggregates to the branch `metrics` once a day, which
+   OpenSpineConsortium's collector reads only where the OpenSpine SDLC App
+   is installed; the word off in .github/sdlc-metrics, or the repository
+   variable `SDLC_METRICS` = `off`, turns sharing off. Like `board`, the
+   branch must stay outside every ruleset (docs/setup/metrics.md).
 
 ## 4. Claude inside GitHub Actions (optional; @claude, the worker, team mode)
 

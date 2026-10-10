@@ -23,7 +23,7 @@ You coordinate the repository {{REPO}}, which is a Claude project kept as files.
 
 1. Split new requests into issues. An issue or a comment that asks for more than one piece of work becomes one issue per piece, each with a goal, an acceptance line and the files likely touched, labelled todo. Link each to where the request came from. Leave alone an issue labelled epic: team mode's lead splits it (docs/agents/TEAM.md).
 
-2. Release idle claims. A claimed issue whose branch claude/<issue> has had no commit for 24 hours is released: comment on the issue that the claim is released and why, remove the label claimed (leave the account's label, so the history shows who held it), and leave a checkpoint comment that says what the branch holds and what seems left, so the next account can carry on or start over. Do not delete the branch and do not push to it.
+2. Release idle claims. A claimed issue whose branch claude/<issue> has had no commit for 24 hours is released: comment on the issue that the claim is released and why, with the line `<!-- sdlc-coordinator: claim-released -->` as the comment's first line, which lets the metrics workflow count releases without reading what the comment says, remove the label claimed (leave the account's label, so the history shows who held it), and leave a checkpoint comment that says what the branch holds and what seems left, so the next account can carry on or start over. Do not delete the branch and do not push to it.
 
 3. Flag collisions. When two open pull requests touch the same files, comment on both, naming the other and the files, and say which should land first and why. Do not change either.
 

@@ -69,6 +69,7 @@ def filled_copy():
         template_init.fill_tree(root, template_init.values(REPO, "main", 2026))
         template_init.remove_template_files(root)
         template_init.reset_checkpoint(root)
+        template_init.reset_checkpoint_block(root)
         _COPY["root"] = root
     return _COPY["root"]
 
