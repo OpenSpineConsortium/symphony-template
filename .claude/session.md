@@ -86,58 +86,46 @@ The owner's steps are in docs/setup/owner-checklist.md.
   repositories got their first branch under another name. Owner step,
   once per repository: Settings, Branches, rename the default branch to
   main (GitHub redirects the old name).
+- sdlc-protocol 0.1.0 is done on wip/extract at
+  f139a079d881ff245511625e443f6eff1318c727 (parity with the template's
+  tools proven in its tests/test_parity.py);
+  the tag v0.1.0 is the owner's (the session's proxy refused tag pushes).
+- claude/10, the template's side of the split, done: sdlc-protocol 0.1.0
+  vendored under tools/sdlc_protocol with tools/VENDORED; tools/board.py,
+  check_protocol.py and team.py are shims over its CLI; tests/test_board.py,
+  test_check_protocol.py and test_team.py gave way to tests/test_vendored.py
+  (the library's own tests cover the rules); experiment/, its tests,
+  docs/history/experiment-research/, trace-build-reports.md and the MCP
+  timeout fact removed (all now in OpenSpineConsortium/coordbench; every
+  experiment/ path in "Completed work" above is there now, under
+  coordbench/ and bench/cooperbench/); docs/project.md names the four other
+  repositories; .claude/settings.json names the marketplace and enables no
+  plugin; template-init.yml makes the App's token when SDLC_APP_ID is set
+  and uses it for the API calls and the push. tools/guard_push.py is left
+  as it is so #12 merges without a conflict.
 
-## Current state (in flight when the session stopped)
+## Current state
 
-- Trace instrumentation on claude/10: four build agents finished green
-  (trace.py; hub and arm; runner and drivers; cli and bridge); the
-  integrator was mid-run. The working tree was committed as it stood,
-  so the suite may not be green and the README's "Adding logging"
-  paragraph may be missing. First job: run the checks and finish it.
-- sdlc-protocol extraction: five builders and an integrator were running
-  in /home/user/sdlc-protocol; whatever existed was pushed to the branch
-  wip/extract of OpenSpineConsortium/sdlc-protocol. The design is in
-  "The sdlc-protocol design" below, since the workflow script died with
-  the container. Parity tests against the old tools were the integrator's
-  step and may be missing.
-- sdlc-marketplace, sdlc-app, the coordbench split: not started; the
-  facts and the plan are below.
-- #13 stays a draft until the split is done; #12 waits on the owner.
+- #13 is a draft, its checks green here, waiting on #12; the owner's steps are in
+  docs/setup/owner-checklist.md, section 6 (rename the four default
+  branches to main, release sdlc-protocol v0.1.0, register the App, merge
+  #12), after which a session marks #13 ready.
 
 ## Remaining tasks
 
-1. claude/10: `python3.12 -m unittest discover -s tests` and
-   `bash scripts/check.sh`; finish the trace integration (contract below:
-   trace.py levels off|prod|debug from COORD_TRACE, event/debug/span/
-   debug_span, listen/unlisten, JsonLines and Memory listeners; hub and
-   runner --debug; prod registers no process listener; README "Adding
-   logging" paragraph in the Running section; timeline.py still reads the
-   pilot format). Commit, push.
-2. sdlc-protocol: finish the library to the design below on wip/extract,
-   parity tests (board render byte-equal on the template's fixtures;
-   guard exit codes and messages equal to claude/11's tools/guard_push.py;
-   check_protocol and team on their fixtures), CI green, merge to main,
-   tag 0.1.0.
-3. sdlc-template: open an issue "Vendor sdlc-protocol", claim it, run
-   sdlc-protocol's scripts/vendor.sh into tools/sdlc_protocol with
-   tools/VENDORED, turn tools/board.py, check_protocol.py, team.py,
-   guard_push.py into thin shims (or switch the workflows to
-   `python3 -m sdlc_protocol board|check|team|guard` with PYTHONPATH=tools),
-   add a test that the vendored copy matches VENDORED's version; keep
-   check_docs, check_edit, marked_section, template_init in the template.
-4. coordbench: `git subtree split -P experiment -b coordbench-split` on
-   claude/10 (history kept), push to OpenSpineConsortium/coordbench main,
-   then reshape: experiment/coordbench/* to the repository root as the
-   package, experiment/*.sh and report.py under bench/cooperbench/ as the
-   first adapter behind a small adapter interface (tasks, scoring, log
-   layout) that run.py calls; the sdlc arm imports sdlc_protocol.gate and
-   adapters.bare_git instead of its own Gate; docs/history research page
-   moves with it; make the repository a copy of the template (CLAUDE.md,
-   docs/project.md, .claude/, workflows) so it dogfoods use 1; move
-   tests/test_coordbench_* and test_experiment_report.py with it; then on
-   claude/10 delete experiment/ and those tests, update README.md and
-   docs/memory (the MCP timeout fact moves to coordbench), and mark #13
-   ready (delete docs/agents/claims/10.md in that commit).
+1. claude/10, after #12 merges: rebase on main, turn tools/guard_push.py
+   into a shim over `sdlc_protocol guard` (its tests/test_guard_push.py
+   then moves to the library's coverage, as the other three did), delete
+   docs/agents/claims/10.md, mark #13 ready.
+2. sdlc-protocol: tests/test_parity.py reads the template's tools, which
+   are now shims; pin it to the template's commit before the shims (or to
+   claude/11's guard), so it keeps comparing against the old code.
+3. Re-vendor coordbench (the sdlc arm's gate), the plugin (guard.py) and
+   the App (protocol_check, claims) from the tag v0.1.0 once it exists.
+4. coordbench, what is left: the bench adapter interface; the sdlc arm on
+   sdlc_protocol.gate and adapters.bare_git instead of its own Gate; the
+   template copy (CLAUDE.md, docs/project.md, .claude/, workflows); arm
+   text that says "this template's claim protocol".
 5. sdlc-marketplace (facts in docs/history/split-research/marketplace-notes.md):
    .claude-plugin/marketplace.json (name sdlc-marketplace, owner
    OpenSpineConsortium, one plugin "sdlc" with source "./plugins/sdlc");
@@ -150,8 +138,9 @@ The owner's steps are in docs/setup/owner-checklist.md.
    permissions cannot ship in a plugin; they stay in the template). In
    the template, .claude/settings.json gets extraKnownMarketplaces
    {"sdlc-marketplace": {"source": {"source": "github", "repo":
-   "OpenSpineConsortium/sdlc-marketplace"}}} and enabledPlugins
-   {"sdlc@sdlc-marketplace": true}; `claude plugin validate` must pass.
+   "OpenSpineConsortium/sdlc-marketplace"}}} (done) and no enabledPlugins,
+   since the plugin runs the hooks the template's settings already run;
+   `claude plugin validate` must pass. Built; left: a CI workflow.
 6. sdlc-app, stage 1 (no hosting): the owner registers a GitHub App "sdlc"
    on the organisation (permissions Contents, Issues, Pull requests read
    and write, Checks write, Metadata read; events issues, issue_comment,
@@ -160,7 +149,7 @@ The owner's steps are in docs/setup/owner-checklist.md.
    SDLC_APP_PRIVATE_KEY; the template's workflows mint an installation
    token with actions/create-github-app-token (pinned to a major tag) and
    use it instead of GITHUB_TOKEN where a push or comment should trigger
-   workflows. Stage 2: in sdlc-app a Python standard-library webhook
+   workflows (template-init.yml does, on claude/10). Stage 2: in sdlc-app a Python standard-library webhook
    receiver (HMAC X-Hub-Signature-256 check), the App manifest JSON, check
    runs on pull requests as the gate (sdlc_protocol.gate with the GitHub
    world adapter), board and release on webhooks, an installation-token
@@ -242,6 +231,13 @@ Stated by the owner in conversation, recorded here and not in CLAUDE.md:
   a ruleset that forbids editing the gate workflow; reject IP protection by
   obfuscation on customer compute, file-level locks through an arbiter
   Action, heartbeat leases and a long-running coordinator Action.
+- The template names the sdlc marketplace in .claude/settings.json and
+  enables no plugin: the plugin runs the hooks the template already wires,
+  so enabling it here would run each twice; it is for repositories not
+  made from the template.
+- template-init uses the App's token for the push as well as the API
+  calls: the Board run the setup issue starts usually sees .template/ and
+  ends, so only the push can start the first board.
 
 ## Constraints
 

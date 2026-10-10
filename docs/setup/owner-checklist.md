@@ -142,6 +142,10 @@ section 2 as well.
 
 ## 2. To run the experiment (agents on CooperBench tasks)
 
+The experiment now lives in its own repository,
+OpenSpineConsortium/coordbench, and runs in a cloud session opened
+there; these steps are the same for it.
+
 1. **Make a subscription token** on your own computer, signed in to the
    Claude account whose usage the run should draw on:
    `claude setup-token`. It prints a long-lived OAuth token (about a year).
@@ -157,13 +161,14 @@ section 2 as well.
    managers" ticked): `openaipublic.blob.core.windows.net` (tiktoken),
    `huggingface.co` (outlines 1706), `pypi.nvidia.com` (llama_index). The
    tasks' containers would then still need those downloads baked into
-   their images (experiment/README.md says why); without this step the run
-   covers the 42 pairs that grade.
+   their images (coordbench's bench/cooperbench/README.md says why);
+   without this step the run covers the 42 pairs that grade.
 5. Nothing on GitHub is needed for the experiment. The session starts
-   Docker inside its own container (experiment/setup.sh); images come from
-   mirror.gcr.io because Docker Hub rate-limits the cloud host; the disk
-   holds about one large task image at a time; a session's background
-   command stops after two hours, so runs go one task at a time.
+   Docker inside its own container (coordbench's
+   bench/cooperbench/setup.sh); images come from mirror.gcr.io because
+   Docker Hub rate-limits the cloud host; the disk holds about one large
+   task image at a time; a session's background command stops after two
+   hours, so runs go one task at a time.
 
 Cost, for planning: about $0.43 of usage per agent session at API prices;
 the 42 gradable pairs over four arms are about 294 sessions (about $125 of
@@ -218,11 +223,60 @@ as its only resource, its instructions, description and memory left blank;
 the repository's CLAUDE.md and docs are the one source. Projects are in
 beta on Pro and Max.
 
-## 6. Where things stand
+## 6. The other repositories
+
+The template is one of five repositories under OpenSpineConsortium;
+docs/project.md says what each is for. Sessions built the other four but
+could not finish setting them up: the push guard refuses any push to a
+branch named main, so each got its first branch under another name, and
+the session's git proxy refused to push a tag. In this order:
+
+1. **Rename each default branch to main**, as an admin of the
+   repository, in sdlc-protocol (now `wip/extract`), coordbench (now
+   `claude/split`), sdlc-marketplace (now `claude/init`) and sdlc-app (now
+   `claude/init`): on its branches page,
+   https://github.com/OpenSpineConsortium/<name>/branches, the default
+   branch's menu, Rename branch. GitHub redirects the old name, and the
+   default branch keeps being the default under its new name.
+2. **Release sdlc-protocol 0.1.0**: create the release v0.1.0 on the commit
+   f139a079d881ff245511625e443f6eff1318c727, the one tools/VENDORED names
+   (Releases, Draft a new release, a new tag v0.1.0 on that commit; or
+   `gh release create v0.1.0 --repo OpenSpineConsortium/sdlc-protocol
+   --target f139a079d881ff245511625e443f6eff1318c727 --title
+   "sdlc-protocol 0.1.0"`). Coordbench, the plugin and the App are to be
+   re-vendored from that tag.
+3. **Register the GitHub App** from a clone of sdlc-app, on your own
+   computer, as an owner of the organization:
+   `python3 scripts/register.py --org OpenSpineConsortium`. Install the App
+   on the organization (Install App; "All repositories" also covers a copy
+   made later), then set the variable `SDLC_APP_ID` and the secret
+   `SDLC_APP_PRIVATE_KEY` with the commands register.py prints; set them
+   at the organization with `--visibility all` for copies to have them on
+   their first push. .github/workflows/template-init.yml then makes the
+   App's token, so a new copy's first commit starts its Checks and its
+   Board; without the two settings it runs on GITHUB_TOKEN as before.
+4. **Merge #12**, the push guard's newline fix.
+5. **Then a session marks #13 ready**: it deletes docs/agents/claims/10.md
+   in that commit, as docs/agents/PROTOCOL.md (Finish) requires, and you
+   merge it.
+
+Nothing is to be done for sdlc-marketplace in this repository:
+.claude/settings.json names the marketplace but enables no plugin, because
+the plugin runs the same hooks this repository's settings already run, and
+enabling it here would run each of them twice; the plugin is for
+repositories not made from the template (its README says how to install it).
+
+## 7. Where things stand
 
 - main: the template, released; .claude/session.md points at the work.
-- claude/10, draft pull request #13 (issue #10): the experiment kit and
-  coordbench; its .claude/session.md is the full checkpoint.
+- claude/10, draft pull request #13 (issue #10): the claim protocol
+  vendored from sdlc-protocol 0.1.0 under tools/sdlc_protocol, with
+  tools/board.py, check_protocol.py and team.py as shims over it;
+  experiment/ moved out to OpenSpineConsortium/coordbench; the App's token
+  in template-init. Its .claude/session.md is the full checkpoint. It
+  stays a draft until #12 is merged (section 6, step 4).
 - claude/11, pull request #12 (issue #11): the push guard's newline fix
   alone, rebased on main, 52 lines over main, ready for review.
+- sdlc-protocol, coordbench, sdlc-marketplace and sdlc-app: built and
+  pushed on the branches section 6 names, waiting on its steps.
 - The main account's weekly Claude usage resets on 2026-10-15 at 11:00 UTC.

@@ -2,6 +2,8 @@
 
 Each item names the area, the skeptic's verdict and its evidence verbatim. "fixed" items are left out.
 
+The paths below are this repository's experiment/ as it stood on the branch claude/10 that day. That code now lives in OpenSpineConsortium/coordbench, where experiment/coordbench/ is the package coordbench/ at the root, the rest of experiment/ is under bench/cooperbench/, the tests named here are under its tests/, and the memory fact on MCP timeouts cited in the cli findings is its docs/mcp-timeout.md. The findings are kept here as the record of the verification round, verbatim, and not updated to the new paths.
+
 ## skeptic:hub-runs
 
 ### PARTLY: 3. hub.py: the hub never forgot a run and re-executed arm.py per run (DELETE /api/runs/{run}, arm classes cached per directory, fresh instance per run)
