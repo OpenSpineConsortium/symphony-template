@@ -144,8 +144,13 @@ jobs:
             echo "no coordinator trigger is set; skipped"
             exit 0
           fi
+          # The routine's /fire endpoint ships under a dated beta header, which
+          # Anthropic's own example sends with every call
+          # (code.claude.com/docs/en/routines, "Trigger a routine"); when the
+          # date moves, the two before it keep working for a while.
           curl -fsS -X POST "$TRIGGER_URL" \
             -H "Authorization: Bearer $TRIGGER_TOKEN" \
+            -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
             -H "anthropic-version: 2023-06-01" \
             -H "Content-Type: application/json" \
             -d '{"text": "The board moved."}' \

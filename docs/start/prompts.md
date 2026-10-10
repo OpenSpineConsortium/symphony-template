@@ -19,7 +19,7 @@ Claim issue N with the claim skill and carry it to a ready pull request, as docs
 **Add this line in a cloud session,** whose GitHub proxy refuses gh's GraphQL commands:
 
 ```
-gh issue and gh pr are refused here, so add the labels, post the plan and open the draft pull request with your GitHub tools or gh api (repos/ORG/NAME/issues/N/labels, repos/ORG/NAME/issues/N/comments, repos/ORG/NAME/pulls); if you cannot mark the pull request ready, say so and stop.
+gh issue and gh pr are refused here, so add the labels, post the plan and open the draft pull request with your GitHub tools or gh api (repos/ORG/NAME/issues/N/labels, repos/ORG/NAME/issues/N/comments, repos/ORG/NAME/pulls). Mark the pull request ready with your GitHub tool update_pull_request (draft false), not gh api, which cannot change a draft; if you have no such tool, say so and stop before you delete the claim file.
 ```
 
 **Add this line on any account but the main one,** so the board says whose claim it is:
@@ -34,7 +34,7 @@ My account label is account:alice and the claim file's Account line is alice.
 Do what the prompt in docs/agents/routines/worker.md says, once, as it stands, with my account label account:main.
 ```
 
-**Make the worker routine,** in the account's Project conversation, so it runs as the Project's threads: paste the prompt from docs/agents/routines/worker.md, then:
+**Make the worker routine,** in the account's Project conversation, so it runs as the Project's threads: paste the prompt from docs/agents/routines/worker.md, add the cloud line above at its end with your repository for ORG/NAME, N then standing for whichever issue the run takes (every run is a cloud session, and the prompt's claim step uses gh issue and gh pr), then:
 
 ```
 Run this every hour, a few minutes past the hour.
@@ -97,5 +97,5 @@ Run coordbench's smoke test: bash bench/cooperbench/setup.sh, then bash bench/co
 **The pilot,** six arms on one task, about 66 agent sessions:
 
 ```
-Run bash bench/cooperbench/pilot.sh pallets_click_task 2068 pilot in the background; if it stops at the two-hour limit, run it again, since finished pairs are kept. When it ends, show me ~/cooperbench/logs/pilot-report.md and remove the task's image with docker rmi akhatua/cooperbench-pallets-click:task2068.
+Run bash bench/cooperbench/pilot.sh pallets_click_task 2068 pilot in the background with a two-hour timeout (7200000 ms), the most a background command gets; if it stops, run it again the same way, since finished pairs are kept. When it ends, show me ~/cooperbench/logs/pilot-report.md and remove the task's image with docker rmi akhatua/cooperbench-pallets-click:task2068.
 ```

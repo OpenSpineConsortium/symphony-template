@@ -32,8 +32,8 @@ Making a repository:
 
 | Link | What it does |
 | --- | --- |
-| https://github.com/new?template_owner=OpenSpineConsortium&template_name=sdlc-template&owner=@me&visibility=public | "Use this template", for a member of the template's enterprise |
-| https://github.com/new?template_owner=TEMPLATE_OWNER&template_name=TEMPLATE_NAME&owner=@me&visibility=public | the same from a public copy; an organization's name in place of `@me` makes it there |
+| https://github.com/new?template_owner=OpenSpineConsortium&template_name=sdlc-template&owner=OpenSpineConsortium&visibility=private | "Use this template", for a member of the template's enterprise: a private repository in an organization of the enterprise (put another one of its organizations for `owner` if you make repositories there); a public one publishes the internal template's files and history and needs the template's owner's agreement first |
+| https://github.com/new?template_owner=TEMPLATE_OWNER&template_name=TEMPLATE_NAME&owner=@me&visibility=public | the same from the public copy, for anyone else; an organization's name in place of `@me` makes it there |
 | https://github.com/account/organizations/new?plan=free | a new organization on the Free plan |
 
 ## GitHub organization, and your own account

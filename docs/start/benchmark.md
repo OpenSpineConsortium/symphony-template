@@ -1,6 +1,6 @@
 # Benchmark coordination with coordbench
 
-[OpenSpineConsortium/coordbench](https://github.com/OpenSpineConsortium/coordbench) keeps the task, the agents and the scoring fixed and swaps the way agents coordinate (an arm: solo, coop, coop-nocomm, coop-git, team, sdlc, sdlc-watch), so two ways can be compared on the same work: CooperBench's task pairs, scored by CooperBench's own evaluation. The agents are headless Claude Code on your own subscription, started in Docker inside one cloud session, which itself only drives shell scripts. You need Claude Pro or Max and nothing on GitHub; the repository is public.
+[OpenSpineConsortium/coordbench](https://github.com/OpenSpineConsortium/coordbench) keeps the task, the agents and the scoring fixed and swaps the way agents coordinate (an arm: solo, coop, coop-nocomm, coop-git, team, sdlc, sdlc-watch), so two ways can be compared on the same work: CooperBench's task pairs, scored by CooperBench's own evaluation. The agents are headless Claude Code on your own subscription, started in Docker inside one cloud session, which itself only drives shell scripts. You need Claude Pro, Max or Team, or an Enterprise seat with Claude Code (on Team and Enterprise an Owner first turns on the GitHub connector at https://claude.ai/admin-settings/connectors); a GitHub account connected at https://claude.ai/code (Sign in with GitHub), since a cloud session cannot start without one; and, unless you have Write on coordbench, a fork of it (https://github.com/OpenSpineConsortium/coordbench/fork) to push the results to, since step 7 gets the results page out of the session's VM by a push to a branch. The repository is public, so reading it needs nothing more.
 
 ## Steps
 
@@ -51,7 +51,7 @@
    bash bench/cooperbench/pilot.sh pallets_click_task 2068 pilot
    ```
 
-   The report lands at ~/cooperbench/logs/pilot-report.md. A session's background command stops after two hours, and the pilot can take longer; run the same command again and it carries on, since finished pairs are kept. When you are done with a task, free the disk for the next: `docker rmi akhatua/cooperbench-pallets-click:task2068`.
+   The report lands at ~/cooperbench/logs/pilot-report.md. A session's background command stops after 30 minutes unless Claude starts it with a longer timeout, at most two hours (7200000 ms), and the pilot can take longer than that; ask for the two-hour timeout, as the pilot prompt in [prompts.md](prompts.md) does, and when it stops run the same command again: it carries on, since finished pairs are kept. When you are done with a task, free the disk for the next: `docker rmi akhatua/cooperbench-pallets-click:task2068`.
 
 7. **Read the results.** None of these calls a model:
 

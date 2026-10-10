@@ -4,7 +4,19 @@ You make a repository from the template, set its GitHub side in one command, cla
 
 ## Once per machine
 
-Claude Code, signed in to your own claude.ai account, and the GitHub CLI, signed in to your own GitHub login. Bash (macOS, Linux, WSL):
+Claude Code, signed in to your own claude.ai account; the GitHub CLI, signed in to your own GitHub login; git; and Python 3.12 or later, since setup-repo.sh, crowd.py, scripts/check.sh and the hooks run `python3`. First the tools, with the line for your system. macOS, with Homebrew (https://brew.sh):
+
+```bash
+brew install gh git python
+```
+
+Debian or Ubuntu, WSL included (the python3 of Ubuntu 24.04 and later is 3.12 or newer; where apt has no gh, follow https://github.com/cli/cli/blob/trunk/docs/install_linux.md):
+
+```bash
+sudo apt update && sudo apt install gh git python3
+```
+
+Then Claude Code and the two sign-ins. Bash (macOS, Linux, WSL):
 
 ```bash
 curl -fsSL https://claude.ai/install.sh | bash
@@ -12,23 +24,24 @@ claude
 gh auth login
 ```
 
-PowerShell (Windows):
+PowerShell (Windows), where the bash blocks below run in WSL (`wsl --install`, then the Debian or Ubuntu line inside it):
 
 ```powershell
 irm https://claude.ai/install.ps1 | iex
+winget install --id Git.Git
 winget install --id GitHub.cli
 claude
 gh auth login
 ```
 
-After the installs, open a new terminal so they are on its path; `claude` then opens a browser to sign in. You should see your account under "Login method" when you type `/status` in Claude Code, and "Logged in to github.com" from `gh auth status`.
+After the installs, open a new terminal so they are on its path; `claude` then opens a browser to sign in. You should see your account under "Login method" when you type `/status` in Claude Code, "Logged in to github.com" from `gh auth status`, and 3.12 or higher from `python3 --version`.
 
 ## Steps
 
-1. **Make the repository.** Open the link, name the repository and create it. Public, because on GitHub Free only a public repository gets enforced branch rules and unlimited Actions minutes ([tiers.md](../setup/tiers.md)); put an organization's name in place of `@me` to make it there.
+1. **Make the repository.** Open the link, name the repository and create it.
 
-   - A member of the template's enterprise: https://github.com/new?template_owner=OpenSpineConsortium&template_name=sdlc-template&owner=@me&visibility=public
-   - Anyone else, from the public copy: https://github.com/new?template_owner=TEMPLATE_OWNER&template_name=TEMPLATE_NAME&owner=@me&visibility=public
+   - A member of the template's enterprise: private, in an organization of the enterprise, whose plan (GitHub Enterprise Cloud) already enforces branch rules and offers auto-merge on a private repository: https://github.com/new?template_owner=OpenSpineConsortium&template_name=sdlc-template&owner=OpenSpineConsortium&visibility=private, with another organization of the enterprise in place of `owner=OpenSpineConsortium` if that is where you make repositories. A public repository made from the internal template publishes its files and history, which needs the template's owner's agreement first ([crowdsourcing.md](../setup/crowdsourcing.md), Part 1, step 2), and a managed user cannot make one at all.
+   - Anyone else, from the public copy: https://github.com/new?template_owner=TEMPLATE_OWNER&template_name=TEMPLATE_NAME&owner=@me&visibility=public. Public, because on GitHub Free only a public repository gets enforced branch rules and unlimited Actions minutes ([tiers.md](../setup/tiers.md)); put an organization's name in place of `@me` to make it there.
 
    You should see the new repository with the template's files.
 
@@ -51,7 +64,7 @@ After the installs, open a new terminal so they are on its path; `claude` then o
    bash scripts/setup-repo.sh --token
    ```
 
-   It touches [Rules](https://github.com/ORG/NAME/settings/rules), [General](https://github.com/ORG/NAME/settings), [Advanced Security](https://github.com/ORG/NAME/settings/security_analysis), [Labels](https://github.com/ORG/NAME/labels) and [Actions secrets](https://github.com/ORG/NAME/settings/secrets/actions). You should see one line per step, among them `ruleset "Protect the default branch": created from docs/setup/ruleset-main.json`, `general: delete head branches on merge, allow auto-merge: on`, `secret CLAUDE_CODE_OAUTH_TOKEN: set` and `code owners: GitHub resolves every owner in .github/CODEOWNERS`. Run it again at any time; nothing is done twice.
+   It touches [Rules](https://github.com/ORG/NAME/settings/rules), [General](https://github.com/ORG/NAME/settings), [Advanced Security](https://github.com/ORG/NAME/settings/security_analysis), [Labels](https://github.com/ORG/NAME/labels) and [Actions secrets](https://github.com/ORG/NAME/settings/secrets/actions). You should see one line per step, among them `ruleset "Protect the default branch": created from docs/setup/ruleset-main.json`, `general: delete head branches on merge, allow auto-merge: on`, `secret CLAUDE_CODE_OAUTH_TOKEN: set` and `code owners: GitHub resolves every owner in .github/CODEOWNERS`. On a private repository it also prints a note that GitHub Free does not enforce its ruleset, which does not hold in an organization of the enterprise. Run it again at any time; nothing is done twice.
 
    On Windows without WSL, store the token from PowerShell and do the rest by hand from the first box of "Set up this project"; gh asks for the value at a hidden prompt:
 
@@ -60,7 +73,7 @@ After the installs, open a new terminal so they are on its path; `claude` then o
    gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo ORG/NAME
    ```
 
-4. **Install the Claude GitHub App.** Cloud sessions push through it, and Projects and routines need it. Follow "install the app" in the second box of "Set up this project", which has your repository already chosen; or run `/install-github-app` in Claude Code in your clone, pick the repository, and choose "Skip for now" when it offers the GitHub Actions setup, since step 3 stored the token and .github/workflows/claude.yml is already here. You should see Claude at https://github.com/ORG/NAME/settings/installations. On an organization, an organization owner may need to approve the installation.
+4. **Install the Claude GitHub App.** Cloud sessions push through it, and Projects and routines need it. Follow "install the app" in the second box of "Set up this project", which usually has your repository already chosen (if not, pick it); or run `/install-github-app` in Claude Code in your clone, pick the repository, and choose "Skip for now" when it offers the GitHub Actions setup, since step 3 stored the token and .github/workflows/claude.yml is already here. You should see Claude at https://github.com/ORG/NAME/settings/installations. On an organization, an organization owner may need to approve the installation.
 
 5. **Open the first task and claim it.** Open https://github.com/ORG/NAME/issues/new?template=task.yml with the title "Task: write the goal", the goal "docs/project.md's Goal, Scope and Model and effort are written" and the acceptance "bash scripts/check.sh passes and the owner agrees". You should see it labelled todo, and a minute later in the Queue of the board at https://github.com/ORG/NAME/blob/board/STATE.md. Then, in your clone:
 
@@ -92,7 +105,7 @@ After the installs, open a new terminal so they are on its path; `claude` then o
    gh workflow run claude-worker.yml --repo ORG/NAME
    ```
 
-   (you should see a "Worker" run at https://github.com/ORG/NAME/actions/workflows/claude-worker.yml), or the worker routine on claude.ai, made as [docs/agents/routines/worker.md](../agents/routines/worker.md) says. Both on one account would race for the same queue under the same label.
+   (you should see a "Worker" run at https://github.com/ORG/NAME/actions/workflows/claude-worker.yml), or the worker routine on claude.ai, made as [docs/agents/routines/worker.md](../agents/routines/worker.md) says, with the line under "Add this line in a cloud session" in [prompts.md](prompts.md) added at the end of its prompt, since every run is a cloud session. Both on one account would race for the same queue under the same label.
 
 8. **A thin Project, optional (Pro and Max).** At https://claude.ai/code/projects/browse make a Project that links ORG/NAME and nothing else, with its instructions, description and memory left blank, since every thread reads them from the repository ([claude-project.md](../setup/claude-project.md)). Then close "Set up this project" when every box is ticked.
 

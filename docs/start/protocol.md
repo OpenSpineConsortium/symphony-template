@@ -44,17 +44,23 @@ The claim protocol's rules (the labels, the claim, the board, the protocol check
 
 5. **Merge with a merge commit, not a squash,** so the commit each consumer's record names stays the last one that changed the package, and the sync finds the consumer you answered in step 4 already up to date.
 
-6. **Watch the sync.** The push to main starts the workflow Sync at https://github.com/OpenSpineConsortium/sdlc-protocol/actions/workflows/sync.yml (also weekly, and by hand with Run workflow, or `gh workflow run sync.yml --repo OpenSpineConsortium/sdlc-protocol`). You should see one row per consumer in the run's summary: up to date, or the pull request `sdlc-protocol/sync` it opened or updated there, as the App OpenSpine SDLC, and whether auto-merge is armed. On the template, coordbench and the marketplace it lands by itself once that repository's required check is green (the one-time setup below, step 4), and on the marketplace the same commit raises the plugin's version, so the merge is also the plugin's release. sdlc-app is private on GitHub Free, which offers auto-merge only on public repositories, so its pull request waits for the owner.
+6. **Watch the sync.** The push to main starts the workflow Sync at https://github.com/OpenSpineConsortium/sdlc-protocol/actions/workflows/sync.yml (also weekly, and by hand with Run workflow, or `gh workflow run sync.yml --repo OpenSpineConsortium/sdlc-protocol`). You should see one row per consumer in the run's summary: up to date, or the pull request `sdlc-protocol/sync` it opened or updated there, as the App OpenSpine SDLC, and whether auto-merge is armed. On the template, coordbench and the marketplace it lands by itself once that repository's required check is green (the one-time setup below, step 4), and on the marketplace the same commit raises the plugin's version, so the merge is also the plugin's release. The sync does not arm auto-merge for sdlc-app, which ecosystem.json gives `"auto_merge": false` and whose settings leave auto-merge off, so its owner merges that pull request.
 
 7. **Tag the release, and bring it into repositories made from the template.** After the merge, with the version from step 2: `git tag vX.Y.Z MERGE_COMMIT && git push origin vX.Y.Z`. A repository made from the template is not on the sync's list, so its owner brings each release in by hand, from its own clone with sdlc-protocol beside it, and lands it by pull request:
 
    ```bash
+   git switch main && git pull
+   git switch -c sdlc-protocol-vX.Y.Z
    git -C ../sdlc-protocol fetch --tags && git -C ../sdlc-protocol checkout vX.Y.Z
    python3 ../sdlc-protocol/scripts/vendor.py . --consumer OpenSpineConsortium/sdlc-template
    bash scripts/check.sh
+   git add tools
+   git commit -m "Vendor sdlc-protocol vX.Y.Z"
+   git push -u origin HEAD
+   gh pr create --fill
    ```
 
-   You should see a line beginning `vendor: replaced the copy and its record` and, at the end, `checks ok`.
+   You should see a line beginning `vendor: replaced the copy and its record`, `checks ok` after the check, and the new pull request's address at the end; merge it once its check is green.
 
 ## The sync's one-time setup, by the owner
 

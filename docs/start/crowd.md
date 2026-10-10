@@ -27,13 +27,18 @@ Crowd mode opens a project to volunteers who each work under their own Claude Pr
 
 2. **Make the organization** on the Free plan at https://github.com/account/organizations/new?plan=free; no API makes one, and a public repository there has every feature crowd mode uses.
 
-3. **A public copy of the template.** sdlc-template is internal to its enterprise, so the template's owner publishes one from their own clone of it, once they agree, since its history goes public too. The first line only prints what would be published; `--yes` publishes; then you clone the copy, which gives you scripts/crowd.py:
+3. **A public copy of the template.** sdlc-template is internal to its enterprise, so the template's owner publishes one from their own clone of it, once they agree, since its history goes public too. The template's owner runs this; the first crowd.py line only prints what would be published, and `--yes` publishes:
 
    ```bash
+   gh repo clone OpenSpineConsortium/sdlc-template && cd sdlc-template
    python3 scripts/crowd.py publish-template OpenSpineConsortium/sdlc-template TEMPLATE_OWNER/TEMPLATE_NAME
    python3 scripts/crowd.py publish-template OpenSpineConsortium/sdlc-template TEMPLATE_OWNER/TEMPLATE_NAME --yes
-   gh repo clone TEMPLATE_OWNER/TEMPLATE_NAME
-   cd TEMPLATE_NAME
+   ```
+
+   Then you, the crowd repository's owner, clone the copy, which gives you scripts/crowd.py for the steps below:
+
+   ```bash
+   gh repo clone TEMPLATE_OWNER/TEMPLATE_NAME && cd TEMPLATE_NAME
    ```
 
    Route B (a member of the enterprise pushes it for you) and the bundle route for managed users are in [crowdsourcing.md](../setup/crowdsourcing.md#part-1-the-owner), step 2.
@@ -79,7 +84,7 @@ Crowd mode opens a project to volunteers who each work under their own Claude Pr
 
 ## A contributor
 
-1. **Your own plan, your own sign-in.** Claude Pro or Max of your own; never give anyone your login, a token from `claude setup-token` or a routine's trigger token. The first line prints the names, never the values, of any other Claude credential set in this shell; unset each it prints before the first `claude`, since it would outrank your own sign-in:
+1. **Your own plan, your own sign-in, your own tools.** Claude Pro or Max of your own; never give anyone your login, a token from `claude setup-token` or a routine's trigger token. You also need git, the GitHub CLI and Python 3.12 or later: `brew install gh git python` on macOS, `sudo apt update && sudo apt install gh git python3` on Debian or Ubuntu, WSL included ([solo.md](solo.md), "Once per machine", has the rest). The first line below prints the names, never the values, of any other Claude credential set in this shell; unset each it prints before the first `claude`, since it would outrank your own sign-in:
 
    ```bash
    env | cut -d= -f1 | grep -E '^(ANTHROPIC_(API_KEY|AUTH_TOKEN|PROFILE|FEDERATION_RULE_ID|ORGANIZATION_ID)|CLAUDE_CODE_(OAUTH_TOKEN|USE_BEDROCK|USE_VERTEX|USE_FOUNDRY))$'

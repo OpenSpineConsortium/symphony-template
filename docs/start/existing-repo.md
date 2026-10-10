@@ -90,5 +90,13 @@ A repository not made from the template takes the protocol in two halves. The sd
 ## What stays different from a copy of the template
 
 - Cloud sessions do not install the plugins a repository declares, so there the push guard and the board at session start are missing, and the ruleset of step 8 is the fence; a Project can add the plugin under Project settings, Plugins. A copy of the template wires the same hooks in its own .claude/settings.json, which cloud sessions do load.
-- `/sdlc:remember` and `/sdlc:checkpoint` act on docs/memory/, tools/marked_section.py and the checkpoint markers in CLAUDE.md, which only the template carries; copy them from it if you want those two. Copy tools/check_docs.py too and the plugin runs it after every edit, holding CLAUDE.md, README.md, .claude/, docs/, tools/ and .github/ to ASCII with LF endings and CLAUDE.md to one pair of checkpoint markers.
+- `/sdlc:remember` and `/sdlc:checkpoint` act on docs/memory/, tools/marked_section.py and the checkpoint markers in CLAUDE.md, which only the template carries; copy them from it if you want those two. tools/check_docs.py is different: once it is in tools/, the plugin runs it after every edit under docs/, .claude/, tools/ or .github/ and to CLAUDE.md or README.md, and refuses the edit (exit 2) while any problem stands, wherever it is. It holds CLAUDE.md to exactly one pair of checkpoint markers, which step 4 does not add, every tracked file in those places to ASCII with LF endings, every `@` import in CLAUDE.md to a file that exists, every tracked file to holding nothing shaped like a common secret, and docs/memory/MEMORY.md, where docs/memory/ exists, to listing each fact file there. So copy it only after the markers are in and those files pass; the markers first, from the clone:
+
+  ```bash
+  printf '%s\n' '' '<!-- cswap:checkpoint:begin -->' '<!-- cswap:checkpoint:end -->' >> CLAUDE.md
+  cp ../sdlc-template/tools/check_docs.py ../sdlc-template/tools/marked_section.py tools/
+  python3 tools/check_docs.py
+  ```
+
+  You should see `docs ok` and the number of files it read; until then, each problem it prints is one the hook would refuse an edit for.
 - No @claude, Actions worker, team mode, coordinator trigger or protocol check in CI: those are the template's workflows and docs ([solo.md](solo.md), [team.md](team.md)). Keep one wiring of the hooks: a repository that has the template's hooks and enables the plugin runs each twice.
