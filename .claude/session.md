@@ -4,8 +4,12 @@ Written 2026-10-10 by the main account's cloud session, in a hurry: the
 owner's usage ran out while four pieces of work were in flight. This is
 the full checkpoint of claude/10 and of the split into five repositories;
 main's own .claude/session.md points here. A session told to "continue"
-starts at "Remaining tasks", in order. The owner's steps are in
-docs/setup/owner-checklist.md.
+works through "Remaining tasks" in order, all of them, without stopping
+between them and without asking the owner anything: the only steps that
+need the owner are registering the GitHub App (task 6, stage 1) and
+merging pull requests, and the session does everything up to and around
+those, commits and pushes after each task, and reports once at the end.
+The owner's steps are in docs/setup/owner-checklist.md.
 
 ## Completed work
 
