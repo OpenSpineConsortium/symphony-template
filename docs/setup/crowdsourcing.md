@@ -109,7 +109,7 @@ Before you start, have git, the GitHub CLI (`gh`), Python 3.12 or later and Clau
    ```
 
 6. **Code owners, issue forms and crowd rules, in one pull request**, claimed under its own Task issue as in step 4 and merged before step 7 requires review.
-   - Replace .github/CODEOWNERS, whose one line names only you: template-init writes the login of whoever made the copy, since GitHub asks a user or a team for review and never an organization (docs/setup/github.md, section 7). The last matching line wins ([why](../history/crowdsourcing/research.md#code-owners)):
+   - Replace .github/CODEOWNERS, whose `* @{{OWNER}}` names an organization and so requests nobody. The last matching line wins ([why](../history/crowdsourcing/research.md#code-owners)):
      ```
      * @{{OWNER}}/maintainers
      /.github/ @OWNER_LOGIN
@@ -302,7 +302,7 @@ Why each item matters: [the safety analysis](../history/crowdsourcing/research.m
 
 Each item, with its reason and size, is in [the gap list](../history/crowdsourcing/research.md#gaps-with-sizes).
 
-- A crowd ruleset and setup-repo.sh option, and a crowd setup checklist; template-init already fills CODEOWNERS with a user, the person who made the copy.
+- A crowd ruleset and setup-repo.sh option, CODEOWNERS filled with a user or team, and a crowd setup checklist.
 - Issue forms without labels, a crowd rule file and checkpoint skill, crowd variants of the coordinator and worker prompts, and a note that routines go outside Projects.
 - A check that fails while a Claude secret or variable is set, and an owner-only @claude that reads its token from an environment.
 - A board that spends less: fewer triggers or a debounce, then rendering by the sdlc-app's token, with `board` protected.
