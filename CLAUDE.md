@@ -45,10 +45,15 @@ Read `.claude/session.md` at the start of a session: it holds the completed work
 - Adoption's mode existing takes the protocol page from sdlc-protocol's spec/PROTOCOL.md at the vendored commit, and the App's tokens are minted account-first, so the public run log says nothing about a repository a stranger names.
 - A session merges the project's pull requests once their check is green, as the owner asked and the earlier sessions did; the rulesets require no review.
 - The files an adoption brings are offered under the MIT License, in sdlc-start's LICENSE; the adoption copies no LICENSE into anyone's repository.
+- An adoption's repository settings are applied by a second, setup-only App, OpenSpine SDLC Setup (Administration write, Metadata read, public, no webhook), which the adopter installs on the one repository for the one run and uninstalls afterwards; installing it is the consent, and the main App never holds Administration on anyone's repository.
+- The owner's own several Claude accounts may be coordinated from one orchestrator of theirs, workers as claude -p subprocesses each with one account's token; the owner decided this knowing the terms-of-service question, and it does not change the rule for contributors' credentials.
+- The Polyphony rename comes after the setup App: the App first, then the repositories, then the user-facing identifiers; the package sdlc_protocol and the SDLC_* variables may stay.
 ### Constraints
 - The cloud environment blocks cooperbench.com, arxiv.org, cursor.com and docs.github.com; CooperBench's paper and data come from the GitHub repository cooperbench/website.
 - The cloud environment withholds CLAUDE_CODE_OAUTH_TOKEN; coordbench reads COORDBENCH_CLAUDE_TOKEN, each account its own.
 - sdlc-template is internal to its enterprise; outsiders need a public copy or sdlc-start.
 - sdlc-start and its Actions logs are public: nothing of the template may be committed or printed there.
 - The cloud session's proxy refuses the Actions variables and secrets API paths, and the auto-mode permission classifier can refuse an outward write (a label through gh api, a repository attached mid-session); the GitHub tools' pull request and merge calls were allowed.
+- A cloud session's tools reach only its own account's sessions, environments and routines; there is no cross-account messaging, and Remote Control drives a session on the owner's own computer.
+- A cloud session's container has 4 CPUs, 15 GB of memory and about 30 GB of free disk; Docker's daemon is installed and starts on demand; a background command stops after two hours.
 <!-- cswap:checkpoint:end -->

@@ -1,129 +1,119 @@
 # Session checkpoint
 
 Written 2026-10-10 at the end of the main account's session, for the next
-session on any account. This session finished the three reviews the last
-one left in .claude/handoff.md, fixed every finding that stood, opened the
-four pull requests the last checkpoint named and merged them in its order.
-The handoff file is gone with the docs pull request.
+session on any account. This session built the setup-only App the last
+checkpoint recommended, so an adoption through the front door applies
+the repository's settings in the same run, and answered the owner's
+questions about running coordbench over several sessions, accounts and a
+GPU grid; those became an issue in coordbench.
 
 ## Completed work
 
-- Start-here documentation, merged as sdlc-template#24 from the branch
-  claude/magical-shannon-ak167f (which took claude/festive-edison-al7xu2's
-  commits and went on from them): docs/start/ with its two reviews
-  finished. The second review's 49 findings were each re-verified by an
-  agent per page and checked by a second agent per page; all 49 held, two
-  in part, and each is fixed in its page. The pages outside docs/start that
-  name the same things (coordinator.md, worker.md, OWNERSHIP.md, github.md,
-  owner-checklist.md) carry the same corrections, and scripts/setup-repo.sh
-  tells an old gh apart from a plan limit. 312 tests on 3.12.
-- Field metrics, template side, merged as sdlc-template#25 from the branch
-  field-metrics: tools/metrics.py (collect, judge, push), metrics.yml,
-  docs/setup/metrics.md, the switch file, a memory fact, and template_init
-  emptying a copy's checkpoint block. The review's 29 findings: 3 refuted
-  by the earlier verifiers, 23 fixed, 3 left with a sentence on the page
-  (the version format, which the collector accepts; thread replies counted
-  as reviews; dismissed changes-requests not counted). The blocking four:
-  the three tests that failed in every copy are template-only; the run is
-  at 03:43 UTC, before the collector's 04:17 read, and on a merge that
-  changes the switch; a branch metrics the project had before is never
-  replaced; the crowd checkpoint skill no longer fails a test. A run stops
-  short of a reserve of 300 requests for the board; check runs are read on
-  every commit made in the window with every attempt. 385 tests on 3.12,
-  and the suite passes in an initialised copy with sharing off.
-  docs/start/links.md names the workflow, the branch and SDLC_METRICS.
-- Field metrics, collector, merged as sdlc-app#3 from that repository's
-  branch claude/festive-edison-al7xu2: scripts/collect.py and collect.yml
-  (reviewed earlier, 9 findings fixed), plus this session's changes: the
-  salt is derived from the App's private key (HMAC-SHA256 of the PEM under
-  the label sdlc-metrics-salt, HKDF's extract step) with SDLC_METRICS_SALT
-  as an optional override, so the owner sets no third secret; forks and
-  archived repositories are skipped unread and counted; the README's
-  advice to set the App's key at the organization with --visibility all is
-  corrected, and its GitHub Free sentence about auto-merge too. 127 tests.
-- Private adoption, merged as sdlc-start#1 from that repository's branch
-  claude/festive-edison-al7xu2: the form, adopt.yml, scripts/adopt.py,
-  refuse.sh and the tests, with the review's 31 findings fixed: the target
-  checkout's ref is qualified (a bare name made actions/checkout fetch and
-  print every branch and tag whose name starts with it); the App's tokens
-  come in an order that tells a stranger nothing about a repository they
-  name (account-only token with metadata read, silenced lookups, then the
-  repository-scoped write token); a broken App is told from an uninstalled
-  one and ends the run red with the issue open; git's messages, the pull
-  request's number and the template's release line stay out of the log;
-  mode existing takes the protocol's page from sdlc-protocol's
-  spec/PROTOCOL.md at the commit tools/VENDORED names (apply's
-  --protocol-spec), brings a workflow and its script together or not at
-  all, never writes a file the repository ignores, and adds CLAUDE.md's
-  import only when the page landed; mode new opens the "Set up this
-  project" issue. 99 tests on 3.12; the real-template tests pass against
-  the template's main.
+- The Setup App, merged as sdlc-app#4 and sdlc-start#6 from the branch
+  claude/magical-shannon-ak167f of each. A second GitHub App, OpenSpine
+  SDLC Setup (sdlc-app's manifest-setup.json: Administration write and
+  Metadata read, no webhook, public), registered by
+  `python3 scripts/register.py --setup --org OpenSpineConsortium` into
+  .sdlc-setup-app.env. The adopter installs it on the one repository for
+  the one run and uninstalls it afterwards; installing it is the consent,
+  so the form has no field for it. In adopt.yml, after the push of
+  sdlc/adopt, the run mints that App's token for the one repository,
+  scripts/setup.py applies what scripts/setup-repo.sh applies (the
+  ruleset of the template's docs/setup/ruleset-main.json, in mode
+  existing without the required check; delete-on-merge and auto-merge;
+  secret scanning, then push protection), revokes the token, and
+  adopt.py body renders the report as the section Settings, from which
+  the next steps follow. Where the mint fails, a probe on the owner's
+  own installation (the Setup App on sdlc-start, metadata read) tells an
+  adopter who did not install it from a broken front door; the second is
+  told to the owner in the issue "Setup App of this front door is not
+  working" on sdlc-start, since GitHub reports a red run only to the
+  person who opened the request. A settings step that dies before its
+  report, and a run that fails after the token was made, say so. The
+  run's log gets one fixed line per setting; GitHub's words go to the
+  report and the pull request.
+- Reviewed by a five-dimension workflow (34 agents): 29 findings, all
+  verified, all fixed, then a verification pass (6 agents) that found two
+  partly fixed and five minor leftovers, fixed too: among them, every 3xx
+  and non-JSON answer counted as done (now a redirect handler and a
+  non-2xx refusal), the probe, the words for each outcome, "Only select
+  repositories" in every install instruction, and the owner's alert by
+  issue rather than by a red run. 139 tests in sdlc-start on 3.12, also
+  against the real template; 137 in sdlc-app; actionlint clean on all
+  three repositories' workflows.
+- The template's start pages, links table and owner checklist say that
+  the front door applies the settings with the Setup App installed (this
+  pull request).
+- Answered, with coordbench read in full: a cloud session has 4 CPUs,
+  15 GB and about 30 GB of disk, Docker's daemon is installed and
+  bench/cooperbench/setup.sh starts it; agents spend about 90 percent of
+  their time waiting on the model; the ceiling is the subscription's
+  usage window, not cores; run.py already has --concurrency, resume and
+  pooled reports; sessions cannot reach another account's sessions, and
+  Claude has no local inference. The owner's design, one orchestrator
+  with claude -p workers each on one of their own accounts' tokens, and
+  the grid route with a self-hosted model, are coordbench#6, opened by
+  this session.
+- The name: "polyphony" is free as a GitHub App name (the page 404s);
+  the rename's three layers were costed in conversation (the App's name
+  and slug; the repositories to polyphony-*, with GitHub's redirects; the
+  user-facing identifiers, the plugin sdlc, the skills /sdlc:, the branch
+  sdlc/adopt, the switch .github/sdlc-metrics, while the package
+  sdlc_protocol and the SDLC_* variables may stay).
 
 ## Current state
 
 - Everything above is merged. No pull request of this session is open
   apart from the one carrying this checkpoint.
-- sdlc-start is live. The owner made the label adopt, the ruleset
-  "Protect the default branch" on its main, made the App public with the
-  permission Workflows: Read and write accepted on the organization's
-  installation, and confirmed SDLC_APP_ID and SDLC_APP_PRIVATE_KEY there.
-  The first live request (sdlc-start#3, mode existing, sharing off, into
-  the old copy OpenSpineConsortium/sdlc-template-test) was answered in 28
-  seconds with the pull request sdlc-template-test#14: 20 files added,
-  .claude/settings.json merged, 4 kept; its public log names no file,
-  branch or number of the private side. That pull request is the owner's
-  to close or merge. The run showed one wrong sentence for a repository
-  that already had the board's workflow, fixed in sdlc-start#4.
-- The license of adopted files is MIT, in sdlc-start's LICENSE
-  (sdlc-start#2); sdlc-protocol's README no longer blames GitHub Free for
-  sdlc-app's unarmed auto-merge (sdlc-protocol#2).
-- sdlc-app has auto-merge on and the one ruleset 24851112 "main"
-  (active, requires the check "check"); the template has ruleset
-  24827932.
-- The auto-mode permission classifier refused creating the label adopt
-  with gh api and one git command in a merge context, and the proxy
-  refuses the Actions variables, secrets and rulesets API paths, so those
-  settings are the owner's to make on their own machine. Attaching
-  sdlc-protocol was refused once and allowed when the owner asked for it;
-  the GitHub tools' pull request and merge calls were allowed throughout.
+- The Setup App is not registered yet, so every adoption pull request
+  says the front door has no Setup App yet and the steps by hand stand;
+  the front door is otherwise live and unchanged for adopters.
+- The two test pull requests of the earlier live runs,
+  sdlc-template-test#14 and sdlc-start-test#1, are still the owner's to
+  merge or close.
+- The auto-mode permission classifier allowed everything this session
+  asked (attaching coordbench, the pull requests, the merges, the issue);
+  the proxy still refuses the Actions variables and secrets API paths.
 
 ## Remaining tasks
 
-1. A live test of mode new is still to run: a throwaway repository
-   with one commit and the App installed, the form with "New repository",
-   and a look at the copy's checkpoint block, the setup issue the run
-   opens and the labels. Mode existing is proven (Current state).
-2. Setup with no manual steps (the owner asked for it): either a second,
-   setup-only App "OpenSpine SDLC Setup" holding Administration and
-   Variables (write), which adopters install for one run and remove, and
-   which applies what scripts/setup-repo.sh does in the same run; or one
-   closing command, `bash scripts/setup-repo.sh`. The setup App was
-   recommended. Never ask for Secrets: an adopter's Claude token is theirs.
-   No OAuth; it needs a server. Change the App's permissions once, when
-   this lands, since every installation must accept each change.
-3. actions/create-github-app-token@v1 targets Node 20, which the
-   runners now warn is deprecated and force onto Node 24; the carried
-   item to move to v2 is worth doing soon, since the front door's run
-   prints that warning every time.
-4. docs/start/README.md and links.md now name the front door for anyone
-   outside the enterprise; existing-repo.md still describes the by-hand
-   way, which the front door's existing mode replaces for most; say so
-   there once the front door is live.
-5. Carried from the earlier checkpoints: try crowd mode on a real
-   organization copy; the 42 gradeable flash pairs; judge.py against a
-   real model; the marketplace ruleset's unattributed-changes field
-   (the template's own ruleset has require_extra_approval_for_unattributed_changes
-   true, and the pull requests merged all the same); sdlc-app stage 2
-   (hosting the webhook); actions/create-github-app-token v2.
-6. A public copy of the template, which the docs/start pages say the
-   owner publishes, is still the owner's decision; with sdlc-start live it
-   may not be needed.
+1. The owner's steps for the Setup App (sdlc-start's README, For the
+   owner, steps 7 and 8): from a clone of sdlc-app,
+   `python3 scripts/register.py --setup --org OpenSpineConsortium`; if
+   GitHub gives a slug other than openspine-sdlc-setup, change the
+   install link in sdlc-start's .github/ISSUE_TEMPLATE/adopt.yml, its
+   README and tests/test_form.py (SETUP_APP_INSTALL); install the Setup
+   App on OpenSpineConsortium/sdlc-start and only it, for the probe; then
+   `gh variable set SDLC_SETUP_APP_ID --repo OpenSpineConsortium/sdlc-start --body <id>`
+   and `python3 scripts/register.py --env-file .sdlc-setup-app.env --print-key | gh secret set SDLC_SETUP_APP_PRIVATE_KEY --repo OpenSpineConsortium/sdlc-start`.
+2. A live test of the Setup App, once step 1 is done: a throwaway
+   repository with one commit and both Apps installed, the form in mode
+   new, then the pull request's section Settings against the
+   repository's rules, general settings and code security pages, the
+   closing comment, and the uninstall; then a request without the Setup
+   App, whose pull request should say so; sdlc-start-test can serve
+   again once its branch sdlc/adopt is deleted.
+3. The Polyphony rename, which the owner put after the setup App: the
+   App first (name and slug, 14 slug links and 56 name mentions across
+   the repositories), then the repositories, then the user-facing
+   identifiers; each layer its own pull requests.
+4. coordbench#6, the fan-out issue: the per-agent token in
+   drivers.py, equal concurrency per arm, the grid route with Podman or
+   Apptainer and the gateway variables; the pilot first in one session.
+5. Carried: actions/create-github-app-token@v1 warns about Node 20, move
+   to v2 (inputs to check first); existing-repo.md should say the front
+   door's existing mode replaces the by-hand way; try crowd mode on a
+   real organization copy; the 42 gradeable flash pairs; judge.py against
+   a real model; the marketplace ruleset's unattributed-changes field;
+   sdlc-app stage 2 (hosting the webhook); a public copy of the template
+   is still the owner's decision and may not be needed.
 
 To continue on another account: connect GitHub at claude.ai/code with
 access to the OpenSpineConsortium repositories, open a session on
-sdlc-template, read this file, and attach sdlc-start, sdlc-app or
-sdlc-protocol as the task needs. The App's private key stays only in the
-owner's .sdlc-app.env and in the repositories' secrets.
+sdlc-template, read this file, and attach sdlc-start, sdlc-app,
+sdlc-protocol or coordbench as the task needs. The Apps' private keys
+stay only in the owner's .sdlc-app.env and .sdlc-setup-app.env and in
+sdlc-start's secrets.
 
 ## Decisions
 
@@ -147,7 +137,6 @@ Stated by the owner in conversation, this session and earlier:
   repository stays private. Anyone adopts it by the form in the public
   sdlc-start, which holds no file of the template; the files an adopter
   receives in their own repository are theirs to read.
-- field-metrics is its own branch and pull request, apart from the docs.
 - The collector's salt is derived from the App's private key, with
   SDLC_METRICS_SALT as an optional override; rotating the key, or changing
   the override, gives every repository a new hash.
@@ -164,13 +153,27 @@ Stated by the owner in conversation, this session and earlier:
 - The files an adoption brings are offered under the MIT License, the
   template's own, in sdlc-start's LICENSE with OpenSpineConsortium as the
   holder; the adoption copies no LICENSE into anyone's repository.
+- An adoption's repository settings are applied by a second, setup-only
+  App, OpenSpine SDLC Setup, holding Administration and Metadata and
+  nothing else, which the adopter installs on the one repository for the
+  one run and uninstalls afterwards; installing it is the consent; the
+  main App never holds Administration on anyone's repository.
+- The owner's own several Claude accounts may be coordinated from one
+  orchestrator of theirs, workers as claude -p subprocesses each with one
+  account's token; the owner decided this knowing the terms-of-service
+  question, and it does not change the rule for contributors'
+  credentials.
+- The Polyphony rename comes after the setup App: the App first, then
+  the repositories, then the user-facing identifiers; the package
+  sdlc_protocol and the SDLC_* variables may stay.
 
 ## Constraints
 
 - The cloud environment blocks cooperbench.com, arxiv.org, cursor.com,
   docs.github.com and github.com web pages. CooperBench's paper and data
   come from the GitHub repository cooperbench/website; GitHub's docs come
-  from their source on raw.githubusercontent.com.
+  from their source on raw.githubusercontent.com; a release asset
+  (actionlint's) downloads.
 - The cloud environment withholds CLAUDE_CODE_OAUTH_TOKEN; coordbench
   reads COORDBENCH_CLAUDE_TOKEN, each account its own.
 - gh issue and gh pr are refused in cloud sessions. Use the GitHub tools
@@ -181,9 +184,15 @@ Stated by the owner in conversation, this session and earlier:
   are public too.
 - The auto-mode permission classifier can refuse an outward write (a
   label through gh api, a repository attached mid-session, a git command
-  near a merge); the GitHub tools' pull request and merge calls were
-  allowed. A session that needs a refused action says so and leaves it
-  to the owner.
+  near a merge); the GitHub tools' pull request, merge and issue calls
+  were allowed. A session that needs a refused action says so and leaves
+  it to the owner.
+- A cloud session's tools reach only its own account's sessions,
+  environments and routines; there is no cross-account messaging, and
+  Remote Control drives a session on the owner's own computer.
+- A cloud session's container has 4 CPUs, 15 GB of memory and about
+  30 GB of free disk; Docker's daemon is installed and starts on demand;
+  a background command stops after two hours.
 - Workflows cannot be resumed across sessions; a review left unfinished
   is re-run from its record. A workflow's agents run two at a time on
   this machine's four CPUs.
