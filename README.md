@@ -2,6 +2,8 @@
 
 This repository is a Claude project kept as files: the instructions, the goal, the shared memory and the board that Claude Code reads in every session, local or cloud, live here under version control. It came from a GitHub template that brings the folder structure, the checks and the workflows already set up, so a new project starts with the whole arrangement in place. Each Claude account makes a thin claude.ai Project that only links this repository, with its instructions, description and memory left blank, because every session loads the goal, the protocol and the memory from the files here; from then on the repository is the one place every account and every session agrees on.
 
+New here? Begin at [docs/start/README.md](docs/start/README.md). It says what the five repositories are and how they fit, has a table of the ways to use them (one person, many cloud sessions at once, a team of people, volunteers, a repository you already have, the benchmark, a change to the protocol itself) with one page of copyable steps each, lists which token goes where and who holds it, and gives a five-minute path from "Use this template" to a cloud session working on a claimed issue.
+
 ## Use this template
 
 About ten minutes, in this order.

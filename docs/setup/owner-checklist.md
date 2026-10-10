@@ -55,7 +55,7 @@ Each opens the exact page; the sections below say what to do there.
 
 - Install the Claude GitHub App: https://github.com/apps/claude/installations/new
 - The same, with this organization and repository preselected (the form GitHub documents for an app's install URL, with the ids the API reports for OpenSpineConsortium/sdlc-template, not tried live from a session): https://github.com/apps/claude/installations/new/permissions?suggested_target_id=285817514&repository_ids[]=1411163972
-- Connect GitHub to Claude: https://claude.ai/settings/connectors
+- Connect GitHub to Claude: Sign in with GitHub at https://claude.ai/code; your connectors, to disconnect it: https://claude.ai/customize/connectors
 - Claude Code in the cloud (sessions, environment settings): https://claude.ai/code
 - How cloud environments, variables and network access work: https://code.claude.com/docs/en/cloud-environments
 - The repository's rulesets (New ruleset, Import): https://github.com/OpenSpineConsortium/sdlc-template/settings/rules
@@ -65,7 +65,7 @@ Each opens the exact page; the sections below say what to do there.
 - New repository variable: https://github.com/OpenSpineConsortium/sdlc-template/settings/variables/actions/new
 - Organization secrets and variables (shared by every repository of the organization): https://github.com/organizations/OpenSpineConsortium/settings/secrets/actions
 - Organization rulesets (applied to every repository of the organization): https://github.com/organizations/OpenSpineConsortium/settings/rules
-- claude.ai Projects: https://claude.ai/projects
+- Projects in Claude Code: https://claude.ai/code/projects/browse
 
 A template copies files only, never settings, secrets or variables: the
 command above sets the repository's, and the next section says what an
@@ -145,8 +145,9 @@ items above may already be open to it.
    account reuses it.
 4. **Start a cloud session** at claude.ai/code on
    OpenSpineConsortium/sdlc-template, on the default network access level,
-   and type "continue". main's .claude/session.md sends the session to the
-   branch claude/10 and its checkpoint.
+   and type "continue": the session reads main's .claude/session.md, the
+   last checkpoint, first. docs/start/prompts.md has the sentences for
+   the everyday moves.
 
 That is all the code work needs. Running agents on benchmark tasks needs
 section 2 as well.
@@ -162,9 +163,13 @@ there; these steps are the same for it.
    `claude setup-token`. It prints a long-lived OAuth token (about a year).
 2. **Put it in the cloud environment, not the repository**: in a claude.ai/code
    session, open the environment menu in the session's title bar, Edit,
-   and add an environment variable named `CLAUDE_CODE_OAUTH_TOKEN` with the
-   token as its value. A session sees only variables that existed when it
-   started, so start a **new** session after adding it.
+   and add the line `COORDBENCH_CLAUDE_TOKEN=<the token>` under
+   Environment variables, not Network secrets. The environment withholds a
+   variable named `CLAUDE_CODE_OAUTH_TOKEN` from the session, since it runs
+   the session's own Claude Code, so coordbench reads the alias and copies
+   it to that name for its agents. A running session keeps the values it
+   last read, so start a **new** session after adding it
+   (docs/start/benchmark.md has the whole run).
 3. **Do not set `ANTHROPIC_API_KEY`** anywhere in that environment:
    CooperBench's adapter prefers it over the token, and it bills the API.
 4. **Optional, for the last 7 of the 50 pairs**: under the same Edit,
