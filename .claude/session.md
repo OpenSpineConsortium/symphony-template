@@ -58,7 +58,20 @@ The owner's steps are in docs/setup/owner-checklist.md.
   a reshape (kit under bench/cooperbench/, tests, CI, CLAUDE.md) was
   running on that branch. The bench adapter interface and the template
   copy are later work.
-- sdlc-marketplace: a build was running toward the branch claude/init.
+- coordbench reshape done: 511 tests green on claude/split (kit under
+  bench/cooperbench/, tests, docs/research.md, CI, CLAUDE.md, LICENSE).
+  Left: the sdlc arm still carries its own gate (import sdlc_protocol.gate
+  once 0.1.0 exists); the bench adapter interface; the template copy;
+  arm text that says "this template's claim protocol".
+- sdlc-marketplace done: the sdlc plugin on claude/init (skills claim,
+  remember, checkpoint; command board; hooks guard, check_edit,
+  session-start), 32 tests, claude plugin validate --strict clean, the
+  guard matching claude/11's on 38 payloads. Left: re-vendor guard.py from
+  the sdlc-protocol 0.1.0 tag; a CI workflow; the template preset and the
+  decision to drop the template's own three hooks (both would run twice).
+- sdlc-app: a build was running toward claude/init (stdlib webhook server,
+  JWT signed with openssl, the gate as the check run "sdlc/protocol",
+  manifest registration script, Dockerfile, tests).
 - sdlc-protocol: the extraction was resumed on Opus; work in progress is on
   its branch wip/extract (its default branch for now).
 - The push guard refuses any push to a branch named main, so the four new
