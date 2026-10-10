@@ -13,7 +13,9 @@ headers and a blank line when the call asks with --include, as gh prints
 them; a route for a call with --jq gives the body gh would print after the
 filter. The fake exits 1 when the status is 400 or more, as gh does. A call
 with no route answers 599 "fake gh: no route for ...", so an unexpected call
-fails the test that made it.
+fails the test that made it. An answer may carry "after", routes that take
+the place of those of the same keys once it is given, so a call that changes
+GitHub, such as a merge, changes what later reads see.
 
 A process per call costs tens of milliseconds, which hundreds of calls turn
 into a slow suite, so routed_run() gives a test the same answers without
@@ -80,6 +82,8 @@ def respond(args, stdin, log, routes_file):
         chosen = answers[min(seen, len(answers) - 1)]
     else:
         chosen = {"status": 599, "body": {"message": "fake gh: no route for " + key}}
+    if chosen.get("after"):
+        changed(routes_file, chosen["after"])
     status = chosen.get("status", 200)
     body = chosen.get("body")
     text = body if isinstance(body, str) else ("" if body is None else json.dumps(body))
@@ -88,6 +92,15 @@ def respond(args, stdin, log, routes_file):
         text = "\r\n".join(head) + "\r\n\r\n" + text
     error = "gh: fake answer (HTTP %d)\n" % status if status >= 400 else ""
     return (1 if status >= 400 else 0), text, error
+
+
+def changed(routes_file, after):
+    """The routes as a call left them: after's keys answered anew."""
+    with open(routes_file, encoding="utf-8") as handle:
+        routes = json.load(handle)
+    routes.update(after)
+    with open(routes_file, "w", encoding="utf-8") as handle:
+        json.dump(routes, handle)
 
 
 def main():
@@ -154,6 +167,9 @@ def calls(log_path):
     return found
 
 
-def answer(status=200, body=None, headers=None):
-    """One answer, for a route's list."""
-    return {"status": status, "body": body, "headers": headers or {}}
+def answer(status=200, body=None, headers=None, after=None):
+    """One answer, for a route's list; after, routes it puts in place."""
+    found = {"status": status, "body": body, "headers": headers or {}}
+    if after:
+        found["after"] = after
+    return found

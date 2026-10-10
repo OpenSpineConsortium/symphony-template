@@ -22,10 +22,10 @@ being made.
 
   setup ORG/NAME [--area AREA]... [--owner LOGIN] [--template OWNER/NAME]
                  [--members-only] [--open-pull-requests] [--wait SECONDS]
-  finish ORG/NAME
-  invite ORG/NAME LOGIN... [--area AREA] [--maintainer]
+  finish ORG/NAME [--owner LOGIN]
+  invite ORG/NAME LOGIN... [--area AREA] [--maintainer] [--owner LOGIN]
   remove ORG/NAME LOGIN
-  audit ORG/NAME
+  audit ORG/NAME [--owner LOGIN]
   publish-template SRC DEST [--yes]
   doctor [--repo ORG/NAME] [--area AREA] [--worker]
 
@@ -38,6 +38,7 @@ an old Python what to install.
 import argparse
 import ast
 import difflib
+import hashlib
 import json
 import os
 import platform
@@ -71,6 +72,7 @@ SETUP_BRANCH = "crowd/setup"
 CROWD_DIR = "docs/setup/crowd"
 RULESET_FILE = "docs/setup/ruleset-crowd.json"
 RULESET_NAME = "Protect the default branch"
+SETUP_TITLE = "Turn on crowd mode"
 ACTIONS_APP = "github-actions"
 ACTIONS_BOT = "github-actions[bot]"
 CLAUDE_APP = "claude"
@@ -95,6 +97,9 @@ FULL_REFSPEC = "+refs/heads/*:refs/remotes/origin/*"
 WORKFLOWS_NEEDED = ("ci.yml", "board.yml", "queue.yml", "tidy.yml")
 
 AREA_SHAPE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+# GitHub refuses a label name over 50 characters, and an area's label is
+# area:AREA.
+MAX_AREA = 45
 LOGIN_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 REPO_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$")
 AREA_PREFIX = "area:"
@@ -107,12 +112,22 @@ ROLE_WORDS = {"pull": "Read", "triage": "Triage", "push": "Write", "maintain": "
 
 # A file that stands for each shared path when the audit asks CODEOWNERS
 # who reviews it: what every session loads or runs, and the ruleset the
-# audit reads.
+# audit reads; then the instruction files Claude Code loads from any folder
+# once a session works there, and the project's MCP servers. NESTED_PROBES
+# puts the same files inside each area, whose own lines would otherwise win.
 OWNER_PROBES = (
     ".github/workflows/ci.yml", ".claude/settings.json", "tools/check_docs.py", "scripts/check.sh",
     "tests/test_crowd.py", "CLAUDE.md", "docs/project.md", "docs/agents/PROTOCOL.md",
-    "docs/memory/MEMORY.md", "docs/setup/ruleset-crowd.json",
+    "docs/memory/MEMORY.md", "docs/setup/ruleset-crowd.json", ".mcp.json",
+    "lib/CLAUDE.md", "lib/CLAUDE.local.md", "docs/history/AGENTS.md", "lib/.claude/rules/any.md",
 )
+NESTED_PROBES = (
+    "src/{area}/CLAUDE.md", "src/{area}/CLAUDE.local.md", "src/{area}/AGENTS.md",
+    "src/{area}/.claude/rules/any.md", "tests/test_{area}/CLAUDE.md",
+)
+# What scripts/crowd.py imports from tools/, so the files a contributor reads
+# before running it are named in one place (the invitation, the guide).
+CROWD_IMPORTS = ("tools/crowd_check.py", "tools/marked_section.py", "tools/template_init.py")
 
 # The credentials that outrank a contributor's own claude.ai login in
 # Claude Code (docs/setup/crowdsourcing.md, Part 2).
@@ -147,7 +162,7 @@ class DryRunStop(Exception):
 Answer = namedtuple("Answer", "status headers body")
 Result = namedtuple("Result", "level name text")
 Miss = namedtuple("Miss", "path where text")
-Change = namedtuple("Change", "files misses dropped")
+Change = namedtuple("Change", "files misses dropped kept")
 
 
 # The GitHub CLI.
@@ -437,28 +452,91 @@ def files_to_read(areas):
     return paths + [area_init_path(area) for area in areas]
 
 
-def build_change(files, repo, default_branch, owner_login, areas):
+def build_change(files, repo, default_branch, owner_login, areas, edited=()):
     """The crowd pull request as a pure function of the default branch's
     files (path to text, None when absent): the files that differ, each with
     its new text or None to delete it; the advisory edits that did not
-    match; and the lines of the old CODEOWNERS the new one drops."""
-    wanted = {}
+    match; the lines of the old CODEOWNERS the new one drops; and the files
+    kept as they are.
+
+    The first time, while docs/project.md does not yet say crowd mode is on,
+    every crowd file is laid down and the one-time edits are made. Once it
+    is on, the one-time edits are left alone, and a file named in edited,
+    one the owner changed after setup last wrote it, is kept: whole for a
+    shipped file, with only the missing areas' rows put in place for
+    CODEOWNERS and OWNERSHIP.md. The caller decides edited from the
+    default branch's history (planned_change)."""
+    converting = crowd_check.mode_of(files.get(PROJECT)) != "on"
+    wanted, misses, kept = {}, [], []
     for source, target in SHIPPED_WHOLE:
-        wanted[target] = shipped(files, source)
+        if target in edited and files.get(target) is not None:
+            wanted[target] = files[target]
+            kept.append(target)
+        else:
+            wanted[target] = shipped(files, source)
     for source, target in SHIPPED_GENERATED:
-        wanted[target] = expanded(shipped(files, source), owner_login, areas)
+        template = shipped(files, source)
+        if target in edited and files.get(target) is not None:
+            wanted[target] = with_area_rows(files[target], template, owner_login, areas, target, misses)
+            kept.append(target)
+        else:
+            wanted[target] = expanded(template, owner_login, areas)
     for area in areas:
         wanted[area_init_path(area)] = files.get(area_init_path(area)) or AREA_INIT.format(area=area)
     for path, description in FORM_DESCRIPTIONS.items():
         if files.get(path) is not None:
             wanted[path] = crowd_form(files[path], description)
-    misses = []
-    wanted[PROJECT] = crowd_project(shipped(files, PROJECT), repo, default_branch, owner_login, misses)
-    wanted[CLAUDE_MD] = crowd_claude_md(shipped(files, CLAUDE_MD), misses)
-    if files.get(README) is not None:
-        wanted[README] = crowd_readme(files[README])
+    if converting:
+        wanted[PROJECT] = crowd_project(shipped(files, PROJECT), repo, default_branch, owner_login, misses)
+        wanted[CLAUDE_MD] = crowd_claude_md(shipped(files, CLAUDE_MD), misses)
+        if files.get(README) is not None:
+            wanted[README] = crowd_readme(files[README])
     changed = {path: text for path, text in wanted.items() if text != files.get(path)}
-    return Change(changed, misses, dropped_lines(files.get(CODEOWNERS), wanted[CODEOWNERS]))
+    return Change(changed, misses, dropped_lines(files.get(CODEOWNERS), wanted[CODEOWNERS]), sorted(kept))
+
+
+# The targets a later setup keeps when the owner edited them after setup
+# wrote them, and where each comes from.
+KEPT_IF_EDITED = {target: source for source, target in SHIPPED_WHOLE + SHIPPED_GENERATED}
+
+
+def area_rows(template, owner_login, area):
+    """The lines a shipped CODEOWNERS or ownership page holds for one area."""
+    return [AREA_WORD.sub(area, line).replace("OWNER_LOGIN", owner_login)
+            for line in template.splitlines() if AREA_WORD.search(line)]
+
+
+def with_area_rows(text, template, owner_login, areas, path, misses):
+    """An edited CODEOWNERS or ownership page with the rows of each area it
+    lacks put in place: after the last row of an area it has, or else after
+    the line the template puts just before the area rows; an area whose rows
+    find no place is noted for the owner instead. Nothing else changes."""
+    lines = text.splitlines()
+    present = set(lines)
+    missing = [area for area in sorted(areas) if not set(area_rows(template, owner_login, area)) <= present]
+    if not missing:
+        return text
+    known = {row for area in areas for row in area_rows(template, owner_login, area)}
+    at = max((number + 1 for number, line in enumerate(lines) if line in known), default=None)
+    if at is None:
+        anchor = line_before_areas(template, owner_login)
+        at = max((number + 1 for number, line in enumerate(lines) if line == anchor), default=None)
+    if at is None:
+        for area in missing:
+            misses.append(Miss(path, f"the rows for the area {area}", " / ".join(area_rows(template, owner_login, area))))
+        return text
+    new = [row for area in missing for row in area_rows(template, owner_login, area) if row not in present]
+    return "\n".join(lines[:at] + new + lines[at:]) + "\n"
+
+
+def line_before_areas(template, owner_login):
+    """The template's line just before its first area row, as written here."""
+    before = None
+    for line in template.splitlines():
+        if AREA_WORD.search(line):
+            return before
+        before = line.replace("OWNER_LOGIN", owner_login)
+    return None
 
 
 def shipped(files, path):
@@ -485,7 +563,10 @@ def expanded(template, owner_login, areas):
 
 def crowd_form(text, description):
     """An issue form that puts no label on, so a stranger's issue is not
-    queued by itself, and says who queues it."""
+    queued by itself, and says who queues it; once it puts none on, as it is,
+    so a description the owner wrote since is kept."""
+    if re.search(r"^labels: \[\]$", text, re.MULTILINE):
+        return text
     text = LABELS_LINE.sub(lambda match: "labels: []", text, count=1)
     return DESCRIPTION_LINE.sub(lambda match: "description: " + description, text, count=1)
 
@@ -568,7 +649,7 @@ def reason_for(path):
 
 def commit_message(change):
     lines = [f"- {path}: {reason_for(path)[0]}" for path in sorted(change.files)]
-    return "Turn on crowd mode\n\n" + "\n".join(lines)
+    return SETUP_TITLE + "\n\n" + "\n".join(lines)
 
 
 def pull_body(change, repo, default_branch):
@@ -583,6 +664,11 @@ def pull_body(change, repo, default_branch):
     if change.dropped:
         lines += ["", "Lines of the old .github/CODEOWNERS this replaces; carry over any that still matter:", "", "```"]
         lines += change.dropped + ["```"]
+    if change.kept:
+        lines += ["", "Kept as they are, since they were changed after setup last wrote them; setup would otherwise "
+                  "write them again from their source, which may have news for them:", ""]
+        lines += [f"- `{path}`, from `{KEPT_IF_EDITED[path]}`" + (", with only the new areas' rows added"
+                  if path in change.files else "") for path in change.kept]
     lines += ["", f"Merge it with `python3 scripts/crowd.py finish {repo}` after reading it; nobody else can approve it yet."]
     return "\n".join(lines) + "\n"
 
@@ -717,11 +803,14 @@ class Context:
         self.repo = repo
         self.org, self.name = repo.split("/")
         self.login = None
+        self.owner_login = None
         self.default = None
         self.org_info = {}
         self.repo_info = {}
         self.verified = set()
         self.left = []
+        self.values = None
+        self.live_ruleset = None
 
     def leave(self, rank, text):
         self.left.append((rank, len(self.left), text))
@@ -785,7 +874,7 @@ def setup(gh, args):
     ctx = Context(gh, args.repo)
     tools_present(gh)
     signed_in(ctx)
-    owner_login = args.owner or ctx.login
+    owner_login = ctx.owner_login = args.owner or ctx.login
     organization(ctx)
     try:
         find_repository(ctx, args.template, args.wait)
@@ -818,14 +907,20 @@ def setup(gh, args):
 
 
 def finish_done(ctx, pull, files):
-    """Whether finish has already done its part: no crowd pull request is
-    left to merge, the default branch says crowd mode is on, and the check
-    is pinned. A second setup then keeps the checklist's finish box ticked,
-    as finish left it, instead of opening it again."""
-    done = pull is None and crowd_check.mode_of(files.get(PROJECT)) == "on" and "pinned" in ctx.verified
+    """Whether finish has already done its part, by the rule finish ticks
+    its box by (merged_box): no crowd pull request is left to merge, the
+    default branch says crowd mode is on, and the check is pinned. A second
+    setup then keeps the checklist's finish box ticked, as finish left it,
+    instead of opening it again."""
+    done = merged_box(pull is None, crowd_check.mode_of(files.get(PROJECT)) == "on", "pinned" in ctx.verified)
     if done:
         ctx.verified.add("merged")
     return done
+
+
+def merged_box(nothing_open, mode_on, pinned):
+    """The setup issue's finish box, the same for setup and finish."""
+    return nothing_open and mode_on and pinned
 
 
 def organization(ctx):
@@ -846,34 +941,46 @@ def organization(ctx):
 
 
 def find_repository(ctx, template, wait):
+    """The repository setup works on, refused before any write when it is
+    the template itself or not public, then waited for: a copy just made is
+    empty for a while, and template-init fills its names on its first run.
+    Every wait shares one deadline, --wait seconds from now."""
+    deadline = time.monotonic() + wait
     answer = ctx.gh.get(f"repos/{ctx.repo}")
-    if answer.status == 404:
+    made = answer.status == 404
+    if made:
         if not template:
             raise CrowdError(f"no repository {ctx.repo}; to make it from a public copy of the template, run this "
                              "again with --template TEMPLATE_OWNER/TEMPLATE_NAME")
         generate(ctx, template)
-        wait_for_init(ctx, wait)
-        answer = ctx.gh.get(f"repos/{ctx.repo}")
-        if answer.status == 404:
-            raise CrowdError(f"GitHub made {ctx.repo} but does not show it yet; run setup again in a minute")
+        info = wait_for_copy(ctx, template, wait, deadline)
     else:
         if template:
             print(f"repository {ctx.repo}: exists, so --template is not used")
-        wait_for_init(ctx, wait)
-    info = answer.body
-    if info.get("is_template"):
-        raise CrowdError(f"{ctx.repo} is a template; setup runs on a copy made from it, never on the template itself")
-    if info.get("private") or info.get("visibility", "public") != "public":
-        raise CrowdError(f"{ctx.repo} is not public: on a Free organization its ruleset would be written but not "
-                         f"enforced; make it public with gh repo edit {ctx.repo} --visibility public "
-                         "--accept-visibility-change-consequences, then run this again")
+        info = answer.body
+    refuse_unworkable(ctx, info)
     ctx.repo_info = info
     ctx.default = info["default_branch"]
+    if not made and not has_commits(ctx):
+        raise CrowdError(f"{ctx.repo} has no commit yet: push the template's files to it first (docs/setup/"
+                         "crowdsourcing.md, Part 1, step 2), then run setup again")
+    wait_for_init(ctx, wait, deadline)
     if read_file(ctx, CROWD_DIR + "/rule.md", ctx.default) is None:
         raise CrowdError(f"{ctx.repo} predates crowd mode: it has no {CROWD_DIR}/; bring docs/setup/crowd/, "
                          "docs/setup/ruleset-crowd.json, scripts/crowd.py and tools/crowd_check.py in from the "
                          "template by pull request, then run setup again")
     print(f"repository {ctx.repo}: public, default branch {ctx.default}, with the crowd files")
+
+
+def refuse_unworkable(ctx, info):
+    if info.get("is_template"):
+        raise CrowdError(f"{ctx.repo} is a template; setup runs on a copy made from it, never on the template "
+                         "itself, and template-init must never run on it; name the copy to make, ORG/NAME, with "
+                         f"--template {ctx.repo}")
+    if info.get("private") or info.get("visibility", "public") != "public":
+        raise CrowdError(f"{ctx.repo} is not public: on a Free organization its ruleset would be written but not "
+                         f"enforced; make it public with gh repo edit {ctx.repo} --visibility public "
+                         "--accept-visibility-change-consequences, then run this again")
 
 
 def generate(ctx, template):
@@ -885,17 +992,39 @@ def generate(ctx, template):
     print(f"repository {ctx.repo}: made from {template}")
 
 
-def wait_for_init(ctx, wait):
+def has_commits(ctx, branch=None):
+    """Whether the default branch has a commit: GitHub answers 409 for an
+    empty repository, and fills a copy made from a template a while after
+    it answers the request to make it."""
+    path = f"repos/{ctx.repo}/git/ref/heads/{escaped(branch or ctx.default, '/')}"
+    return ctx.gh.get(path, ok=(409,)).status == 200
+
+
+def wait_for_copy(ctx, template, wait, deadline):
+    """The new copy's repository answer, once GitHub shows it with its
+    default branch's first commit. Until then the copy has no files, and
+    every file read would answer 404 as if template-init were done."""
+    while True:
+        answer = ctx.gh.get(f"repos/{ctx.repo}")
+        if answer.status == 200 and has_commits(ctx, answer.body.get("default_branch")):
+            print(f"repository {ctx.repo}: GitHub has filled it from {template}")
+            return answer.body
+        if time.monotonic() >= deadline:
+            raise CrowdError(f"GitHub made {ctx.repo} from {template}, but after {wait} seconds it still has no "
+                             "commit; run setup again in a minute, without --template")
+        time.sleep(INIT_WAIT_STEP)
+
+
+def wait_for_init(ctx, wait, deadline):
     """template-init fills a new copy's names on its first push and removes
     .template/; until then the copy still names the template."""
-    deadline = time.monotonic() + wait
     while ctx.gh.get(f"repos/{ctx.repo}/contents/{PENDING}").status != 404:
         if time.monotonic() >= deadline:
             raise CrowdError(
                 f"template-init has not finished on {ctx.repo} after {wait} seconds; see its run on the Actions "
-                f"tab, or do it by hand in a clone: GITHUB_TOKEN=$(gh auth token) python3 tools/template_init.py "
-                f"--repo {ctx.repo} --default-branch main --create-labels --open-issue, then commit, push and "
-                "run setup again")
+                f"tab, or do it by hand in a clone of {ctx.repo}: GITHUB_TOKEN=$(gh auth token) python3 "
+                f"tools/template_init.py --repo {ctx.repo} --default-branch {ctx.default} --create-labels "
+                "--open-issue, then commit, push and run setup again")
         time.sleep(INIT_WAIT_STEP)
     print("template-init: done")
 
@@ -1047,17 +1176,24 @@ def crowd_variable(ctx):
 
 
 def labels(ctx, wanted_areas):
-    """The board's labels and one per area; the areas are those asked for
-    and those whose label already exists, so adding one later drops no other
-    from CODEOWNERS."""
+    """The board's labels, the signed-in owner's own account and agent
+    labels, so the owner's claims name the owner's login as everyone else's
+    do, and one per area; the areas are those asked for and those whose
+    label already exists, so adding one later drops no other from
+    CODEOWNERS."""
     existing = {label["name"]: label for label in ctx.gh.pages(f"repos/{ctx.repo}/labels")}
     found = {name[len(AREA_PREFIX):] for name in existing if name.startswith(AREA_PREFIX)}
-    areas = sorted(set(wanted_areas or []) | {area for area in found if AREA_SHAPE.match(area)})
-    wanted = list(template_init.LABELS) + [named_label(AREA_LABEL, AREA_PREFIX, area) for area in areas]
+    areas = sorted(set(wanted_areas or []) | {area for area in found if is_area(area)})
+    wanted = list(template_init.LABELS) + person_labels(ctx.login)
+    wanted += [named_label(AREA_LABEL, AREA_PREFIX, area) for area in areas]
     for name, color, description in wanted:
         ensure_label(ctx, existing.get(name), name, color, description)
     ctx.verified.add("labels")
     return areas
+
+
+def person_labels(login):
+    return [named_label(ACCOUNT_LABEL, "account:", login), named_label(AGENT_LABEL, "agent:", login)]
 
 
 def named_label(kind, prefix, name):
@@ -1067,7 +1203,10 @@ def named_label(kind, prefix, name):
 
 def ensure_label(ctx, have, name, color, description):
     """One label as wanted. have is the label as listed, None when it is
-    not, or False when the caller has not looked."""
+    not, or False when the caller has not looked. GitHub's 422 means the
+    label exists only when its error says already_exists; any other 422,
+    such as a name over 50 characters, and a label that cannot then be
+    read or changed, is an error, so nothing is reported done that is not."""
     path = f"repos/{ctx.repo}/labels/{escaped(name)}"
     if have is False:
         answer = ctx.gh.get(path)
@@ -1078,12 +1217,24 @@ def ensure_label(ctx, have, name, color, description):
         if made.status != 422:
             print(f"label {name}: created")
             return
-        have = ctx.gh.get(path).body or {}
+        if not already_exists(made.body):
+            raise CrowdError(f"label {name}: GitHub refused it: {github_message(made.body)}", 422)
+        answer = ctx.gh.get(path)
+        if answer.status != 200:
+            raise CrowdError(f"label {name}: GitHub says it exists but does not show it (HTTP {answer.status})")
+        have = answer.body
     if (have.get("color") or "").lower() == color and (have.get("description") or "") == description:
         print(f"label {name}: already")
         return
-    ctx.gh.call("PATCH", path, {"color": color, "description": description})
+    changed = ctx.gh.call("PATCH", path, {"color": color, "description": description})
+    if changed.status == 404:
+        raise CrowdError(f"label {name}: GitHub did not find it to update (HTTP 404)")
     print(f"label {name}: updated")
+
+
+def already_exists(body):
+    errors = (body or {}).get("errors") if isinstance(body, dict) else None
+    return any(isinstance(error, dict) and error.get("code") == "already_exists" for error in errors or [])
 
 
 def wanted_teams(areas):
@@ -1113,7 +1264,13 @@ def teams(ctx, areas):
         if roles.get(slug) != permission:
             ctx.gh.call("PUT", f"orgs/{ctx.org}/teams/{slug}/repos/{ctx.repo}", {"permission": permission})
         print(f"team {slug}: {'created' if made[slug] else 'exists'}, {role} given")
-    ctx.verified.add("teams")
+    admins = sorted(slug for slug, role in roles.items() if role == "admin")
+    for slug in admins:
+        print(f"team {slug}: has Admin here, which setup gives no team")
+        ctx.leave(LEFT_OTHER, f"take Admin from the team {slug}, or the team off this repository: "
+                              + ctx.page("settings/access"))
+    if not admins:
+        ctx.verified.add("teams")
 
 
 def find_ruleset(ctx):
@@ -1166,22 +1323,53 @@ def ruleset(ctx):
 
 def interaction_limit(ctx):
     """For a project that takes no reports from outside its members; every
-    run renews it, since GitHub lets it lapse after six months."""
+    run renews it, since GitHub lets it lapse after six months. A limit the
+    organization set applies here already, and GitHub refuses a
+    repository's own while it lasts (409), so setup then says so and goes
+    on."""
+    path = f"repos/{ctx.repo}/interaction-limits"
+    current = ctx.gh.get(path).body or {}
+    origin = current.get("origin")
+    if origin and origin != "repository":
+        print(f"interaction limit: {current.get('limit')} is set for the whole {origin} until "
+              f"{current.get('expires_at')}, and applies here; the {origin}'s own settings renew it")
+        return
     body = {"limit": "collaborators_only", "expiry": "six_months"}
-    ctx.gh.call("PUT", f"repos/{ctx.repo}/interaction-limits", body)
+    answer = ctx.gh.call("PUT", path, body, ok=(409,))
+    if answer.status == 409:
+        print(f"interaction limit: GitHub refused one for this repository, since {ctx.org} has its own "
+              "(HTTP 409); that one applies here")
+        return
     print("interaction limit: collaborators only, for six months; run setup --members-only again to renew it")
+
+
+def app_installation(ctx):
+    """The Claude GitHub App here, as setup and the audit both judge it:
+    'selected' when it is installed for selected repositories, 'all' when
+    for every repository of the organization, 'missing', or 'unreadable'.
+    The setup issue's box is ticked for 'selected' alone, by both."""
+    answer = ctx.gh.get(f"orgs/{ctx.org}/installations?per_page=100", ok=(403,))
+    if answer.status != 200:
+        return "unreadable"
+    found = [item for item in (answer.body or {}).get("installations") or [] if item.get("app_slug") == CLAUDE_APP]
+    if not found:
+        return "missing"
+    return "all" if found[0].get("repository_selection") == "all" else "selected"
 
 
 def claude_app(ctx):
     """Installing an app is the owner's consent in the browser; this finds
     out whether it is done and links the page with the ids filled."""
     link = template_init.app_install_link(ctx.org_info.get("id"), ctx.repo_info.get("id"))
-    answer = ctx.gh.get(f"orgs/{ctx.org}/installations?per_page=100", ok=(403,))
-    installed = answer.status == 200 and any(
-        item.get("app_slug") == CLAUDE_APP for item in (answer.body or {}).get("installations") or [])
-    if installed:
-        print("Claude GitHub App: installed")
+    state = app_installation(ctx)
+    if state == "selected":
+        print("Claude GitHub App: installed for selected repositories")
         ctx.verified.add("app")
+        return link
+    if state == "all":
+        page = f"https://github.com/organizations/{ctx.org}/settings/installations"
+        print(f"Claude GitHub App: installed on every repository of {ctx.org}")
+        ctx.leave(LEFT_APP, f"limit the Claude GitHub App to {ctx.name} (\"Only select repositories\"): {page}")
         return link
     print("Claude GitHub App: not installed here; no API installs it")
     ctx.leave(LEFT_APP, f"install the Claude GitHub App on {ctx.name} only: {link} (choose \"Only select "
@@ -1196,20 +1384,23 @@ def crowd_pull_request(ctx, owner_login, areas):
     else, and no file under .github/workflows/ changes, so the token needs
     no workflow scope. The branch is the tool's own, like the sync's, so a
     forced update of it is how setup refreshes it after the default branch
-    moved. Returns the pull request's number, or None, and the default
-    branch's files the change was built from."""
-    main_sha = ctx.gh.get(f"repos/{ctx.repo}/git/ref/heads/{escaped(ctx.default, '/')}").body["object"]["sha"]
-    base_tree = ctx.gh.get(f"repos/{ctx.repo}/git/commits/{main_sha}").body["tree"]["sha"]
+    moved, or after anyone else pushed to it. Returns the pull request's
+    number, or None, and the default branch's files the change was built
+    from."""
+    main_sha, base_tree = default_head(ctx)
     files = read_files(ctx, files_to_read(areas), main_sha)
-    change = build_change(files, ctx.repo, ctx.default, owner_login, areas)
+    change = planned_change(ctx, files, main_sha, owner_login, areas)
     for miss in change.misses:
         ctx.leave(LEFT_EDITS, f"{miss.path}, {miss.where}, did not match this copy's text; write it by hand: "
                               f"{miss.text}")
+    for path in change.kept:
+        print(f"crowd file {path}: kept as it is, since it changed after setup wrote it; "
+              f"its source is {KEPT_IF_EDITED[path]}")
     if not change.files:
         print(f"crowd files: already on {ctx.default}")
         return None, files
     pull = open_setup_pull(ctx)
-    if pull and holds(ctx, pull["head"]["sha"], change.files):
+    if pull and head_matches(ctx, pull["head"]["sha"], main_sha, base_tree, change):
         print(f"crowd files: open as #{pull['number']}, up to date")
         code_owners_resolve(ctx, SETUP_BRANCH)
         return pull["number"], files
@@ -1222,6 +1413,72 @@ def crowd_pull_request(ctx, owner_login, areas):
     print(f"crowd files: {len(change.files)} files on {SETUP_BRANCH}, pull request #{number}")
     code_owners_resolve(ctx, SETUP_BRANCH)
     return number, files
+
+
+def default_head(ctx):
+    """The default branch's head commit and its tree."""
+    main_sha = ctx.gh.get(f"repos/{ctx.repo}/git/ref/heads/{escaped(ctx.default, '/')}").body["object"]["sha"]
+    base_tree = ctx.gh.get(f"repos/{ctx.repo}/git/commits/{main_sha}").body["tree"]["sha"]
+    return main_sha, base_tree
+
+
+def planned_change(ctx, files, main_sha, owner_login, areas):
+    """The change setup makes, which finish expects to find: build_change,
+    with the crowd files the owner changed since setup wrote them kept. That
+    is told only once crowd mode is on, from the default branch's history:
+    a file whose latest commit is not one of setup's (its title starts with
+    SETUP_TITLE) holds someone's later, reviewed edit."""
+    change = build_change(files, ctx.repo, ctx.default, owner_login, areas)
+    if crowd_check.mode_of(files.get(PROJECT)) != "on":
+        return change
+    edited = {path for path in change.files
+              if path in KEPT_IF_EDITED and files.get(path) is not None and not written_by_setup(ctx, main_sha, path)}
+    if not edited:
+        return change
+    return build_change(files, ctx.repo, ctx.default, owner_login, areas, edited)
+
+
+def written_by_setup(ctx, main_sha, path):
+    """Whether the latest commit on the default branch that changed path is
+    setup's own."""
+    answer = ctx.gh.get(f"repos/{ctx.repo}/commits?sha={main_sha}&path={escaped(path, '/')}&per_page=1")
+    commits = answer.body if answer.status == 200 and isinstance(answer.body, list) else []
+    message = ((commits[0].get("commit") or {}).get("message") or "") if commits else ""
+    return message.startswith(SETUP_TITLE)
+
+
+def blob_sha(text):
+    """The id git gives a file of this text, as GitHub stores the content a
+    tree is made with."""
+    data = text.encode("utf-8")
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def tree_entries(ctx, tree_sha):
+    """Every file of a tree, path to (mode, type, sha), read in one call."""
+    body = ctx.gh.get(f"repos/{ctx.repo}/git/trees/{tree_sha}?recursive=1").body or {}
+    if body.get("truncated"):
+        raise CrowdError(f"the tree {tree_sha[:7]} is too large for GitHub to list whole, so {SETUP_BRANCH} cannot "
+                         "be compared with what setup writes; read the pull request and merge it by hand")
+    return {entry["path"]: (entry.get("mode"), entry.get("type"), entry.get("sha"))
+            for entry in body.get("tree") or [] if entry.get("type") != "tree"}
+
+
+def head_matches(ctx, head, main_sha, base_tree, change):
+    """Whether the commit head is exactly setup's commit for change: its one
+    parent is the default branch's head, and its tree holds that branch's
+    files with the change applied, blob for blob. A file list would not do:
+    a rename shows only its new name and hides the old path's deletion."""
+    commit = ctx.gh.get(f"repos/{ctx.repo}/git/commits/{head}").body or {}
+    if [parent.get("sha") for parent in commit.get("parents") or []] != [main_sha]:
+        return False
+    wanted = tree_entries(ctx, base_tree)
+    for path, text in change.files.items():
+        if text is None:
+            wanted.pop(path, None)
+        else:
+            wanted[path] = ("100644", "blob", blob_sha(text))
+    return tree_entries(ctx, (commit.get("tree") or {}).get("sha", "")) == wanted
 
 
 def setup_commit(ctx, change, base_tree, parent):
@@ -1239,7 +1496,7 @@ def setup_commit(ctx, change, base_tree, parent):
 
 
 def open_pull(ctx, change):
-    body = {"title": "Turn on crowd mode", "head": SETUP_BRANCH, "base": ctx.default,
+    body = {"title": SETUP_TITLE, "head": SETUP_BRANCH, "base": ctx.default,
             "body": pull_body(change, ctx.repo, ctx.default)}
     made = ctx.gh.call("POST", f"repos/{ctx.repo}/pulls", body).body
     return made["number"] if made else "(new)"
@@ -1248,11 +1505,6 @@ def open_pull(ctx, change):
 def open_setup_pull(ctx):
     found = ctx.gh.get(f"repos/{ctx.repo}/pulls?head={ctx.org}:{SETUP_BRANCH}&state=open").body or []
     return found[0] if found else None
-
-
-def holds(ctx, ref, wanted):
-    """Whether ref has every file of the change as the change has it."""
-    return all(read_file(ctx, path, ref) == text for path, text in wanted.items())
 
 
 def code_owners_resolve(ctx, ref):
@@ -1328,7 +1580,7 @@ def crowd_checklist(repo, default_branch, verified, pull=None, goal=None, app_li
     script verified; the open ones are the owner's, each with its link."""
     org = repo.split("/")[0]
     base = f"https://github.com/{repo}/blob/{default_branch}"
-    pull_text = f"pull request #{pull}" if pull else "the crowd/setup pull request"
+    pull_text = f"pull request #{pull}" if pull and "merged" not in verified else "the crowd/setup pull request"
     goal_text = f" (#{goal})" if goal else ""
 
     def box(key, text):
@@ -1410,13 +1662,15 @@ def finish(gh, args):
     text = read_file(ctx, RULESET_FILE, ctx.default)
     if text is None:
         raise CrowdError(f"{RULESET_FILE} is missing on {ctx.default}; run setup first")
+    mode = crowd_check.mode_of(read_file(ctx, PROJECT, ctx.default))
+    ctx.owner_login = finish_owner(ctx, args.owner, mode)
     pull = open_setup_pull(ctx)
     if pull:
         if not pull_is_sound(ctx, pull, text):
             return 0
     else:
         print(f"{SETUP_BRANCH}: no open pull request")
-        if crowd_check.mode_of(read_file(ctx, PROJECT, ctx.default)) != "on":
+        if mode != "on":
             raise CrowdError(f"crowd mode is not on in {ctx.repo}'s {PROJECT} and no {SETUP_BRANCH} pull request "
                              f"is open: run python3 scripts/crowd.py setup {ctx.repo} first")
     pinned = pin(ctx, text)
@@ -1424,7 +1678,7 @@ def finish(gh, args):
         merge(ctx, pull)
         wait_for_mode(ctx)
     results = audit_results(ctx)
-    rewrite_checklist(ctx, results, pull)
+    rewrite_checklist(ctx, results, text, pinned)
     print_results(results)
     if not pinned:
         ctx.leave(LEFT_FINISH, "pin check to GitHub Actions by hand: Settings, Rules, Rulesets, \"Protect the "
@@ -1438,36 +1692,77 @@ def finish(gh, args):
     return 1 if not pinned or any(result.level == "FAIL" for result in results) else 0
 
 
+def finish_owner(ctx, asked, mode):
+    """The login the shared paths must ask, never read from the pull
+    request, which anyone with Write can push to: --owner when given; once
+    crowd mode is on, the one owner the default branch's reviewed CODEOWNERS
+    gives them; otherwise the signed-in owner, as setup's own default."""
+    if asked:
+        return asked
+    if mode == "on":
+        found = single_owner(read_file(ctx, CODEOWNERS, ctx.default))
+        if found:
+            return found
+    return ctx.login
+
+
+def single_owner(codeowners):
+    """The one login CODEOWNERS gives CLAUDE.md, without its @, or None."""
+    names = owners_of(codeowners, CLAUDE_MD)
+    if len(names) == 1 and names[0].startswith("@") and "/" not in names[0]:
+        return names[0][1:]
+    return None
+
+
 def pull_is_sound(ctx, pull, ruleset_text):
-    """Whether the open crowd/setup pull request is still what setup made
-    and passed its check on GitHub Actions; False while the check runs.
-    Anything else refuses, and nothing is written."""
+    """Whether the open crowd/setup pull request is still what setup would
+    write now, pushed by the signed-in owner alone, and passed its check on
+    GitHub Actions; False while the check runs or GitHub's record of the
+    last push is not there yet. Anything else refuses, and nothing is
+    written."""
     number, head = pull["number"], pull["head"]["sha"]
-    for commit in ctx.gh.pages(f"repos/{ctx.repo}/pulls/{number}/commits"):
-        author = (commit.get("author") or {}).get("login")
-        if author != ctx.login:
-            raise CrowdError(f"commit {commit.get('sha', '')[:7]} on {SETUP_BRANCH} is by {author or 'an unknown author'}, "
-                             f"not {ctx.login}: someone else pushed to it; close #{number} and run setup again")
-    expected = expected_change(ctx, head)
-    changed = {item["filename"] for item in ctx.gh.pages(f"repos/{ctx.repo}/pulls/{number}/files")}
-    if changed != set(expected.files) or not holds(ctx, head, expected.files):
-        raise CrowdError(f"#{number} is not what setup would write from {ctx.default} now: {ctx.default} moved, or "
-                         f"someone pushed; run python3 scripts/crowd.py setup {ctx.repo} again, then finish")
+    actors = setup_pushers(ctx, pull)
+    if actors is None:
+        print(f"{SETUP_BRANCH}: GitHub's activity record does not show who pushed {head[:7]} yet; wait, then run "
+              "finish again")
+        return False
+    others = sorted(actors - {ctx.login})
+    if others:
+        raise CrowdError(f"{', '.join(others)} pushed to {SETUP_BRANCH} (GitHub's activity record for the branch), "
+                         f"not only {ctx.login}: close #{number}, read what was pushed, and run setup again")
+    main_sha, base_tree = default_head(ctx)
+    areas = area_labels(ctx)
+    files = read_files(ctx, files_to_read(areas), main_sha)
+    expected = planned_change(ctx, files, main_sha, ctx.owner_login, areas)
+    if not head_matches(ctx, head, main_sha, base_tree, expected):
+        raise CrowdError(f"#{number} is not what setup would write from {ctx.default} now for the owner "
+                         f"{ctx.owner_login}: {ctx.default} moved, or someone pushed; run python3 scripts/crowd.py "
+                         f"setup {ctx.repo} again, then finish (give both the same --owner, if setup had one)")
     code_owners_resolve(ctx, SETUP_BRANCH)
     return check_passed(ctx, number, head, ruleset_text)
 
 
-def expected_change(ctx, head):
-    """The change setup would make now, for the owner login the pull
-    request's CODEOWNERS gives the shared paths and the areas whose label
-    exists."""
-    owner = owners_of(read_file(ctx, CODEOWNERS, head), ".github/CODEOWNERS")
-    owner_login = owner[0].lstrip("@") if owner and "/" not in owner[0] else ctx.login
-    areas = sorted(label["name"][len(AREA_PREFIX):] for label in ctx.gh.pages(f"repos/{ctx.repo}/labels")
-                   if label["name"].startswith(AREA_PREFIX) and AREA_SHAPE.match(label["name"][len(AREA_PREFIX):]))
-    main_sha = ctx.gh.get(f"repos/{ctx.repo}/git/ref/heads/{escaped(ctx.default, '/')}").body["object"]["sha"]
-    files = read_files(ctx, files_to_read(areas), main_sha)
-    return build_change(files, ctx.repo, ctx.default, owner_login, areas)
+def setup_pushers(ctx, pull):
+    """Who pushed crowd/setup, from GitHub's own record of the branch, which
+    names the account behind each push, where a commit's author is only
+    what the pusher typed into git: the actor of the push that made the
+    pull request's head, and of every push since the pull request opened.
+    None when no push made the head yet in that record."""
+    since = pull.get("created_at") or ""
+    head = pull["head"]["sha"]
+    ref = escaped("refs/heads/" + SETUP_BRANCH, "/")
+    activities = ctx.gh.pages(f"repos/{ctx.repo}/activity?ref={ref}")
+    made_head = next((item for item in activities if item.get("after") == head), None)
+    if made_head is None:
+        return None
+    later = [item for item in activities if (item.get("timestamp") or "") >= since]
+    return {(item.get("actor") or {}).get("login") or "an unknown account" for item in [made_head] + later}
+
+
+def area_labels(ctx):
+    """The areas whose label exists, sorted."""
+    return sorted(label["name"][len(AREA_PREFIX):] for label in ctx.gh.pages(f"repos/{ctx.repo}/labels")
+                  if label["name"].startswith(AREA_PREFIX) and is_area(label["name"][len(AREA_PREFIX):]))
 
 
 def check_passed(ctx, number, head, ruleset_text):
@@ -1527,25 +1822,34 @@ def wait_for_mode(ctx):
     print(f"crowd mode: on, on {ctx.default}")
 
 
-# Which audit checks stand behind which box of the setup issue's checklist.
+# Which audit checks stand behind which box of the setup issue's checklist,
+# and the levels that tick it. Each box follows the rule setup ticks it by,
+# so a setup after a finish, or a second finish, rewrites nothing: an Actions
+# setting that could not be read leaves setup's box open, and so a warning
+# does here.
 BOX_CHECKS = {
-    "settings": ("repository settings", "actions settings"),
-    "teams": ("teams",),
-    "labels": ("labels",),
-    "ruleset": ("ruleset",),
-    "variable": ("variables",),
-    "merged": ("mode",),
-    "two_factor": ("two-factor",),
+    "settings": (("repository settings", ("ok", "warn")), ("actions settings", ("ok",))),
+    "teams": (("teams", ("ok", "warn")),),
+    "labels": (("labels", ("ok", "warn")),),
+    "two_factor": (("two-factor", ("ok",)),),
 }
 
 
-def rewrite_checklist(ctx, results, pull):
+def rewrite_checklist(ctx, results, ruleset_text, pinned):
+    """The setup issue's checklist after finish: no crowd pull request is
+    left open, since finish merged it or there was none."""
     levels = {}
     for result in results:
         levels.setdefault(result.name, set()).add(result.level)
-    verified = {box for box, names in BOX_CHECKS.items()
-                if all(name in levels and "FAIL" not in levels[name] for name in names)}
-    if levels.get("Claude app") == {"ok"}:
+    verified = {box for box, rules in BOX_CHECKS.items()
+                if all(name in levels and levels[name] <= set(allowed) for name, allowed in rules)}
+    if ruleset_matches_file(ctx.live_ruleset, ruleset_text):
+        verified.add("ruleset")
+    if crowd_variable_true(ctx.values or {}):
+        verified.add("variable")
+    if merged_box(True, levels.get("mode") == {"ok"}, pinned):
+        verified.add("merged")
+    if app_installation(ctx) == "selected":
         verified.add("app")
     if goal_written(read_file(ctx, PROJECT, ctx.default) or ""):
         verified.add("goal")
@@ -1553,8 +1857,24 @@ def rewrite_checklist(ctx, results, pull):
     link = template_init.app_install_link(org_id, ctx.repo_info.get("id"))
     issues = open_issues(ctx)
     goal = next((issue["number"] for issue in issues if issue.get("title") == GOAL_TITLE), None)
-    body = crowd_checklist(ctx.repo, ctx.default, verified, pull["number"] if pull else None, goal, link)
+    body = crowd_checklist(ctx.repo, ctx.default, verified, None, goal, link)
     setup_issue(ctx, issues, body)
+
+
+def ruleset_matches_file(live, text):
+    """Whether the live ruleset is the crowd file's, with its pin or without
+    it, as setup leaves it before finish."""
+    if not live:
+        return False
+    return same_ruleset(live, crowd_ruleset(text, True)) or same_ruleset(live, crowd_ruleset(text, False))
+
+
+def crowd_variable_true(values):
+    """CLAUDE_CROWD as the workflows read it: the repository's value, else
+    the organization's."""
+    name = crowd_check.CROWD_VARIABLE
+    repository, organization = values.get("variables") or {}, values.get("organization variables") or {}
+    return str(repository.get(name, organization.get(name)) or "").lower() == "true"
 
 
 # audit: reads only. One line per check, ok, warn or FAIL with what fixes it.
@@ -1562,6 +1882,7 @@ def rewrite_checklist(ctx, results, pull):
 def audit(gh, args):
     ctx = Context(gh, args.repo)
     signed_in(ctx)
+    ctx.owner_login = args.owner or ctx.login
     load_repository(ctx)
     results = audit_results(ctx)
     print_results(results)
@@ -1580,7 +1901,7 @@ def ok(name, text):
 def audit_results(ctx):
     ctx.org_info = ctx.gh.get(f"orgs/{ctx.org}").body or {}
     codeowners = read_file(ctx, CODEOWNERS, ctx.default)
-    values = actions_values(ctx)
+    values = ctx.values = actions_values(ctx)
     checks = (
         lambda: audit_organization(ctx),
         lambda: audit_owners(ctx, codeowners),
@@ -1630,7 +1951,7 @@ def audit_organization(ctx):
 
 
 def audit_owners(ctx, codeowners):
-    expected = {ctx.login.lower()} | {name.lstrip("@").lower() for name in owners_of(codeowners, CLAUDE_MD)}
+    expected = {ctx.login.lower(), (ctx.owner_login or ctx.login).lower()}
     others = sorted(member["login"] for member in ctx.gh.pages(f"orgs/{ctx.org}/members?role=admin")
                     if member["login"].lower() not in expected)
     if others:
@@ -1717,8 +2038,7 @@ def audit_variables(ctx, values):
     repository, organization = values["variables"], values["organization variables"]
     name = crowd_check.CROWD_VARIABLE
     results = []
-    effective = repository.get(name, organization.get(name))
-    if str(effective or "").lower() != "true":
+    if not crowd_variable_true(values):
         results.append(Result("FAIL", "variables", f"{name} is not true, so the Claude workflows may start: "
                               f"gh variable set {name} --repo {ctx.repo} --body true, and find out who changed it "
                               "in the organization's audit log"))
@@ -1775,7 +2095,7 @@ def audit_ruleset(ctx):
     for item in listing:
         live = ctx.gh.get(f"repos/{ctx.repo}/rulesets/{item['id']}").body or {}
         if item.get("name") == RULESET_NAME and item.get("source_type", "Repository") == "Repository":
-            ours = live
+            ours = ctx.live_ruleset = live
         elif any(actor.get("bypass_mode", "always") == "always" for actor in live.get("bypass_actors") or []):
             results.append(Result("warn", "ruleset", f"the ruleset \"{item.get('name')}\" lets someone bypass it always"))
     if ours is None:
@@ -1787,29 +2107,34 @@ def audit_ruleset(ctx):
     return results or ok("ruleset", f"as {RULESET_FILE} says, check taken only from GitHub Actions")
 
 
+def owner_probes(areas):
+    return OWNER_PROBES + tuple(probe.format(area=area) for area in areas for probe in NESTED_PROBES)
+
+
 def audit_codeowners(ctx, codeowners):
+    """Every shared path, the instruction files inside each area included,
+    asks one login alone, and that login is the owner's: the signed-in
+    owner, or --owner. Who CODEOWNERS names is never taken from CODEOWNERS
+    itself, or a change that gave every path to someone else would pass."""
     if codeowners is None:
         return [Result("FAIL", "code owners", f"no {CODEOWNERS} on {ctx.default}; python3 scripts/crowd.py setup "
                        f"{ctx.repo} opens the pull request that writes it")]
+    owner = "@" + (ctx.owner_login or ctx.login)
     results = []
-    owners = {}
-    for path in OWNER_PROBES:
+    for path in owner_probes(area_labels(ctx)):
         names = owners_of(codeowners, path)
-        owners[path] = names
-        if len(names) != 1 or "/" in names[0]:
-            results.append(Result("FAIL", "code owners", f"{path} asks {' '.join(names) or 'nobody'}, not the "
-                                  "owner alone"))
-    single = {tuple(names) for names in owners.values() if len(names) == 1 and "/" not in names[0]}
-    if len(single) > 1:
-        results.append(Result("FAIL", "code owners", "the shared paths ask different people: "
-                              + ", ".join(sorted(names[0] for names in single))))
+        if [name.lower() for name in names] != [owner.lower()]:
+            results.append(Result("FAIL", "code owners", f"{path} asks {' '.join(names) or 'nobody'}, not {owner} "
+                                  "alone"))
     for error in code_owner_errors(ctx, ctx.default):
         results.append(Result("FAIL", "code owners", error))
     if results:
-        results[-1] = results[-1]._replace(text=results[-1].text + f"; python3 scripts/crowd.py setup {ctx.repo} opens "
-                                           f"the pull request that writes {CODEOWNERS} again")
+        results[-1] = results[-1]._replace(text=results[-1].text + f"; if {owner} is not the owner, run this with "
+                                           f"--owner LOGIN; python3 scripts/crowd.py setup {ctx.repo} opens the pull "
+                                           f"request that writes {CODEOWNERS} again")
         return results
-    return ok("code owners", f"every shared path asks {owners[CLAUDE_MD][0]} alone, and every line resolves")
+    return ok("code owners", f"every shared path, the instruction files in every folder included, asks {owner} "
+                             "alone, and every line resolves")
 
 
 def audit_mode(ctx):
@@ -1877,8 +2202,17 @@ def audit_interaction_limit(ctx, now=None):
     now = now or datetime.now(timezone.utc)
     if expires - now < LIMIT_WARNING:
         return [Result("warn", "interaction limit", f"{body.get('limit')} lapses at {body['expires_at']}: "
-                       f"python3 scripts/crowd.py setup {ctx.repo} --members-only renews it")]
+                       + renewal(ctx, body))]
     return ok("interaction limit", f"{body.get('limit')} until {body['expires_at']}")
+
+
+def renewal(ctx, limit):
+    """How to renew a limit, by where it was set: GitHub refuses a
+    repository's own while the organization's lasts."""
+    if limit.get("origin") == "organization":
+        return (f"the organization {ctx.org} set it, so renew it there: gh api --method PUT "
+                f"orgs/{ctx.org}/interaction-limits -f limit={limit.get('limit')} -f expiry=six_months")
+    return f"python3 scripts/crowd.py setup {ctx.repo} --members-only renews it"
 
 
 def pushers(ctx, ref):
@@ -1952,14 +2286,13 @@ def audit_main(ctx):
 
 
 def audit_app(ctx):
-    answer = ctx.gh.get(f"orgs/{ctx.org}/installations?per_page=100", ok=(403,))
-    if answer.status != 200:
-        return [Result("warn", "Claude app", f"installations could not be read (HTTP {answer.status})")]
-    found = [item for item in (answer.body or {}).get("installations") or [] if item.get("app_slug") == CLAUDE_APP]
+    state = app_installation(ctx)
     page = f"https://github.com/organizations/{ctx.org}/settings/installations"
-    if not found:
+    if state == "unreadable":
+        return [Result("warn", "Claude app", "installations could not be read")]
+    if state == "missing":
         return [Result("warn", "Claude app", f"not installed; cloud sessions and routines need it: {page}")]
-    if found[0].get("repository_selection") == "all":
+    if state == "all":
         return [Result("warn", "Claude app", f"installed on every repository of {ctx.org}; limit it to this one: {page}")]
     return ok("Claude app", f"installed for selected repositories; this one should be among them: {page}")
 
@@ -1971,6 +2304,7 @@ def audit_app(ctx):
 def invite(gh, args):
     ctx = Context(gh, args.repo)
     signed_in(ctx)
+    ctx.owner_login = args.owner or ctx.login
     load_repository(ctx)
     ready_for_people(ctx)
     for login in args.logins:
@@ -1999,11 +2333,12 @@ def invite(gh, args):
 
 def ready_for_people(ctx):
     """The review rules hold: crowd mode is on, the ruleset is the crowd one
-    with its pin, code owners resolve, CLAUDE_CROWD is true and no Claude
-    value reaches the repository."""
+    with its pin, CODEOWNERS gives the shared paths to the owner alone and
+    resolves, CLAUDE_CROWD is true and no Claude value reaches the
+    repository."""
     values = actions_values(ctx)
     results = audit_mode(ctx) + audit_ruleset(ctx) + audit_variables(ctx, values)
-    results += [Result("FAIL", "code owners", error) for error in code_owner_errors(ctx, ctx.default)]
+    results += audit_codeowners(ctx, read_file(ctx, CODEOWNERS, ctx.default))
     forbidden = [name for name in values["secrets"] + values["organization secrets"] if name in crowd_check.SECRET_NAMES]
     results += [Result("FAIL", "secrets", f"{name} reaches this repository") for name in forbidden]
     failed = [result for result in results if result.level == "FAIL"]
@@ -2011,12 +2346,13 @@ def ready_for_people(ctx):
         lines = "\n  ".join(f"{result.name}: {result.text}" for result in failed)
         raise CrowdError(f"{ctx.repo} is not ready for people yet; nothing was written:\n  {lines}\n"
                          f"Run python3 scripts/crowd.py finish {ctx.repo}, then invite again.")
-    print(f"ready: crowd mode is on, the ruleset is pinned, code owners resolve, and no Claude value reaches {ctx.repo}")
+    print(f"ready: crowd mode is on, the ruleset is pinned, the shared paths ask @{ctx.owner_login} alone, and no "
+          f"Claude value reaches {ctx.repo}")
 
 
 def invite_one(ctx, login, area, maintainer):
-    for kind, prefix in ((ACCOUNT_LABEL, "account:"), (AGENT_LABEL, "agent:")):
-        ensure_label(ctx, False, *named_label(kind, prefix, login))
+    for name, color, description in person_labels(login):
+        ensure_label(ctx, False, name, color, description)
     teams = [CONTRIBUTORS]
     if maintainer:
         teams += [MAINTAINERS] + ([f"{area}-maintainers"] if area else [])
@@ -2039,12 +2375,15 @@ def warn_small_team(ctx, area):
 
 
 def print_invitation(ctx, login, area):
-    area_text = f" --area {area}" if area else " --area AREA"
+    area_text = f" --area {area}" if area else ""
     print(f"Send {login} this:")
     print(f"  You are invited to {ctx.org} to work on {ctx.name} under your own Claude account. Turn on two-factor "
           f"authentication for your GitHub account first (https://github.com/settings/security), then accept at "
-          f"https://github.com/orgs/{ctx.org}/invitation within 7 days. Then run")
-    print(f"    gh repo clone {ctx.repo} && cd {ctx.name} && python3 scripts/crowd.py doctor{area_text}")
+          f"https://github.com/orgs/{ctx.org}/invitation within 7 days. Then clone it:")
+    print(f"    gh repo clone {ctx.repo} && cd {ctx.name}")
+    print(f"  read scripts/crowd.py and what it imports ({', '.join(CROWD_IMPORTS)}), which run on your machine, "
+          "then run")
+    print(f"    python3 scripts/crowd.py doctor{area_text}")
     print("  and do what its Next: line says until it says ready. Every step, with its reason, is in Part 2 of "
           f"https://github.com/{ctx.repo}/blob/{ctx.default}/docs/setup/crowdsourcing.md#part-2-a-contributor")
 
@@ -2118,13 +2457,24 @@ def publish_template(gh, args):
         clone = Path(folder) / "template"
         git(["clone", "--quiet", "--single-branch", "--branch", branch, git_url(args.src), str(clone)])
         head = git(["rev-parse", "HEAD"], clone)
+        resuming = False
         if destination.status != 404:
-            return already_published(ctx, args, destination.body, head)
+            state = destination_state(ctx, args, destination.body, head)
+            if state == "published":
+                print(f"{args.dest}: already published at {head[:7]}")
+                return 0
+            if state != "made, not pushed":
+                raise CrowdError(f"{args.dest} exists and is not this template at {head[:7]}; nothing is overwritten: "
+                                 "choose another name, or delete it first if it is yours to delete")
+            resuming = True
+            print(f"{args.dest}: made by an earlier run of this, as an empty public template, whose push did not "
+                  "happen; the push is what is left")
         print_summary(args, source.body, branch, head, clone)
         if not args.yes:
             print(f"Nothing was published; run again with --yes once {args.src}'s owner agrees.")
             return 0
-        create_template(ctx, args, head)
+        if not resuming:
+            create_template(ctx, args, head)
         if ctx.gh.dry_run:
             print(f"would run git push {git_url(args.dest)} {branch}:{branch}")
             return 0
@@ -2149,34 +2499,54 @@ def git(args, cwd=None):
     return done.stdout.strip()
 
 
-def already_published(ctx, args, existing, head):
-    ref = ctx.gh.get(f"repos/{args.dest}/git/ref/heads/{escaped(existing.get('default_branch', ''), '/')}")
+def template_description(src, head):
+    """The description publish-template gives the copy, which tells a copy
+    an earlier run made from any other repository of that name."""
+    return f"Public copy of {src} at {head[:7]}"
+
+
+def destination_state(ctx, args, existing, head):
+    """What an existing DEST is: "published", this template at this head;
+    "made, not pushed", the empty template an earlier run made before its
+    push failed (GitHub answers 409 for an empty repository's branch); or
+    "other"."""
+    branch = existing.get("default_branch") or ""
+    ref = ctx.gh.get(f"repos/{args.dest}/git/ref/heads/{escaped(branch, '/')}", ok=(409,))
+    if ref.status == 409:
+        made_here = existing.get("is_template") and existing.get("description") == template_description(args.src, head)
+        return "made, not pushed" if made_here else "other"
     dest_head = (ref.body or {}).get("object", {}).get("sha") if ref.status == 200 else None
-    if existing.get("is_template") and dest_head == head:
-        print(f"{args.dest}: already published at {head[:7]}")
-        return 0
-    raise CrowdError(f"{args.dest} exists and is not this template at {head[:7]}; nothing is overwritten: "
-                     "choose another name, or delete it first if it is yours to delete")
+    return "published" if existing.get("is_template") and dest_head == head else "other"
 
 
 def print_summary(args, source, branch, head, clone):
-    """What publishing makes public, all of it read from the clone."""
+    """What publishing makes public, all of it read from the clone: the
+    people in the history, every file at the head, and every path that only
+    earlier commits hold, which the history publishes too."""
     people = sorted(set(git(["log", "--format=%an <%ae>%n%cn <%ce>"], clone).splitlines()) - {""})
-    sizes = [int(line.split()[3]) for line in git(["ls-tree", "-r", "-l", "HEAD"], clone).splitlines()
-             if line.split()[1] == "blob"]
+    listing = [line.split(None, 4) for line in git(["ls-tree", "-r", "-l", "HEAD"], clone).splitlines()]
+    files = [(fields[4], int(fields[3])) for fields in listing if len(fields) == 5 and fields[1] == "blob"]
+    ever = set(git(["log", "--format=", "--name-only", "--no-renames", "HEAD"], clone).splitlines()) - {""}
+    earlier = sorted(ever - {path for path, _ in files})
     print(f"{args.src}: {source.get('visibility', 'unknown')}, branch {branch} at {head}")
     print(f"commits: {git(['rev-list', '--count', 'HEAD'], clone)}")
     print("people in that history, whose names and emails become public:")
     for person in people:
         print("  " + person)
-    print(f"files: {len(sizes)}, {sum(sizes)} bytes")
+    print(f"files at the head: {len(files)}, {sum(size for _, size in files)} bytes:")
+    for path, _ in files:
+        print("  " + path)
+    if earlier:
+        print(f"paths only earlier commits hold, which the history publishes too: {len(earlier)}:")
+        for path in earlier:
+            print("  " + path)
     print("Not published: issues, pull requests, other branches, settings, secrets and Actions history.")
     print(f"Publishing makes every line above public, under {args.dest}, as a template.")
 
 
 def create_template(ctx, args, head):
     owner, name = args.dest.split("/")
-    description = f"Public copy of {args.src} at {head[:7]}"
+    description = template_description(args.src, head)
     if owner.lower() == ctx.login.lower():
         body = {"name": name, "private": False, "is_template": True, "description": description}
         ctx.gh.call("POST", "user/repos", body)
@@ -2526,9 +2896,14 @@ def repository_name(text):
     return text
 
 
+def is_area(text):
+    return bool(AREA_SHAPE.match(text)) and len(text) <= MAX_AREA
+
+
 def area_name(text):
-    if not AREA_SHAPE.match(text):
-        raise argparse.ArgumentTypeError(f"{text!r}: an area is lowercase letters, digits and hyphens")
+    if not is_area(text):
+        raise argparse.ArgumentTypeError(f"{text!r}: an area is lowercase letters, digits and hyphens, "
+                                         f"{MAX_AREA} at most, so its label area:AREA fits GitHub's 50")
     return text
 
 
@@ -2558,14 +2933,19 @@ def parse_args(argv):
     setup_args.add_argument("--members-only", action="store_true", help="limit issues and comments to collaborators")
     setup_args.add_argument("--open-pull-requests", action="store_true", help="let anyone open a pull request")
     setup_args.add_argument("--wait", type=int, default=300, metavar="SECONDS", help="seconds to wait for template-init (default 300)")
-    command("finish", "Check, pin and merge the crowd/setup pull request, then audit.")
+    owner_help = "the login CODEOWNERS gives the shared paths, if setup had --owner (default: you)"
+    finish_args = command("finish", "Check, pin and merge the crowd/setup pull request, then audit.")
+    finish_args.add_argument("--owner", type=login_name, metavar="LOGIN", help=owner_help.replace(
+        "(default: you)", "(default: the one CODEOWNERS on the default branch names once crowd mode is on, else you)"))
     invite_args = command("invite", "Invite people into the teams, with their labels.")
     invite_args.add_argument("logins", nargs="+", type=login_name, metavar="LOGIN")
     invite_args.add_argument("--area", type=area_name, metavar="AREA", help="their area")
     invite_args.add_argument("--maintainer", action="store_true", help="also maintainers, and the area's team")
+    invite_args.add_argument("--owner", type=login_name, metavar="LOGIN", help=owner_help)
     remove_args = command("remove", "Remove someone from the organization and the repository.")
     remove_args.add_argument("login", type=login_name, metavar="LOGIN")
-    command("audit", "Check the repository against crowd mode; exit 1 on any failure.", dry_run=False)
+    audit_args = command("audit", "Check the repository against crowd mode; exit 1 on any failure.", dry_run=False)
+    audit_args.add_argument("--owner", type=login_name, metavar="LOGIN", help=owner_help)
     publish = command("publish-template", "Publish a public copy of a template (route A).", repo=False)
     publish.add_argument("src", type=repository_name, metavar="SRC", help="the template to copy, OWNER/NAME")
     publish.add_argument("dest", type=repository_name, metavar="DEST", help="the public template to make, OWNER/NAME")

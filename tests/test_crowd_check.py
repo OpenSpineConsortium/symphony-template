@@ -44,6 +44,9 @@ FORBIDDEN = crowd_check.SECRET_NAMES + crowd_check.VARIABLE_NAMES
 # A workflow runs on a subscription when it uses Claude's action or hands the
 # token's value to a step; ci.yml's guard only compares it with nothing.
 REACHES_CLAUDE = re.compile(r"anthropics/claude-code-action|secrets\.CLAUDE_CODE_OAUTH_TOKEN\s*\}\}")
+# A step that hands a routine's trigger pair to a command can start that
+# routine on its owner's subscription.
+TRIGGER_SECRET = re.compile(r"secrets\.COORDINATOR_TRIGGER_[A-Z]+\s*\}\}")
 
 # The job-level conditions the three Claude workflows had before crowd mode,
 # held here so the gate in front of each is proven to leave them whole.
@@ -143,10 +146,17 @@ def gated(jobs, name):
         function in condition for function in STATUS_FUNCTIONS)
 
 
-def ci_steps():
-    """ci.yml's job check, step by step, as tests/test_vendored.py reads it."""
-    steps = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8").split("\n    steps:\n", 1)[1]
-    return [step.splitlines() for step in re.split(r"\n(?=      - )", steps)]
+def steps_of(job_lines):
+    """One job's steps, each as its lines: a step starts with a dash six
+    spaces in, under the job's key steps."""
+    text = "\n".join(job_lines)
+    steps = text.split("\n    steps:\n", 1)[1] if "\n    steps:\n" in text else text.split("    steps:\n", 1)[1]
+    return [step.splitlines() for step in re.split(r"\n(?=      - )", steps.rstrip("\n"))]
+
+
+def ci_steps(job="check"):
+    """One of ci.yml's jobs, step by step."""
+    return steps_of(jobs_of("ci.yml")[job])
 
 
 def step_named(steps, name):
@@ -191,6 +201,22 @@ class ClaudeWorkflowsInCrowdMode(unittest.TestCase):
                 self.assertTrue(gated(jobs, name), f"{path.name}: job {name} can start in crowd mode")
         self.assertLessEqual({"claude.yml", "claude-lead.yml", "claude-worker.yml"}, found)
 
+    def test_every_step_that_can_start_a_routine_is_gated(self):
+        # A routine's trigger runs on its owner's subscription; a pair that
+        # reaches a crowd repository must not let a writer's push start it.
+        found = []
+        for path in sorted(WORKFLOWS.glob("*.yml")):
+            jobs = jobs_of(path.name)
+            for name, lines in jobs.items():
+                if not any(TRIGGER_SECRET.search(line) for line in lines) or gated(jobs, name):
+                    continue
+                for step in steps_of(lines):
+                    if any(TRIGGER_SECRET.search(line) for line in step):
+                        found.append((path.name, step[0].strip()))
+                        condition = key_of(step, "if", indent=8) or ""
+                        self.assertTrue(condition.startswith(CROWD_OFF + " "), (path.name, step[0], condition))
+        self.assertIn(("board.yml", "- name: Tell the coordinator routine"), found)
+
     def test_the_leads_later_jobs_need_route_and_ask_for_no_status_function(self):
         jobs = jobs_of("claude-lead.yml")
         for name in ("plan", "unblock", "integrate"):
@@ -199,14 +225,14 @@ class ClaudeWorkflowsInCrowdMode(unittest.TestCase):
                 self.assertNotIn(function, key_of(jobs[name], "if"), name)
 
     def test_each_says_so_in_its_header(self):
-        for workflow in ("claude.yml", "claude-lead.yml", "claude-worker.yml"):
+        for workflow in ("claude.yml", "claude-lead.yml", "claude-worker.yml", "board.yml"):
             header = (WORKFLOWS / workflow).read_text(encoding="utf-8").split("\non:", 1)[0]
             self.assertIn("In crowd mode", header, workflow)
 
 
 class GuardStep(unittest.TestCase):
-    """The guard is a step of the required check, handed only true or false
-    for each forbidden name."""
+    """The guard is a step of the required check; the job values, which runs
+    no code of the repository's, tells it which secrets exist by name."""
 
     def test_it_runs_after_the_checks_in_the_job_check(self):
         names = [step[0].strip() for step in ci_steps()]
@@ -214,15 +240,52 @@ class GuardStep(unittest.TestCase):
                         names.index("- name: Hold a crowd repository to its rules"))
         self.assertIn("        run: python3 tools/crowd_check.py guard", guard_step())
 
-    def test_it_names_each_forbidden_value_as_a_comparison_only(self):
-        env = step_env(guard_step())
-        flags = {name: value for name, value in env.items() if name.startswith(crowd_check.SET_PREFIX)}
+    def test_the_job_that_runs_the_repositorys_code_names_no_secret(self):
+        # GitHub hands a job's runner every secret the job names, and the
+        # checks and tests a pull request brings run in check.
+        for line in jobs_of("ci.yml")["check"]:
+            self.assertNotIn("secrets.", line)
+
+    def test_values_compares_each_secret_with_nothing_and_runs_nothing_of_the_repositorys(self):
+        lines = jobs_of("ci.yml")["values"]
+        steps = steps_of(lines)
+        self.assertEqual(len(steps), 1)
+        env = step_env(steps[0])
         wanted = {f"SET_{name}": f"${{{{ secrets.{name} != '' }}}}" for name in crowd_check.SECRET_NAMES}
-        wanted.update({f"SET_{name}": f"${{{{ vars.{name} != '' }}}}" for name in crowd_check.VARIABLE_NAMES})
-        self.assertEqual(flags, wanted)
-        for line in guard_step():
+        self.assertEqual(env, wanted)
+        for line in lines:
+            self.assertNotRegex(line, r"uses:|checkout|tools/|scripts/|python|bash ", line)
             for value in re.findall(r"secrets\.[A-Z_]+[^}]*", line):
                 self.assertRegex(value, r"^secrets\.[A-Z_]+ != '' $", line)
+        self.assertIsNone(key_of(lines, "if"))
+        self.assertEqual(key_of(lines, "secrets", indent=6), "${{ steps.names.outputs.secrets }}")
+
+    def test_values_prints_only_the_names_that_are_set(self):
+        block = "\n".join(jobs_of("ci.yml")["values"]).split("run: |", 1)[1]
+        run = "\n".join(line.strip() for line in block.splitlines())
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "output"
+            environ = clean_environment(GITHUB_OUTPUT=str(output), SET_ANTHROPIC_API_KEY="true",
+                                        SET_SDLC_APP_PRIVATE_KEY="true", SET_CLAUDE_CODE_OAUTH_TOKEN="false")
+            done = subprocess.run(["bash", "-c", run], capture_output=True, text=True, env=environ)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertEqual(output.read_text(), "secrets=ANTHROPIC_API_KEY SDLC_APP_PRIVATE_KEY\n")
+            self.assertEqual(crowd_check.present_names({"SECRETS_SET": "ANTHROPIC_API_KEY SDLC_APP_PRIVATE_KEY"}),
+                             ["ANTHROPIC_API_KEY", "SDLC_APP_PRIVATE_KEY"])
+            environ = clean_environment(GITHUB_OUTPUT=str(output))
+            output.write_text("")
+            subprocess.run(["bash", "-c", run], capture_output=True, text=True, env=environ, check=True)
+            self.assertEqual(output.read_text(), "secrets=\n")
+
+    def test_check_needs_values_and_runs_whatever_values_did(self):
+        lines = jobs_of("ci.yml")["check"]
+        self.assertEqual(needs_of(lines), ["values"])
+        self.assertEqual(key_of(lines, "if"), "${{ !cancelled() }}")
+        env = step_env(guard_step())
+        self.assertEqual(env["SECRETS_SET"], "${{ needs.values.outputs.secrets }}")
+        self.assertEqual(env["VALUES_RESULT"], "${{ needs.values.result }}")
+        flags = {name: value for name, value in env.items() if name.startswith(crowd_check.SET_PREFIX)}
+        self.assertEqual(flags, {f"SET_{name}": f"${{{{ vars.{name} != '' }}}}" for name in crowd_check.VARIABLE_NAMES})
 
     def test_it_is_never_skipped_and_tells_a_fork_from_this_repository(self):
         self.assertFalse([line for line in guard_step() if line.strip().startswith("if:")])
@@ -262,8 +325,9 @@ def files(mode=None, block="nothing yet", session="old notes\n", outside="text")
     return {crowd_check.PROJECT: project, crowd_check.CLAUDE_MD: claude, crowd_check.SESSION: session}
 
 
-def problems(base, head=None, crowd="", present=(), pull_request=True, from_fork=False):
-    return crowd_check.guard_problems(base, head or base, crowd, list(present), pull_request, REPO, from_fork)
+def problems(base, head=None, crowd="", present=(), pull_request=True, from_fork=False, values_result="success"):
+    return crowd_check.guard_problems(base, head or base, crowd, list(present), pull_request, REPO, from_fork,
+                                      values_result)
 
 
 class GuardProblems(unittest.TestCase):
@@ -348,9 +412,18 @@ class GuardProblems(unittest.TestCase):
         self.assertTrue(summary.startswith("crowd: on"), summary)
         self.assertIn("its rules hold", summary)
 
-    def test_the_flags_are_read_by_name_and_only_true_counts(self):
-        environ = {"SET_CLAUDE_CODE_OAUTH_TOKEN": "true", "SET_CLAUDE_TEAM": "false", "SET_OTHER": "true"}
-        self.assertEqual(crowd_check.present_names(environ), ["CLAUDE_CODE_OAUTH_TOKEN"])
+    def test_the_names_are_read_by_name_and_only_true_counts_for_a_variable(self):
+        environ = {"SECRETS_SET": "CLAUDE_CODE_OAUTH_TOKEN OTHER", "SET_CLAUDE_TEAM": "false", "SET_CLAUDE_WORKER": "true",
+                   "SET_ANTHROPIC_API_KEY": "true"}
+        self.assertEqual(crowd_check.present_names(environ), ["CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_WORKER"])
+
+    def test_values_that_did_not_succeed_fail_crowd_mode_and_nothing_else(self):
+        for result in ("failure", "cancelled", ""):
+            found = problems(files("on"), crowd="true", values_result=result)
+            self.assertEqual(len(found), 1, result)
+            self.assertIn("whether one does is unknown", found[0])
+        self.assertEqual(problems(files("off"), values_result="failure"), [])
+        self.assertEqual(problems(files("on"), crowd="", values_result="failure", from_fork=True), [])
 
 
 def clean_environment(**extra):
@@ -358,7 +431,8 @@ def clean_environment(**extra):
     git the tests start at another repository, and without any GitHub event
     variable the outer run has."""
     environ = {name: value for name, value in os.environ.items()
-               if not name.startswith(("GIT_", "GITHUB_", "SET_")) and name not in ("CLAUDE_CROWD", "BASE_SHA")}
+               if not name.startswith(("GIT_", "GITHUB_", "SET_"))
+               and name not in ("CLAUDE_CROWD", "BASE_SHA", "SECRETS_SET", "VALUES_RESULT")}
     environ.update(extra)
     return environ
 
@@ -410,6 +484,7 @@ class GuardCommand(unittest.TestCase):
         return clone
 
     def guard(self, clone, **environ):
+        environ.setdefault("VALUES_RESULT", "success")
         return subprocess.run([sys.executable, str(TOOL), "guard"], cwd=clone, capture_output=True, text=True,
                               env=clean_environment(GITHUB_REPOSITORY=REPO, **environ))
 
@@ -429,7 +504,7 @@ class GuardCommand(unittest.TestCase):
 
     def test_a_secret_reaching_the_repository_fails_without_its_value(self):
         done = self.guard(self.checkout("code"), GITHUB_EVENT_NAME="pull_request", BASE_SHA=self.base,
-                          CLAUDE_CROWD="true", SET_CLAUDE_CODE_OAUTH_TOKEN="true")
+                          CLAUDE_CROWD="true", SECRETS_SET="CLAUDE_CODE_OAUTH_TOKEN")
         self.assertEqual(done.returncode, 1)
         self.assertIn("the secret CLAUDE_CODE_OAUTH_TOKEN reaches this repository", done.stderr)
 
@@ -447,7 +522,8 @@ class GuardCommand(unittest.TestCase):
     @unittest.skipUnless((ROOT / ".git").exists(), "the guard reads HEAD, and this tree has no git")
     def test_the_template_itself_is_off_and_passes(self):
         done = subprocess.run([sys.executable, str(TOOL), "guard"], cwd=ROOT, capture_output=True, text=True,
-                              env=clean_environment(GITHUB_EVENT_NAME="push", SET_SDLC_APP_PRIVATE_KEY="true"))
+                              env=clean_environment(GITHUB_EVENT_NAME="push", SECRETS_SET="SDLC_APP_PRIVATE_KEY",
+                                                    VALUES_RESULT="success"))
         if crowd_check.mode_of((ROOT / crowd_check.PROJECT).read_text(encoding="utf-8")) == "off":
             self.assertEqual((done.returncode, done.stdout.strip()), (0, "crowd: off"), done.stderr)
 

@@ -17,7 +17,9 @@ function above them:
          may reach the repository; while the default branch says crowd mode
          is on, the variable CLAUDE_CROWD that keeps the Claude workflows
          from starting must be true, and a pull request may not change a
-         committed checkpoint.
+         committed checkpoint. It is told which secrets exist by name only,
+         by ci.yml's job values, so the job that runs this repository's
+         code never holds a secret's value.
   queue  .github/workflows/queue.yml, on every issue event that queues
          work: takes todo or blocker off again when someone without the
          Maintain or Admin role put it on, or changed a queued issue.
@@ -67,9 +69,14 @@ CLAUDE_MD = "CLAUDE.md"
 SESSION = ".claude/session.md"
 # The files the guard reads at the default branch and in the checkout.
 GUARDED_FILES = (PROJECT, CLAUDE_MD, SESSION)
-# The prefix ci.yml gives each forbidden name: SET_<NAME> is "true" when the
-# value reaches the repository. GitHub compares inside the expression, so no
-# value is ever in the step's environment.
+# How ci.yml tells the guard what reaches the repository. SECRETS_SET is the
+# space-separated names the job values found set, that job's only output,
+# and VALUES_RESULT how that job ended: the job check, which runs the
+# repository's code, names no secret, since GitHub hands a job's runner the
+# value of every secret the job names. Variables are no secret, so the guard
+# step reads them itself: SET_<NAME> is "true" when the variable is set.
+SECRETS_SET = "SECRETS_SET"
+VALUES_RESULT = "VALUES_RESULT"
 SET_PREFIX = "SET_"
 # An issue edit that changes what it asks.
 EDITED_FIELDS = ("title", "body")
@@ -120,6 +127,10 @@ VALUE_REACHES = (
     "no Claude credential or switch has a place here; delete it with `gh {kind} delete {name} --repo {repo}`, or take "
     "this repository off the organization {kind}'s list; `python3 scripts/crowd.py audit {repo}` says which"
 )
+VALUES_UNKNOWN = (
+    "the job values, which names the Claude secrets that reach this repository, ended {result}, so whether one "
+    "does is unknown; run the check again"
+)
 CHECKPOINT_CHANGED = (
     "this pull request changes {what}: in crowd mode a checkpoint is a comment on the pull request, never a commit "
     "(.claude/rules/crowd.md, the checkpoint skill); put it back as it is on the default branch"
@@ -152,7 +163,7 @@ def checkpoint_problems(base, head):
     return [CHECKPOINT_CHANGED.format(what=what) for what in changed]
 
 
-def guard_problems(base, head, crowd_value, present, pull_request, repo, from_fork=False):
+def guard_problems(base, head, crowd_value, present, pull_request, repo, from_fork=False, values_result="success"):
     """Every way the run breaks crowd mode's rules, one sentence each with
     its fix; none when it keeps them or the repository is not in crowd mode.
 
@@ -167,12 +178,16 @@ def guard_problems(base, head, crowd_value, present, pull_request, repo, from_fo
     turns the mode off is still held to the rules it would remove. A fork's
     pull request sees no secret and perhaps no variable, so it is held to
     the checkpoint rule alone; the push that merges it is held to the rest.
+    values_result is how ci.yml's job values ended: when it did not succeed,
+    present may be missing a secret, so a run with crowd mode showing fails.
     """
     base_on = mode_of(base.get(PROJECT)) == "on"
     signalled = base_on or mode_of(head.get(PROJECT)) == "on" or is_true(crowd_value)
     problems = []
     if signalled and not from_fork:
         problems += [value_problem(name, repo) for name in present]
+        if values_result != "success":
+            problems.append(VALUES_UNKNOWN.format(result=values_result or "without running"))
     if base_on and not from_fork and not gate_holds(crowd_value):
         problems.append(GATE_OFF.format(variable=CROWD_VARIABLE, repo=repo))
     if base_on and pull_request:
@@ -191,7 +206,11 @@ def guard_summary(base, head, crowd_value, from_fork=False):
 
 
 def present_names(environ):
-    return [name for name in SECRET_NAMES + VARIABLE_NAMES if is_true(environ.get(SET_PREFIX + name))]
+    """The forbidden names that reach the repository: the secrets the job
+    values named, and the variables the guard step was told are set."""
+    secrets = set((environ.get(SECRETS_SET) or "").split())
+    return ([name for name in SECRET_NAMES if name in secrets]
+            + [name for name in VARIABLE_NAMES if is_true(environ.get(SET_PREFIX + name))])
 
 
 # The guard's command line: git for the two trees, the environment for the
@@ -250,7 +269,8 @@ def guard(environ, cwd="."):
     head = tree_files(cwd, "HEAD")
     base = tree_files(cwd, base_revision(environ, cwd, pull_request))
     crowd_value = environ.get(CROWD_VARIABLE, "")
-    problems = guard_problems(base, head, crowd_value, present_names(environ), pull_request, repo, from_fork)
+    problems = guard_problems(base, head, crowd_value, present_names(environ), pull_request, repo, from_fork,
+                              environ.get(VALUES_RESULT, ""))
     for problem in problems:
         print("crowd: " + problem, file=sys.stderr)
     if not problems:

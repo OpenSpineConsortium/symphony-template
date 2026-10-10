@@ -120,10 +120,12 @@ def why_the_library_cannot_compare(commit):
 
 
 def ci_steps():
-    """The steps of ci.yml's one job, each as its lines with the indent
-    stripped. The workflow is read as text, the standard library having no
-    YAML parser; each step starts with a dash six spaces in."""
+    """The steps of ci.yml's job check, the first, each as its lines with
+    the indent stripped. The workflow is read as text, the standard library
+    having no YAML parser; each step starts with a dash six spaces in, and
+    the next job starts two spaces in."""
     steps = CI.read_text(encoding="utf-8").split("\n    steps:\n", 1)[1]
+    steps = re.split(r"\n(?=  [A-Za-z0-9_-]+:)", steps, maxsplit=1)[0]
     return [[line.strip() for line in step.splitlines()] for step in re.split(r"\n(?=      - )", steps)]
 
 

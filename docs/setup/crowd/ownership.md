@@ -4,7 +4,7 @@ Who reviews which part of the repository, in crowd mode. Anyone with Write claim
 
 | Area | Paths | Reviewed by | Label | Merges |
 | --- | --- | --- | --- | --- |
-| The shared paths | .github/, .claude/, tools/, scripts/, tests/, CLAUDE.md, docs/project.md, docs/agents/, docs/memory/, docs/setup/ | OWNER_LOGIN | none | OWNER_LOGIN |
+| The shared paths | .github/, .claude/, tools/, scripts/, tests/, CLAUDE.md, docs/project.md, docs/agents/, docs/memory/, docs/setup/, .mcp.json, and CLAUDE.md, CLAUDE.local.md, AGENTS.md and .claude/ in every folder, an area's included | OWNER_LOGIN | none | OWNER_LOGIN |
 | Everything else | every path no other row names | {{OWNER}}/maintainers | none | {{OWNER}}/maintainers |
 | AREA | src/AREA/, tests/test_AREA/ | {{OWNER}}/AREA-maintainers | area:AREA | {{OWNER}}/maintainers |
 

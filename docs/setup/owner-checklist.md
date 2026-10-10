@@ -44,8 +44,9 @@ command instead, and none of the token, variable or auto-merge steps on this
 page: `python3 scripts/crowd.py setup ORG/NAME --area AREA`, then, after
 reading the pull request it opens, `python3 scripts/crowd.py finish
 ORG/NAME`. docs/setup/crowdsourcing.md, Part 1, says what each does and what
-is left by hand; setup-repo.sh refuses to run once crowd mode is on, since
-it would turn auto-merge on and can store a token.
+is left by hand; setup-repo.sh refuses to run once crowd mode is on, or
+when it cannot tell, since it would turn auto-merge on and can store a
+token.
 
 ## One-click links
 
