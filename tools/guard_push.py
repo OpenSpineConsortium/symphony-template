@@ -14,6 +14,20 @@ The hook is the first fence and branch protection on GitHub the second,
 so anything this script cannot read it lets through rather than wedging
 the session: an unparseable command, a broken payload or a git that
 answers nothing all pass, and GitHub still refuses what matters.
+
+shlex reads a newline as whitespace, which would glue a line onto the one
+before it, so a small pass runs first: it turns each unquoted newline into
+the separator the shell reads it as, ends a comment at its newline, and
+removes a backslash-newline, the shell's line continuation. It tracks
+single quotes, double quotes and the backslash, and nothing else of the
+shell: the quoting inside a command substitution is read as the quoting
+around it. In particular a here-document body is read as commands like any
+other line: a body line that starts a push to main is refused, and the
+person rephrases it or puts the text in a file. Cutting bodies out was
+tried and dropped: telling a here-document from an arithmetic shift, a
+quoted marker or an opener inside a substitution takes more of the shell
+than this hook can read, each misreading cut real commands out of sight,
+and the one shape it bought is rare and answered by a rephrasing.
 """
 
 import json
@@ -29,6 +43,39 @@ VALUE_OPTIONS = {"--receive-pack", "--repo", "-o", "--push-option"}
 # and the verb, as in "git -C clone push".
 GIT_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
 
+# What ends a word for the shell: a # right after one of these starts a
+# comment; anywhere else it is part of the word.
+WORD_BREAKS = " \t\n;&|()<>"
+
+
+def plain_shell(command):
+    """The command with each unquoted newline made a ; so that shlex, which
+    reads a newline as whitespace, ends a command there as the shell does.
+    A comment ends at its newline, which then separates; a backslash-newline
+    is the line continuation the shell removes; a newline inside quotes
+    stays inside its word."""
+    out, quote, word_start, i = [], None, True, 0
+    while i < len(command):
+        ch = command[i]
+        if ch == "\\" and quote != "'":
+            if command[i + 1:i + 2] != "\n":
+                out.append(command[i:i + 2])
+            i, word_start = i + 2, False
+        elif quote:
+            if ch == quote:
+                quote = None
+            out.append(ch)
+            i, word_start = i + 1, False
+        elif ch == "#" and word_start:
+            end = command.find("\n", i)
+            i = len(command) if end == -1 else end
+        else:
+            if ch in "'\"":
+                quote = ch
+            out.append(" ; " if ch == "\n" else ch)
+            i, word_start = i + 1, ch in WORD_BREAKS
+    return "".join(out)
+
 
 def simple_commands(command):
     """The argument lists of the simple commands inside a shell command.
@@ -37,9 +84,13 @@ def simple_commands(command):
     tokens: ;, &&, | and ( ) end one command, a redirection swallows its
     target and the file descriptor digit before it. A command shlex cannot
     read (an unclosed quote) yields nothing, and the caller lets it pass.
+    Newlines and comments are read by plain_shell first, so shlex's own
+    comment handling, which would read a # inside a word as a comment and
+    swallow the rest of the text, is off.
     """
-    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lexer = shlex.shlex(plain_shell(command), posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
+    lexer.commenters = ""
     try:
         tokens = list(lexer)
     except ValueError:
