@@ -4,18 +4,24 @@ The board, the protocol check and team mode's clerk moved to the library
 OpenSpineConsortium/sdlc-protocol, whose own tests cover the rules and hold
 them to this repository's old tools byte for byte. What is left to test
 here is the copy and the wiring: that tools/sdlc_protocol is the release
-tools/VENDORED names, unchanged, and that tools/board.py, check_protocol.py
-and team.py still answer as the workflows that call them expect.
+tools/VENDORED names, unchanged, with the sha256 of each of its files on
+the record's lines after the first; that scripts/check.sh holds the copy
+to that record, so a hand edit fails the required check; that template-init
+leaves the copy and the record as they are in a repository made from the
+template; and that tools/board.py, check_protocol.py and team.py still
+answer as the workflows that call them expect.
 
 The comparison with the library reads a clone of it beside this
 repository, as /home/user/sdlc-protocol is beside /home/user/sdlc-template,
 or the one SDLC_PROTOCOL names, and skips when there is none, as on CI."""
 
+import hashlib
 import importlib.util
 import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -29,23 +35,46 @@ TOOLS = ROOT / "tools"
 sys.path.insert(0, str(TOOLS))
 
 import sdlc_protocol  # noqa: E402
+import template_init  # noqa: E402
 from sdlc_protocol.adapters import github  # noqa: E402
 
 VENDORED = TOOLS / "VENDORED"
 PACKAGE = TOOLS / "sdlc_protocol"
 FIXTURES = ROOT / "tests" / "fixtures"
 LIBRARY = Path(os.environ.get("SDLC_PROTOCOL") or ROOT.parent / "sdlc-protocol")
-VENDORED_LINE = re.compile(r"^sdlc-protocol (\S+) (\S+)\n$")
+FIRST_LINE = re.compile(r"sdlc-protocol (\S+) (\S+)")
+DIGEST_LINE = re.compile(r"([0-9a-f]{64})  (\S+)")
+VERIFY = "python3 tools/sdlc_protocol/vendoring.py verify tools"
 SHIMS = ("board", "check_protocol", "team")
 REPO = "octo/widgets"
 
 
+def read_record():
+    """The version, the commit and the digests tools/VENDORED records: a
+    first line "sdlc-protocol <version> <commit>", then one line per copied
+    file, "<sha256>  <path inside the copy>", in path order, the layout
+    sha256sum writes. Read here on its own terms rather than by the copy's
+    vendoring.py, so the copy is not the only judge of itself."""
+    text = VENDORED.read_text(encoding="ascii")
+    if not text.endswith("\n"):
+        raise AssertionError(f"{VENDORED} does not end with a newline")
+    first, *rest = text[:-1].split("\n")
+    head = FIRST_LINE.fullmatch(first)
+    if not head:
+        raise AssertionError(f"{VENDORED} does not start with 'sdlc-protocol <version> <commit>'")
+    lines = [DIGEST_LINE.fullmatch(line) for line in rest]
+    if not lines or not all(lines):
+        raise AssertionError(f"{VENDORED} does not list '<sha256>  <path>' for each copied file")
+    paths = [line.group(2) for line in lines]
+    if paths != sorted(set(paths)):
+        raise AssertionError(f"{VENDORED} does not list each file once, in path order")
+    return head.group(1), head.group(2), {line.group(2): line.group(1) for line in lines}
+
+
 def vendored():
     """The version and the commit tools/VENDORED names."""
-    match = VENDORED_LINE.match(VENDORED.read_text(encoding="utf-8"))
-    if not match:
-        raise AssertionError(f"{VENDORED} is not one line 'sdlc-protocol <version> <commit>'")
-    return match.group(1), match.group(2)
+    version, commit, _ = read_record()
+    return version, commit
 
 
 def package_files():
@@ -62,6 +91,24 @@ def git(*args):
 def library_has(commit):
     return subprocess.run(["git", "-C", str(LIBRARY), "cat-file", "-e", f"{commit}^{{commit}}"],
                           capture_output=True).returncode == 0
+
+
+def copy_of_the_vendor_dir(folder):
+    """tools/VENDORED and tools/sdlc_protocol copied into folder/tools,
+    without Python's caches, as a checkout would have them."""
+    vendor_dir = Path(folder) / "tools"
+    vendor_dir.mkdir()
+    shutil.copyfile(VENDORED, vendor_dir / "VENDORED")
+    shutil.copytree(PACKAGE, vendor_dir / "sdlc_protocol", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    return vendor_dir
+
+
+def verify(vendor_dir, cwd=ROOT):
+    """The copy's own check, run as a script by its path, as scripts/check.sh
+    runs it."""
+    script = Path(vendor_dir) / "sdlc_protocol" / "vendoring.py"
+    return subprocess.run([sys.executable, "-B", str(script), "verify", str(vendor_dir)],
+                          cwd=cwd, capture_output=True, text=True)
 
 
 def run_tool(name, *args, cwd=ROOT, env=None):
@@ -89,6 +136,13 @@ class TheCopy(unittest.TestCase):
         _, commit = vendored()
         self.assertRegex(commit, r"^[0-9a-f]{40}$")
 
+    def test_the_record_lists_every_file_of_the_copy_with_its_sha256(self):
+        _, _, digests = read_record()
+        self.assertEqual(sorted(digests), package_files())
+        for name in package_files():
+            with self.subTest(name=name):
+                self.assertEqual(digests[name], hashlib.sha256((PACKAGE / name).read_bytes()).hexdigest())
+
     def test_every_file_is_the_librarys_at_that_commit(self):
         _, commit = vendored()
         if not (LIBRARY / ".git").exists():
@@ -101,6 +155,46 @@ class TheCopy(unittest.TestCase):
         for name in theirs:
             with self.subTest(name=name):
                 self.assertEqual((PACKAGE / name).read_bytes(), git("show", f"{commit}:sdlc_protocol/{name}"))
+
+
+class TheVerification(unittest.TestCase):
+    """scripts/check.sh holds the copy to its record before the tests run,
+    so a pull request that edits tools/sdlc_protocol by hand fails the
+    required check, offline; the library's own tests cover each problem
+    the check can name."""
+
+    def test_check_sh_verifies_the_copy_before_the_tests(self):
+        lines = [line.strip() for line in (ROOT / "scripts" / "check.sh").read_text(encoding="utf-8").splitlines()]
+        self.assertIn(VERIFY, lines)
+        tests = next(number for number, line in enumerate(lines) if line.startswith("python3 -m unittest"))
+        self.assertLess(lines.index(VERIFY), tests)
+
+    def test_the_copy_matches_its_record(self):
+        version, commit = vendored()
+        done = verify(TOOLS)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertTrue(done.stdout.startswith(f"vendored sdlc-protocol {version} at {commit[:7]}: "), done.stdout)
+
+    def test_a_hand_edit_of_the_copy_fails(self):
+        with tempfile.TemporaryDirectory() as folder:
+            vendor_dir = copy_of_the_vendor_dir(folder)
+            with open(vendor_dir / "sdlc_protocol" / "board.py", "a", encoding="ascii", newline="\n") as board:
+                board.write("# a local fix\n")
+            done = verify(vendor_dir, cwd=folder)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("board.py was edited by hand", done.stdout)
+
+
+class TheTemplateInit(unittest.TestCase):
+    """template-init fills the placeholders in every file of a new copy but
+    its workflows; were one in tools/sdlc_protocol or tools/VENDORED, the new
+    copy's first check would fail on its own unedited copy."""
+
+    def test_it_leaves_the_copy_and_its_record_as_they_are(self):
+        with tempfile.TemporaryDirectory() as folder:
+            copy_of_the_vendor_dir(folder)
+            changed = template_init.fill_tree(Path(folder), template_init.values(REPO, "main", 2026))
+        self.assertEqual(changed, [])
 
 
 class TheShims(unittest.TestCase):

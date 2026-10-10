@@ -8,6 +8,10 @@ set -eu
 cd "$(dirname "$0")/.."
 
 python3 tools/check_docs.py
+# The claim protocol's copy must be byte for byte what tools/VENDORED
+# records: a change to it is made in OpenSpineConsortium/sdlc-protocol and
+# arrives by that repository's sync pull request, so a hand edit fails here.
+python3 tools/sdlc_protocol/vendoring.py verify tools
 python3 -m unittest discover -s tests -v
 
 # The project's own checks go here: its linter, its test runner, its build.
