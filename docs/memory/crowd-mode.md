@@ -17,9 +17,11 @@ Actions and pins that check to app 15368; `invite` refuses until then;
 
 What GitHub then enforces:
 
-- claude.yml, claude-lead.yml and claude-worker.yml never start: each job's
-  `if` puts `vars.CLAUDE_CROWD != 'true' &&` first. An unset variable reads
-  as empty, so elsewhere each condition is exactly the old one.
+- claude.yml, claude-lead.yml and claude-worker.yml never start while
+  CLAUDE_CROWD is true: each job's `if` puts `vars.CLAUDE_CROWD != 'true' &&`
+  first. GitHub compares it without case and trims nothing, so "true " leaves
+  the gate open, and the guard reads it the same way. An unset variable
+  reads as empty, so elsewhere each condition is exactly the old one.
 - The required check runs `tools/crowd_check.py guard`, which fails while a
   Claude secret or CLAUDE_WORKER or CLAUDE_TEAM reaches the repository and
   crowd mode shows anywhere; while the default branch says on and

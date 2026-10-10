@@ -17,9 +17,11 @@ name: Checks
 # the same reason: that repository's sync workflow pushes sdlc-protocol/sync
 # with the GitHub App's token, which, unlike a workflow's own GITHUB_TOKEN,
 # starts this workflow, and then opens or updates the branch's pull request,
-# which runs the check again on the same commit. It leaves out crowd/ too:
-# scripts/crowd.py setup pushes crowd/setup with the owner's token through
-# the API and opens its pull request, whose run is the one that counts.
+# which runs the check again on the same commit. It leaves out crowd/setup
+# too, and only that branch, so a repository outside crowd mode loses no
+# run it had: scripts/crowd.py setup pushes crowd/setup with the owner's
+# token through the API and opens its pull request, whose run is the one
+# that counts.
 # Before the checks the job clones OpenSpineConsortium/sdlc-protocol, which
 # is public, so the clone needs no token, and names the clone to them in
 # SDLC_PROTOCOL. check.sh's vendoring.py verify holds tools/sdlc_protocol to
@@ -52,7 +54,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
   push:
-    branches-ignore: ["claude/**", "sdlc-protocol/**", "crowd/**"]
+    branches-ignore: ["claude/**", "sdlc-protocol/**", "crowd/setup"]
 
 permissions:
   contents: read

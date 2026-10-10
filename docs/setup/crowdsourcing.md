@@ -213,7 +213,7 @@ Why each item matters: [the safety analysis](../history/crowdsourcing/research.m
 
 GitHub enforces these once `setup` and `finish` have run, with nobody remembering them:
 
-- The Claude workflows never start. Their job-level condition reads CLAUDE_CROWD, and while docs/project.md says crowd mode is on, the required check goes red on the default branch and on every pull request if anyone deletes the variable.
+- The Claude workflows never start while CLAUDE_CROWD is true: their job-level condition reads it. A writer can delete it (below), so while docs/project.md says crowd mode is on, every run of the required check, on the default branch or on a pull request, fails until it is back, naming the command that puts it back; a Claude job that starts meanwhile finds no token and does nothing.
 - No Claude credential or switch reaches the repository. The required check fails while any of CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY, COORDINATOR_TRIGGER_URL, COORDINATOR_TRIGGER_TOKEN, SDLC_APP_PRIVATE_KEY, CLAUDE_WORKER or CLAUDE_TEAM does, from the repository or the organization, and the audit fails on any repository secret at all. Auto-merge is an admin's setting, and team mode needs the two variables the check refuses.
 - Checkpoints are pull request comments. The required check fails a pull request that changes .claude/session.md or the checkpoint block of CLAUDE.md.
 - "check" counts only from GitHub Actions, and the shared paths need your review. The ruleset pins the check to app 15368 and asks for a code owner's review, an approval of the latest push and resolved threads, and CODEOWNERS gives the paths every session loads or runs to you alone.

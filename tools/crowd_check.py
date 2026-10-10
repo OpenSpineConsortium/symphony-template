@@ -94,9 +94,17 @@ def mode_of(text):
 
 
 def is_true(value):
-    """Whether a variable says true; GitHub compares strings without case,
-    and so does this."""
+    """Whether a value says true, read generously: any sign of crowd mode
+    holds a run to the secret rule."""
     return str(value or "").strip().lower() == "true"
+
+
+def gate_holds(value):
+    """Whether the Claude workflows' gate holds for this CLAUDE_CROWD: their
+    condition `vars.CLAUDE_CROWD != 'true'` is false only for true in some
+    case, since GitHub compares strings without case but trims nothing, so
+    "true " leaves the gate open, and the guard must call that off."""
+    return str(value or "").lower() == "true"
 
 
 # The guard: a pure decision over what the default branch and the checkout
@@ -165,7 +173,7 @@ def guard_problems(base, head, crowd_value, present, pull_request, repo, from_fo
     problems = []
     if signalled and not from_fork:
         problems += [value_problem(name, repo) for name in present]
-    if base_on and not from_fork and not is_true(crowd_value):
+    if base_on and not from_fork and not gate_holds(crowd_value):
         problems.append(GATE_OFF.format(variable=CROWD_VARIABLE, repo=repo))
     if base_on and pull_request:
         problems += checkpoint_problems(base, head)

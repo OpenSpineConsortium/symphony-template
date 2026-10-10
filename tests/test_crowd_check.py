@@ -233,7 +233,7 @@ class GuardStep(unittest.TestCase):
 
     def test_the_push_trigger_leaves_out_the_setup_branch(self):
         text = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
-        self.assertIn('branches-ignore: ["claude/**", "sdlc-protocol/**", "crowd/**"]', text)
+        self.assertIn('branches-ignore: ["claude/**", "sdlc-protocol/**", "crowd/setup"]', text)
 
 
 class QueueWorkflow(unittest.TestCase):
@@ -288,6 +288,14 @@ class GuardProblems(unittest.TestCase):
 
     def test_the_variable_is_read_without_case(self):
         self.assertEqual(problems(files("on"), crowd="True"), [])
+
+    def test_a_value_the_workflows_gate_reads_as_not_true_fails(self):
+        # GitHub's != ignores case and trims nothing, so "true " leaves
+        # claude.yml's gate open; the guard calls that off, not on.
+        for value in ("true ", " true", "true\n", "yes"):
+            found = problems(files("on"), crowd=value)
+            self.assertEqual(len(found), 1, repr(value))
+            self.assertIn("is not true", found[0])
 
     def test_the_variable_alone_holds_setups_window_to_the_secret_rule(self):
         found = problems(files("off"), crowd="true", present=["CLAUDE_CODE_OAUTH_TOKEN"])

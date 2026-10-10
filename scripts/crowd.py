@@ -804,6 +804,7 @@ def setup(gh, args):
         interaction_limit(ctx)
     app_link = claude_app(ctx)
     pull, files = crowd_pull_request(ctx, owner_login, areas)
+    finished = finish_done(ctx, pull, files)
     issues = open_issues(ctx)
     goal = goal_issue(ctx, issues, files.get(PROJECT) or "")
     body = crowd_checklist(ctx.repo, ctx.default, ctx.verified, pull, goal, app_link)
@@ -812,8 +813,19 @@ def setup(gh, args):
     goal_text = f" (#{goal})" if goal else ""
     print_left(ctx, f"write the goal{goal_text}, make the coordinator routine "
                     f"(docs/agents/routines/coordinator.md), and invite people with "
-                    f"python3 scripts/crowd.py invite {ctx.repo} LOGIN")
+                    f"python3 scripts/crowd.py invite {ctx.repo} LOGIN", when="Then" if finished else "After finish")
     return 0
+
+
+def finish_done(ctx, pull, files):
+    """Whether finish has already done its part: no crowd pull request is
+    left to merge, the default branch says crowd mode is on, and the check
+    is pinned. A second setup then keeps the checklist's finish box ticked,
+    as finish left it, instead of opening it again."""
+    done = pull is None and crowd_check.mode_of(files.get(PROJECT)) == "on" and "pinned" in ctx.verified
+    if done:
+        ctx.verified.add("merged")
+    return done
 
 
 def organization(ctx):
@@ -1630,7 +1642,9 @@ def audit_owners(ctx, codeowners):
 def audit_members(ctx):
     lacking = sorted(member["login"] for member in ctx.gh.pages(f"orgs/{ctx.org}/members?filter=2fa_disabled"))
     if lacking:
-        return [Result("FAIL", "members without two-factor", ", ".join(lacking))]
+        return [Result("FAIL", "members without two-factor", ", ".join(lacking) + ": each turns it on at "
+                       "https://github.com/settings/security, and requiring it for the organization removes them until "
+                       f"they do: https://github.com/organizations/{ctx.org}/settings/security")]
     return ok("members without two-factor", "none")
 
 
@@ -1639,7 +1653,8 @@ def audit_repository(ctx):
     results = []
     if info.get("private") or info.get("visibility", "public") != "public":
         results.append(Result("FAIL", "repository settings", "the repository is not public, so a Free organization "
-                              "does not enforce its ruleset"))
+                              f"does not enforce its ruleset: gh repo edit {ctx.repo} --visibility public "
+                              "--accept-visibility-change-consequences"))
     if info.get("allow_auto_merge"):
         results.append(Result("FAIL", "repository settings", f"auto-merge is on: gh repo edit {ctx.repo} "
                               "--enable-auto-merge=false"))
@@ -1710,8 +1725,11 @@ def audit_variables(ctx, values):
     for where, found in (("repository", repository), ("organization", organization)):
         for other in sorted(found):
             if other in crowd_check.VARIABLE_NAMES:
+                fix = (f"gh variable delete {other} --repo {ctx.repo}" if where == "repository" else
+                       f"take {ctx.repo} off its repositories at https://github.com/organizations/{ctx.org}/settings/"
+                       "variables/actions")
                 results.append(Result("FAIL", "variables", f"the {where} variable {other} turns on a Claude "
-                                      "workflow; delete it"))
+                                      f"workflow; delete it: {fix}"))
             elif other != name:
                 results.append(Result("warn", "variables", f"the {where} variable {other} is set"))
     return results or ok("variables", f"{name} is true, and no other variable is set")
@@ -1726,7 +1744,8 @@ def audit_environments(ctx):
                 forbidden = item["name"] in crowd_check.SECRET_NAMES + crowd_check.VARIABLE_NAMES
                 if forbidden or kind == "secrets":
                     results.append(Result("FAIL" if forbidden else "warn", "environments",
-                                          f"{environment['name']} holds the {kind[:-1]} {item['name']}"))
+                                          f"{environment['name']} holds the {kind[:-1]} {item['name']}: "
+                                          + ctx.page("settings/environments")))
     return results or ok("environments", "no secret and no Claude variable in any environment")
 
 
@@ -1739,14 +1758,16 @@ def audit_other_secrets(ctx):
             continue
         for item in (answer.body or {}).get("secrets") or []:
             level = "FAIL" if item["name"] in crowd_check.SECRET_NAMES else "warn"
-            results.append(Result(level, "other secrets", f"the {kind} secret {item['name']} is set"))
+            results.append(Result(level, "other secrets", f"the {kind} secret {item['name']} is set: "
+                                  + ctx.page(f"settings/secrets/{kind}")))
     return results or ok("other secrets", "no Dependabot or Codespaces secret")
 
 
 def audit_ruleset(ctx):
     text = read_file(ctx, RULESET_FILE, ctx.default)
     if text is None:
-        return [Result("FAIL", "ruleset", f"{RULESET_FILE} is missing on {ctx.default}")]
+        return [Result("FAIL", "ruleset", f"{RULESET_FILE} is missing on {ctx.default}; bring it in from the "
+                       "template by pull request")]
     wanted = crowd_ruleset(text, pinned=True)
     listing = ctx.gh.pages(f"repos/{ctx.repo}/rulesets")
     results = []
@@ -1768,7 +1789,8 @@ def audit_ruleset(ctx):
 
 def audit_codeowners(ctx, codeowners):
     if codeowners is None:
-        return [Result("FAIL", "code owners", f"no {CODEOWNERS} on {ctx.default}")]
+        return [Result("FAIL", "code owners", f"no {CODEOWNERS} on {ctx.default}; python3 scripts/crowd.py setup "
+                       f"{ctx.repo} opens the pull request that writes it")]
     results = []
     owners = {}
     for path in OWNER_PROBES:
@@ -1784,6 +1806,8 @@ def audit_codeowners(ctx, codeowners):
     for error in code_owner_errors(ctx, ctx.default):
         results.append(Result("FAIL", "code owners", error))
     if results:
+        results[-1] = results[-1]._replace(text=results[-1].text + f"; python3 scripts/crowd.py setup {ctx.repo} opens "
+                                           f"the pull request that writes {CODEOWNERS} again")
         return results
     return ok("code owners", f"every shared path asks {owners[CLAUDE_MD][0]} alone, and every line resolves")
 
@@ -1809,7 +1833,7 @@ def audit_teams(ctx):
                                   f"not {ROLE_WORDS[wanted]}; setup gives it"))
     for slug, role in sorted(roles.items()):
         if role == "admin":
-            results.append(Result("FAIL", "teams", f"{slug} has Admin here"))
+            results.append(Result("FAIL", "teams", f"{slug} has Admin here: " + ctx.page("settings/access")))
         elif slug not in (CONTRIBUTORS, MAINTAINERS) and not slug.endswith("-maintainers"):
             results.append(Result("warn", "teams", f"{slug} has {ROLE_WORDS.get(role, role)} here, and setup did "
                                   "not make it"))
@@ -1829,7 +1853,8 @@ def audit_outside_collaborators(ctx):
     for person in ctx.gh.pages(f"repos/{ctx.repo}/collaborators?affiliation=outside"):
         role = person.get("role_name")
         if role in ("maintain", "admin"):
-            results.append(Result("FAIL", "outside collaborators", f"{person['login']} has {role}"))
+            results.append(Result("FAIL", "outside collaborators", f"{person['login']} has {role}: gh api --method "
+                                  f"DELETE repos/{ctx.repo}/collaborators/{person['login']}"))
         elif role == "write":
             results.append(Result("warn", "outside collaborators", f"{person['login']} has write, perhaps left "
                                   f"from a helper: gh api --method DELETE repos/{ctx.repo}/collaborators/{person['login']}"))
@@ -2020,7 +2045,8 @@ def print_invitation(ctx, login, area):
           f"authentication for your GitHub account first (https://github.com/settings/security), then accept at "
           f"https://github.com/orgs/{ctx.org}/invitation within 7 days. Then run")
     print(f"    gh repo clone {ctx.repo} && cd {ctx.name} && python3 scripts/crowd.py doctor{area_text}")
-    print("  and do what its Next: line says until it says ready.")
+    print("  and do what its Next: line says until it says ready. Every step, with its reason, is in Part 2 of "
+          f"https://github.com/{ctx.repo}/blob/{ctx.default}/docs/setup/crowdsourcing.md#part-2-a-contributor")
 
 
 def remove(gh, args):

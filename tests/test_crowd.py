@@ -580,6 +580,26 @@ class SetupAgain(unittest.TestCase):
             line = next(line for line in second.lines if line.startswith(step))
             self.assertRegex(line, r"already|up to date", line)
 
+    def test_after_finish_the_checklist_keeps_finish_ticked(self):
+        # finish ticks its box from the audit; a later setup, run to add an
+        # area or just again, must not open that box back up.
+        run = setup_run(merged_world(World()))
+        self.assertEqual(run.code, 0, run.err)
+        self.assertIn("crowd files: already on main", run.lines)
+        body = run.body_of(f"PATCH {API}/issues/1")["body"]
+        self.assertIn("- [x] Read the crowd/setup pull request, then run", body)
+        self.assertTrue(run.lines[-1].startswith("Then: write the goal"), run.lines[-1])
+
+    def test_with_a_new_crowd_pull_request_finish_is_open_again(self):
+        world = merged_world(World())
+        world.labels["area:renderer"] = ("c5def5", "The renderer slice; see docs/agents/OWNERSHIP.md")
+        world.teams["renderer-maintainers"] = "push"
+        run = setup_run(world)
+        self.assertEqual(run.code, 0, run.err)
+        body = run.body_of(f"PATCH {API}/issues/1")["body"]
+        self.assertIn(f"- [ ] Read pull request #{PULL_NUMBER}, then run", body)
+        self.assertTrue(run.lines[-1].startswith("After finish:"), run.lines[-1])
+
 
 @template_only
 class SetupDryRun(unittest.TestCase):
@@ -1042,6 +1062,9 @@ class Invite(unittest.TestCase):
         self.assertEqual(run.body_of(f"PUT orgs/{ORG}/teams/contributors/memberships/alice"), {"role": "member"})
         self.assertIn(f"https://github.com/orgs/{ORG}/invitation", run.out)
         self.assertIn(f"gh repo clone {REPO} && cd {NAME} && python3 scripts/crowd.py doctor --area AREA", run.out)
+        part_2 = re.search(r"crowdsourcing\.md#([a-z0-9-]+)", run.out).group(1)
+        self.assertIn(part_2, section_anchors(GUIDE))
+        self.assertTrue(part_2.startswith("part-2"), part_2)
 
     def test_a_maintainer_of_an_area_joins_three_teams_and_hears_about_two_reviewers(self):
         run = Run(merged_world(World()), "invite", REPO, "alice", "--maintainer", "--area", "parser")
@@ -1137,6 +1160,35 @@ class Audit(unittest.TestCase):
         for change, words in cases:
             with self.subTest(words=words):
                 self.assert_fails(change, words)
+
+    def test_every_failing_check_says_what_fixes_it(self):
+        # The guide's step 10: each line comes with the command or the page
+        # that fixes it. A check with several lines may say it once, last.
+        world = merged_world(World())
+        world.secrets = ["DEPLOY_KEY"]
+        world.org_secrets = ["CLAUDE_CODE_OAUTH_TOKEN"]
+        world.variables.update(CLAUDE_WORKER="true")
+        world.org_variables = {"CLAUDE_TEAM": "[]"}
+        world.repository.update(allow_auto_merge=True, private=True, visibility="private", delete_branch_on_merge=False)
+        world.token = {"default_workflow_permissions": "write", "can_approve_pull_request_reviews": True}
+        world.without_two_factor = ["writer1"]
+        world.outside.append({"login": "helper", "role_name": "admin"})
+        world.teams["others"] = "admin"
+        world.environments = {"prod": {"secrets": ["ANTHROPIC_API_KEY"]}}
+        world.dependabot = ["CLAUDE_CODE_OAUTH_TOKEN"]
+        world.codeowners_errors["main"] = [{"line": 3, "message": "Unknown owner"}]
+        world.workflows["queue.yml"] = "disabled_manually"
+        world.queued = {21: [("labeled", "writer1")]}
+        world.roles.update(writer1="write")
+        run = self.audit(world)
+        last = {}
+        for line in run.lines:
+            if line.startswith("FAIL"):
+                last[line[6:].split(":", 1)[0]] = line
+        self.assertGreaterEqual(len(last), 12, run.out)
+        fixes = ("gh ", "python3 scripts/crowd.py", "https://", "setup ", "take todo off")
+        for name, line in last.items():
+            self.assertTrue(any(fix in line for fix in fixes), line)
 
     def test_a_strict_ruleset_or_an_always_bypass_is_reported(self):
         def strict(world):
