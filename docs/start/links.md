@@ -36,6 +36,7 @@ Making a repository:
 | --- | --- |
 | https://github.com/new?template_owner=OpenSpineConsortium&template_name=sdlc-template&owner=OpenSpineConsortium&visibility=private | "Use this template", for a member of the template's enterprise: a private repository in an organization of the enterprise (put another one of its organizations for `owner` if you make repositories there); a public one publishes the internal template's files and history and needs the template's owner's agreement first |
 | https://github.com/new?template_owner=TEMPLATE_OWNER&template_name=TEMPLATE_NAME&owner=@me&visibility=public | the same from the public copy, for anyone else; an organization's name in place of `@me` makes it there |
+| https://github.com/OpenSpineConsortium/sdlc-start/issues/new?template=adopt.yml | the front door's form, for anyone outside the enterprise: a pull request in a repository of your own with the whole template, or the protocol alone, opened by the OpenSpine SDLC App (install it on the repository first: https://github.com/apps/openspine-sdlc/installations/new); it answers once the front door's owner has set it up |
 | https://github.com/account/organizations/new?plan=free | a new organization on the Free plan |
 
 ## GitHub organization, and your own account

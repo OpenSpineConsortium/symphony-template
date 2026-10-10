@@ -40,9 +40,14 @@ Read `.claude/session.md` at the start of a session: it holds the completed work
 - Crowdsourcing: each contributor works under their own Claude account and the project never holds anyone's credential; crowd mode (scripts/crowd.py, CLAUDE_CROWD) enforces it.
 - Field metrics: no hosted server; on by default, disclosed, one switch off; aggregates only, a repository only as a salted hash; the failure-mode judge runs client side.
 - "Free to use" is not "free access to the source": the template stays private and is adopted through the public OpenSpineConsortium/sdlc-start, which holds no file of it.
+- The collector's salt is derived from the App's private key, with SDLC_METRICS_SALT as an optional override; rotating the key or changing the override gives every repository a new hash.
+- The metrics workflow runs at 03:43 UTC, before the collector's 04:17 read, and on a merge that changes the switch; it never replaces a branch metrics that holds other files and never runs in a fork.
+- Adoption's mode existing takes the protocol page from sdlc-protocol's spec/PROTOCOL.md at the vendored commit, and the App's tokens are minted account-first, so the public run log says nothing about a repository a stranger names.
+- A session merges the project's pull requests once their check is green, as the owner asked and the earlier sessions did; the rulesets require no review.
 ### Constraints
 - The cloud environment blocks cooperbench.com, arxiv.org, cursor.com and docs.github.com; CooperBench's paper and data come from the GitHub repository cooperbench/website.
 - The cloud environment withholds CLAUDE_CODE_OAUTH_TOKEN; coordbench reads COORDBENCH_CLAUDE_TOKEN, each account its own.
 - sdlc-template is internal to its enterprise; outsiders need a public copy or sdlc-start.
 - sdlc-start and its Actions logs are public: nothing of the template may be committed or printed there.
+- The cloud session's proxy refuses the Actions variables and secrets API paths, and the auto-mode permission classifier can refuse an outward write (a label through gh api, a repository attached mid-session); the GitHub tools' pull request and merge calls were allowed.
 <!-- cswap:checkpoint:end -->
