@@ -44,6 +44,7 @@ Read `.claude/session.md` at the start of a session: it holds the completed work
 - The metrics workflow runs at 03:43 UTC, before the collector's 04:17 read, and on a merge that changes the switch; it never replaces a branch metrics that holds other files and never runs in a fork.
 - Adoption's mode existing takes the protocol page from sdlc-protocol's spec/PROTOCOL.md at the vendored commit, and the App's tokens are minted account-first, so the public run log says nothing about a repository a stranger names.
 - A session merges the project's pull requests once their check is green, as the owner asked and the earlier sessions did; the rulesets require no review.
+- The files an adoption brings are offered under the MIT License, in sdlc-start's LICENSE; the adoption copies no LICENSE into anyone's repository.
 ### Constraints
 - The cloud environment blocks cooperbench.com, arxiv.org, cursor.com and docs.github.com; CooperBench's paper and data come from the GitHub repository cooperbench/website.
 - The cloud environment withholds CLAUDE_CODE_OAUTH_TOKEN; coordbench reads COORDBENCH_CLAUDE_TOKEN, each account its own.
