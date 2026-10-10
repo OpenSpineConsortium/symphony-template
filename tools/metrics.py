@@ -16,7 +16,10 @@ each file, how each measure lines up with the benchmark's, and the switch.
            how the protocol ran and nothing about what was built or by whom.
            The workflow puts it on the branch metrics, where
            OpenSpineConsortium's collector reads it, and only where the
-           repository installed the OpenSpine SDLC App.
+           repository installed the OpenSpine SDLC App. GITHUB_TOKEN's hour
+           is the whole repository's, the board's runs among it, so a run
+           stops before it would leave the board fewer requests than
+           RESERVE, says so, and writes nothing.
   judge    run by a maintainer on their own machine, with their own gh and
            their own Claude Code (claude -p) on their own subscription, never
            with ANTHROPIC_API_KEY. It reads each recent pull request's
@@ -26,7 +29,13 @@ each file, how each measure lines up with the benchmark's, and the switch.
            maintainer's local claude process and nowhere else, which asks the
            model on their own account as any of their sessions does: JUDGE.json
            holds counts alone, and --push puts it on the branch metrics beside
-           METRICS.json as an ordinary commit, never a forced one.
+           METRICS.json as an ordinary commit, never a forced one. It refuses
+           while any variable that would bill an API or a cloud account is
+           set, and --push only in a clone whose origin is the repository
+           judged, since JUDGE.json names no repository, by design.
+  push     put a JUDGE.json the judge already wrote on the branch metrics,
+           after the same origin check, so a push that was refused, or a
+           run kept without --push, never costs a second judgement.
   unchanged OLD NEW  exit 0 when two METRICS.json files differ in nothing
            but generated_at, so the workflow writes only when something moved.
 
@@ -104,6 +113,15 @@ RELEASE_MARKER = "<!-- sdlc-coordinator: claim-released -->"
 MAIN_MOVED_PREFIX = board.MAIN_MOVED_MARKER.split("{sha}")[0]
 CONFLICT_WORDS = board.main_moved_text("conflicting", "{base}", "{sha}").split("{base}")[0]
 DIRTY = "dirty"
+# GITHUB_TOKEN has 1,000 requests an hour for the whole repository, and
+# the board's runs draw on the same hour. A run stops before it would leave
+# fewer than this many, writes nothing, and the branch metrics keeps its
+# last record until a run that fits. Each answer's headers say how many
+# are left and when the hour turns.
+HOURLY_BUDGET = 1000
+RESERVE = 300
+REMAINING_HEADER = "X-RateLimit-Remaining"
+RESET_HEADER = "X-RateLimit-Reset"
 
 
 # --- time --------------------------------------------------------------------
@@ -188,6 +206,52 @@ def protocol_version(path=VENDORED):
 
 # --- reading GitHub ----------------------------------------------------------
 
+def header_number(headers, name):
+    """A header's whole number, or None when it is missing or not one."""
+    try:
+        return int((headers or {}).get(name))
+    except (TypeError, ValueError):
+        return None
+
+
+class OutOfBudget(GitHubError):
+    """The hour's requests are down to the board's reserve."""
+
+
+class Budgeted(GitHub):
+    """The protocol library's client with the hour's budget watched: each
+    answer says how many requests are left, and the next call is refused
+    before it is made once that is down to the reserve. GitHub's own
+    refusal of a spent hour, a 403, is read the same way, so a run that
+    starts after the board spent the hour says so too."""
+
+    def __init__(self, token, repo, reserve=RESERVE, **kwargs):
+        super().__init__(token, repo, **kwargs)
+        self.reserve, self.calls, self.remaining, self.reset = reserve, 0, None, None
+
+    def request(self, method, url, body=None, missing_ok=False):
+        if self.remaining is not None and self.remaining <= self.reserve:
+            raise OutOfBudget(self.refusal())
+        try:
+            data, headers = super().request(method, url, body, missing_ok)
+        except GitHubError as problem:
+            if problem.status == 403 and "api rate limit exceeded" in problem.detail.lower():
+                self.remaining = 0
+                raise OutOfBudget(f"GitHub refused the call ({problem.detail}); {self.refusal()}") from None
+            raise
+        self.calls += 1
+        if (remaining := header_number(headers, REMAINING_HEADER)) is not None:
+            self.remaining, self.reset = remaining, header_number(headers, RESET_HEADER)
+        return data, headers
+
+    def refusal(self):
+        back = f"at {iso(datetime.fromtimestamp(self.reset, timezone.utc))}" if self.reset else "within the hour"
+        return (f"stopped after {self.calls} calls, with {self.remaining} of GITHUB_TOKEN's {HOURLY_BUDGET:,} "
+                f"requests an hour left for the board, whose reserve is {self.reserve}: nothing is written, and "
+                f"the branch {METRICS_BRANCH} keeps its last record. The hour's budget comes back {back}; run "
+                "the workflow again once it has, at a quiet moment.")
+
+
 def window_pulls(api, window):
     """Every pull request changed in the window. GitHub lists them by last
     update, newest first, so the listing stops at the first one older than
@@ -206,14 +270,15 @@ def window_pulls(api, window):
 @dataclass
 class PullFacts:
     """What one pull request contributes: the pull as listed, its commits
-    (oldest first), its submitted reviews, the check runs on its head, the
-    check runs on the head it was opened with (None when that head cannot
-    be told) and, while it is open, GitHub's mergeable_state."""
+    (oldest first), its submitted reviews, the check runs on each of its
+    commits made in the window, by commit, the check runs on the head it
+    was opened with (None when that head cannot be told) and, while it is
+    open, GitHub's mergeable_state."""
 
     pull: dict
     commits: list = field(default_factory=list)
     reviews: list = field(default_factory=list)
-    head_runs: list = field(default_factory=list)
+    runs: dict = field(default_factory=dict)
     first_runs: list = None
     mergeable_state: str = None
 
@@ -234,19 +299,39 @@ def first_head_sha(pull, commits):
     return max(before, key=lambda c: commit_time(c, "committer"))["sha"] if before else None
 
 
+def every_check_run(api, sha):
+    """Every check run on one commit, earlier attempts included: GitHub's
+    default listing, the latest attempt of each check, hides a failed run
+    behind its re-run, and a failure that was run again is one
+    check_runs_failed is for. The vendored client's check_runs asks with
+    no filter, so the endpoint is paged here, the way it pages it."""
+    runs = []
+    for page in api.pages(f"/repos/{api.repo}/commits/{sha}/check-runs", {"filter": "all"}):
+        if isinstance(page, dict):
+            runs.extend(page.get("check_runs") or [])
+    return runs
+
+
 def pull_facts(api, pull, window):
-    """The calls one pull request takes: its commits, its reviews, the runs
-    on its head, the runs on its first head when it opened in the window,
-    and its detail while it is open, for the mergeable_state the list
-    leaves out."""
+    """The calls one pull request takes, so the budget can be reckoned
+    (RESERVE): one for its commits, one for its reviews, one for the check
+    runs of each commit made in the window, one more for the head it was
+    opened with when that was made before the window, and while it is
+    open one for its detail, two when GitHub has not computed its
+    mergeability yet. The runs are read on every commit made in the
+    window, not the head alone: the default branch takes only a pull
+    request whose check passed, so a merged one's head is green by
+    construction, and the failures its earlier heads had would never be
+    seen."""
     path = f"/repos/{api.repo}/pulls/{pull['number']}"
     facts = PullFacts(pull, api.get_all(path + "/commits"),
                       [r for r in api.get_all(path + "/reviews") if r.get("state") != "PENDING"])
-    head = (pull.get("head") or {}).get("sha")
-    facts.head_runs = api.check_runs(head) if head else []
+    made = [c["sha"] for c in facts.commits if c.get("sha") and window.holds(commit_time(c, "committer"))]
+    facts.runs = {sha: every_check_run(api, sha) for sha in made}
     if window.holds(time_of(pull, "created_at")):
         first = first_head_sha(pull, facts.commits)
-        facts.first_runs = facts.head_runs if first == head else (api.check_runs(first) if first else None)
+        if first is not None:
+            facts.first_runs = facts.runs[first] if first in facts.runs else every_check_run(api, first)
     if pull.get("state") == "open":
         facts.mergeable_state = settled(api, api.get(path)).get("mergeable_state")
     return facts
@@ -259,7 +344,11 @@ def claim_number(pull):
 def branch_claims(api, window, known):
     """The issue numbers of claude/<n> branches with no pull request among
     the window's whose head commit was made in the window. GitHub's REST API
-    says when a commit was made, never when a branch was."""
+    says when a commit was made, never when a branch was, so each such
+    branch costs one call. A closed issue's branch is not skipped: tidy.yml
+    deletes it when the issue closes, so nearly every branch here is an
+    open issue's, and the listing of open issues that would tell them apart
+    would cost calls and save none."""
     found = set()
     for branch in api.get_all(f"/repos/{api.repo}/branches"):
         number = claims.number_of(branch.get("name") or "")
@@ -331,14 +420,24 @@ def commit_author(commit):
     return "email:" + email if email and "[bot]" not in email else None
 
 
-def contributors(facts):
-    """How many people wrote the window's pull requests, reviews and
-    commits; the identities are counted here and never leave."""
+def made_in(commit, window):
+    """Whether the commit was authored or committed in the window; a rebase
+    keeps the author date and renews the committer date."""
+    return any(window.holds(commit_time(commit, who)) for who in ("author", "committer"))
+
+
+def contributors(facts, window):
+    """How many people did something in the window on its pull requests:
+    opened one, submitted a review on one, or made a commit on one. A pull
+    request enters the window on any change, a board comment on a stale
+    one among them, so each person is dated by their own act, not by the
+    pull request's; the identities are counted here and never leave."""
     found = set()
     for f in facts:
-        found.add(person(f.pull.get("user")))
-        found.update(person(r.get("user")) for r in f.reviews)
-        found.update(commit_author(c) for c in f.commits)
+        if window.holds(time_of(f.pull, "created_at")):
+            found.add(person(f.pull.get("user")))
+        found.update(person(r.get("user")) for r in f.reviews if window.holds(time_of(r, "submitted_at")))
+        found.update(commit_author(c) for c in f.commits if made_in(c, window))
     return len(found - {None})
 
 
@@ -358,11 +457,11 @@ def conflicts(facts, comments):
 
 
 def window_runs(facts, window):
-    """The check runs on the window's heads that finished in the window,
-    each once."""
+    """The check runs on the window's commits that finished in the window,
+    each once: a commit in two pull requests brings its runs twice."""
     runs = {}
     for f in facts:
-        for run in f.head_runs:
+        for run in (r for found in f.runs.values() for r in found):
             if window.holds(time_of(run, "completed_at")):
                 runs[run.get("id") or id(run)] = run
     return list(runs.values())
@@ -416,7 +515,9 @@ def merge_waits(merged):
 
 def first_check_passed(f):
     """Whether every counted check run on the head the pull request opened
-    with passed; None when that head is unknown or none of its runs counted."""
+    with passed, every attempt among them, so a check that passed only when
+    run again did not pass first; None when that head is unknown or none of
+    its runs counted."""
     counted = [r for r in f.first_runs or [] if r.get("conclusion") in PASSED | FAILED]
     return all(r["conclusion"] in PASSED for r in counted) if counted else None
 
@@ -440,7 +541,7 @@ def measures(facts, extra_claims, comments, window):
         sum(1 for r in runs if r.get("conclusion") in FAILED),
         conflicts(facts, comments),
         sum(1 for c in comments if RELEASE_MARKER in (c.get("body") or "")),
-        contributors(facts),
+        contributors(facts, window),
     )))
     durations = dict(zip(DURATION_KEYS, (*summary(claim_waits(opened)), *summary(merge_waits(merged)),
                                          *summary(review_waits(opened)))))
@@ -490,6 +591,27 @@ APPF_GROUPS = {"C1a": "unresponsiveness", "C1b": "unresponsiveness", "C2": "unre
                "C3a": "hallucination", "C3b": "hallucination", "C4a": "repetition", "C4b": "repetition"}
 PROMPT_VARIANT = "appF-7"
 DEFAULT_MODEL = "claude-sonnet-5-5"
+JUDGE_KEYS = ("schema", "generated_at", "model", "prompt_variant", "conversations", "counts", "groups")
+# The model is the one free-form string JUDGE.json carries, and the branch
+# metrics is as public as the repository: a name is kept to the shape
+# OpenSpineConsortium's collector keeps, so a cloud model ARN, with an
+# account number in it, is refused before it can be written.
+MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}(\[[a-z0-9]{1,8}\])?")
+# Each of these makes claude bill an API or a cloud account instead of the
+# maintainer's subscription, and send the conversations there; the judge
+# refuses while one is set, saying where they would have gone. It never
+# passes one on, nor ANTHROPIC_BASE_URL, which alone would send them to a
+# gateway: that one is dropped, and the dry run says so.
+BILLING_VARIABLES = {
+    "ANTHROPIC_API_KEY": "bill the API with it",
+    "ANTHROPIC_AUTH_TOKEN": "bill the API, or the gateway ANTHROPIC_BASE_URL names, with it",
+    "CLAUDE_CODE_USE_BEDROCK": "send every conversation to Amazon Bedrock, billed to that account",
+    "CLAUDE_CODE_USE_VERTEX": "send every conversation to Google Vertex AI, billed to that account",
+    "CLAUDE_CODE_USE_FOUNDRY": "send every conversation to Microsoft Foundry, billed to that account",
+}
+DROPPED_VARIABLES = (*BILLING_VARIABLES, "ANTHROPIC_BASE_URL")
+TOOL_ROLES = {"gh": "reads the pull requests as you", "claude": "is the model that codes them"}
+PUSH_COMMAND = "python3 tools/metrics.py push"
 # App F's text word for word, as coordbench's prompts/commerrors-appF-7.txt
 # holds it, up to its Output paragraph. That paragraph asked for quotes and
 # a description; here the answer is the codes alone, so no text of the
@@ -517,6 +639,11 @@ MENTION = re.compile(r"@([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)")
 CONVERSATION_LIMIT = 100_000
 CONVERSATION_KEEP = 50_000
 EMPTY_MCP = '{"mcpServers": {}}'
+# The system prompt goes to claude as a file in the folder it runs in, not
+# as an argument: a shell in the way (cmd.exe runs npm's claude.cmd on
+# Windows) would split a multi-line argument, and a process listing shows
+# every argument.
+PROMPT_FILE = "system-prompt.txt"
 CALL_TIMEOUT = 600
 API_VERSION = "2022-11-28"
 PER_PAGE = 100
@@ -525,6 +652,11 @@ REVIEW_WORDS = {"APPROVED": "review: approved", "CHANGES_REQUESTED": "review: ch
 HEADER = ("Conversation of a pull request: {count} messages in time order, each as [message id] time sender -> "
           "recipient (all for a broadcast): content. The people are named A, B, C and so on in the order they "
           "first speak; bot is any app or bot account.")
+# The protocol's own comments are posted again and again by design: the
+# board's "main moved" on every move of the default branch, its "idle" on
+# every quiet day, the coordinator's release. They are nobody's words, and
+# App F would read them as spammy repetition, so they stay out.
+PROTOCOL_MARKERS = (MAIN_MOVED_PREFIX, board.IDLE_MARKER, RELEASE_MARKER)
 
 
 class JudgeError(Exception):
@@ -540,7 +672,10 @@ class Gh:
         self.repo, self.run, self.binary = repo, run, binary
 
     def call(self, *args):
-        done = self.run([self.binary, *args], capture_output=True, text=True, encoding="utf-8")
+        try:
+            done = self.run([self.binary, *args], capture_output=True, text=True, encoding="utf-8")
+        except OSError as problem:
+            raise JudgeError(f"gh did not run: {problem}") from None
         if done.returncode != 0:
             raise JudgeError(f"gh {args[0]} {args[-1]}: {(done.stderr or done.stdout or '').strip()[:300]}")
         return done.stdout
@@ -579,10 +714,15 @@ class Message:
     text: str
 
 
+def is_protocol_comment(text):
+    return any(marker in text for marker in PROTOCOL_MARKERS)
+
+
 def pull_messages(pull, comments, review_comments, reviews):
     """A pull request's conversation in time order: its description, its
-    comments, its review comments and its reviews. A review with no words
-    still says something when it approves or asks for changes."""
+    comments, its review comments and its reviews, without the protocol's
+    own automated comments. A review with no words still says something
+    when it approves or asks for changes."""
     messages = []
     if (pull.get("body") or "").strip():
         messages.append(Message(time_of(pull, "created_at"), pull.get("user"), "description", pull["body"]))
@@ -595,7 +735,8 @@ def pull_messages(pull, comments, review_comments, reviews):
             messages.append(Message(time_of(review, "submitted_at"), review.get("user"), REVIEW_WORDS[state],
                                     review.get("body") or ""))
     epoch = datetime.min.replace(tzinfo=timezone.utc)
-    return sorted((m for m in messages if m.text.strip() or m.note), key=lambda m: m.when or epoch)
+    said = (m for m in messages if (m.text.strip() or m.note) and not is_protocol_comment(m.text))
+    return sorted(said, key=lambda m: m.when or epoch)
 
 
 def letters(index):
@@ -661,43 +802,52 @@ def conversation_text(gh, pull):
                                 gh.get_all(f"{path}/pulls/{number}/reviews")))
 
 
-def claude_command(binary, model):
-    """claude -p with App F as the whole system prompt, one turn, no tool,
-    no MCP server, no settings (so no hook), no skill and no session kept;
-    it runs in an empty folder, so no project's CLAUDE.md is read either."""
+def claude_command(binary, model, prompt_file):
+    """claude -p with App F as the whole system prompt, read from a file,
+    one turn, no tool, no MCP server, no settings (so no hook), no skill
+    and no session kept; it runs in the folder that holds the prompt file
+    and nothing else, so no project's CLAUDE.md is read either."""
     return [binary, "-p", "--output-format", "json", "--model", model, "--max-turns", "1",
-            "--system-prompt", APPF_PROMPT, "--tools", "", "--strict-mcp-config", "--mcp-config", EMPTY_MCP,
-            "--setting-sources", "", "--disable-slash-commands", "--no-session-persistence"]
+            "--system-prompt-file", str(prompt_file), "--tools", "", "--strict-mcp-config", "--mcp-config",
+            EMPTY_MCP, "--setting-sources", "", "--disable-slash-commands", "--no-session-persistence"]
 
 
 class LocalClaude:
     """The maintainer's own Claude Code, signed in to their own account.
-    The conversation goes to this one process on stdin and nowhere else."""
+    The conversation goes to this one process on stdin and nowhere else.
+    The binary is the path the PATH check found, so the process starts
+    on a system that resolves a command name differently from a path."""
 
     def __init__(self, model, run=subprocess.run, binary="claude"):
         self.model, self.run, self.binary = model, run, binary
 
-    def command(self):
-        return claude_command(self.binary, self.model)
+    def command(self, prompt_file):
+        return claude_command(self.binary, self.model, prompt_file)
 
     def ask(self, conversation):
-        with tempfile.TemporaryDirectory(prefix="sdlc-judge-") as empty:
+        with tempfile.TemporaryDirectory(prefix="sdlc-judge-") as folder:
+            prompt_file = Path(folder) / PROMPT_FILE
+            prompt_file.write_text(APPF_PROMPT, encoding="utf-8")
             try:
-                done = self.run(self.command(), input=conversation, capture_output=True, text=True,
-                                encoding="utf-8", cwd=empty, timeout=CALL_TIMEOUT, env=judge_environment(os.environ))
+                done = self.run(self.command(prompt_file), input=conversation, capture_output=True, text=True,
+                                encoding="utf-8", cwd=folder, timeout=CALL_TIMEOUT,
+                                env=judge_environment(os.environ))
             except (OSError, subprocess.SubprocessError) as problem:
                 raise JudgeError(f"claude did not run: {problem}") from None
         return claude_result(done)
 
 
 def judge_environment(environ):
-    """The maintainer's environment, which holds their sign-in, without an
-    API key, which the refusal has already kept out."""
-    return {name: value for name, value in environ.items() if name != "ANTHROPIC_API_KEY"}
+    """The maintainer's environment, which holds their sign-in, without
+    the variables that would bill or redirect the call; the refusal has
+    already kept the billing ones out, and the gateway URL goes here."""
+    return {name: value for name, value in environ.items() if name not in DROPPED_VARIABLES}
 
 
 def claude_result(done):
-    """The reply's text from claude's JSON result."""
+    """The reply's text from claude's JSON result; when claude failed, the
+    error says what claude said, which reaches the maintainer's terminal
+    and nowhere else."""
     try:
         result = json.loads(done.stdout)
     except (TypeError, ValueError):
@@ -705,9 +855,20 @@ def claude_result(done):
                          f"{(done.stderr or '').strip()[-300:]}") from None
     if done.returncode != 0 or not isinstance(result, dict) or result.get("is_error") \
             or not isinstance(result.get("result"), str):
-        subtype = result.get("subtype") if isinstance(result, dict) else None
-        raise JudgeError(f"claude failed ({subtype}); nothing is written")
+        raise JudgeError(f"claude failed ({claude_failure(result, done.stderr)}); nothing is written")
     return result["result"]
+
+
+def claude_failure(result, stderr):
+    """Claude Code's own account of a failure: the subtype, then the end of
+    its result text, where a sign-in or usage-limit message goes under the
+    subtype success, its errors and stderr, whichever it filled."""
+    if not isinstance(result, dict):
+        return "no result object"
+    errors = result.get("errors") if isinstance(result.get("errors"), list) else []
+    said = [text.strip()[-300:] for text in (result.get("result"), *map(str, errors), stderr)
+            if isinstance(text, str) and text.strip()]
+    return "; ".join([str(result.get("subtype")), *said])
 
 
 def reply_object(text):
@@ -756,25 +917,51 @@ def judge_record(model, conversations, counts, now):
 
 def judge_refusal(environ, which):
     """Why the judge will not run here, or None."""
-    if environ.get("ANTHROPIC_API_KEY"):
-        return ("judge: ANTHROPIC_API_KEY is set, and claude would bill the API with it, which this project never "
-                "does. Unset it (`unset ANTHROPIC_API_KEY`) and run again: claude then runs on your own "
-                "subscription, signed in with `claude` as usual.")
-    for tool, why in (("gh", "reads the pull requests as you"), ("claude", "is the model that codes them")):
+    for name, outcome in BILLING_VARIABLES.items():
+        if environ.get(name):
+            return (f"judge: {name} is set, and claude would {outcome}, which this project never does. Unset it "
+                    f"(`unset {name}`) and run again: claude then runs on your own subscription, signed in with "
+                    "`claude` as usual.")
+    for tool, why in TOOL_ROLES.items():
         if not which(tool):
             return f"judge: {tool} is not on PATH; it {why}. Install it, sign in, and run again."
     return None
 
 
-def show_dry_run(claude, conversations, pulls, record, out):
+def repository_of(url):
+    """OWNER/NAME from a remote's URL in any form git takes (https, ssh,
+    scp-like, a path; with or without .git), or None when it ends in no
+    such pair."""
+    parts = re.split(r"[/:]", re.sub(r"(\.git)?/?$", "", url.strip(), count=1))
+    return "/".join(parts[-2:]) if len(parts) >= 2 and all(parts[-2:]) else None
+
+
+def origin_refusal(git, repo):
+    """Why a push would land on the wrong repository, or None: the push
+    goes to origin, and JUDGE.json names no repository, by design, so
+    origin must be the repository judged."""
+    try:
+        url = git("remote", "get-url", REMOTE).strip()
+    except JudgeError:
+        url = ""
+    found = repository_of(url)
+    if found and found.lower() == repo.lower():
+        return None
+    where = f"is {url}" if url else "has no URL"
+    return (f"the repository judged is {repo}, but this clone's {REMOTE} {where}, so the push would put its counts "
+            f"on another repository's branch {METRICS_BRANCH}. Run this in a clone of {repo}.")
+
+
+def show_dry_run(claude, conversations, pulls, record, environ, out):
     """What a run would send and write, and nothing sent or written."""
     print(f"judge: a dry run; nothing is sent, written or pushed. {len(conversations)} of {pulls} pull requests "
           "have a conversation, and a run would send each to your local claude, one call each.", file=out)
-    command = claude.command()
-    shown = [word if word != APPF_PROMPT else "<the system prompt below>" for word in command]
-    print("--- the command, run in an empty temporary folder ---", file=out)
-    print(shlex.join(shown), file=out)
-    print("--- the system prompt ---", file=out)
+    if environ.get("ANTHROPIC_BASE_URL"):
+        print("judge: ANTHROPIC_BASE_URL is set here and is dropped from claude's environment, so the "
+              "conversations go where your sign-in does, not to that URL.", file=out)
+    print(f"--- the command, run in a temporary folder holding {PROMPT_FILE} and nothing else ---", file=out)
+    print(shlex.join(claude.command(f"<that folder>/{PROMPT_FILE}")), file=out)
+    print(f"--- the system prompt, written to {PROMPT_FILE} ---", file=out)
     print(APPF_PROMPT, file=out)
     print("--- stdin: the first conversation ---", file=out)
     print(conversations[0] if conversations else "(no conversation in the window)", file=out)
@@ -789,13 +976,20 @@ def judge(args, environ, gh, claude, which=shutil.which, git=None, out=sys.stdou
     if refusal:
         print(refusal, file=sys.stderr)
         return 1
+    gh.binary, claude.binary = which("gh"), which("claude")
     gh.repo = args.repo or gh.default_repo()
+    # A mismatch is found before a pull request is read or a conversation
+    # sent, so it costs nothing.
+    refusal = args.push and origin_refusal(git or run_git, gh.repo)
+    if refusal:
+        print(f"judge: --push refused: {refusal}", file=sys.stderr)
+        return 1
     now = parse_time(args.now) if args.now else datetime.now(timezone.utc)
     pulls = window_pulls(gh, Window.ending(now, args.window_days))[:args.limit or None]
     conversations = [text for pull in pulls if (text := conversation_text(gh, pull))]
     if args.dry_run:
         record = judge_record(claude.model, len(conversations), {}, now)
-        return show_dry_run(claude, conversations, len(pulls), record, out)
+        return show_dry_run(claude, conversations, len(pulls), record, environ, out)
     counts, judged, unreadable = {}, 0, 0
     for number, conversation in enumerate(conversations, start=1):
         readable, code = judged_code(claude, conversation)
@@ -848,7 +1042,9 @@ def judge_commit(git, path, parent):
     kept = [line for line in (git("ls-tree", parent).splitlines() if parent else [])
             if not line.endswith("\t" + JUDGE_FILE)]
     tree = git("mktree", input="\n".join(kept + [f"100644 blob {blob}\t{JUDGE_FILE}"]) + "\n").strip()
-    message = f"Judge counts as of {iso(datetime.now(timezone.utc))}"
+    # The push is made with a person's credentials, so [skip ci] keeps any
+    # workflow a repository starts on every push off a tree of two files.
+    message = f"Judge counts as of {iso(datetime.now(timezone.utc))} [skip ci]"
     return git("commit-tree", tree, *(("-p", parent) if parent else ()), "-m", message).strip()
 
 
@@ -871,7 +1067,35 @@ def push_judge(path, git):
         except JudgeError as problem:
             refused = problem
     raise JudgeError(f"the push to {METRICS_BRANCH} was refused twice, the last time with: {refused}; "
-                     f"{path} is written, so run the push again with --push")
+                     f"{path} is written, so push it alone with `{PUSH_COMMAND} --out {path}`")
+
+
+def judge_file(path):
+    """The JUDGE.json at path, checked to be one the judge wrote: the
+    branch metrics takes the judge's aggregates and nothing else."""
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as problem:
+        raise JudgeError(f"{path} is not a JUDGE.json the judge wrote: {problem}") from None
+    if not isinstance(record, dict) or tuple(record) != JUDGE_KEYS or record.get("schema") != JUDGE_SCHEMA:
+        raise JudgeError(f"{path} is not a JUDGE.json the judge wrote; run the judge first")
+    return record
+
+
+def push(args, gh, git=None, out=sys.stdout):
+    """The push command: a JUDGE.json the judge already wrote, onto the
+    branch metrics, after the same origin check as judge --push, so a
+    push that was refused, or a run kept without --push, is never judged
+    again to be pushed once. gh is asked only for the default repository."""
+    path = Path(args.out)
+    judge_file(path)
+    gh.repo = args.repo or gh.default_repo()
+    refusal = origin_refusal(git or run_git, gh.repo)
+    if refusal:
+        print(f"push: refused: {refusal}", file=sys.stderr)
+        return 1
+    print(f"push: {path} pushed to {METRICS_BRANCH} as {push_judge(path, git or run_git)}", file=out)
+    return 0
 
 
 # --- the command line -----------------------------------------------------------
@@ -883,10 +1107,10 @@ def collect(args, environ, opener=None, sleep=time.sleep):
         return 0
     now = parse_time(args.now) if args.now else datetime.now(timezone.utc)
     window = Window.ending(now, args.window_days)
-    api = GitHub(environ.get("GITHUB_TOKEN"), args.repo, opener=opener, sleep=sleep)
+    api = Budgeted(environ.get("GITHUB_TOKEN"), args.repo, opener=opener, sleep=sleep)
     facts, extra_claims, comments = read_repository(api, window)
     write_json(args.out, metrics_record(measures(facts, extra_claims, comments, window), window, protocol_version()))
-    print(f"metrics: {args.out} written over {args.window_days} days")
+    print(f"metrics: {args.out} written over {args.window_days} days, in {api.calls} calls")
     return 0
 
 
@@ -905,6 +1129,14 @@ def positive(text):
     return value
 
 
+def model_name(text):
+    if not MODEL_NAME.fullmatch(text):
+        raise argparse.ArgumentTypeError("a model name starts with a letter or digit, goes on with letters, digits, "
+                                         "dots, dashes and underscores, at most 64 in all, and may end in [a tag]; "
+                                         f"{text!r} is written to JUDGE.json as it is, so it is refused")
+    return text
+
+
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Field metrics of the claim protocol (docs/setup/metrics.md).")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -916,12 +1148,17 @@ def parse_args(argv):
     code.add_argument("--repo", help="OWNER/NAME (default: the repository gh sees here)")
     code.add_argument("--limit", type=positive, help="judge at most this many pull requests, newest first")
     code.add_argument("--dry-run", action="store_true", help="show what would be sent and written; send nothing")
-    code.add_argument("--model", default=DEFAULT_MODEL, help=f"the model claude runs (default: {DEFAULT_MODEL})")
+    code.add_argument("--model", default=DEFAULT_MODEL, type=model_name,
+                      help=f"the model claude runs (default: {DEFAULT_MODEL})")
     code.add_argument("--out", default=JUDGE_FILE, help=f"where JUDGE.json goes (default: ./{JUDGE_FILE})")
-    code.add_argument("--push", action="store_true", help=f"commit JUDGE.json onto the branch {METRICS_BRANCH}")
+    code.add_argument("--push", action="store_true",
+                      help=f"commit JUDGE.json onto the branch {METRICS_BRANCH} of origin, the repository judged")
     for each in (gather, code):
         each.add_argument("--window-days", type=positive, default=WINDOW_DAYS, help="days to look back (default: 30)")
         each.add_argument("--now", help="the window's end, an ISO time (default: now; for tests)")
+    send = commands.add_parser("push", help=f"push a JUDGE.json the judge wrote onto the branch {METRICS_BRANCH}")
+    send.add_argument("--repo", help="OWNER/NAME the file was judged for (default: the repository gh sees here)")
+    send.add_argument("--out", default=JUDGE_FILE, help=f"the file, as judge --out wrote it (default: ./{JUDGE_FILE})")
     same = commands.add_parser("unchanged", help="exit 0 when two METRICS.json differ only in generated_at")
     same.add_argument("old")
     same.add_argument("new")
@@ -935,6 +1172,8 @@ def main(argv=None):
             return collect(args, os.environ)
         if args.command == "judge":
             return judge(args, os.environ, Gh(), LocalClaude(args.model))
+        if args.command == "push":
+            return push(args, Gh())
         return unchanged(args)
     except (GitHubError, JudgeError) as problem:
         print(f"metrics: {problem}", file=sys.stderr)
