@@ -205,7 +205,9 @@ about 42 sessions.
 ## 3. The repository's GitHub settings (sdlc-template and every copy)
 
 `bash scripts/setup-repo.sh` does 1 to 4 and checks 5 in one run
-(above). By hand, under Settings of the repository, as
+(above); a repository adopted through the front door with its Setup App
+installed has 1 to 4 done by that run, as its pull request's section
+Settings says. By hand, under Settings of the repository, as
 docs/setup/github.md describes:
 
 1. **Rules**: Rules, Rulesets, New ruleset, Import a ruleset, and choose
