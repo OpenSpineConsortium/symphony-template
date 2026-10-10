@@ -55,7 +55,7 @@ Each opens the exact page; the sections below say what to do there.
 
 - Install the Claude GitHub App: https://github.com/apps/claude/installations/new
 - The same, with this organization and repository preselected (the form GitHub documents for an app's install URL, with the ids the API reports for OpenSpineConsortium/sdlc-template, not tried live from a session): https://github.com/apps/claude/installations/new/permissions?suggested_target_id=285817514&repository_ids[]=1411163972
-- Connect GitHub to Claude: https://claude.ai/settings/connectors
+- Connect GitHub to Claude: Sign in with GitHub at https://claude.ai/code; your connectors, to disconnect it: https://claude.ai/customize/connectors
 - Claude Code in the cloud (sessions, environment settings): https://claude.ai/code
 - How cloud environments, variables and network access work: https://code.claude.com/docs/en/cloud-environments
 - The repository's rulesets (New ruleset, Import): https://github.com/OpenSpineConsortium/sdlc-template/settings/rules
@@ -65,7 +65,7 @@ Each opens the exact page; the sections below say what to do there.
 - New repository variable: https://github.com/OpenSpineConsortium/sdlc-template/settings/variables/actions/new
 - Organization secrets and variables (shared by every repository of the organization): https://github.com/organizations/OpenSpineConsortium/settings/secrets/actions
 - Organization rulesets (applied to every repository of the organization): https://github.com/organizations/OpenSpineConsortium/settings/rules
-- claude.ai Projects: https://claude.ai/projects
+- Projects in Claude Code: https://claude.ai/code/projects/browse
 
 A template copies files only, never settings, secrets or variables: the
 command above sets the repository's, and the next section says what an
@@ -145,8 +145,9 @@ items above may already be open to it.
    account reuses it.
 4. **Start a cloud session** at claude.ai/code on
    OpenSpineConsortium/sdlc-template, on the default network access level,
-   and type "continue". main's .claude/session.md sends the session to the
-   branch claude/10 and its checkpoint.
+   and type "continue": the session reads main's .claude/session.md, the
+   last checkpoint, first. docs/start/prompts.md has the sentences for
+   the everyday moves.
 
 That is all the code work needs. Running agents on benchmark tasks needs
 section 2 as well.
@@ -160,26 +161,41 @@ there; these steps are the same for it.
 1. **Make a subscription token** on your own computer, signed in to the
    Claude account whose usage the run should draw on:
    `claude setup-token`. It prints a long-lived OAuth token (about a year).
-2. **Put it in the cloud environment, not the repository**: in a claude.ai/code
-   session, open the environment menu in the session's title bar, Edit,
-   and add an environment variable named `CLAUDE_CODE_OAUTH_TOKEN` with the
-   token as its value. A session sees only variables that existed when it
-   started, so start a **new** session after adding it.
+2. **Put it in the cloud environment, not the repository**: at
+   https://claude.ai/code, select the cloud icon showing the current
+   environment's name, in the row above the message box, then Cloud, and
+   Add cloud environment (or hover an environment and select its
+   settings icon to edit it), and add the line
+   `COORDBENCH_CLAUDE_TOKEN=<the token>` under Environment variables,
+   not Network secrets. The environment withholds a variable named
+   `CLAUDE_CODE_OAUTH_TOKEN` from the session, since it runs the
+   session's own Claude Code, so coordbench reads the alias and copies
+   it to that name for its agents. A running session keeps the values it
+   last read, so start a **new** session after adding it
+   (docs/start/benchmark.md has the whole run).
 3. **Do not set `ANTHROPIC_API_KEY`** anywhere in that environment:
    CooperBench's adapter prefers it over the token, and it bills the API.
-4. **Optional, for the last 7 of the 50 pairs**: under the same Edit,
-   Network access, add these allowed domains (keep "allow package
-   managers" ticked): `openaipublic.blob.core.windows.net` (tiktoken),
-   `huggingface.co` (outlines 1706), `pypi.nvidia.com` (llama_index). The
-   tasks' containers would then still need those downloads baked into
-   their images (coordbench's bench/cooperbench/README.md says why);
-   without this step the run covers the 42 pairs that grade.
-5. Nothing on GitHub is needed for the experiment. The session starts
-   Docker inside its own container (coordbench's
-   bench/cooperbench/setup.sh); images come from mirror.gcr.io because
-   Docker Hub rate-limits the cloud host; the disk holds about one large
-   task image at a time; a session's background command stops after two
-   hours, so runs go one task at a time.
+4. **Optional, for the last 7 of the 50 pairs**: in the same dialog, set
+   Network access to Custom and add these allowed domains (keep "Also
+   include default list of common package managers" ticked):
+   `openaipublic.blob.core.windows.net` (tiktoken), `huggingface.co`
+   (outlines 1706), `pypi.nvidia.com` (llama_index). The tasks'
+   containers would then still need those downloads baked into their
+   images (coordbench's bench/cooperbench/README.md says why); without
+   this step the run covers the 42 pairs that grade.
+5. On GitHub the experiment needs only the account connected at
+   claude.ai/code, which every cloud session needs, and a fork of
+   coordbench (or Write on it) to push a results page to, with the Claude
+   GitHub App installed on the repository the session pushes to
+   (https://github.com/apps/claude/installations/new, Only select
+   repositories), unless GitHub was connected with `/web-setup`: a session
+   connected through the App pushes with the App's token, which writes
+   only where the App is installed. The session starts Docker inside its
+   own container (coordbench's bench/cooperbench/setup.sh); images come
+   from mirror.gcr.io because Docker Hub rate-limits the cloud host; the
+   disk holds about one large task image at a time; a session's background
+   command stops after 30 minutes, or two hours at most when started with
+   that timeout, so runs go one task at a time.
 
 Cost, for planning: about $0.43 of usage per agent session at API prices;
 the 42 gradable pairs over four arms are about 294 sessions (about $125 of
@@ -232,7 +248,11 @@ docs/setup/github.md describes:
 3. **Coordinator routine** (optional, once a second account joins):
    docs/agents/routines/coordinator.md. Its API trigger's address and bearer
    token go into the repository secrets `COORDINATOR_TRIGGER_URL` and
-   `COORDINATOR_TRIGGER_TOKEN`.
+   `COORDINATOR_TRIGGER_TOKEN` only while every writer of the repository is
+   you, since any writer's workflow can read them and each fire spends the
+   main account's usage; otherwise leave the trigger out
+   (docs/start/team.md, steps 1 and 6), and the hourly schedule and the
+   pull request events carry the routine.
 
 ## 5. A claude.ai Project per account (optional)
 
@@ -284,9 +304,9 @@ run's summary what is missing. Once, in this order:
 
    Where the two are already set at the organization with `--visibility
    all`, sdlc-protocol, being public, has them, and this step is done.
-3. **Allow auto-merge on the public consumers**. `bash
-   scripts/setup-repo.sh` turns it on here (section 3); these commands
-   do it for all three, and change nothing where it is on already:
+3. **Allow auto-merge on the three consumers the sync arms it for**.
+   `bash scripts/setup-repo.sh` turns it on here (section 3); these
+   commands do it for all three, and change nothing where it is on already:
 
    ```
    gh api -X PATCH repos/OpenSpineConsortium/sdlc-template -F allow_auto_merge=true
@@ -294,17 +314,17 @@ run's summary what is missing. Once, in this order:
    gh api -X PATCH repos/OpenSpineConsortium/sdlc-marketplace -F allow_auto_merge=true
    ```
 
-   sdlc-app is private, and GitHub Free offers auto-merge only on public
-   repositories, so the App's sync pull request waits for you to merge it.
+   The sync does not arm auto-merge for sdlc-app, which ecosystem.json
+   gives `"auto_merge": false` (docs/start/protocol.md, step 6), so you
+   merge the App's sync pull request yourself.
 4. **Require the check `check` on each consumer's main**, with a ruleset,
    so auto-merge waits for it to be green. Here
    docs/setup/ruleset-main.json already does (section 3); the same file
-   imports into coordbench and sdlc-marketplace (their Settings, Rules,
-   Rulesets, New ruleset, Import a ruleset). On sdlc-app it is written but
-   not enforced while the repository is private on GitHub Free
-   (docs/setup/tiers.md). On sdlc-protocol require `check` and, if you
-   like, the `downstream (<name>)` jobs, so a change that breaks a
-   consumer cannot merge there.
+   imports into coordbench, sdlc-marketplace and sdlc-app (their Settings,
+   Rules, Rulesets, New ruleset, Import a ruleset); on sdlc-app the check
+   then gates your own merge (step 3). On sdlc-protocol require `check`
+   and, if you like, the `downstream (<name>)` jobs, so a change that
+   breaks a consumer cannot merge there.
 5. **Land the pull requests that brought the sync**, one per repository
    from the branch `claude/festive-edison-al7xu2`, the four consumers'
    first. sdlc-protocol's `downstream` jobs vendor its change into each

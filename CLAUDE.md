@@ -38,8 +38,11 @@ Read `.claude/session.md` at the start of a session: it holds the completed work
 - A protocol change is made in OpenSpineConsortium/sdlc-protocol and reaches every consumer by its sync on one push (ecosystem.json, sync.yml).
 - coordbench measures what CooperBench measures, as CooperBench 63b9d44 does, differing only with a stated reason (PARITY.md); model-judged measures run only on purpose, never with ANTHROPIC_API_KEY.
 - Crowdsourcing: each contributor works under their own Claude account and the project never holds anyone's credential; crowd mode (scripts/crowd.py, CLAUDE_CROWD) enforces it.
+- Field metrics: no hosted server; on by default, disclosed, one switch off; aggregates only, a repository only as a salted hash; the failure-mode judge runs client side.
+- "Free to use" is not "free access to the source": the template stays private and is adopted through the public OpenSpineConsortium/sdlc-start, which holds no file of it.
 ### Constraints
-- The cloud environment blocks cooperbench.com, arxiv.org and cursor.com; CooperBench's paper and data come from the GitHub repository cooperbench/website.
+- The cloud environment blocks cooperbench.com, arxiv.org, cursor.com and docs.github.com; CooperBench's paper and data come from the GitHub repository cooperbench/website.
 - The cloud environment withholds CLAUDE_CODE_OAUTH_TOKEN; coordbench reads COORDBENCH_CLAUDE_TOKEN, each account its own.
-- sdlc-template is internal to its enterprise; outsiders need a public copy.
+- sdlc-template is internal to its enterprise; outsiders need a public copy or sdlc-start.
+- sdlc-start and its Actions logs are public: nothing of the template may be committed or printed there.
 <!-- cswap:checkpoint:end -->
