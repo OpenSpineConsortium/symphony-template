@@ -13,7 +13,11 @@ name: Checks
 # never writes a workflow file (GITHUB_TOKEN may not change one): the push
 # trigger leaves out the claim branches, whose pull request runs the check, so
 # no run is ever skipped under the name "check" and a required check cannot be
-# satisfied by a skipped run.
+# satisfied by a skipped run. It leaves out sdlc-protocol's sync branch for
+# the same reason: that repository's sync workflow pushes sdlc-protocol/sync
+# with the GitHub App's token, which, unlike a workflow's own GITHUB_TOKEN,
+# starts this workflow, and then opens or updates the branch's pull request,
+# which runs the check again on the same commit.
 # On a pull request the same job also runs tools/check_protocol.py, which
 # holds a claude/<issue> pull request to the claim protocol: its claim file
 # while draft, that file's deletion when ready, a body that closes its
@@ -25,7 +29,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
   push:
-    branches-ignore: ["claude/**"]
+    branches-ignore: ["claude/**", "sdlc-protocol/**"]
 
 permissions:
   contents: read
