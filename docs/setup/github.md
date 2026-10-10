@@ -1,6 +1,6 @@
 # Setting up the repository on GitHub
 
-A template repository copies files only. The new repository gets none of the template's settings, branch rules, secrets, labels or issues. That is why the first push runs .github/workflows/template-init.yml, which fills the names into the files, creates the labels and opens the issue "Set up this project", and why this page exists for what only a person with the repository's settings can do. Do these once, in this order, under https://github.com/{{REPO}}/settings; or run `bash scripts/setup-repo.sh` once from a clone with the GitHub CLI signed in, which does sections 1, 2 and 5 and the variables in one go (docs/setup/owner-checklist.md gathers every step, the Claude side included, and says what an organization can set once for every repository it makes).
+A template repository copies files only. The new repository gets none of the template's settings, branch rules, secrets, labels or issues. That is why the first push runs .github/workflows/template-init.yml, which fills the names into the files, creates the labels and opens the issue "Set up this project", and why this page exists for what only a person with the repository's settings can do. Do these once, in this order, under https://github.com/{{REPO}}/settings; or run `bash scripts/setup-repo.sh` once from a clone with the GitHub CLI signed in, which does sections 1, 2 and 5 and the variables in one go and checks section 7 (docs/setup/owner-checklist.md gathers every step, the Claude side included, and says what an organization can set once for every repository it makes).
 
 ## 1. Protect the default branch
 
@@ -40,3 +40,9 @@ Under Code security, turn on secret scanning and push protection. They are the f
 ## 6. Dependabot
 
 .github/dependabot.yml asks for weekly updates of the GitHub Actions the workflows use, which are pinned to a major tag. Nothing to set; it runs once the file is on {{DEFAULT_BRANCH}}.
+
+## 7. Code owners
+
+.github/CODEOWNERS is one line, `* @LOGIN`, which asks LOGIN to review every pull request. GitHub requests review only from a user or a team that has write access to the repository (a user may also be named by an email address on their account), never from an organization: a line that names anything else (an organization, a user without Write, a secret team or a team without Write) assigns no code owner, and the only sign is the error GitHub lists on the file's page and through its API. So template-init writes the owner's login in a personal copy and, in an organization's copy, the login of the user whose push made the copy, which is whoever pressed "Use this template". A copy made by an app has no such user; template-init then leaves the organization's name in the line and says so in its run's log.
+
+Check it once: open .github/CODEOWNERS on GitHub, which marks a line it cannot resolve, or run `gh api repos/{{REPO}}/codeowners/errors`, which prints `{"errors":[]}` when every owner resolves; scripts/setup-repo.sh runs the same check. To fix the line, or to hand review to a team instead of one person, change it by pull request to `* @LOGIN` or, in an organization's copy, `* @{{OWNER}}/TEAM`, where the team is visible and has Write on this repository, and say so in docs/project.md under Owners and in docs/agents/OWNERSHIP.md. Review by a code owner is only asked for, not required, until a ruleset requires it; docs/setup/ruleset-main.json does not.

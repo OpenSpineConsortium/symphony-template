@@ -2,9 +2,13 @@
 
 "Use this template" copies the files with their placeholders still in them.
 This script, run once by .github/workflows/template-init.yml on the first
-push, fills the five placeholders in every text file outside
+push, fills the six placeholders in every text file outside
 .github/workflows/, removes the marker folder .template/ and, with a token,
 makes the labels the board uses and opens the "Set up this project" issue.
+The code owner .github/CODEOWNERS names is the owner in a personal copy and,
+in an organization's copy, the user whose push made it, read from the event
+that started the run: GitHub asks a user or a team for review, never an
+organization.
 The workflows are never written: they carry no placeholder, and the
 GITHUB_TOKEN the workflow runs with may not create, change or delete a file
 under .github/workflows/, so the init workflow stays in the tree and ends
@@ -29,10 +33,14 @@ API = "https://api.github.com"
 API_VERSION = "2022-11-28"
 USER_AGENT = "sdlc-template-init"
 TIMEOUT = 60
-PLACEHOLDER_NAMES = ("PROJECT_NAME", "REPO", "OWNER", "DEFAULT_BRANCH", "YEAR")
+PLACEHOLDER_NAMES = ("PROJECT_NAME", "REPO", "OWNER", "CODE_OWNER", "DEFAULT_BRANCH", "YEAR")
 REMOVED = (".template",)
 WORKFLOWS = (".github", "workflows")
 WORKFLOWS_NOTE = "(workflows are left as they are: GITHUB_TOKEN may not write them)"
+NO_CODE_OWNER_NOTE = (
+    "(.github/CODEOWNERS names the organization, which GitHub never asks for review, because"
+    " no user made this copy: replace it with a user or a team, docs/setup/github.md section 7)"
+)
 SETUP_ISSUE_TITLE = "Set up this project"
 # The labels GitHub Issues needs to be the queue, and the two team mode
 # adds: name, colour, description.
@@ -57,8 +65,9 @@ def placeholder(name):
     return "{{" + name + "}}"
 
 
-def values(repo, default_branch, year):
-    """What each placeholder becomes."""
+def values(repo, default_branch, year, code_owner=None):
+    """What each placeholder becomes. The code owner is the owner unless
+    another login is given."""
     owner, _, name = repo.partition("/")
     if not owner or not name or "/" in name:
         raise InitError(f"--repo must be OWNER/NAME, not {repo!r}")
@@ -66,9 +75,60 @@ def values(repo, default_branch, year):
         placeholder("PROJECT_NAME"): name,
         placeholder("REPO"): repo,
         placeholder("OWNER"): owner,
+        placeholder("CODE_OWNER"): code_owner or owner,
         placeholder("DEFAULT_BRANCH"): default_branch,
         placeholder("YEAR"): str(year),
     }
+
+
+def read_event(path):
+    """The event that started this workflow run, from the file Actions names
+    in GITHUB_EVENT_PATH; empty without a path or when the file is not a
+    JSON object."""
+    if not path:
+        return {}
+    try:
+        event = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return event if isinstance(event, dict) else {}
+
+
+def is_organization_copy(repo, event):
+    """Whether the event says this repository belongs to an organization. An
+    event about another repository says nothing about this one."""
+    repository = event.get("repository")
+    if not isinstance(repository, dict) or str(repository.get("full_name", "")).lower() != repo.lower():
+        return False
+    owner = repository.get("owner")
+    return isinstance(owner, dict) and owner.get("type") == "Organization"
+
+
+def pushing_user(event):
+    """The login of the user who sent the event, or None when an app or a
+    bot sent it, since neither can be a code owner."""
+    sender = event.get("sender")
+    if isinstance(sender, dict) and sender.get("type") == "User" and sender.get("login"):
+        return str(sender["login"])
+    return None
+
+
+def code_owner(repo, event):
+    """The login .github/CODEOWNERS names, or None when nobody fits.
+
+    GitHub requests review only from a user or a team with write access,
+    never from an organization, so `* @ORG` asks nobody. In a personal copy
+    the owner fits. In an organization's copy the user whose push started
+    this run does: "Use this template" makes the copy's first commit as the
+    person who made the repository, the GITHUB_ACTOR of that run. An
+    organization's copy made by an app has no such person, and None says
+    so; without an event the run cannot tell an organization from a user
+    and keeps the owner.
+    """
+    owner = repo.partition("/")[0]
+    if not is_organization_copy(repo, event):
+        return owner
+    return pushing_user(event)
 
 
 def is_removed(rel):
@@ -250,7 +310,7 @@ def setup_issue_body(repo, default_branch, app_link=APP_INSTALL):
         "who each work on their own Claude account, run `python3 scripts/crowd.py setup` instead, which rewrites "
         f"this checklist ([docs/setup/crowdsourcing.md]({base}/docs/setup/crowdsourcing.md)):",
         "",
-        f"- [ ] Run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand: import the branch rules under [Rules]({settings}/rules) (New ruleset, Import a ruleset, docs/setup/ruleset-main.json from your clone), tick \"Automatically delete head branches\" and \"Allow auto-merge\" under [General]({settings}), turn on secret scanning and push protection under [Code security]({settings}/security_analysis), and check the seven labels under [Labels](https://github.com/{repo}/labels) ([docs/setup/github.md]({base}/docs/setup/github.md)).",
+        f"- [ ] Run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand: import the branch rules under [Rules]({settings}/rules) (New ruleset, Import a ruleset, docs/setup/ruleset-main.json from your clone), tick \"Automatically delete head branches\" and \"Allow auto-merge\" under [General]({settings}), turn on secret scanning and push protection under [Code security]({settings}/security_analysis), check the seven labels under [Labels](https://github.com/{repo}/labels), and open [.github/CODEOWNERS]({base}/.github/CODEOWNERS) to see that GitHub marks no line of it as an error ([docs/setup/github.md]({base}/docs/setup/github.md), section 7).",
         f"- [ ] One OAuth flow for the Claude side: from Claude Code signed in as the main account, run /install-github-app and pick this repository; it installs the Claude GitHub App and writes the secret CLAUDE_CODE_OAUTH_TOKEN, which turns on @claude. By hand: [install the app]({app_link}), then run `claude setup-token` and paste the token as a [new repository secret]({settings}/secrets/actions/new) named CLAUDE_CODE_OAUTH_TOKEN ([docs/setup/claude-action.md]({base}/docs/setup/claude-action.md)).",
         f"- [ ] Make the thin Project for each Claude account ([docs/setup/claude-project.md]({base}/docs/setup/claude-project.md)).",
         f"- [ ] Make the worker routine in the main account's Project ([docs/agents/routines/worker.md]({base}/docs/agents/routines/worker.md)), or run it from Actions instead: a [new repository variable]({settings}/variables/actions/new) named CLAUDE_WORKER with the value true, and another named CLAUDE_TEAM with a JSON list of member names to run a team with a lead ([docs/agents/TEAM.md]({base}/docs/agents/TEAM.md)); the coordinator ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)) joins once a second account does.",
@@ -288,6 +348,8 @@ def parse_args(argv):
     parser.add_argument("--root", default=".", help="the repository root (default: the current directory)")
     parser.add_argument("--create-labels", action="store_true", help="make the board's labels through the API (needs GITHUB_TOKEN)")
     parser.add_argument("--open-issue", action="store_true", help="open the setup issue through the API (needs GITHUB_TOKEN)")
+    parser.add_argument("--event", default=os.environ.get("GITHUB_EVENT_PATH", ""),
+                        help="the event file of the run, which says who made an organization's copy (default: $GITHUB_EVENT_PATH, set by Actions)")
     return parser.parse_args(argv)
 
 
@@ -295,12 +357,15 @@ def main(argv=None):
     args = parse_args(argv)
     root = Path(args.root).resolve()
     try:
-        mapping = values(args.repo, args.default_branch, args.year)
+        person = code_owner(args.repo, read_event(args.event))
+        mapping = values(args.repo, args.default_branch, args.year, person)
         filled = fill_tree(root, mapping)
         for path in filled:
             print(f"{path}: filled")
         if filled:
             print(WORKFLOWS_NOTE)
+        if filled and person is None:
+            print(NO_CODE_OWNER_NOTE)
         for path in remove_template_files(root):
             print(f"{path}: deleted")
         for path in reset_checkpoint(root):

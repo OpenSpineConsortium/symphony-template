@@ -398,10 +398,15 @@ CROWD_MODE_BLOCK = "\n".join([
     "  - Heavy commands run under a time and a memory limit (timeout, ulimit).",
 ])
 OLD_OWNERS = "\n".join([
-    "- Repository owner: {OWNER}, who merges to {DEFAULT_BRANCH}; .github/CODEOWNERS names the same login.",
+    "- Repository owner: {OWNER}, who merges to {DEFAULT_BRANCH}; .github/CODEOWNERS names {CODE_OWNER}, the owner's own login, "
+    "or in an organization's copy the person who made the copy, because GitHub asks a user or a team for review and never "
+    "an organization (docs/setup/github.md, section 7).",
     "- Main Claude account: the first account, whose Project runs the worker routine (docs/agents/routines/worker.md) and, once a second account joins, the coordinator (docs/agents/routines/coordinator.md); its label is account:main.",
     "- Other accounts: none yet. Each gets a label of its own (docs/setup/github.md, Labels) and a row in docs/agents/OWNERSHIP.md.",
 ])
+# The login template-init wrote as the copy's code owner: the owner, or in an
+# organization's copy the person who made it, which only the copy knows.
+CODE_OWNER_NAMED = re.compile(r"\.github/CODEOWNERS names (\S+), the owner's own login")
 NEW_OWNERS = "\n".join([
     "- Repository owner: {OWNER_LOGIN}, who reviews and merges the shared paths .github/CODEOWNERS gives the owner alone; everything reaches {DEFAULT_BRANCH} by pull request.",
     "- Reviewers: the team {OWNER}/maintainers reviews and merges everything else, and each area's team reviews its own folders (docs/agents/OWNERSHIP.md); nobody merges their own pull request, except {OWNER_LOGIN} for the shared paths.",
@@ -577,7 +582,8 @@ def crowd_project(text, repo, default_branch, owner_login, misses):
         text = MODE_OFF_LINE.sub(lambda match: CROWD_MODE_BLOCK, text, count=1)
     elif mode is None:
         text = text.rstrip("\n") + "\n\n## Crowd mode\n\n" + CROWD_MODE_BLOCK + "\n"
-    old = filled(OLD_OWNERS, repo, default_branch)
+    named = CODE_OWNER_NAMED.search(text)
+    old = filled(OLD_OWNERS, repo, default_branch, **({"CODE_OWNER": named.group(1)} if named else {}))
     new = filled(NEW_OWNERS, repo, default_branch, OWNER_LOGIN=owner_login)
     return advisory(text, old, new, Miss(PROJECT, "the three bullets under Owners", new), misses)
 
