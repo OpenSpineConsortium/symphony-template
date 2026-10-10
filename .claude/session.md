@@ -47,6 +47,25 @@ The owner's steps are in docs/setup/owner-checklist.md.
   on the GitHub App (manifest flow, create-github-app-token, check runs,
   rulesets, webhooks), was still running and its notes may be missing.
 
+## Progress since the first checkpoint (2026-10-10, on Opus)
+
+- Task 1 is done: the trace integration finished green (679 tests) and is
+  pushed on claude/10; production tracing costs about one function call.
+  One gap it noted: run.py --debug does not yet put COORD_TRACE=debug into
+  the agents' containers or the session driver's wrappers.
+- coordbench: `experiment/`'s history (13 commits) is pushed to the branch
+  claude/split of OpenSpineConsortium/coordbench, now its default branch;
+  a reshape (kit under bench/cooperbench/, tests, CI, CLAUDE.md) was
+  running on that branch. The bench adapter interface and the template
+  copy are later work.
+- sdlc-marketplace: a build was running toward the branch claude/init.
+- sdlc-protocol: the extraction was resumed on Opus; work in progress is on
+  its branch wip/extract (its default branch for now).
+- The push guard refuses any push to a branch named main, so the four new
+  repositories got their first branch under another name. Owner step,
+  once per repository: Settings, Branches, rename the default branch to
+  main (GitHub redirects the old name).
+
 ## Current state (in flight when the session stopped)
 
 - Trace instrumentation on claude/10: four build agents finished green
