@@ -87,11 +87,18 @@ jobs:
         with:
           ref: ${{ env.DEFAULT_BRANCH }}
 
-      - name: Stop in the template repository itself
+      # The checkout is the default branch, so on a pull request that brings
+      # the board (a setup branch, an adoption) the tool is not there yet:
+      # that run is skipped, not red, and the first run after the merge
+      # renders the board.
+      - name: Stop in the template itself, or before the board's tool has landed
         id: gate
         run: |
           if [ -e .template/PENDING ]; then
             echo "the template itself, or a copy not yet initialised; no board"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif [ ! -f tools/board.py ]; then
+            echo "the default branch has no tools/board.py yet; no board until the pull request that brings it is merged"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 

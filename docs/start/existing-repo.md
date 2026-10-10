@@ -77,7 +77,7 @@ A repository not made from the template takes the protocol in two halves. The sd
    gh pr create --fill
    ```
 
-   Until the merge, the Board runs started by the branch and its pull request are red, because the job checks out the default branch, which has no tools/board.py yet; that is expected. Once it is merged, the next issue event runs "Board" (https://github.com/ORG/NAME/actions/workflows/board.yml; `gh workflow run board.yml --repo ORG/NAME` starts one now), and you should see the board at https://github.com/ORG/NAME/blob/board/STATE.md.
+   Until the merge, the Board runs started by the branch and its pull request are skipped, since the job checks out the default branch, which has no tools/board.py yet. Once it is merged, the next issue event runs "Board" (https://github.com/ORG/NAME/actions/workflows/board.yml; `gh workflow run board.yml --repo ORG/NAME` starts one now), and you should see the board at https://github.com/ORG/NAME/blob/board/STATE.md.
 
 8. **Protect the default branch, and only it,** at https://github.com/ORG/NAME/settings/rules: require a pull request and your own checks, and block force pushes and deletions. Never target the branch `board`, which board.yml force-pushes on every change. The template's docs/setup/ruleset-main.json requires a check named "check", which this repository has only if its CI has a job of that name. A private repository needs GitHub Pro, Team or Enterprise for the ruleset to be enforced; on Free it is saved and ignored ([tiers.md](../setup/tiers.md)).
 
