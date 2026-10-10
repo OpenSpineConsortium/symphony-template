@@ -34,7 +34,12 @@ Run `bash scripts/check.sh` before opening or updating a pull request. CI runs t
 Read `.claude/session.md` at the start of a session: it holds the completed work, the current state and the remaining tasks. Tag durable facts in conversation as `Decision:` or `Constraint:` so the next `cswap checkpoint write` keeps them.
 
 ### Durable decisions
-- (none recorded)
+- Prefer GitHub's native, free features; no API billing: Claude in CI runs on a subscription OAuth token.
+- A protocol change is made in OpenSpineConsortium/sdlc-protocol and reaches every consumer by its sync on one push (ecosystem.json, sync.yml).
+- coordbench measures what CooperBench measures, as CooperBench 63b9d44 does, differing only with a stated reason (PARITY.md); model-judged measures run only on purpose, never with ANTHROPIC_API_KEY.
+- Crowdsourcing: each contributor works under their own Claude account and the project never holds anyone's credential; crowd mode (scripts/crowd.py, CLAUDE_CROWD) enforces it.
 ### Constraints
-- (none recorded)
+- The cloud environment blocks cooperbench.com, arxiv.org and cursor.com; CooperBench's paper and data come from the GitHub repository cooperbench/website.
+- The cloud environment withholds CLAUDE_CODE_OAUTH_TOKEN; coordbench reads COORDBENCH_CLAUDE_TOKEN, each account its own.
+- sdlc-template is internal to its enterprise; outsiders need a public copy.
 <!-- cswap:checkpoint:end -->
