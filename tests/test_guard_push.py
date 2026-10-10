@@ -81,8 +81,38 @@ class ParsingTest(unittest.TestCase):
     def test_other_git_verbs_are_not_pushes(self):
         self.assertIsNone(guard_push.push_arguments(["git", "pull", "origin", "main"]))
 
+    def test_a_newline_ends_a_command(self):
+        commands = guard_push.simple_commands("git add -A\ngit commit -m x\ngit push origin main")
+        self.assertEqual(commands, [["git", "add", "-A"], ["git", "commit", "-m", "x"],
+                                    ["git", "push", "origin", "main"]])
+
+    def test_a_comment_ends_at_its_newline(self):
+        for command in ("git status # look first\ngit push origin main",
+                        "# look first\ngit push origin main",
+                        "true; # a note ending in a backslash \\\ngit push origin main"):
+            self.assertEqual(guard_push.simple_commands(command)[-1],
+                             ["git", "push", "origin", "main"], command)
+
+    def test_a_hash_inside_a_word_or_quotes_is_not_a_comment(self):
+        for command in ("git commit -m 'Claim #7' && git push origin main",
+                        "echo a#b; git push origin main"):
+            self.assertEqual(guard_push.simple_commands(command)[-1],
+                             ["git", "push", "origin", "main"], command)
+
+    def test_a_backslash_newline_joins_two_lines(self):
+        self.assertEqual(guard_push.simple_commands("git push \\\n  origin main"),
+                         [["git", "push", "origin", "main"]])
+
+    def test_a_newline_inside_quotes_stays_inside_the_word(self):
+        for command in ("git commit -m 'one\ngit push origin main' && git push -u origin claude/7",
+                        'git commit -m "one\ngit push origin main" && git push -u origin claude/7'):
+            commands = guard_push.simple_commands(command)
+            self.assertEqual(commands[0], ["git", "commit", "-m", "one\ngit push origin main"], command)
+            self.assertEqual(commands[1], ["git", "push", "-u", "origin", "claude/7"], command)
+
     def test_unparseable_command_yields_nothing(self):
         self.assertEqual(guard_push.simple_commands("git push 'unclosed"), [])
+        self.assertEqual(guard_push.simple_commands("echo 'unclosed\ngit push origin main"), [])
 
 
 class MainTest(unittest.TestCase):
@@ -104,6 +134,28 @@ class MainTest(unittest.TestCase):
         code, message = self.run_main("git push -u origin claude/7")
         self.assertEqual(code, 0)
         self.assertEqual(message, "")
+
+    def test_push_to_main_on_a_later_line_is_refused(self):
+        code, message = self.run_main("git add -A\ngit commit -m x\ngit push origin main")
+        self.assertEqual(code, 2)
+        self.assertIn("pull requests", message)
+
+    def test_claim_push_then_a_line_naming_main_passes(self):
+        for command in ("git push -u origin claude/7\ngit fetch origin main",
+                        "git push -u origin claude/7\n# then open the pull request against main",
+                        "git push -u origin claude/7 # not main"):
+            self.assertEqual(self.run_main(command), (0, ""), command)
+
+    def test_a_here_document_body_is_read_as_commands(self):
+        """The trade the docstring states: the hook reads no here-documents,
+        so a body line that starts a push to main is refused and the person
+        rephrases it, while a body that names no push passes as before."""
+        refused, message = self.run_main("git commit -F - <<'EOF'\nClaim #7\n\ngit push origin main\nEOF\n"
+                                         "git push -u origin claude/7")
+        self.assertEqual(refused, 2)
+        self.assertIn("pull requests", message)
+        self.assertEqual(self.run_main("git commit -F - <<'EOF'\nClaim #7\n\nThe board first.\nEOF\n"
+                                       "git push -u origin claude/7"), (0, ""))
 
     def test_command_without_push_passes_without_git(self):
         payload = json.dumps({"tool_input": {"command": "git status"}})
