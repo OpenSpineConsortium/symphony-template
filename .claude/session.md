@@ -111,6 +111,24 @@ The owner's steps are in docs/setup/owner-checklist.md.
   branches to main, release sdlc-protocol v0.1.0, register the App, merge
   #12), after which a session marks #13 ready.
 
+## Done on 2026-10-10, after the owner's steps
+
+- The owner registered the GitHub App OpenSpine SDLC (slug openspine-sdlc,
+  id 5258276; "sdlc" is held by the account @sdlc), set SDLC_APP_ID and
+  SDLC_APP_PRIVATE_KEY on sdlc-template, merged sdlc-app#1 and #12, made the
+  release v0.1.0 of sdlc-protocol, and every new repository's default
+  branch is main.
+- claude/10 merged main (#12), tools/guard_push.py became a shim over the
+  vendored guard (tests/test_guard_push.py passes unchanged against it),
+  the claim file is deleted and #13 is marked ready. The plugin's, the
+  App's and coordbench's vendored copies are byte-identical to v0.1.0.
+- Left for later, none blocking: run the App's webhook server somewhere
+  public (stage 2) and require the check sdlc/protocol; organization-wide
+  SDLC_APP_ID and SDLC_APP_PRIVATE_KEY need gh's admin:org scope from an
+  owner; sdlc-protocol's parity tests should read the template's tools
+  from the commit before the shims; the bench adapter interface and the
+  template copy in coordbench; check_suite rerequested in the App.
+
 ## Remaining tasks
 
 1. claude/10, after #12 merges: rebase on main, turn tools/guard_push.py
