@@ -1,6 +1,6 @@
 # Benchmark coordination with coordbench
 
-[OpenSpineConsortium/coordbench](https://github.com/OpenSpineConsortium/coordbench) keeps the task, the agents and the scoring fixed and swaps the way agents coordinate (an arm: solo, coop, coop-nocomm, coop-git, team, sdlc, sdlc-watch), so two ways can be compared on the same work: CooperBench's task pairs, scored by CooperBench's own evaluation. The agents are headless Claude Code on your own subscription, started in Docker inside one cloud session, which itself only drives shell scripts. You need Claude Pro, Max or Team, or an Enterprise seat with Claude Code (on Team and Enterprise an Owner first turns on the GitHub connector at https://claude.ai/admin-settings/connectors); a GitHub account connected at https://claude.ai/code (Sign in with GitHub), since a cloud session cannot start without one; and, unless you have Write on coordbench, a fork of it (https://github.com/OpenSpineConsortium/coordbench/fork) to push the results to, since step 7 gets the results page out of the session's VM by a push to a branch. The repository is public, so reading it needs nothing more.
+[OpenSpineConsortium/coordbench](https://github.com/OpenSpineConsortium/coordbench) keeps the task, the agents and the scoring fixed and swaps the way agents coordinate (an arm: solo, coop, coop-nocomm, coop-git, team, sdlc, sdlc-watch), so two ways can be compared on the same work: CooperBench's task pairs, scored by CooperBench's own evaluation. The agents are headless Claude Code on your own subscription, started in Docker inside one cloud session, which itself only drives shell scripts. You need Claude Pro, Max or Team, or an Enterprise seat with Claude Code (on Team and Enterprise an Owner first turns on the GitHub connector at https://claude.ai/admin-settings/connectors); a GitHub account connected at https://claude.ai/code (Sign in with GitHub), since a cloud session cannot start without one; unless you have Write on coordbench, a fork of it (https://github.com/OpenSpineConsortium/coordbench/fork) to push the results to, since step 7 gets the results page out of the session's VM by a push to a branch; and the Claude GitHub App installed on the repository the session pushes to (https://github.com/apps/claude/installations/new, Only select repositories), unless you connected GitHub with `/web-setup`, since a session connected through the App pushes with the App's token, which writes only where the App is installed. The repository is public, so reading it needs nothing more.
 
 ## Steps
 
@@ -25,9 +25,9 @@
 
    Press "Create environment". Put it under Environment variables, not Network secrets: a network secret is never attached to requests for api.anthropic.com, which is where the agents send it. Not as CLAUDE_CODE_OAUTH_TOKEN either: the environment withholds that name from the session, since it runs the session's own Claude Code, and run.py copies the alias to it for the agents. Leave ANTHROPIC_API_KEY unset: CooperBench's adapter prefers it, and it bills the API. Keep the environment personal, never shared: anyone who uses an environment reads its variables. The seven pairs of three tasks that do not grade need openaipublic.blob.core.windows.net, huggingface.co and pypi.nvidia.com (Custom network access, with the default package managers kept), and then their downloads baked into the task images (coordbench's bench/cooperbench/README.md).
 
-3. **Start a new session on coordbench in that environment,** since a session reads the variables when it starts: https://claude.ai/code?repositories=OpenSpineConsortium/coordbench&environment=coordbench (or your fork, step 7). Paste the smoke-test prompt from [prompts.md](prompts.md), or run steps 4 and 5 yourself.
+3. **Start a new session on coordbench in that environment,** since a session reads the variables when it starts: https://claude.ai/code?repositories=OpenSpineConsortium/coordbench&environment=coordbench (or your fork, step 7). Paste the smoke-test prompt from [prompts.md](prompts.md), or ask the session to run the commands of steps 4 and 5 one at a time: a cloud session has no shell of its own, so Claude runs every command.
 
-4. **Set up and prepare one task,** in the session:
+4. **Set up and prepare one task.** Ask the session to run:
 
    ```bash
    bash bench/cooperbench/setup.sh
@@ -43,7 +43,7 @@
    python3 bench/cooperbench/report.py --run solo=smoke-solo
    ```
 
-   You should see a last line beginning `timings:` and then the report, with the pair under ~/cooperbench/logs/smoke-solo/solo/pallets_click_task/2068/f1_f6/ (result.json, eval.json, the agent's trajectory). For the protocol itself, the same pair under the sdlc arm: `--arm sdlc --name smoke-sdlc`, two agents.
+   You should see, near the end of run.py's output, `coordbench run: solo-2068-f1_f6-<id>: timings: ...`, then `coordbench run: pallets_click_task/2068 f1_f6: pass` (fail is a pair whose patches failed CooperBench's tests; error means the run itself broke), and last `coordbench run: summary: 1 completed, ...`; then the report, with the pair under ~/cooperbench/logs/smoke-solo/solo/pallets_click_task/2068/f1_f6/ (result.json, eval.json, the agent's trajectory). For the protocol itself, the same pair under the sdlc arm: `--arm sdlc --name smoke-sdlc`, two agents.
 
 6. **The pilot: six arms on one task.** solo, coop, coop-nocomm, coop-git, team and sdlc over the task's flash pairs, then the report and the free heuristics judge:
 
@@ -51,7 +51,7 @@
    bash bench/cooperbench/pilot.sh pallets_click_task 2068 pilot
    ```
 
-   The report lands at ~/cooperbench/logs/pilot-report.md. A session's background command stops after 30 minutes unless Claude starts it with a longer timeout, at most two hours (7200000 ms), and the pilot can take longer than that; ask for the two-hour timeout, as the pilot prompt in [prompts.md](prompts.md) does, and when it stops run the same command again: it carries on, since finished pairs are kept. When you are done with a task, free the disk for the next: `docker rmi akhatua/cooperbench-pallets-click:task2068`.
+   The report lands at ~/cooperbench/logs/pilot-report.md. A session's background command stops after 30 minutes unless Claude starts it with a longer timeout, at most two hours (7200000 ms), and the pilot can take longer than that; ask for the two-hour timeout, as the pilot prompt in [prompts.md](prompts.md) does, and when it stops, first remove the agent containers the stopped run left behind, which would otherwise keep running on your usage and the session's CPU for up to two more hours (`docker ps -aq --filter label=coordbench.run | xargs -r docker rm -f`; Redis and the git server carry no such label and stay), then run the same command again: it carries on, since finished pairs are kept. When you are done with a task, free the disk for the next: `docker rmi akhatua/cooperbench-pallets-click:task2068`.
 
 7. **Read the results.** None of these calls a model:
 
@@ -61,7 +61,7 @@
    python3 coordbench/judge.py heuristics ~/cooperbench/logs/pilot-sdlc
    ```
 
-   report.py sets the arms side by side with CooperBench's own rates and intervals. compare.py writes one HTML page with the runs embedded, which opens from disk with no server and no network; to look at it, the page has to leave the VM: have the session commit it to a branch of its own (never main) and push, then download it from the file's page on GitHub and open it in a browser. That push needs Write on the repository the session runs on, so without Write on coordbench run the session on your own fork (https://github.com/OpenSpineConsortium/coordbench/fork). `python3 coordbench/export.py <pair dir> --site OUT` lays runs out for CooperBench's own viewer instead (coordbench/viewer/README.md). judge.py's other sections (commerrors, symptoms, speechacts, emergent) do call a model, on your subscription through the same token; run them only on purpose, with `--dry-run` first to see what would be sent.
+   report.py sets the arms side by side with CooperBench's own rates and intervals. compare.py writes one HTML page with the runs embedded, which opens from disk with no server and no network; to look at it, the page has to leave the VM: have the session commit it to a branch of its own (never main) and push, then download it from the file's page on GitHub and open it in a browser. That push needs Write on the repository the session runs on, so without Write on coordbench run the session on your own fork (https://github.com/OpenSpineConsortium/coordbench/fork). It also needs the Claude GitHub App installed on the repository the session pushes to (https://github.com/apps/claude/installations/new), unless you connected GitHub with `/web-setup`, since the App's token writes only where the App is installed. `python3 coordbench/export.py <pair dir> --site OUT` lays runs out for CooperBench's own viewer instead (coordbench/viewer/README.md). judge.py's other sections (commerrors, symptoms, speechacts, emergent) do call a model, on your subscription through the same token; run them only on purpose, with `--dry-run` first to see what would be sent.
 
 ## What it costs
 

@@ -4,37 +4,42 @@ You make a repository from the template, set its GitHub side in one command, cla
 
 ## Once per machine
 
-Claude Code, signed in to your own claude.ai account; the GitHub CLI, signed in to your own GitHub login; git; and Python 3.12 or later, since setup-repo.sh, crowd.py, scripts/check.sh and the hooks run `python3`. First the tools, with the line for your system. macOS, with Homebrew (https://brew.sh):
+Claude Code, signed in to your own claude.ai account; the GitHub CLI, signed in to your own GitHub login; git; and Python 3.12 or later, since setup-repo.sh, crowd.py, scripts/check.sh and the hooks run `python3`. On Windows, do all of it inside WSL (`wsl --install`, then everything below in its terminal): the scripts and the hooks need bash and python3, and what you install and sign in to from PowerShell is not what WSL runs. First the tools, with the line for your system. macOS, with Homebrew (https://brew.sh):
 
 ```bash
 brew install gh git python
 ```
 
-Debian or Ubuntu, WSL included (the python3 of Ubuntu 24.04 and later is 3.12 or newer; where apt has no gh, follow https://github.com/cli/cli/blob/trunk/docs/install_linux.md):
+Debian or Ubuntu, WSL included. Add GitHub's own apt repository first, the "Recommended (Official)" lines of https://github.com/cli/cli/blob/trunk/docs/install_linux.md, because the distribution's gh (2.45 on Ubuntu 24.04) is older than the 2.65 that setup-repo.sh's secret-scanning flags need; then:
 
 ```bash
 sudo apt update && sudo apt install gh git python3
 ```
 
-Then Claude Code and the two sign-ins. Bash (macOS, Linux, WSL):
+The python3 of Debian 13, and of Ubuntu 24.04 and later, is 3.12 or newer. Debian 12's is 3.11 and Ubuntu 22.04's 3.10: there, install 3.12 or later yourself (https://www.python.org/downloads/) and see that `python3` runs the one you installed, since the scripts and the hooks call it by that name.
+
+Then Claude Code. Bash (macOS, Linux, WSL):
 
 ```bash
 curl -fsSL https://claude.ai/install.sh | bash
-claude
-gh auth login
 ```
 
-PowerShell (Windows), where the bash blocks below run in WSL (`wsl --install`, then the Debian or Ubuntu line inside it):
+PowerShell, only for the route without WSL in step 3, which needs git and gh in Windows as well:
 
 ```powershell
 irm https://claude.ai/install.ps1 | iex
 winget install --id Git.Git
 winget install --id GitHub.cli
+```
+
+Open a new terminal, so the installs are on its path, and sign in to both, the same two lines in bash and in PowerShell; `claude` opens a browser:
+
+```bash
 claude
 gh auth login
 ```
 
-After the installs, open a new terminal so they are on its path; `claude` then opens a browser to sign in. You should see your account under "Login method" when you type `/status` in Claude Code, "Logged in to github.com" from `gh auth status`, and 3.12 or higher from `python3 --version`.
+You should see your account under "Login method" when you type `/status` in Claude Code, "Logged in to github.com" from `gh auth status`, 2.65 or higher from `gh --version`, and 3.12 or higher from `python3 --version`.
 
 ## Steps
 
@@ -51,6 +56,11 @@ After the installs, open a new terminal so they are on its path; `claude` then o
    gh repo clone ORG/NAME
    cd NAME
    GITHUB_TOKEN=$(gh auth token) python3 tools/template_init.py --repo ORG/NAME --default-branch main --create-labels --open-issue
+   ```
+
+   Run from a clone, the script has no push event to say who made an organization's copy, so in an organization's copy it writes `* @ORG` into .github/CODEOWNERS, which asks nobody for review: change that line to `* @LOGIN`, your own GitHub login (`gh api user --jq .login`), before you commit. Then:
+
+   ```bash
    git add -A
    git commit -m "Initialise from the template"
    git push origin main
@@ -58,22 +68,24 @@ After the installs, open a new terminal so they are on its path; `claude` then o
 
 3. **The GitHub side, in one command, on your own computer.** A cloud session cannot run it: its GitHub proxy refuses gh's GraphQL commands, and the session has no admin rights. Leave out the first two lines if step 2 already made the clone. In a second terminal run `claude setup-token`, approve it in the browser, and paste the token it prints at the hidden prompt of the first; nothing you paste is shown or saved.
 
+   `--token` stores that token as the repository's secret CLAUDE_CODE_OAUTH_TOKEN, which stays yours only while you are the repository's one writer: anyone with Write can push a workflow that reads it, and every writer's @claude comment spends your plan ([README.md](README.md), Accounts and tokens). A repository in an organization has writers you did not add: the organization's owners are admins of every repository in it, and its base permission can give every member Write. So in an organization, first open https://github.com/ORG/NAME/settings/access, the owners at https://github.com/orgs/ORG/people?query=role%3Aowner and the base permission at https://github.com/organizations/ORG/settings/member_privileges; if anyone besides you can write, leave `--token` out and skip step 6 and step 7's Actions worker, which run on it ([team.md](team.md), step 1).
+
    ```bash
    gh repo clone ORG/NAME
    cd NAME
    bash scripts/setup-repo.sh --token
    ```
 
-   It touches [Rules](https://github.com/ORG/NAME/settings/rules), [General](https://github.com/ORG/NAME/settings), [Advanced Security](https://github.com/ORG/NAME/settings/security_analysis), [Labels](https://github.com/ORG/NAME/labels) and [Actions secrets](https://github.com/ORG/NAME/settings/secrets/actions). You should see one line per step, among them `ruleset "Protect the default branch": created from docs/setup/ruleset-main.json`, `general: delete head branches on merge, allow auto-merge: on`, `secret CLAUDE_CODE_OAUTH_TOKEN: set` and `code owners: GitHub resolves every owner in .github/CODEOWNERS`. On a private repository it also prints a note that GitHub Free does not enforce its ruleset, which does not hold in an organization of the enterprise. Run it again at any time; nothing is done twice.
+   It touches [Rules](https://github.com/ORG/NAME/settings/rules), [General](https://github.com/ORG/NAME/settings), [Advanced Security](https://github.com/ORG/NAME/settings/security_analysis), [Labels](https://github.com/ORG/NAME/labels) and [Actions secrets](https://github.com/ORG/NAME/settings/secrets/actions). You should see one line per step, among them `ruleset "Protect the default branch": created from docs/setup/ruleset-main.json`, `general: delete head branches on merge, allow auto-merge: on`, `secret CLAUDE_CODE_OAUTH_TOKEN: set` (`skipped` without `--token`) and `code owners: GitHub resolves every owner in .github/CODEOWNERS`. On a private repository it also prints a note that GitHub Free does not enforce its ruleset, which does not hold in an organization of the enterprise. Run it again at any time; nothing is done twice.
 
-   On Windows without WSL, store the token from PowerShell and do the rest by hand from the first box of "Set up this project"; gh asks for the value at a hidden prompt:
+   On Windows without WSL, store the token from PowerShell, under the same condition, and do the rest of this step by hand from the first box of "Set up this project"; gh asks for the value at a hidden prompt. That route also serves steps 4, 6 and 8, but step 5's local session and step 7's setup-repo.sh line need bash and python3, which WSL provides: without it, do step 5 from a cloud session, with the prompt in [README.md](README.md), step 5, and set step 7's variable at https://github.com/ORG/NAME/settings/variables/actions/new (CLAUDE_WORKER with `true`); its `gh workflow run` line runs in PowerShell.
 
    ```powershell
    claude setup-token
    gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo ORG/NAME
    ```
 
-4. **Install the Claude GitHub App.** Cloud sessions push through it, and Projects and routines need it. Follow "install the app" in the second box of "Set up this project", which usually has your repository already chosen (if not, pick it); or run `/install-github-app` in Claude Code in your clone, pick the repository, and choose "Skip for now" when it offers the GitHub Actions setup, since step 3 stored the token and .github/workflows/claude.yml is already here. You should see Claude at https://github.com/ORG/NAME/settings/installations. On an organization, an organization owner may need to approve the installation.
+4. **Install the Claude GitHub App.** Cloud sessions push through it, and Projects and routines need it. Follow "install the app" in the second box of "Set up this project", which usually has your repository already chosen (if not, pick it); or run `/install-github-app` in Claude Code in your clone, pick the repository, and choose "Skip for now" when it offers the GitHub Actions setup, since step 3 stored the token, or left it out on purpose, and .github/workflows/claude.yml is already here. You should see Claude at https://github.com/ORG/NAME/settings/installations. On an organization, an organization owner may need to approve the installation.
 
 5. **Open the first task and claim it.** Open https://github.com/ORG/NAME/issues/new?template=task.yml with the title "Task: write the goal", the goal "docs/project.md's Goal, Scope and Model and effort are written" and the acceptance "bash scripts/check.sh passes and the owner agrees". You should see it labelled todo, and a minute later in the Queue of the board at https://github.com/ORG/NAME/blob/board/STATE.md. Then, in your clone:
 
@@ -96,7 +108,7 @@ After the installs, open a new terminal so they are on its path; `claude` then o
    @claude summarise what this repository is for, in three sentences.
    ```
 
-   You should see a run of "Claude" at https://github.com/ORG/NAME/actions/workflows/claude.yml and its answer on the issue. Each run spends your own plan's usage (the five-hour window and the weekly limit), which is why the workflow caps its turns; only someone with write access starts it. Keep usage credits off unless you want overage billed at API rates.
+   You should see a run of "Claude" at https://github.com/ORG/NAME/actions/workflows/claude.yml and its answer on the issue. Each run spends your own plan's usage (the five-hour window and the weekly limit), which is why the workflow caps its turns. Only someone with write access starts it, and each of them spends your plan: that is why step 3 stores the token only while you are the one writer. Keep usage credits off unless you want overage billed at API rates.
 
 7. **Keep it going, optional: one worker, not two.** Either the Actions worker, which every six hours starts Claude only when the queue has work:
 
@@ -105,7 +117,7 @@ After the installs, open a new terminal so they are on its path; `claude` then o
    gh workflow run claude-worker.yml --repo ORG/NAME
    ```
 
-   (you should see a "Worker" run at https://github.com/ORG/NAME/actions/workflows/claude-worker.yml), or the worker routine on claude.ai, made as [docs/agents/routines/worker.md](../agents/routines/worker.md) says, with the line under "Add this line in a cloud session" in [prompts.md](prompts.md) added at the end of its prompt, since every run is a cloud session. Both on one account would race for the same queue under the same label.
+   (you should see a "Worker" run at https://github.com/ORG/NAME/actions/workflows/claude-worker.yml), or the worker routine on claude.ai, made as [docs/agents/routines/worker.md](../agents/routines/worker.md) says in the Project of step 8, so on Pro and Max do that step first; on Team and Enterprise, which have no Projects yet, make it at https://claude.ai/code/routines with New routine, the same prompt, the repository and a Schedule trigger, as [team.md](team.md), step 6 does for the coordinator. Either way, add the line under "Add this line in a cloud session" in [prompts.md](prompts.md) at the end of its prompt, since every run is a cloud session. Both on one account would race for the same queue under the same label.
 
 8. **A thin Project, optional (Pro and Max).** At https://claude.ai/code/projects/browse make a Project that links ORG/NAME and nothing else, with its instructions, description and memory left blank, since every thread reads them from the repository ([claude-project.md](../setup/claude-project.md)). Then close "Set up this project" when every box is ticked.
 

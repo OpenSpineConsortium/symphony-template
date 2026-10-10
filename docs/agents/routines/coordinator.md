@@ -8,10 +8,10 @@ Make the routine inside the main account's Project (docs/setup/claude-project.md
 
 ## Triggers to set
 
-The schedule exists from the moment the routine is made. Once it exists, open it on the Project's Routines tab and add the two other triggers there: the pull request events for {{REPO}}, and the API trigger, whose address and bearer token that page shows; copy those two into the repository secrets (docs/setup/github.md).
+The schedule exists from the moment the routine is made. Once it exists, open it on the Project's Routines tab and add the pull request events for {{REPO}} there. Add the third trigger, the API trigger, only while every writer of the repository is you: its address and its bearer token have to be repository secrets, which any writer's workflow can read, and each fire runs the routine on the main account's usage. docs/start/team.md, step 1, takes those secrets out before anyone else gets Write, and the hourly schedule then catches up with what the trigger would have woken early.
 
 - Pull request events on {{REPO}}: the routine runs when a pull request is opened, updated or closed.
-- The API trigger: copy its address and its bearer token into the repository secrets COORDINATOR_TRIGGER_URL and COORDINATOR_TRIGGER_TOKEN (docs/setup/github.md). .github/workflows/board.yml fires it only when a run changed the board, never when the board came out unchanged, so the routine's own labels and comments, each of which starts a board run, do not call it back in a chain. An API trigger takes at most 30 fires an hour per routine and 100 an hour per account; a busy hour loses the rest, and the next scheduled run catches up.
+- The API trigger, only where every writer is you: copy its address and its bearer token into the repository secrets COORDINATOR_TRIGGER_URL and COORDINATOR_TRIGGER_TOKEN (docs/setup/github.md). .github/workflows/board.yml fires it only when a run changed the board, never when the board came out unchanged, so the routine's own labels and comments, each of which starts a board run, do not call it back in a chain. An API trigger takes at most 30 fires an hour per routine and 100 an hour per account; a busy hour loses the rest, and the next scheduled run catches up.
 - A schedule, hourly, the shortest a routine allows: the floor that releases idle claims and tidies memory even when nothing happens on GitHub.
 
 ## The prompt

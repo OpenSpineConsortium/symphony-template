@@ -8,6 +8,7 @@ Each person brings their own Claude plan and their own GitHub login, and the rep
 
    ```bash
    gh secret delete CLAUDE_CODE_OAUTH_TOKEN --repo ORG/NAME
+   gh secret delete ANTHROPIC_API_KEY --repo ORG/NAME
    gh secret delete COORDINATOR_TRIGGER_URL --repo ORG/NAME
    gh secret delete COORDINATOR_TRIGGER_TOKEN --repo ORG/NAME
    gh secret delete SDLC_APP_PRIVATE_KEY --repo ORG/NAME
@@ -15,7 +16,7 @@ Each person brings their own Claude plan and their own GitHub login, and the rep
    gh variable delete CLAUDE_TEAM --repo ORG/NAME
    ```
 
-   The same lines run in PowerShell, and a name you never set only answers that it was not found. SDLC_APP_PRIVATE_KEY is the GitHub App's key, which only the first push's "Template init" run reads. A secret that comes from the organization is not deleted by these lines: take this repository off its list at https://github.com/organizations/ORG/settings/secrets/actions. You should see none of the four at https://github.com/ORG/NAME/settings/secrets/actions and neither variable at https://github.com/ORG/NAME/settings/variables/actions. From then on @claude, the Actions worker and team mode do nothing, and the board does not wake the coordinator; each person's own sessions and worker routine do the work, on their own plans. For volunteers in an organization, crowd mode ([crowd.md](crowd.md)) does the same and holds the repository to it, since its required check fails while any of these reaches it.
+   The same lines run in PowerShell, and a name you never set only answers that it was not found. SDLC_APP_PRIVATE_KEY is the GitHub App's key, which only the first push's "Template init" run reads; ANTHROPIC_API_KEY is there only if `/install-github-app` stored an API key instead of the token, and bills the API. A secret that comes from the organization is not deleted by these lines: at https://github.com/organizations/ORG/settings/secrets/actions open each of these names and look at its Repository access. "Selected repositories" has a list to take this repository off; "All repositories" and "Private repositories" have none, so change the policy to "Selected repositories" with every repository but this one, or delete the secret at the organization (`gh secret delete NAME --org ORG`). You should see none of the five at https://github.com/ORG/NAME/settings/secrets/actions and neither variable at https://github.com/ORG/NAME/settings/variables/actions. From then on @claude, the Actions worker and team mode do nothing, and the board does not wake the coordinator; each person's own sessions and worker routine do the work, on their own plans. For volunteers in an organization, crowd mode ([crowd.md](crowd.md)) does the same and holds the repository to it, since its required check fails while any of these reaches it.
 
 2. **Give each person Write.** A claim is a branch pushed to this repository, not to a fork: the protocol check refuses a claim whose branch lives elsewhere. At https://github.com/ORG/NAME/settings/access (Collaborators & teams), or:
 
@@ -33,15 +34,15 @@ Each person brings their own Claude plan and their own GitHub login, and the rep
 
    You should see it at https://github.com/ORG/NAME/labels beside account:main.
 
-4. **A row in OWNERSHIP.md, by pull request.** Open a Task issue at https://github.com/ORG/NAME/issues/new?template=task.yml asking for it, and in a session paste:
+4. **A row in OWNERSHIP.md, by pull request.** Open a Task issue at https://github.com/ORG/NAME/issues/new?template=task.yml asking for it, and in a session in your clone (`claude`) paste the prompt below; from a cloud session, add the line under "Add this line in a cloud session" in [prompts.md](prompts.md) after it, since gh issue and gh pr are refused there:
 
    ```
-   Claim issue N with the claim skill: add a row to docs/agents/OWNERSHIP.md for the account alice, label account:alice, owning the paths I name next, and say so in docs/project.md under Owners. Do not merge.
+   Claim issue N with the claim skill: add a row to docs/agents/OWNERSHIP.md for the account alice, label account:alice, owning the paths I name next; say so in docs/project.md under Owners; and add a line per path at the end of .github/CODEOWNERS naming @LOGIN beside the login already there, since GitHub uses only the last line that matches a file. Do not merge.
    ```
 
-   You should see the row on main once you merge it; a pull request touching another account's area then asks that account for a look.
+   You should see the row on main once you merge it; a pull request touching those paths then asks LOGIN for a look through CODEOWNERS, once they have accepted step 2's invitation, since GitHub asks only a user with Write.
 
-5. **Each person, once, on their own account.** Claude Pro or Max, or a Team or Enterprise seat with Claude Code; `claude` signed in as themselves; Sign in with GitHub at https://claude.ai/code; a cloud environment of their own ([parallel.md](parallel.md), step 1); a thin Project of their own on ORG/NAME, Pro and Max only ([claude-project.md](../setup/claude-project.md)); and, if they want work taken without starting sessions by hand, a worker routine made from [docs/agents/routines/worker.md](../agents/routines/worker.md) with `account:main` changed to their own label and the line under "Add this line in a cloud session" in [prompts.md](prompts.md) added at its end, since every run is a cloud session, where gh issue and gh pr are refused. In any session they start by hand, one sentence tells it whose claim it makes:
+5. **Each person, once, on their own account.** Claude Pro or Max, or a Team or Enterprise seat with Claude Code; `claude` signed in as themselves; Sign in with GitHub at https://claude.ai/code; a cloud environment of their own ([parallel.md](parallel.md), step 1); a thin Project of their own on ORG/NAME, Pro and Max only ([claude-project.md](../setup/claude-project.md)); and, if they want work taken without starting sessions by hand, a worker routine made from [docs/agents/routines/worker.md](../agents/routines/worker.md) with `account:main` changed to their own label and the line under "Add this line in a cloud session" in [prompts.md](prompts.md) added at its end, since every run is a cloud session, where gh issue and gh pr are refused. The worker is made in their Project, or, on Team and Enterprise, which have no Projects yet, at https://claude.ai/code/routines with New routine, that prompt, the repository, their own environment and an hourly Schedule trigger ([parallel.md](parallel.md), step 6). In any session they start by hand, one sentence tells it whose claim it makes:
 
    ```
    My account label is account:alice and the claim file's Account line is alice.

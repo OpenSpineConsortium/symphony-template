@@ -14,7 +14,7 @@ Put your repository for ORG/NAME (ORG is the user or the organization that owns 
 | https://github.com/ORG/NAME/settings/variables/actions | the same, Variables tab | CLAUDE_WORKER, CLAUDE_TEAM, CLAUDE_MAX_ROUNDS, CLAUDE_ALLOWED_TOOLS, CLAUDE_CROWD, SDLC_APP_ID |
 | https://github.com/ORG/NAME/settings/variables/actions/new | the same, New repository variable | one new variable |
 | https://github.com/ORG/NAME/settings/actions | Settings, Actions, General | whether Actions run, and the default token's rights |
-| https://github.com/ORG/NAME/settings/access | Settings, Collaborators & teams | Write for each person who claims issues |
+| https://github.com/ORG/NAME/settings/access | Settings, Collaborators & teams | Write for each person who claims issues, once the secrets above are out of the repository ([team.md](team.md), step 1) |
 | https://github.com/ORG/NAME/settings/installations | Settings, GitHub Apps | see that the Claude GitHub App reaches this repository |
 | https://github.com/ORG/NAME/labels | Issues, Labels | the seven labels, and `account:<name>` per account |
 | https://github.com/ORG/NAME/issues/new?template=task.yml | Issues, New issue, Task | a piece of work for the queue, labelled todo |

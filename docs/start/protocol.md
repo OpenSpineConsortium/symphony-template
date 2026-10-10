@@ -4,10 +4,10 @@ The claim protocol's rules (the labels, the claim, the board, the protocol check
 
 ## Steps
 
-1. **Branch in sdlc-protocol.**
+1. **Branch in a fork of sdlc-protocol.** Write on sdlc-protocol stays its owner's alone, because its Actions hold the App's key (the one-time setup below, step 2) and a writer's pull request runs the workflow that reads it. Everyone else works from a fork: `gh repo fork --clone` makes it, clones it and sets sdlc-protocol as `upstream`, the repository the pull request of step 3 opens in. The owner clones sdlc-protocol itself with `gh repo clone OpenSpineConsortium/sdlc-protocol`.
 
    ```bash
-   gh repo clone OpenSpineConsortium/sdlc-protocol
+   gh repo fork OpenSpineConsortium/sdlc-protocol --clone
    cd sdlc-protocol
    git switch -c my-change
    ```
@@ -29,7 +29,7 @@ The claim protocol's rules (the labels, the claim, the board, the protocol check
    gh pr create --fill
    ```
 
-   You should see the check `check` and one job per consumer, `downstream (sdlc-template)`, `downstream (coordbench)`, `downstream (sdlc-marketplace)` and `downstream (sdlc-app)`: each vendors your change into that repository's main and runs its own check there, so a change that would break a consumer is red before it merges.
+   You should see the check `check` and one job per consumer, `downstream (sdlc-template)`, `downstream (coordbench)`, `downstream (sdlc-marketplace)` and `downstream (sdlc-app)`: each vendors your change into that repository's main and runs its own check there, so a change that would break a consumer is red before it merges. A fork's pull request gets no secrets, so on it `downstream (sdlc-template)` and `downstream (sdlc-app)`, whose repositories are not public and are read only with the App's key, say they skipped and pass; the owner's own branch runs all four.
 
 4. **When a downstream job is red on purpose,** because a consumer pins the old output in a test or calls a function that changed, that consumer goes first: in a clone of it, vendor your branch and answer the change in a pull request of its own, merge that, then re-run this pull request's downstream jobs. From the consumer's clone, with your branch checked out in ../sdlc-protocol:
 
@@ -46,9 +46,10 @@ The claim protocol's rules (the labels, the claim, the board, the protocol check
 
 6. **Watch the sync.** The push to main starts the workflow Sync at https://github.com/OpenSpineConsortium/sdlc-protocol/actions/workflows/sync.yml (also weekly, and by hand with Run workflow, or `gh workflow run sync.yml --repo OpenSpineConsortium/sdlc-protocol`). You should see one row per consumer in the run's summary: up to date, or the pull request `sdlc-protocol/sync` it opened or updated there, as the App OpenSpine SDLC, and whether auto-merge is armed. On the template, coordbench and the marketplace it lands by itself once that repository's required check is green (the one-time setup below, step 4), and on the marketplace the same commit raises the plugin's version, so the merge is also the plugin's release. The sync does not arm auto-merge for sdlc-app, which ecosystem.json gives `"auto_merge": false` and whose settings leave auto-merge off, so its owner merges that pull request.
 
-7. **Tag the release, and bring it into repositories made from the template.** After the merge, with the version from step 2: `git tag vX.Y.Z MERGE_COMMIT && git push origin vX.Y.Z`. A repository made from the template is not on the sync's list, so its owner brings each release in by hand, from its own clone with sdlc-protocol beside it, and lands it by pull request:
+7. **Tag the release, and bring it into repositories made from the template.** After the merge, the owner tags it with the version from step 2, fetching first, since the merge commit was made on GitHub and is not yet in the clone: `git fetch origin && git tag vX.Y.Z MERGE_COMMIT && git push origin vX.Y.Z`. A repository made from the template is not on the sync's list, so its owner brings each release in by hand, from its own clone with sdlc-protocol beside it (the first line clones it there if it is not), and lands it by pull request:
 
    ```bash
+   [ -d ../sdlc-protocol ] || gh repo clone OpenSpineConsortium/sdlc-protocol ../sdlc-protocol
    git switch main && git pull
    git switch -c sdlc-protocol-vX.Y.Z
    git -C ../sdlc-protocol fetch --tags && git -C ../sdlc-protocol checkout vX.Y.Z
@@ -62,6 +63,8 @@ The claim protocol's rules (the labels, the claim, the board, the protocol check
 
    You should see a line beginning `vendor: replaced the copy and its record`, `checks ok` after the check, and the new pull request's address at the end; merge it once its check is green.
 
+   When the check fails on the new copy instead, the release changed something the template's tests pin, and the template answered it in a pull request of its own (step 4): in a clone of the template you made the repository from, `git log --stat --full-diff -- tools/VENDORED` lists the commits that moved the record past your version and every file each one changed (without `--full-diff`, only the record), and the files outside tools/ (tests, fixtures, scripts) are that answer; copy them into this branch and commit them with the copy. A repository not made from the template ([existing-repo.md](existing-repo.md)) has no scripts/check.sh: it runs `python3 tools/sdlc_protocol/vendoring.py verify tools` and its own checks in that line's place, and should see the verify line end with `files match VENDORED`.
+
 ## The sync's one-time setup, by the owner
 
 Until the variable SDLC_APP_ID is set on sdlc-protocol, the sync skips itself, stays green and says in its summary what is missing. Once, in this order:
@@ -73,6 +76,8 @@ Until the variable SDLC_APP_ID is set on sdlc-protocol, the sync skips itself, s
    gh variable set SDLC_APP_ID --repo OpenSpineConsortium/sdlc-protocol --body 5258276
    python3 scripts/register.py --print-key | gh secret set SDLC_APP_PRIVATE_KEY --repo OpenSpineConsortium/sdlc-protocol
    ```
+
+   The key stays on sdlc-protocol only while you are its one writer: the downstream jobs read it on every pull request from a branch of the repository itself, any writer could read it the same way with a workflow of their own, and its tokens push branches and open pull requests on all five repositories, the private sdlc-app and the internal template among them. So everyone else works from a fork (the steps above, step 1), whose pull request gets no secrets.
 
 3. Allow auto-merge on the consumers the sync arms it for:
 

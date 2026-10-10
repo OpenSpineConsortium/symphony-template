@@ -4,7 +4,7 @@ A repository not made from the template takes the protocol in two halves. The sd
 
 ## Steps
 
-1. **Clone the two sources beside your repository, and branch.** sdlc-protocol is public; TEMPLATE_OWNER/TEMPLATE_NAME is the template for a member of its enterprise and the public copy for anyone else ([README.md](README.md)):
+1. **Clone the two sources beside your repository, and branch.** sdlc-protocol is public; TEMPLATE_OWNER/TEMPLATE_NAME is the template for a member of its enterprise and the public copy for anyone else ([README.md](README.md)), which exists only once the template's owner publishes one; until then, ask the owner for the five files the `cp` lines below take from it (board.yml, tidy.yml, board.py, check_docs.py and marked_section.py), put them under ../sdlc-template at the paths those lines read, and skip the second clone:
 
    ```bash
    cd ..
@@ -24,7 +24,7 @@ A repository not made from the template takes the protocol in two halves. The sd
    python3 tools/sdlc_protocol/vendoring.py verify tools
    ```
 
-   You should see `vendor: wrote tools/VENDORED: sdlc-protocol 0.2.0 f530a6694477466c5826a6626681c8c84c8f1aa9, 15 file hashes` and then `vendored sdlc-protocol 0.2.0 at f530a66: 15 files match VENDORED`. Later releases come the same way ([protocol.md](protocol.md), step 7); nothing reaches this repository by itself.
+   You should see `vendor: wrote tools/VENDORED: sdlc-protocol 0.2.0 f530a6694477466c5826a6626681c8c84c8f1aa9, 15 file hashes` and then `vendored sdlc-protocol 0.2.0 at f530a66: 15 files match VENDORED`. Later releases come the same way ([protocol.md](protocol.md), step 7), with the verify line above and this repository's own checks in place of `bash scripts/check.sh`, which only the template has; nothing reaches this repository by itself.
 
 3. **The protocol's text and the claim folder.** spec/PROTOCOL.md is the protocol in prose with no placeholders, the claim file's shape included, and the skills read it at docs/agents/PROTOCOL.md:
 
@@ -68,7 +68,7 @@ A repository not made from the template takes the protocol in two halves. The sd
 
    You should see them at https://github.com/ORG/NAME/labels. epic and blocked belong to team mode, which needs the template's other workflows.
 
-7. **Land it by pull request.** A push of files under .github/workflows/ needs gh's workflow scope; `gh auth refresh -s workflow` adds it if the push is refused:
+7. **Land it by pull request.** A push of files under .github/workflows/ needs gh's workflow scope; `gh auth refresh -s workflow` adds it if the push is refused. The personal install of step 5 writes no .claude/settings.json; if you took it, leave that path off the first line, since git stages nothing when one path matches no file:
 
    ```bash
    git add .claude/settings.json .github/workflows/board.yml .github/workflows/tidy.yml tools docs/agents CLAUDE.md
@@ -77,9 +77,9 @@ A repository not made from the template takes the protocol in two halves. The sd
    gh pr create --fill
    ```
 
-   Once it is merged, the next issue event runs "Board" (https://github.com/ORG/NAME/actions/workflows/board.yml; `gh workflow run board.yml --repo ORG/NAME` starts one now), and you should see the board at https://github.com/ORG/NAME/blob/board/STATE.md.
+   Until the merge, the Board runs started by the branch and its pull request are red, because the job checks out the default branch, which has no tools/board.py yet; that is expected. Once it is merged, the next issue event runs "Board" (https://github.com/ORG/NAME/actions/workflows/board.yml; `gh workflow run board.yml --repo ORG/NAME` starts one now), and you should see the board at https://github.com/ORG/NAME/blob/board/STATE.md.
 
-8. **Protect the default branch, and only it,** at https://github.com/ORG/NAME/settings/rules: require a pull request and your own checks, and block force pushes and deletions. Never target the branch `board`, which board.yml force-pushes on every change. The template's docs/setup/ruleset-main.json requires a check named "check", which this repository has only if its CI has a job of that name.
+8. **Protect the default branch, and only it,** at https://github.com/ORG/NAME/settings/rules: require a pull request and your own checks, and block force pushes and deletions. Never target the branch `board`, which board.yml force-pushes on every change. The template's docs/setup/ruleset-main.json requires a check named "check", which this repository has only if its CI has a job of that name. A private repository needs GitHub Pro, Team or Enterprise for the ruleset to be enforced; on Free it is saved and ignored ([tiers.md](../setup/tiers.md)).
 
 9. **Claim the first issue.** Open one labelled todo, run `claude` in the clone and paste:
 
@@ -89,14 +89,16 @@ A repository not made from the template takes the protocol in two halves. The sd
 
 ## What stays different from a copy of the template
 
-- Cloud sessions do not install the plugins a repository declares, so there the push guard and the board at session start are missing, and the ruleset of step 8 is the fence; a Project can add the plugin under Project settings, Plugins. A copy of the template wires the same hooks in its own .claude/settings.json, which cloud sessions do load.
-- `/sdlc:remember` and `/sdlc:checkpoint` act on docs/memory/, tools/marked_section.py and the checkpoint markers in CLAUDE.md, which only the template carries; copy them from it if you want those two. tools/check_docs.py is different: once it is in tools/, the plugin runs it after every edit under docs/, .claude/, tools/ or .github/ and to CLAUDE.md or README.md, and refuses the edit (exit 2) while any problem stands, wherever it is. It holds CLAUDE.md to exactly one pair of checkpoint markers, which step 4 does not add, every tracked file in those places to ASCII with LF endings, every `@` import in CLAUDE.md to a file that exists, every tracked file to holding nothing shaped like a common secret, and docs/memory/MEMORY.md, where docs/memory/ exists, to listing each fact file there. So copy it only after the markers are in and those files pass; the markers first, from the clone:
+- Cloud sessions do not install the plugins a repository declares, so there the push guard and the board at session start are missing, and the ruleset of step 8 is the fence, where the plan enforces it (a Free private repository has none); a Project can add the plugin under Project settings, Plugins. A copy of the template wires the same hooks in its own .claude/settings.json, which cloud sessions do load.
+- `/sdlc:remember` and `/sdlc:checkpoint` act on docs/memory/, tools/marked_section.py and the checkpoint markers in CLAUDE.md, which only the template carries; the block below adds them, with an empty memory index rather than the template's, whose facts are about the template, and the import that makes every session read it. Both skills run `bash scripts/check.sh`, which this repository lacks: run `python3 tools/check_docs.py` and your own checks there, as step 9's prompt says for the claim skill. tools/check_docs.py is different: once it is in tools/, the plugin runs it after every edit under docs/, .claude/, tools/ or .github/ and to CLAUDE.md or README.md, and reports every problem that stands, wherever it is, back to the session (exit 2); the edit stays written. It holds CLAUDE.md to exactly one pair of checkpoint markers, which step 4 does not add, every tracked file in those places to ASCII with LF endings, every `@` import in CLAUDE.md to a file that exists, every tracked file to holding nothing shaped like a common secret, and docs/memory/MEMORY.md, where docs/memory/ exists, to listing each fact file there. So copy it only after the markers are in and those files pass; the markers first, from the clone:
 
   ```bash
-  printf '%s\n' '' '<!-- cswap:checkpoint:begin -->' '<!-- cswap:checkpoint:end -->' >> CLAUDE.md
+  mkdir -p docs/memory
+  printf '%s\n' '# Memory index' '' 'One line per fact under docs/memory/: a dash, the title as a link to its file, a colon and one line; the remember skill adds them.' > docs/memory/MEMORY.md
+  printf '%s\n' '' '@docs/memory/MEMORY.md' '' '<!-- cswap:checkpoint:begin -->' '<!-- cswap:checkpoint:end -->' >> CLAUDE.md
   cp ../sdlc-template/tools/check_docs.py ../sdlc-template/tools/marked_section.py tools/
   python3 tools/check_docs.py
   ```
 
-  You should see `docs ok` and the number of files it read; until then, each problem it prints is one the hook would refuse an edit for.
+  You should see `docs ok` and the number of files it read; until then, each problem it prints is one the hook would report after an edit.
 - No @claude, Actions worker, team mode, coordinator trigger or protocol check in CI: those are the template's workflows and docs ([solo.md](solo.md), [team.md](team.md)). Keep one wiring of the hooks: a repository that has the template's hooks and enables the plugin runs each twice.
