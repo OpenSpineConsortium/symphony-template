@@ -295,7 +295,12 @@ run's summary what is missing. Once, in this order:
    the old record of one line and fail. Then sdlc-protocol's, with a merge
    commit rather than a squash, so the commit the consumers' records name
    stays the last one that changed the package and the first sync finds
-   every consumer up to date.
+   every consumer up to date. Push sdlc-protocol's branch first all the
+   same: each consumer's CI clones sdlc-protocol and fails when the clone
+   has no commit of the one its VENDORED names, which until the library's
+   pull request merges is on that branch alone. The consumers' branches
+   change their .github/workflows/ci.yml, so they go up with a token that
+   has the workflow scope.
 6. **Release sdlc-protocol 0.2.0** once its pull request is merged:
    `gh release create v0.2.0 --repo OpenSpineConsortium/sdlc-protocol
    --target <the merge commit> --title "sdlc-protocol 0.2.0"`.

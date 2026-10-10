@@ -18,6 +18,14 @@ name: Checks
 # with the GitHub App's token, which, unlike a workflow's own GITHUB_TOKEN,
 # starts this workflow, and then opens or updates the branch's pull request,
 # which runs the check again on the same commit.
+# Before the checks the job clones OpenSpineConsortium/sdlc-protocol, which
+# is public, so the clone needs no token, and names the clone to them in
+# SDLC_PROTOCOL. check.sh's vendoring.py verify holds tools/sdlc_protocol to
+# tools/VENDORED, but both sit in this tree, and a pull request that edits
+# the copy can rewrite its line in VENDORED as easily; with the clone named,
+# tests/test_vendored.py compares every file of the copy with the library's
+# at the commit VENDORED names, and fails, rather than skips, when the clone
+# is missing or has no such commit, so neither edit passes the check.
 # On a pull request the same job also runs tools/check_protocol.py, which
 # holds a claude/<issue> pull request to the claim protocol: its claim file
 # while draft, that file's deletion when ready, a body that closes its
@@ -44,7 +52,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Clone sdlc-protocol, the library the copy is held to
+        run: git clone --quiet https://github.com/OpenSpineConsortium/sdlc-protocol "$RUNNER_TEMP/sdlc-protocol"
+
       - name: Run the checks
+        env:
+          SDLC_PROTOCOL: ${{ runner.temp }}/sdlc-protocol
         run: bash scripts/check.sh
 
       - name: Hold a claude/ pull request to the claim protocol

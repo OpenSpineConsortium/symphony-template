@@ -4,9 +4,14 @@ tools/sdlc_protocol is a vendored copy of the package sdlc_protocol, and
 tools/VENDORED records it: the release and the commit on the first line,
 then the sha256 of every copied file. scripts/check.sh runs
 `python3 tools/sdlc_protocol/vendoring.py verify tools` before the tests, so
-a pull request that edits the copy by hand, adds a file to it or loses one
-fails the required check, offline. A fix to the board, the protocol check,
-team mode's clerk or the push guard is therefore a pull request to
+a pull request that edits the copy by hand, adds a file to it or loses one,
+and leaves VENDORED as it was, fails the required check, offline. VENDORED
+sits in the same tree, so the same pull request could rewrite it to match;
+CI therefore clones sdlc-protocol, which is public, and names the clone in
+SDLC_PROTOCOL, and tests/test_vendored.py compares every file of the copy
+with the library's at the commit VENDORED names, failing when they differ
+or when the clone has no such commit. A fix to the board, the protocol
+check, team mode's clerk or the push guard is therefore a pull request to
 sdlc-protocol.
 
 The template itself, OpenSpineConsortium/sdlc-template, then receives the

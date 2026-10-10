@@ -12,6 +12,9 @@ python3 tools/check_docs.py
 # records: a change to it is made in OpenSpineConsortium/sdlc-protocol and
 # arrives by that repository's sync pull request in the template, or by its
 # scripts/vendor.py in a repository made from it, so a hand edit fails here.
+# A hand edit that rewrote VENDORED to match passes this line and fails
+# tests/test_vendored.py, which compares the copy with the library itself
+# in the clone SDLC_PROTOCOL names (CI clones it; .github/workflows/ci.yml).
 python3 tools/sdlc_protocol/vendoring.py verify tools
 python3 -m unittest discover -s tests -v
 
