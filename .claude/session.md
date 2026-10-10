@@ -63,32 +63,36 @@ The handoff file is gone with the docs pull request.
 
 - Everything above is merged. No pull request of this session is open
   apart from the one carrying this checkpoint.
-- sdlc-start is not live yet: its workflow is on main, but the owner's
-  steps below have not been done, and the label adopt does not exist, so a
-  request opened now starts no run.
-- The cloud session's proxy refuses the Actions variables and secrets
-  paths (HTTP 403), so whether sdlc-start holds SDLC_APP_ID and
-  SDLC_APP_PRIVATE_KEY, as the last checkpoint says, could not be checked
-  from here. sdlc-app has auto-merge on and the one ruleset 24851112
-  "main" (active, requires the check "check"); sdlc-start has no ruleset
-  and auto-merge off; the template has ruleset 24827932.
-- The session was refused three things by the auto-mode permission
-  classifier: attaching OpenSpineConsortium/sdlc-protocol, creating the
-  label adopt with gh api, and a git command in a merge context. It was
-  allowed the GitHub merge tool, which merged the four pull requests.
+- sdlc-start is live. The owner made the label adopt, the ruleset
+  "Protect the default branch" on its main, made the App public with the
+  permission Workflows: Read and write accepted on the organization's
+  installation, and confirmed SDLC_APP_ID and SDLC_APP_PRIVATE_KEY there.
+  The first live request (sdlc-start#3, mode existing, sharing off, into
+  the old copy OpenSpineConsortium/sdlc-template-test) was answered in 28
+  seconds with the pull request sdlc-template-test#14: 20 files added,
+  .claude/settings.json merged, 4 kept; its public log names no file,
+  branch or number of the private side. That pull request is the owner's
+  to close or merge. The run showed one wrong sentence for a repository
+  that already had the board's workflow, fixed in sdlc-start#4.
+- The license of adopted files is MIT, in sdlc-start's LICENSE
+  (sdlc-start#2); sdlc-protocol's README no longer blames GitHub Free for
+  sdlc-app's unarmed auto-merge (sdlc-protocol#2).
+- sdlc-app has auto-merge on and the one ruleset 24851112 "main"
+  (active, requires the check "check"); the template has ruleset
+  24827932.
+- The auto-mode permission classifier refused creating the label adopt
+  with gh api and one git command in a merge context, and the proxy
+  refuses the Actions variables, secrets and rulesets API paths, so those
+  settings are the owner's to make on their own machine. Attaching
+  sdlc-protocol was refused once and allowed when the owner asked for it;
+  the GitHub tools' pull request and merge calls were allowed throughout.
 
 ## Remaining tasks
 
-1. Owner steps before strangers can use the front door, in this order
-   (sdlc-start's README, For the owner): create the label adopt
-   (`gh label create adopt --repo OpenSpineConsortium/sdlc-start --color
-   0e8a16 --description "A request for an adoption pull request, handled
-   by .github/workflows/adopt.yml"`); make the App public; give it
-   Workflows: Read and write, and accept the new permission on every
-   installation; confirm the variable SDLC_APP_ID and the secret
-   SDLC_APP_PRIVATE_KEY on sdlc-start; protect main there with a ruleset
-   requiring the check "check"; decide the license of adopted files (the
-   template's LICENSE is MIT, and adopt.py copies none).
+1. A live test of mode new is still to run: a throwaway repository
+   with one commit and the App installed, the form with "New repository",
+   and a look at the copy's checkpoint block, the setup issue the run
+   opens and the labels. Mode existing is proven (Current state).
 2. Setup with no manual steps (the owner asked for it): either a second,
    setup-only App "OpenSpine SDLC Setup" holding Administration and
    Variables (write), which adopters install for one run and remove, and
@@ -97,11 +101,10 @@ The handoff file is gone with the docs pull request.
    recommended. Never ask for Secrets: an adopter's Claude token is theirs.
    No OAuth; it needs a server. Change the App's permissions once, when
    this lands, since every installation must accept each change.
-3. sdlc-protocol's README says GitHub Free keeps sdlc-app from
-   auto-merging (section "How a change reaches the other repositories",
-   step 5). That is wrong: the sync does not arm auto-merge for sdlc-app
-   because ecosystem.json gives it auto_merge false. Correct it there in a
-   pull request of its own; this session could not attach the repository.
+3. actions/create-github-app-token@v1 targets Node 20, which the
+   runners now warn is deprecated and force onto Node 24; the carried
+   item to move to v2 is worth doing soon, since the front door's run
+   prints that warning every time.
 4. docs/start/README.md and links.md now name the front door for anyone
    outside the enterprise; existing-repo.md still describes the by-hand
    way, which the front door's existing mode replaces for most; say so
@@ -158,6 +161,9 @@ Stated by the owner in conversation, this session and earlier:
 - The pull requests this project's sessions open are merged by the
   session once their check is green, as the last checkpoint asked and as
   the earlier sessions did; the repositories' rulesets require no review.
+- The files an adoption brings are offered under the MIT License, the
+  template's own, in sdlc-start's LICENSE with OpenSpineConsortium as the
+  holder; the adoption copies no LICENSE into anyone's repository.
 
 ## Constraints
 
