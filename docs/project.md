@@ -19,7 +19,7 @@ Out of scope, by decision: what this project does not do, each with the reason, 
   - OpenSpineConsortium/sdlc-protocol, public: the claim protocol as a Python library with no dependencies (the board, the protocol check, team mode's clerk, the push guard's rules and the merge gate). It is vendored here under tools/sdlc_protocol, with tools/VENDORED naming the release and its commit; a change to the rules is made there and comes in by its scripts/vendor.sh and a pull request here.
   - OpenSpineConsortium/coordbench, public: the playground and benchmark that compares ways of coordinating Claude Code agents on CooperBench's tasks, this protocol among them; its sdlc arm is to run on the library's merge gate. It began as experiment/ on OpenSpineConsortium/sdlc-template's branch claude/10.
   - OpenSpineConsortium/sdlc-marketplace, public: the Claude Code plugin marketplace with one plugin, sdlc, which brings the skills, /board and the hooks to a repository not made from this template. .claude/settings.json names the marketplace and enables nothing, since this repository wires the same hooks itself.
-  - OpenSpineConsortium/sdlc-app, private: the GitHub App sdlc. Its installation token lets template-init's first commit start the Checks and the Board, which a push with GITHUB_TOKEN cannot; later its webhook server runs the protocol check as a check run of its own.
+  - OpenSpineConsortium/sdlc-app, private: the GitHub App OpenSpine SDLC (slug openspine-sdlc). Its installation token lets template-init's first commit start the Checks and the Board, which a push with GITHUB_TOKEN cannot; later its webhook server runs the protocol check as a check run of its own.
 
 ## Model and effort
 

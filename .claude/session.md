@@ -141,7 +141,7 @@ The owner's steps are in docs/setup/owner-checklist.md.
    "OpenSpineConsortium/sdlc-marketplace"}}} (done) and no enabledPlugins,
    since the plugin runs the hooks the template's settings already run;
    `claude plugin validate` must pass. Built; left: a CI workflow.
-6. sdlc-app, stage 1 (no hosting): the owner registers a GitHub App "sdlc"
+6. sdlc-app, stage 1 (no hosting): the owner registers the GitHub App "OpenSpine SDLC" ("sdlc" is held by the account @sdlc)
    on the organisation (permissions Contents, Issues, Pull requests read
    and write, Checks write, Metadata read; events issues, issue_comment,
    pull_request, push, check_suite, installation; webhook off), installs

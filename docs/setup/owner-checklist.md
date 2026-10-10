@@ -233,8 +233,9 @@ the session's git proxy refused to push a tag. In this order:
 
 1. **Rename each default branch to main**, as an admin of the
    repository, in sdlc-protocol (now `wip/extract`), coordbench (now
-   `claude/split`), sdlc-marketplace (now `claude/init`) and sdlc-app (now
-   `claude/init`): on its branches page,
+   `claude/split`) and sdlc-marketplace (now `claude/init`); sdlc-app
+   already has main, and its first change is pull request
+   OpenSpineConsortium/sdlc-app#1, to merge first. On each branches page,
    https://github.com/OpenSpineConsortium/<name>/branches, the default
    branch's menu, Rename branch. GitHub redirects the old name, and the
    default branch keeps being the default under its new name.
@@ -247,7 +248,10 @@ the session's git proxy refused to push a tag. In this order:
    re-vendored from that tag.
 3. **Register the GitHub App** from a clone of sdlc-app, on your own
    computer, as an owner of the organization:
-   `python3 scripts/register.py --org OpenSpineConsortium`. Install the App
+   `python3 scripts/register.py --org OpenSpineConsortium`, which names it
+   OpenSpine SDLC (slug openspine-sdlc): App names are global across GitHub
+   and "sdlc" belongs to the account @sdlc, so if a name is taken, add
+   `--name "<another>"`. Install the App
    on the organization (Install App; "All repositories" also covers a copy
    made later), then set the variable `SDLC_APP_ID` and the secret
    `SDLC_APP_PRIVATE_KEY` with the commands register.py prints; set them
