@@ -11,7 +11,7 @@ Put your repository for ORG/NAME (ORG is the user or the organization that owns 
 | https://github.com/ORG/NAME/settings/security_analysis | Settings, Advanced Security | secret scanning, then push protection |
 | https://github.com/ORG/NAME/settings/secrets/actions | Settings, Secrets and variables, Actions | the secrets: CLAUDE_CODE_OAUTH_TOKEN, COORDINATOR_TRIGGER_URL, COORDINATOR_TRIGGER_TOKEN, SDLC_APP_PRIVATE_KEY |
 | https://github.com/ORG/NAME/settings/secrets/actions/new | the same, New repository secret | one new secret |
-| https://github.com/ORG/NAME/settings/variables/actions | the same, Variables tab | CLAUDE_WORKER, CLAUDE_TEAM, CLAUDE_MAX_ROUNDS, CLAUDE_ALLOWED_TOOLS, CLAUDE_CROWD, SDLC_APP_ID |
+| https://github.com/ORG/NAME/settings/variables/actions | the same, Variables tab | CLAUDE_WORKER, CLAUDE_TEAM, CLAUDE_MAX_ROUNDS, CLAUDE_ALLOWED_TOOLS, CLAUDE_CROWD, SDLC_APP_ID, SDLC_METRICS |
 | https://github.com/ORG/NAME/settings/variables/actions/new | the same, New repository variable | one new variable |
 | https://github.com/ORG/NAME/settings/actions | Settings, Actions, General | whether Actions run, and the default token's rights |
 | https://github.com/ORG/NAME/settings/access | Settings, Collaborators & teams | Write for each person who claims issues, once the secrets above are out of the repository ([team.md](team.md), step 1) |
@@ -27,6 +27,8 @@ Put your repository for ORG/NAME (ORG is the user or the organization that owns 
 | https://github.com/ORG/NAME/actions/workflows/claude-worker.yml | Actions, Worker | the Actions worker and team members; Run workflow |
 | https://github.com/ORG/NAME/actions/workflows/claude-lead.yml | Actions, Lead | team mode's lead |
 | https://github.com/ORG/NAME/actions/workflows/template-init.yml | Actions, Template init | the first push's run |
+| https://github.com/ORG/NAME/actions/workflows/metrics.yml | Actions, Metrics | the daily field-metrics runs, and one by hand after setting SDLC_METRICS ([metrics.md](../setup/metrics.md)); Run workflow |
+| https://github.com/ORG/NAME/blob/metrics/METRICS.json | the branch metrics, METRICS.json | the aggregates the repository shares, or that sharing is off |
 
 Making a repository:
 
