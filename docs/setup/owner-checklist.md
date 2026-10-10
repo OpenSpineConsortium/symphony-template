@@ -11,8 +11,9 @@ repository; each one goes only where this page says.
 Every repository setting of section 3 and the variables of section 4 are
 one run of `bash scripts/setup-repo.sh` from a clone, on your own
 computer, with the GitHub CLI signed in (`gh auth login`) as a user with
-admin rights on the repository; a cloud session cannot run it, having
-neither gh nor admin rights. The script creates the ruleset
+admin rights on the repository; a cloud session cannot run it: gh is
+installed there, but its GitHub proxy refuses gh's GraphQL commands, and
+the session has no admin rights. The script creates the ruleset
 docs/setup/ruleset-main.json unless one of that name is already listed
 for the repository, turns on "Automatically delete head branches" and
 "Allow auto-merge", turns on secret scanning and then push protection
@@ -38,6 +39,15 @@ the Claude GitHub App's installation, the organization's rulesets,
 secrets and variables (below), the cloud environment's variable
 (section 2) and the claude.ai Projects (section 5) are pages you open,
 from the links that follow.
+
+A project worked by volunteers on their own Claude accounts takes another
+command instead, and none of the token, variable or auto-merge steps on this
+page: `python3 scripts/crowd.py setup ORG/NAME --area AREA`, then, after
+reading the pull request it opens, `python3 scripts/crowd.py finish
+ORG/NAME`. docs/setup/crowdsourcing.md, Part 1, says what each does and what
+is left by hand; setup-repo.sh refuses to run once crowd mode is on, or
+when it cannot tell, since it would turn auto-merge on and can store a
+token.
 
 ## One-click links
 

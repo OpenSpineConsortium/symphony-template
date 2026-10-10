@@ -8,7 +8,10 @@ subscription OAuth token the main account makes with `claude setup-token`
 five-hour window and the weekly limit, and bill no API. Until the secret
 is set the workflow does nothing, quietly. The token is the one secret
 beyond the coordinator trigger pair that the repository ever asks for,
-and it lives in the repository's Actions settings, never in a file.
+and it lives in the repository's Actions settings, never in a file. In
+crowd mode (crowd-mode.md) the repository holds no such token and the
+job never starts: its condition needs the variable CLAUDE_CROWD not to be
+true.
 
 Source: the Claude Code documentation on GitHub Actions and
 authentication (code.claude.com/docs), read 2026-10-09.

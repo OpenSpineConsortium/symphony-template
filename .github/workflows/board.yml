@@ -39,7 +39,12 @@ name: Board
 # .template/, which template-init deletes, so the run ends there without
 # writing anything. The last step tells the coordinator routine the board moved,
 # only when it did and the two secrets are set; it fails softly, so a
-# routine that did not answer never turns the board red.
+# routine that did not answer never turns the board red. In crowd mode
+# (docs/setup/crowdsourcing.md) that step never runs: while the variable
+# CLAUDE_CROWD is true its condition is false, so a trigger pair that reaches
+# a crowd repository, from the organization for instance, cannot start the
+# owner's routine on the owner's subscription whenever a writer moves the
+# board; the crowd coordinator runs on its schedule alone.
 
 on:
   push:
@@ -130,7 +135,7 @@ jobs:
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Tell the coordinator routine
-        if: steps.board.outputs.changed == 'true'
+        if: vars.CLAUDE_CROWD != 'true' && steps.board.outputs.changed == 'true'
         env:
           TRIGGER_URL: ${{ secrets.COORDINATOR_TRIGGER_URL }}
           TRIGGER_TOKEN: ${{ secrets.COORDINATOR_TRIGGER_TOKEN }}

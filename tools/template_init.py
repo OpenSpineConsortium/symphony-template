@@ -298,11 +298,17 @@ def setup_issue_body(repo, default_branch, app_link=APP_INSTALL):
     with the settings pages behind it for whoever does it by hand; the second
     is the one OAuth flow, with the app's install page and the new-secret
     form behind it. GitHub's secret and variable forms take no prefill, so
-    those links open the form and the text names what to type."""
+    those links open the form and the text names what to type. The opening
+    line points a project for volunteers on their own Claude accounts at
+    scripts/crowd.py instead, which rewrites this checklist for crowd mode:
+    the first two boxes would store the owner's token and turn auto-merge on,
+    which crowd mode keeps off."""
     base = f"https://github.com/{repo}/blob/{default_branch}"
     settings = f"https://github.com/{repo}/settings"
     return "\n".join([
-        "This repository was made from the SDLC template. Finish setting it up:",
+        "This repository was made from the SDLC template. Finish setting it up below; or, to open it to volunteers "
+        "who each work on their own Claude account, run `python3 scripts/crowd.py setup` instead, which rewrites "
+        f"this checklist ([docs/setup/crowdsourcing.md]({base}/docs/setup/crowdsourcing.md)):",
         "",
         f"- [ ] Run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand: import the branch rules under [Rules]({settings}/rules) (New ruleset, Import a ruleset, docs/setup/ruleset-main.json from your clone), tick \"Automatically delete head branches\" and \"Allow auto-merge\" under [General]({settings}), turn on secret scanning and push protection under [Code security]({settings}/security_analysis), check the seven labels under [Labels](https://github.com/{repo}/labels), and open [.github/CODEOWNERS]({base}/.github/CODEOWNERS) to see that GitHub marks no line of it as an error ([docs/setup/github.md]({base}/docs/setup/github.md), section 7).",
         f"- [ ] One OAuth flow for the Claude side: from Claude Code signed in as the main account, run /install-github-app and pick this repository; it installs the Claude GitHub App and writes the secret CLAUDE_CODE_OAUTH_TOKEN, which turns on @claude. By hand: [install the app]({app_link}), then run `claude setup-token` and paste the token as a [new repository secret]({settings}/secrets/actions/new) named CLAUDE_CODE_OAUTH_TOKEN ([docs/setup/claude-action.md]({base}/docs/setup/claude-action.md)).",

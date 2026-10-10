@@ -5,7 +5,9 @@ session in Actions (.github/workflows/claude.yml): it reads CLAUDE.md and
 the rules like every other session, answers, fixes, or takes the work the
 comment asks for. Until the one secret below exists, the workflow ends at
 its first step with a pointer and does nothing, so nothing here is
-required.
+required. In crowd mode (docs/setup/crowdsourcing.md) none of this page
+applies: the repository holds no Claude token, and the workflow never
+starts while the repository variable CLAUDE_CROWD is true.
 
 ## No API billing
 

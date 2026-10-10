@@ -15,7 +15,10 @@ name: Lead
 # and no usage. Off until both CLAUDE_TEAM is set and CLAUDE_WORKER is
 # true, since a plan nobody works is usage wasted; Claude runs need the
 # secret CLAUDE_CODE_OAUTH_TOKEN (docs/setup/claude-action.md) and draw on
-# the main account's subscription.
+# the main account's subscription. In crowd mode (docs/project.md,
+# docs/setup/crowdsourcing.md) the route job never starts, and so neither
+# does any job after it: plan, unblock and integrate need route and ask for
+# no status function, so GitHub skips them with it.
 #
 # Runs for one epic or task wait for each other; runs for different ones
 # do not. The group is set on the jobs that run Claude, not on the
@@ -48,7 +51,7 @@ env:
 jobs:
   route:
     if: >-
-      vars.CLAUDE_TEAM != '' && vars.CLAUDE_WORKER == 'true'
+      vars.CLAUDE_CROWD != 'true' && vars.CLAUDE_TEAM != '' && vars.CLAUDE_WORKER == 'true'
       && (github.event_name == 'workflow_dispatch'
           || (github.event.action == 'labeled' && github.event.label.name == 'epic')
           || (github.event.action == 'labeled' && github.event.label.name == 'blocked'

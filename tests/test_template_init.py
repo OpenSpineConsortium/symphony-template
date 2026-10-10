@@ -289,6 +289,12 @@ class Labels(unittest.TestCase):
         self.assertIn("https://github.com/octo/widgets/blob/main/.github/CODEOWNERS", body)
         self.assertEqual(body.count("- [ ]"), 6)
 
+    def test_the_setup_issue_points_a_crowd_project_at_crowd_py_before_the_boxes(self):
+        body = template_init.setup_issue_body("octo/widgets", "main")
+        first = body.splitlines()[0]
+        self.assertIn("python3 scripts/crowd.py setup", first)
+        self.assertIn("https://github.com/octo/widgets/blob/main/docs/setup/crowdsourcing.md", first)
+
     def test_the_setup_issue_opens_with_the_one_command_and_links_every_settings_page(self):
         body = template_init.setup_issue_body("octo/widgets", "main")
         self.assertTrue(body.splitlines()[2].startswith("- [ ] Run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand:"))
