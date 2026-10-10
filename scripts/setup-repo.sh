@@ -10,13 +10,18 @@
 # GitHub steps through the GitHub CLI, so they are one run instead of six
 # settings pages. Run it once on your own computer, from a clone, with gh
 # signed in (gh auth login) as a user with admin rights on the repository.
-# A cloud session cannot run it: it has no gh and no admin rights. Running
+# A cloud session cannot run it: gh is installed there, but its GitHub proxy
+# refuses gh's GraphQL commands and the session has no admin rights. Running
 # it again does nothing twice: a ruleset that exists is skipped, a toggle
-# that is on stays on, a label is updated in place.
+# that is on stays on, a label is updated in place. In a crowd repository
+# (docs/setup/crowdsourcing.md), whose variable CLAUDE_CROWD is true, it
+# stops before any write: it would turn auto-merge on and can store a
+# subscription token, and crowd mode keeps both off; scripts/crowd.py setup
+# is that repository's one command instead.
 #
 # What it does, in order, one line of output per step:
 #   1. finds the repository (the argument, or the clone's remote) and its
-#      default branch;
+#      default branch, and stops when crowd mode is on there;
 #   2. creates the ruleset docs/setup/ruleset-main.json unless one of that
 #      name is already listed for the repository; on GitHub Free a private
 #      repository's ruleset is written but not enforced (docs/setup/tiers.md),
@@ -56,7 +61,9 @@ Sets up the GitHub side of a repository made from this template: the
 default branch's ruleset, delete-branch-on-merge, auto-merge, secret
 scanning with push protection, the labels, the variables asked for and,
 with --token, the secret CLAUDE_CODE_OAUTH_TOKEN. Needs the GitHub CLI
-signed in (gh auth login) with admin rights on the repository.
+signed in (gh auth login) with admin rights on the repository. In crowd
+mode (the variable CLAUDE_CROWD is true) it changes nothing: run
+python3 scripts/crowd.py setup instead.
 
   OWNER/NAME        the repository; by default the one this clone's
                     remote points at
@@ -106,6 +113,15 @@ fi
 IFS=$'\t' read -r REPO DEFAULT_BRANCH VISIBILITY <<<"$view"
 VISIBILITY=$(printf '%s' "$VISIBILITY" | tr '[:upper:]' '[:lower:]')
 printf 'repository: %s (default branch %s, %s)\n' "$REPO" "$DEFAULT_BRANCH" "$VISIBILITY"
+
+# Crowd mode keeps auto-merge off and holds no Claude token, and the steps
+# below turn auto-merge on and can store one, so they never run there. A
+# 404, no such variable, is the ordinary case; GitHub compares the value
+# without case, and so does this.
+crowd=$(gh api "repos/$REPO/actions/variables/CLAUDE_CROWD" --jq .value 2>/dev/null || true)
+if [ "$(printf '%s' "$crowd" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
+  die "crowd mode is on: scripts/setup-repo.sh would turn auto-merge on and can store a subscription token; run python3 scripts/crowd.py setup $REPO instead, which keeps both off"
+fi
 
 # 2. The ruleset, from the file the docs ship, unless its name is already
 # listed. GitHub would make a second ruleset of the same name, so the check
