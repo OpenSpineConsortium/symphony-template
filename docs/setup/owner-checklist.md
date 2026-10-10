@@ -226,43 +226,88 @@ beta on Pro and Max.
 ## 6. The other repositories
 
 The template is one of five repositories under OpenSpineConsortium;
-docs/project.md says what each is for. Sessions built the other four but
-could not finish setting them up: the push guard refuses any push to a
-branch named main, so each got its first branch under another name, and
-the session's git proxy refused to push a tag. In this order:
+docs/project.md says what each is for, and sdlc-protocol's
+[ECOSYSTEM.md](https://github.com/OpenSpineConsortium/sdlc-protocol/blob/main/ECOSYSTEM.md)
+maps which of them copies which of the library's modules. The first
+round of setting them up is done. Checked on 2026-10-10: each of the
+four has main as its default branch, sdlc-protocol has the release tag
+v0.1.0 on f139a079d881ff245511625e443f6eff1318c727, and #12 and #13 are
+merged. The App OpenSpine SDLC (slug openspine-sdlc, id 5258276) is
+registered, and its id and key are set on this repository.
 
-1. **Rename each default branch to main**, as an admin of the
-   repository, in sdlc-protocol (now `wip/extract`), coordbench (now
-   `claude/split`) and sdlc-marketplace (now `claude/init`); sdlc-app
-   already has main, and its first change is pull request
-   OpenSpineConsortium/sdlc-app#1, to merge first. On each branches page,
-   https://github.com/OpenSpineConsortium/<name>/branches, the default
-   branch's menu, Rename branch. GitHub redirects the old name, and the
-   default branch keeps being the default under its new name.
-2. **Release sdlc-protocol 0.1.0**: create the release v0.1.0 on the commit
-   f139a079d881ff245511625e443f6eff1318c727, the one tools/VENDORED names
-   (Releases, Draft a new release, a new tag v0.1.0 on that commit; or
-   `gh release create v0.1.0 --repo OpenSpineConsortium/sdlc-protocol
-   --target f139a079d881ff245511625e443f6eff1318c727 --title
-   "sdlc-protocol 0.1.0"`). Coordbench, the plugin and the App are to be
-   re-vendored from that tag.
-3. **Register the GitHub App** from a clone of sdlc-app, on your own
-   computer, as an owner of the organization:
-   `python3 scripts/register.py --org OpenSpineConsortium`, which names it
-   OpenSpine SDLC (slug openspine-sdlc): App names are global across GitHub
-   and "sdlc" belongs to the account @sdlc, so if a name is taken, add
-   `--name "<another>"`. Install the App
-   on the organization (Install App; "All repositories" also covers a copy
-   made later), then set the variable `SDLC_APP_ID` and the secret
-   `SDLC_APP_PRIVATE_KEY` with the commands register.py prints; set them
-   at the organization with `--visibility all` for copies to have them on
-   their first push. .github/workflows/template-init.yml then makes the
-   App's token, so a new copy's first commit starts its Checks and its
-   Board; without the two settings it runs on GITHUB_TOKEN as before.
-4. **Merge #12**, the push guard's newline fix.
-5. **Then a session marks #13 ready**: it deletes docs/agents/claims/10.md
-   in that commit, as docs/agents/PROTOCOL.md (Finish) requires, and you
-   merge it.
+### The sync: one push to sdlc-protocol reaches every repository
+
+A change to the protocol is made in sdlc-protocol alone. Its CI runs each
+consumer's own check on the change before it merges (the jobs
+`downstream (<name>)`), and the push to its main starts its workflow
+Sync, which vendors the change into each consumer and opens the pull
+request `sdlc-protocol/sync` there, as the App, with auto-merge on where
+the repository allows it. Nobody copies anything by hand. Until the
+variable below is set, the sync skips itself, stays green and says in its
+run's summary what is missing. Once, in this order:
+
+1. **Install the App on all five repositories**: the organization's
+   settings, GitHub Apps, OpenSpine SDLC, Configure, and choose "All
+   repositories" or add sdlc-protocol, sdlc-template, coordbench,
+   sdlc-marketplace and sdlc-app
+   (https://github.com/organizations/OpenSpineConsortium/settings/installations).
+   The sync's token is scoped to one consumer at a time, and the App
+   needs no permission beyond the ones it was registered with (contents
+   and pull requests, write).
+2. **Give sdlc-protocol the App's id and key**, the same values this
+   repository has. From a clone of sdlc-app, whose .sdlc-app.env
+   register.py wrote, so the key goes through a pipe and never onto the
+   screen:
+
+   ```
+   gh variable set SDLC_APP_ID --repo OpenSpineConsortium/sdlc-protocol --body 5258276
+   python3 scripts/register.py --print-key | gh secret set SDLC_APP_PRIVATE_KEY --repo OpenSpineConsortium/sdlc-protocol
+   ```
+
+   Where the two are already set at the organization with `--visibility
+   all`, sdlc-protocol, being public, has them, and this step is done.
+3. **Allow auto-merge on the public consumers**. `bash
+   scripts/setup-repo.sh` turns it on here (section 3); these commands
+   do it for all three, and change nothing where it is on already:
+
+   ```
+   gh api -X PATCH repos/OpenSpineConsortium/sdlc-template -F allow_auto_merge=true
+   gh api -X PATCH repos/OpenSpineConsortium/coordbench -F allow_auto_merge=true
+   gh api -X PATCH repos/OpenSpineConsortium/sdlc-marketplace -F allow_auto_merge=true
+   ```
+
+   sdlc-app is private, and GitHub Free offers auto-merge only on public
+   repositories, so the App's sync pull request waits for you to merge it.
+4. **Require the check `check` on each consumer's main**, with a ruleset,
+   so auto-merge waits for it to be green. Here
+   docs/setup/ruleset-main.json already does (section 3); the same file
+   imports into coordbench and sdlc-marketplace (their Settings, Rules,
+   Rulesets, New ruleset, Import a ruleset). On sdlc-app it is written but
+   not enforced while the repository is private on GitHub Free
+   (docs/setup/tiers.md). On sdlc-protocol require `check` and, if you
+   like, the `downstream (<name>)` jobs, so a change that breaks a
+   consumer cannot merge there.
+5. **Land the pull requests that brought the sync**, one per repository
+   from the branch `claude/festive-edison-al7xu2`, the four consumers'
+   first. sdlc-protocol's `downstream` jobs vendor its change into each
+   consumer's main and run that consumer's check there, and until a
+   consumer's own pull request has merged, its tests on main still read
+   the old record of one line and fail. Then sdlc-protocol's, with a merge
+   commit rather than a squash, so the commit the consumers' records name
+   stays the last one that changed the package and the first sync finds
+   every consumer up to date.
+6. **Release sdlc-protocol 0.2.0** once its pull request is merged:
+   `gh release create v0.2.0 --repo OpenSpineConsortium/sdlc-protocol
+   --target <the merge commit> --title "sdlc-protocol 0.2.0"`.
+7. **Run the sync once by hand** to see it work: sdlc-protocol's Actions
+   tab, Sync, Run workflow. Its summary has a row per consumer: up to
+   date, or the pull request it opened or updated and whether auto-merge
+   is on.
+
+Afterwards, a sync pull request that waits because main moved under it
+(the ruleset requires a branch to be up to date) needs no hand: the next
+push to sdlc-protocol, the weekly run or Run workflow rebuilds the branch
+on the consumer's main as it then is.
 
 Nothing is to be done for sdlc-marketplace in this repository:
 .claude/settings.json names the marketplace but enables no plugin, because
@@ -272,15 +317,13 @@ repositories not made from the template (its README says how to install it).
 
 ## 7. Where things stand
 
-- main: the template, released; .claude/session.md points at the work.
-- claude/10, draft pull request #13 (issue #10): the claim protocol
-  vendored from sdlc-protocol 0.1.0 under tools/sdlc_protocol, with
-  tools/board.py, check_protocol.py and team.py as shims over it;
-  experiment/ moved out to OpenSpineConsortium/coordbench; the App's token
-  in template-init. Its .claude/session.md is the full checkpoint. It
-  stays a draft until #12 is merged (section 6, step 4).
-- claude/11, pull request #12 (issue #11): the push guard's newline fix
-  alone, rebased on main, 52 lines over main, ready for review.
-- sdlc-protocol, coordbench, sdlc-marketplace and sdlc-app: built and
-  pushed on the branches section 6 names, waiting on its steps.
+- main: the template, with the claim protocol vendored from sdlc-protocol
+  under tools/sdlc_protocol and tools/board.py, check_protocol.py, team.py
+  and guard_push.py as shims over it; experiment/ moved out to
+  OpenSpineConsortium/coordbench; the App's token in template-init.
+- The sync of section 6 and sdlc-protocol 0.2.0, whose record lists the
+  sha256 of every copied file and each consumer's check holds its copy
+  to, came as one pull request per repository from the branch
+  `claude/festive-edison-al7xu2`, to land in the order of section 6,
+  step 5.
 - The main account's weekly Claude usage resets on 2026-10-15 at 11:00 UTC.
