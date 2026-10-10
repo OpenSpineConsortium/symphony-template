@@ -31,6 +31,10 @@ For the maintainer of the template itself: mark the repository as a template (Se
 
 Nothing is copied from the repository into the Project's own fields, and nothing needs to be. Linking a repository to a Project is a pointer: it tells threads what to clone, and claude.ai reads nothing from the clone into the Project's instructions, description or memory. Claude Code, on the other hand, assembles every session's context from the clone, identically for a thread of a Project and for a cloud session opened on the repository, so the repository already enforces what a copy in the Project's fields would only approximate: one text for every account, changed by one merged pull request, with no per-account credential anywhere. A copy in the fields would go stale between syncs and differ quietly from one account to the next. The Project's own memory is at most a private cache of the account that made the Project; what every account should know goes to docs/memory/ by pull request.
 
+## Where the protocol's code lives
+
+The claim protocol's code is a library of its own, OpenSpineConsortium/sdlc-protocol, vendored here under tools/sdlc_protocol with tools/VENDORED naming the release and its commit; tools/board.py, check_protocol.py, team.py and guard_push.py are shims over it, so the workflows, the hook and every copy already made keep calling the same paths. A new release comes in when someone runs that repository's scripts/vendor.sh on a clone of this one and lands the change by pull request. Three more repositories go with this one: OpenSpineConsortium/coordbench, the benchmark that compares ways of coordinating agents; OpenSpineConsortium/sdlc-marketplace, the Claude Code plugin that brings the skills and the hooks to a repository not made from this template; and sdlc-app, the private GitHub App whose token lets template-init's first commit start the Checks and the Board. docs/project.md says what each is for and who owns it.
+
 cswap is the optional multi-account switcher (claude-swap-cloud on PyPI); its `checkpoint write` rewrites the same block at the end of CLAUDE.md as the checkpoint skill does, and nothing in this repository needs it.
 
 ## What comes next
@@ -44,5 +48,5 @@ This is the first layer: the repository as the shared plane, with the board, the
 ## What this never does
 
 - Nothing here scripts claude.ai, and nothing writes into a Project's instructions, description or memory. Anthropic's consumer terms forbid automated access except through an API key or where Anthropic explicitly permits it; routines and cloud threads are Anthropic's own features, used as offered, and Claude Code reads the repository natively. The Project links the repository, and people press the buttons.
-- No credential and no token is kept in the repository. The workflows run on GitHub's own token; the optional secrets are the coordinator routine's trigger pair and the main account's subscription token for @claude (docs/setup/claude-action.md), kept in the repository's settings and never in a file (docs/setup/github.md).
+- No credential and no token is kept in the repository. The workflows run on GitHub's own token, and template-init on the sdlc App's token where the App is set up; the optional secrets are the coordinator routine's trigger pair, the main account's subscription token for @claude (docs/setup/claude-action.md) and the App's private key (docs/setup/owner-checklist.md), kept in the repository's settings and never in a file (docs/setup/github.md).
 - No API key anywhere.

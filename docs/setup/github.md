@@ -1,6 +1,6 @@
 # Setting up the repository on GitHub
 
-A template repository copies files only. The new repository gets none of the template's settings, branch rules, secrets, labels or issues. That is why the first push runs .github/workflows/template-init.yml, which fills the names into the files, creates the labels and opens the issue "Set up this project", and why this page exists for what only a person with the repository's settings can do. Do these once, in this order, under https://github.com/{{REPO}}/settings.
+A template repository copies files only. The new repository gets none of the template's settings, branch rules, secrets, labels or issues. That is why the first push runs .github/workflows/template-init.yml, which fills the names into the files, creates the labels and opens the issue "Set up this project", and why this page exists for what only a person with the repository's settings can do. Do these once, in this order, under https://github.com/{{REPO}}/settings; or run `bash scripts/setup-repo.sh` once from a clone with the GitHub CLI signed in, which does sections 1, 2 and 5 and the variables in one go (docs/setup/owner-checklist.md gathers every step, the Claude side included, and says what an organization can set once for every repository it makes).
 
 ## 1. Protect the default branch
 
