@@ -6,4 +6,4 @@ Which account owns which area of the repository. Any account claims issues anywh
 | --- | --- | --- | --- | --- |
 | The whole repository, until areas are split | everything | main | account:main | {{CODE_OWNER}} |
 
-To split an area: add a row with its paths, the account and the account's label (docs/setup/github.md says how to add one), by pull request, and say so in docs/project.md under Owners.
+To split an area: add a row with its paths, the account and the account's label (docs/setup/github.md says how to add one), by pull request; say so in docs/project.md under Owners; and add a line at the end of .github/CODEOWNERS for the same paths naming the account's GitHub login beside the login already there, since GitHub uses the last line that matches a file and asks only a user with Write. That line is what asks the account for a look.

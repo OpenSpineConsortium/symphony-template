@@ -2,6 +2,8 @@
 
 This repository is a Claude project kept as files: the instructions, the goal, the shared memory and the board that Claude Code reads in every session, local or cloud, live here under version control. It came from a GitHub template that brings the folder structure, the checks and the workflows already set up, so a new project starts with the whole arrangement in place. Each Claude account makes a thin claude.ai Project that only links this repository, with its instructions, description and memory left blank, because every session loads the goal, the protocol and the memory from the files here; from then on the repository is the one place every account and every session agrees on.
 
+New here? Begin at [docs/start/README.md](docs/start/README.md). It says what the five repositories are and how they fit, has a table of the ways to use them (one person, many cloud sessions at once, a team of people, volunteers, a repository you already have, the benchmark, a change to the protocol itself) with one page of copyable steps each, lists which token goes where and who holds it, and gives a five-minute path from "Use this template" to a cloud session working on a claimed issue.
+
 ## Use this template
 
 About ten minutes, in this order.
@@ -64,6 +66,6 @@ This is the first layer: the repository as the shared plane, with the board, the
 ## What this never does
 
 - Nothing here scripts claude.ai, and nothing writes into a Project's instructions, description or memory. Anthropic's consumer terms forbid automated access except through an API key or where Anthropic explicitly permits it; routines and cloud threads are Anthropic's own features, used as offered, and Claude Code reads the repository natively. The Project links the repository, and people press the buttons.
-- No credential and no token is kept in the repository. The workflows run on GitHub's own token, and template-init on the sdlc App's token where the App is set up; the optional secrets are the coordinator routine's trigger pair, the main account's subscription token for @claude (docs/setup/claude-action.md) and the App's private key (docs/setup/owner-checklist.md), kept in the repository's settings and never in a file (docs/setup/github.md).
+- No credential and no token is kept in the repository. The workflows run on GitHub's own token, and template-init on the sdlc App's token where the App is set up; the optional secrets are the coordinator routine's trigger pair, the main account's subscription token for @claude (docs/setup/claude-action.md) and the App's private key (docs/setup/owner-checklist.md), kept in the repository's settings and never in a file (docs/setup/github.md), and only while the owner is the repository's one writer, since every writer's workflows can read a repository secret; docs/start/team.md, step 1, takes them out before anyone else gets Write.
 - No API key anywhere.
 - Nothing of a project's content leaves it: the metrics workflow reads with GitHub's own token and writes aggregates alone, to the project's own branch `metrics`, and the judge's conversations go only to the maintainer's own claude (docs/setup/metrics.md).

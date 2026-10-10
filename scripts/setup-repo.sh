@@ -34,7 +34,8 @@
 #   4. turns on secret scanning, then push protection, which GitHub accepts
 #      only once scanning is on; where the plan or the visibility offers
 #      neither (a Free organization's private repository has no Secret
-#      Protection) it prints why and carries on;
+#      Protection) it prints why and carries on, and a gh older than 2.65,
+#      which lacks the two flags, is reported as that and not as the plan;
 #   5. creates or updates the labels, read from LABELS in
 #      tools/template_init.py, so the list lives in one place;
 #   6. sets each repository variable given as --var NAME=VALUE; the ones
@@ -170,14 +171,24 @@ gh repo edit "$REPO" --delete-branch-on-merge --enable-auto-merge
 echo "general: delete head branches on merge, allow auto-merge: on"
 
 # 4. Secret scanning, then push protection. A failure here is the plan or
-# the visibility, not the script, so it is reported and the run goes on.
+# the visibility, not the script, so it is reported and the run goes on;
+# except "unknown flag", which is a gh older than 2.65.0, the first release
+# with these two flags (a distribution's package often is), and blaming the
+# plan for that would leave scanning off for good.
+old_gh() {
+  printf '%s: this gh (%s) predates the flag; install gh 2.65 or later (https://github.com/cli/cli/blob/trunk/docs/install_linux.md) and run this again\n' "$1" "$(gh --version | head -n 1)"
+}
 if answer=$(gh repo edit "$REPO" --enable-secret-scanning 2>&1); then
   echo "secret scanning: on"
   if answer=$(gh repo edit "$REPO" --enable-secret-scanning-push-protection 2>&1); then
     echo "push protection: on"
+  elif grep -q "unknown flag" <<<"$answer"; then
+    old_gh "push protection"
   else
     printf 'push protection: not available here (%s); turn it on by hand if the plan offers it\n' "$(tr '\n' ' ' <<<"$answer")"
   fi
+elif grep -q "unknown flag" <<<"$answer"; then
+  old_gh "secret scanning"
 else
   printf 'secret scanning: not available here (%s); a Free organization'"'"'s private repository has no Secret Protection, docs/setup/github.md section 5\n' "$(tr '\n' ' ' <<<"$answer")"
 fi
