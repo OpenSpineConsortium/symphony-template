@@ -69,9 +69,17 @@ The owner's steps are in docs/setup/owner-checklist.md.
   guard matching claude/11's on 38 payloads. Left: re-vendor guard.py from
   the sdlc-protocol 0.1.0 tag; a CI workflow; the template preset and the
   decision to drop the template's own three hooks (both would run twice).
-- sdlc-app: a build was running toward claude/init (stdlib webhook server,
-  JWT signed with openssl, the gate as the check run "sdlc/protocol",
-  manifest registration script, Dockerfile, tests).
+- sdlc-app done on claude/init: stdlib webhook server (HMAC, 202 then a
+  worker thread, one JSON log line per delivery), JWT signed with openssl,
+  installation-token cache, the gate as the check run "sdlc/protocol" from
+  the vendored protocol_check, scripts/register.py (manifest flow, writes
+  .sdlc-app.env 0600), Dockerfile, CI, 67 tests. Run only against fakes:
+  nothing is registered yet. Owner: `python3 scripts/register.py --org
+  OpenSpineConsortium` from a clone, install the App, set SDLC_APP_ID and
+  SDLC_APP_PRIVATE_KEY (register.py prints the gh commands). Left:
+  check_suite rerequested, re-vendor from sdlc-protocol 0.1.0, the
+  template's create-github-app-token step, and dropping CI's protocol step
+  once sdlc/protocol is required.
 - sdlc-protocol: the extraction was resumed on Opus; work in progress is on
   its branch wip/extract (its default branch for now).
 - The push guard refuses any push to a branch named main, so the four new
