@@ -18,7 +18,9 @@ name: Worker
 # action is told to accept it. Off until CLAUDE_WORKER is true; Claude
 # runs need the secret CLAUDE_CODE_OAUTH_TOKEN (docs/setup/claude-action.md)
 # and draw on the main account's subscription. One run at a time per
-# member.
+# member. In crowd mode (docs/project.md, docs/setup/crowdsourcing.md) the
+# job never starts, whatever CLAUDE_WORKER says: each contributor runs their
+# own worker on their own account, and the repository holds no token.
 
 on:
   schedule:
@@ -36,7 +38,7 @@ on:
 
 jobs:
   worker:
-    if: vars.CLAUDE_WORKER == 'true'
+    if: vars.CLAUDE_CROWD != 'true' && vars.CLAUDE_WORKER == 'true'
     strategy:
       fail-fast: false
       matrix:

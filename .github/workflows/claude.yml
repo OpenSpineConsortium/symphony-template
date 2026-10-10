@@ -12,6 +12,10 @@ name: Claude
 # spending the owner's five-hour window. Without --allowedTools the action
 # grants only its own GitHub tools, so the session could not run git, gh or
 # the checks; the repository variable CLAUDE_ALLOWED_TOOLS overrides the list.
+# In crowd mode (docs/project.md, docs/setup/crowdsourcing.md) the job never
+# starts: its condition needs the repository variable CLAUDE_CROWD not to be
+# true, and a repository that never set it reads it as empty, so there the
+# condition is exactly the one before it.
 
 on:
   issue_comment:
@@ -26,10 +30,11 @@ on:
 jobs:
   claude:
     if: |
+      vars.CLAUDE_CROWD != 'true' && (
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

@@ -28,6 +28,10 @@ Every account's Project uses the same model and the same effort, so the work rea
 - Model: not yet chosen.
 - Effort: not yet chosen.
 
+## Crowd mode
+
+- Crowd mode: off. To open the project to volunteers who each work on their own Claude account, the owner runs `python3 scripts/crowd.py setup` (docs/setup/crowdsourcing.md), whose pull request turns this line on with the decisions that come with it; from then on the required check holds the repository to them.
+
 ## Owners
 
 - Repository owner: {{OWNER}}, who merges to {{DEFAULT_BRANCH}}; .github/CODEOWNERS names the same login.

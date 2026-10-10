@@ -17,7 +17,9 @@ name: Checks
 # the same reason: that repository's sync workflow pushes sdlc-protocol/sync
 # with the GitHub App's token, which, unlike a workflow's own GITHUB_TOKEN,
 # starts this workflow, and then opens or updates the branch's pull request,
-# which runs the check again on the same commit.
+# which runs the check again on the same commit. It leaves out crowd/ too:
+# scripts/crowd.py setup pushes crowd/setup with the owner's token through
+# the API and opens its pull request, whose run is the one that counts.
 # Before the checks the job clones OpenSpineConsortium/sdlc-protocol, which
 # is public, so the clone needs no token, and names the clone to them in
 # SDLC_PROTOCOL. check.sh's vendoring.py verify holds tools/sdlc_protocol to
@@ -32,12 +34,25 @@ name: Checks
 # issue, a head in this repository. The extra event types are the moments
 # those facts change without a push: marked ready, converted back to draft,
 # the body edited.
+# The same job holds a crowd repository (docs/setup/crowdsourcing.md) to
+# its rules, so they are part of the required check: tools/crowd_check.py
+# guard fails while a Claude secret or variable reaches the repository and
+# crowd mode shows anywhere, while the default branch says crowd mode is on
+# and the variable CLAUDE_CROWD, which keeps the Claude workflows from
+# starting, is not true, and when a pull request changes a committed
+# checkpoint there. The expressions compare inside GitHub and hand the step
+# only "true" or "false", as the Claude workflows' HAVE_TOKEN does, so no
+# value is ever in its environment; an organization's secret reaches
+# secrets.NAME as a repository's does, so both are caught. A fork's pull
+# request is given no secret and perhaps no variable, so for it the step
+# holds the checkpoint rule alone, which needs only git. Outside crowd mode
+# it prints "crowd: off" and passes, whatever secrets exist.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
   push:
-    branches-ignore: ["claude/**", "sdlc-protocol/**"]
+    branches-ignore: ["claude/**", "sdlc-protocol/**", "crowd/**"]
 
 permissions:
   contents: read
@@ -59,6 +74,21 @@ jobs:
         env:
           SDLC_PROTOCOL: ${{ runner.temp }}/sdlc-protocol
         run: bash scripts/check.sh
+
+      - name: Hold a crowd repository to its rules
+        env:
+          CLAUDE_CROWD: ${{ vars.CLAUDE_CROWD }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          FROM_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          SET_CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+          SET_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          SET_COORDINATOR_TRIGGER_URL: ${{ secrets.COORDINATOR_TRIGGER_URL != '' }}
+          SET_COORDINATOR_TRIGGER_TOKEN: ${{ secrets.COORDINATOR_TRIGGER_TOKEN != '' }}
+          SET_SDLC_APP_PRIVATE_KEY: ${{ secrets.SDLC_APP_PRIVATE_KEY != '' }}
+          SET_CLAUDE_WORKER: ${{ vars.CLAUDE_WORKER != '' }}
+          SET_CLAUDE_TEAM: ${{ vars.CLAUDE_TEAM != '' }}
+        run: python3 tools/crowd_check.py guard
 
       - name: Hold a claude/ pull request to the claim protocol
         if: github.event_name == 'pull_request'

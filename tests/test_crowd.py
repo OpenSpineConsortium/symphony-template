@@ -775,13 +775,21 @@ class BuildChange(unittest.TestCase):
         for path in (".github/CODEOWNERS", "docs/agents/OWNERSHIP.md"):
             self.assertNotRegex(files[path], r"(?<![A-Za-z0-9])(AREA|OWNER_LOGIN)(?![A-Za-z0-9])", path)
 
-    def test_a_mode_line_that_says_off_is_turned_on_in_place(self):
-        files = dict(self.files)
-        files[crowd.PROJECT] = files[crowd.PROJECT].replace("## Owners", "## Crowd mode\n\n- Crowd mode: off. See scripts/crowd.py.\n\n## Owners")
-        text = crowd.build_change(files, REPO, "main", OWNER, []).files[crowd.PROJECT]
+    def test_the_shipped_mode_line_is_turned_on_in_place(self):
+        self.assertEqual(crowd_check.mode_of(self.files[crowd.PROJECT]), "off")
+        text = self.change.files[crowd.PROJECT]
         self.assertEqual(len(crowd_check.MODE_LINE.findall(text)), 1)
         self.assertEqual(crowd_check.mode_of(text), "on")
         self.assertNotIn("Crowd mode: off", text)
+        self.assertEqual(text.count("## Crowd mode"), 1)
+
+    def test_a_copy_older_than_the_mode_line_gets_the_section(self):
+        files = dict(self.files)
+        files[crowd.PROJECT] = re.sub(r"## Crowd mode\n\n- Crowd mode: off\..*\n\n", "", files[crowd.PROJECT])
+        self.assertIsNone(crowd_check.mode_of(files[crowd.PROJECT]))
+        text = crowd.build_change(files, REPO, "main", OWNER, []).files[crowd.PROJECT]
+        self.assertEqual(crowd_check.mode_of(text), "on")
+        self.assertEqual(text.count("## Crowd mode"), 1)
 
     def test_claude_md_keeps_its_markers_and_only_one_sentence_changes_inside(self):
         old, new = self.files[crowd.CLAUDE_MD], self.change.files[crowd.CLAUDE_MD]
@@ -1395,6 +1403,55 @@ class SetupRepoScript(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn(f"POST {API}/rulesets", keys)
         self.assertIn("repo edit", keys)
+
+
+GUIDE = ROOT / "docs" / "setup" / "crowdsourcing.md"
+# The words the guide leaves for the reader to fill, as a command takes them.
+GUIDE_WORDS = {"TEMPLATE_OWNER/TEMPLATE_NAME": "octo/template", "ORG/NAME": REPO, "AREA": "parser", "LOGIN": "someone"}
+
+
+def section_anchors(path):
+    """The anchors GitHub gives a Markdown file's headings."""
+    headings = re.findall(r"^#+ (.+)$", path.read_text(encoding="utf-8"), re.MULTILINE)
+    return {re.sub(r"[^\w\- ]", "", heading.strip().lower()).replace(" ", "-") for heading in headings}
+
+
+def guide_commands():
+    """Each crowd.py command in the guide's code blocks, as its arguments,
+    with the reader's words filled and optional parts left out."""
+    found, fenced = [], False
+    for line in GUIDE.read_text(encoding="utf-8").splitlines():
+        if line.strip().startswith("```"):
+            fenced = not fenced
+            continue
+        for command in re.findall(r"python3 scripts/crowd\.py ([^&\n]+)", line) if fenced else []:
+            for word, value in GUIDE_WORDS.items():
+                command = re.sub(r"(?<![A-Za-z0-9_])" + re.escape(word) + r"(?![A-Za-z0-9_])", value, command)
+            found.append(re.sub(r"\[[^]]*\]", "", command).split())
+    return found
+
+
+class Guide(unittest.TestCase):
+    """docs/setup/crowdsourcing.md, the page that tells the owner and each
+    contributor what to run, stays true to crowd.py and to its evidence."""
+
+    def test_every_reason_names_a_section_of_the_research_record(self):
+        anchors = section_anchors(ROOT / crowd.RESEARCH)
+        linked = re.findall(r"research\.md#([a-z0-9-]+)", GUIDE.read_text(encoding="utf-8"))
+        self.assertGreater(len(linked), 30)
+        for anchor in linked + [anchor for _, anchor in list(crowd.WHY.values()) + [crowd.AREA_WHY]]:
+            self.assertIn(anchor, anchors)
+
+    def test_every_command_it_gives_is_one_crowd_py_takes(self):
+        commands = guide_commands()
+        self.assertLessEqual({"setup", "finish", "invite", "remove", "audit", "publish-template", "doctor"},
+                             {args[0] for args in commands})
+        for args in commands:
+            with redirect_stderr(io.StringIO()):
+                try:
+                    crowd.parse_args(args)
+                except SystemExit:
+                    self.fail("crowd.py does not take: " + " ".join(args))
 
 
 class Source(unittest.TestCase):
