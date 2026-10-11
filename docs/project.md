@@ -12,6 +12,8 @@ In scope: the areas this project owns, each in one line; docs/agents/OWNERSHIP.m
 
 Out of scope, by decision: what this project does not do, each with the reason, so nobody proposes it again.
 
+- A settings-as-code app (github/safe-settings, or the Repository Settings App reading .github/settings.yml), decided no on 2026-10-11 (issue #18): it is a dependency with admin rights on every repository it covers, and a server of our own in one case, for settings that Symphony Setup applies for one run from the front door, scripts/setup-repo.sh from a clone, and organization rulesets, secrets and variables for what an organization makes.
+
 ## Repositories
 
 - {{REPO}}, this one: the shared plane for every account and every session; the default branch is {{DEFAULT_BRANCH}}.
