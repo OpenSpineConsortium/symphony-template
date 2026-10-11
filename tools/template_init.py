@@ -356,7 +356,7 @@ def setup_issue_body(repo, default_branch, app_link=APP_INSTALL):
     base = f"https://github.com/{repo}/blob/{default_branch}"
     settings = f"https://github.com/{repo}/settings"
     return "\n".join([
-        "This repository was made from the SDLC template. Finish setting it up below; or, to open it to volunteers "
+        "This repository was made from the Symphony template. Finish setting it up below; or, to open it to volunteers "
         "who each work on their own Claude account, run `python3 scripts/crowd.py setup` instead, which rewrites "
         f"this checklist ([docs/setup/crowdsourcing.md]({base}/docs/setup/crowdsourcing.md)):",
         "",

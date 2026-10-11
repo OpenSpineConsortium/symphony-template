@@ -16,7 +16,7 @@ each file, how each measure lines up with the benchmark's, and the switch.
            how the protocol ran and nothing about what was built or by whom.
            The workflow puts it on the branch metrics, where
            OpenSpineConsortium's collector reads it, and only where the
-           repository installed the OpenSpine SDLC App. GITHUB_TOKEN's hour
+           repository installed the Symphony App. GITHUB_TOKEN's hour
            is the whole repository's, the board's runs among it, so a run
            stops before it would leave the board fewer requests than
            RESERVE, says so, and writes nothing.
@@ -39,7 +39,7 @@ each file, how each measure lines up with the benchmark's, and the switch.
   unchanged OLD NEW  exit 0 when two METRICS.json files differ in nothing
            but generated_at, so the workflow writes only when something moved.
 
-The switch: sharing is on unless the file .github/sdlc-metrics or the
+The switch: sharing is on unless the file .github/symphony-metrics or the
 repository variable SDLC_METRICS (handed to the workflow's environment)
 says otherwise. Off from either wins, and an off run writes exactly
 {"schema": "sdlc-metrics/1", "sharing": "off"} without a single API call.
@@ -78,7 +78,10 @@ SCHEMA = "sdlc-metrics/1"
 JUDGE_SCHEMA = "sdlc-judge/1"
 ON, OFF = "on", "off"
 OFF_RECORD = {"schema": SCHEMA, "sharing": OFF}
-SWITCH_FILE = ".github/sdlc-metrics"
+SWITCH_FILE = ".github/symphony-metrics"
+# The switch's name before the rename to Symphony, still read, since a
+# repository set up before it carries that file.
+OLD_SWITCH_FILE = ".github/sdlc-metrics"
 SWITCH_VARIABLE = "SDLC_METRICS"
 METRICS_BRANCH = "metrics"
 METRICS_FILE = "METRICS.json"
@@ -183,13 +186,15 @@ def sharing(root, environ):
     said = first_word(environ.get(SWITCH_VARIABLE))
     if said and said != ON:
         return OFF
-    try:
-        text = (Path(root) / SWITCH_FILE).read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return ON
-    except (OSError, UnicodeDecodeError):
-        return OFF
-    return ON if first_word(text) == ON else OFF
+    for name in (SWITCH_FILE, OLD_SWITCH_FILE):
+        try:
+            text = (Path(root) / name).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            continue
+        except (OSError, UnicodeDecodeError):
+            return OFF
+        return ON if first_word(text) == ON else OFF
+    return ON
 
 
 def protocol_version(path=VENDORED):

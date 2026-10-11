@@ -1,4 +1,4 @@
-Field metrics: .github/workflows/metrics.yml writes the protocol's aggregates, never a name or any text, to METRICS.json on the branch metrics daily with GITHUB_TOKEN alone; a maintainer's judge adds App F counts as JUDGE.json; .github/sdlc-metrics or the variable SDLC_METRICS turns sharing off.
+Field metrics: .github/workflows/metrics.yml writes the protocol's aggregates, never a name or any text, to METRICS.json on the branch metrics daily with GITHUB_TOKEN alone; a maintainer's judge adds App F counts as JUDGE.json; .github/symphony-metrics or the variable SDLC_METRICS turns sharing off.
 
 tools/metrics.py collect reads the last 30 days of pull requests, reviews,
 check runs, claude/<n> branches and comments from the REST API and writes
@@ -10,7 +10,7 @@ the file. Off from the file or the variable writes {"schema":
 
 The run is daily at 03:43 UTC, before OpenSpineConsortium's collector reads
 the branch at 04:17, and on a push to the default branch that changes
-.github/sdlc-metrics, so a merge of off is read as off the same day; the
+.github/symphony-metrics, so a merge of off is read as off the same day; the
 variable starts no run, so the owner runs the workflow once after setting
 it. Disabling the workflow stops no sharing: the branch keeps its last
 record, so the switch goes off and one run writes it before the workflow
@@ -37,5 +37,5 @@ release comment with `<!-- sdlc-coordinator: claim-released -->` (both
 coordinator prompts carry it), and the board's "main moved" comment says
 "conflicting with" for a conflict; change either and metrics.py with it.
 OpenSpineConsortium's collector, in sdlc-app, reads only the two files at
-the ref metrics of repositories that installed the OpenSpine SDLC App and
+the ref metrics of repositories that installed the Symphony App and
 stores them under a salted hash of the repository.

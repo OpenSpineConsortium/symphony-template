@@ -10,15 +10,15 @@ name: Metrics
 # title, branch name, URL, issue number or text, so the file can be shared
 # without sharing the project. OpenSpineConsortium's collector reads this
 # file and JUDGE.json from the branch metrics, and only in a repository that
-# installed the OpenSpine SDLC App; nothing here sends anything anywhere.
+# installed the Symphony App; nothing here sends anything anywhere.
 # Sharing is on by default, with one switch two ways: the word off in
-# .github/sdlc-metrics on the default branch, or the repository variable
+# .github/symphony-metrics on the default branch, or the repository variable
 # SDLC_METRICS set to off. Off from either wins, and the run then writes
 # {"schema": "sdlc-metrics/1", "sharing": "off"} and calls no API.
 #
 # The run is daily at 03:43 UTC, before the collector's read at 04:17, so
 # what the collector reads is the day's; by hand; and on a push to the
-# default branch that changes .github/sdlc-metrics, so a merge of off puts
+# default branch that changes .github/symphony-metrics, so a merge of off puts
 # the off record on the branch at once, before the next read, instead of
 # leaving the last on record there for one more day. A change to the
 # variable starts no run: the owner runs the workflow once by hand after
@@ -56,7 +56,7 @@ name: Metrics
 
 on:
   push:
-    paths: [".github/sdlc-metrics"]
+    paths: [".github/symphony-metrics", ".github/sdlc-metrics"]
   schedule:
     - cron: "43 3 * * *"
   workflow_dispatch:

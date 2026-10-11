@@ -68,7 +68,7 @@ Write a checkpoint for this pull request with the checkpoint skill, as the skill
 Remember this with the remember skill, in this pull request: <the fact, in one sentence>
 ```
 
-**Show the whole board,** since the session hook prints only its first 120 lines (`/sdlc:board` where the plugin brings it):
+**Show the whole board,** since the session hook prints only its first 120 lines (`/symphony:board` where the plugin brings it):
 
 ```
 /board

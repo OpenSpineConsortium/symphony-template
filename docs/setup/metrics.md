@@ -1,6 +1,6 @@
 # Field metrics
 
-OpenSpineConsortium/coordbench measures ways of coordinating coding agents on CooperBench's task pairs, this template's claim protocol among them. Field metrics measure the same protocol where it is really used, in this repository, so the benchmark's numbers can be set beside what happens in practice. Only aggregates are kept: counts, durations, outcome rates and how often each kind of communication error appears. No code, no text, no title, no login, no branch name and no repository name ever goes into the files, and nothing leaves the repository unless the repository installed the OpenSpine SDLC App, whose collector reads two files and nothing else. Sharing is on by default and has one switch, below.
+OpenSpineConsortium/coordbench measures ways of coordinating coding agents on CooperBench's task pairs, this template's claim protocol among them. Field metrics measure the same protocol where it is really used, in this repository, so the benchmark's numbers can be set beside what happens in practice. Only aggregates are kept: counts, durations, outcome rates and how often each kind of communication error appears. No code, no text, no title, no login, no branch name and no repository name ever goes into the files, and nothing leaves the repository unless the repository installed the Symphony App, whose collector reads two files and nothing else. Sharing is on by default and has one switch, below.
 
 Two pieces do the work, both in tools/metrics.py:
 
@@ -36,7 +36,7 @@ How the choices were made:
 - The first head commit. GitHub keeps no record of the head a pull request was opened with, so it is the newest of its commits committed by the time it opened, with a minute's grace for a fast clock. When a rebase has replaced them all, the pull request stays out of first_check_pass_rate. On a `claude/N` pull request opened at once, as the protocol asks, the first head is usually the claim commit.
 - Check runs. They are read on every commit of the window's pull requests made in the window, not on the head alone: the default branch takes only a pull request whose check passed, so a merged pull request's head is green by construction, and the failures its earlier heads had would never be seen. And every attempt on a commit is read (filter=all), where GitHub's listing shows the latest attempt of each check alone, so a failure that a re-run fixed is still the failure it was.
 - Conflicts come from two places because each misses some: GitHub computes `dirty` only for an open pull request and only as it stands now, and the board's comment marks the moment the default branch moved under one. Both are counted once per pull request.
-- The budget. A run costs, per pull request of the window, one REST call for its commits, one for its reviews, one for the check runs of each of its commits made in the window, one more for the head it was opened with when that was made before the window, and while it is open one for its detail, or two when GitHub has not computed its mergeability yet; one per claim branch without a pull request in the window; and one per hundred pull requests, branches and comments listed. GITHUB_TOKEN has 1,000 requests an hour for the whole repository, which the board's runs share, so the run reads from each answer how many are left and stops before it would leave fewer than 300 for the board: it says so, with the calls it made and when the hour's budget comes back, writes nothing, and the workflow run fails; the branch keeps its last record, and the next run, the daily one or one by hand once the hour has turned, writes again when it fits. The log of a run that fits says how many calls it took. It runs once a day at 03:43 UTC, before OpenSpineConsortium's collector reads the branch at 04:17, by hand from the Actions tab or with `gh workflow run metrics.yml --repo OWNER/NAME`, and on a push to the default branch that changes .github/sdlc-metrics (the switch, below).
+- The budget. A run costs, per pull request of the window, one REST call for its commits, one for its reviews, one for the check runs of each of its commits made in the window, one more for the head it was opened with when that was made before the window, and while it is open one for its detail, or two when GitHub has not computed its mergeability yet; one per claim branch without a pull request in the window; and one per hundred pull requests, branches and comments listed. GITHUB_TOKEN has 1,000 requests an hour for the whole repository, which the board's runs share, so the run reads from each answer how many are left and stops before it would leave fewer than 300 for the board: it says so, with the calls it made and when the hour's budget comes back, writes nothing, and the workflow run fails; the branch keeps its last record, and the next run, the daily one or one by hand once the hour has turned, writes again when it fits. The log of a run that fits says how many calls it took. It runs once a day at 03:43 UTC, before OpenSpineConsortium's collector reads the branch at 04:17, by hand from the Actions tab or with `gh workflow run metrics.yml --repo OWNER/NAME`, and on a push to the default branch that changes .github/symphony-metrics (the switch, below).
 - Medians are rounded half up to whole seconds; the 90th percentile is the nearest rank, the smallest value at or above nine tenths of them. A wait against the clock (a later event dated earlier) is left out. Rates are rounded to four places. Where a value has nothing to measure it is null.
 
 ## The files
@@ -143,11 +143,11 @@ The branch `metrics` is as visible as the repository: in a public repository any
 
 Sharing is on unless one of these says off; off from either wins.
 
-- The file .github/sdlc-metrics on the default branch: its first word is `on` or `off`. A missing file means on; any first word but `on`, or a file that cannot be read, means off. Change it by pull request like any file:
+- The file .github/symphony-metrics on the default branch: its first word is `on` or `off`. A missing file means on; any first word but `on`, or a file that cannot be read, means off. Change it by pull request like any file:
 
   ```
-  printf 'off\n' > .github/sdlc-metrics
-  git add .github/sdlc-metrics && git commit -m "Turn field metrics off"
+  printf 'off\n' > .github/symphony-metrics
+  git add .github/symphony-metrics && git commit -m "Turn field metrics off"
   ```
 
 - The repository variable SDLC_METRICS, which the workflow hands to the tool: `off` (any word but `on`) turns sharing off whatever the file says, and it needs no pull request:
@@ -156,7 +156,7 @@ Sharing is on unless one of these says off; off from either wins.
   gh variable set SDLC_METRICS --repo OWNER/NAME --body off
   ```
 
-With sharing off the run writes `{"schema": "sdlc-metrics/1", "sharing": "off"}` and makes no API call, so the collector sees only that. The run comes at once after a merge of off, since the workflow starts on a push to the default branch that changes .github/sdlc-metrics; the variable starts no run, so after setting it run the workflow once by hand:
+With sharing off the run writes `{"schema": "sdlc-metrics/1", "sharing": "off"}` and makes no API call, so the collector sees only that. The run comes at once after a merge of off, since the workflow starts on a push to the default branch that changes .github/symphony-metrics; the variable starts no run, so after setting it run the workflow once by hand:
 
 ```
 gh workflow run metrics.yml --repo OWNER/NAME
@@ -196,7 +196,7 @@ python3 tools/metrics.py push
 
 ## Who reads the files
 
-OpenSpineConsortium's collector lives in the private repository OpenSpineConsortium/sdlc-app. Once a day, at 04:17 UTC, after this repository's run at 03:43, it lists the repositories that installed the OpenSpine SDLC App, reads METRICS.json and JUDGE.json at the ref `metrics` of each and no other path, keeps only those whose sharing is on, and stores each day's files under HMAC-SHA256 of the repository's node id with a salt only the collector holds, never under the repository's name. A repository whose switch is off shows the collector `"sharing": "off"` and nothing more. A repository without the App is never read; its branch `metrics` is written all the same and stays the project's own record.
+OpenSpineConsortium's collector lives in the private repository OpenSpineConsortium/sdlc-app. Once a day, at 04:17 UTC, after this repository's run at 03:43, it lists the repositories that installed the Symphony App, reads METRICS.json and JUDGE.json at the ref `metrics` of each and no other path, keeps only those whose sharing is on, and stores each day's files under HMAC-SHA256 of the repository's node id with a salt only the collector holds, never under the repository's name. A repository whose switch is off shows the collector `"sharing": "off"` and nothing more. A repository without the App is never read; its branch `metrics` is written all the same and stays the project's own record.
 
 ## The branch and the rules
 

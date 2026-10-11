@@ -41,9 +41,9 @@ the owner's one action and the two live tests are below.
   wins (a 30-minute grace on the installation's updated_at or
   created_at; repositories named on open adopt issues, read from the
   JSON gh writes, are left alone); the sweep skips offered (branch
-  sdlc/adopt), adopted (PROTOCOL.md), declined (closed pull request from
-  sdlc/adopt), refused (the App's open issue "OpenSpine SDLC could not
-  open its pull request"), opted out (.github/sdlc-adopt says off),
+  symphony/adopt), adopted (PROTOCOL.md), declined (closed pull request from
+  symphony/adopt), refused (the App's open issue "Symphony could not
+  open its pull request"), opted out (.github/symphony-adopt says off),
   archived, no commit, no Issues, and the organization's own; an
   installation short of a write permission is passed over without a
   token; a time budget of 420 seconds under the JWT's life, incremental
@@ -169,7 +169,7 @@ Stated by the owner in conversation, this session and earlier:
   template's own, in sdlc-start's LICENSE with OpenSpineConsortium as the
   holder; the adoption copies no LICENSE into anyone's repository.
 - An adoption's repository settings are applied by a second, setup-only
-  App, OpenSpine SDLC Setup, holding Administration and Metadata and
+  App, Symphony Setup, holding Administration and Metadata and
   nothing else, which the adopter installs on the one repository for the
   one run and uninstalls afterwards; installing it is the consent; the
   main App never holds Administration on anyone's repository.

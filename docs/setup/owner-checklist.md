@@ -230,8 +230,8 @@ docs/setup/github.md describes:
 6. **Template**: sdlc-template is already marked as a template repository.
 7. **Field metrics**: nothing to set. .github/workflows/metrics.yml writes
    the project's aggregates to the branch `metrics` once a day, which
-   OpenSpineConsortium's collector reads only where the OpenSpine SDLC App
-   is installed; the word off in .github/sdlc-metrics, or the repository
+   OpenSpineConsortium's collector reads only where the Symphony App
+   is installed; the word off in .github/symphony-metrics, or the repository
    variable `SDLC_METRICS` = `off`, turns sharing off. Like `board`, the
    branch must stay outside every ruleset (docs/setup/metrics.md).
 
@@ -278,7 +278,7 @@ maps which of them copies which of the library's modules. The first
 round of setting them up is done. Checked on 2026-10-10: each of the
 four has main as its default branch, sdlc-protocol has the release tag
 v0.1.0 on f139a079d881ff245511625e443f6eff1318c727, and #12 and #13 are
-merged. The App OpenSpine SDLC (slug openspine-sdlc, id 5258276) is
+merged. The App Symphony (slug openspine-sdlc, id 5258276) is
 registered, and its id and key are set on this repository.
 
 ### The sync: one push to sdlc-protocol reaches every repository
@@ -293,7 +293,7 @@ variable below is set, the sync skips itself, stays green and says in its
 run's summary what is missing. Once, in this order:
 
 1. **Install the App on all five repositories**: the organization's
-   settings, GitHub Apps, OpenSpine SDLC, Configure, and choose "All
+   settings, GitHub Apps, Symphony, Configure, and choose "All
    repositories" or add sdlc-protocol, sdlc-template, coordbench,
    sdlc-marketplace and sdlc-app
    (https://github.com/organizations/OpenSpineConsortium/settings/installations).
