@@ -10,12 +10,17 @@ do is listed first, in the order to do it.
 ## The owner's morning, in order
 
 1. Rename the two GitHub Apps, in each App's settings page: "OpenSpine
-   SDLC" to "Symphony" (slug symphony) and "OpenSpine SDLC Setup" to
-   "Symphony Setup" (slug symphony-setup); the owner wants no OpenSpine
-   in the name. A GitHub App's name is unique across all of GitHub, so
-   if one is taken, pick another and give the session the slug GitHub
-   shows: every flip below and the extension name those two. Keep the
-   Setup URL of both Apps on the form, with "Redirect on update" ticked.
+   SDLC" to "Symphony Dev" (slug symphony-dev) and "OpenSpine SDLC
+   Setup" to "Symphony Setup" (slug symphony-setup). The owner wants no
+   OpenSpine in the name, and GitHub reserves an App name that matches
+   an existing account (Symphony, Symph and Symph0ny are all taken), so
+   the owner chose Symphony Dev on 2026-10-11. Set the main App's
+   description to "Symphony: pull-request-gated Claude Code agents for
+   your repository. Install it, press Create on the form, merge the pull
+   request." and both Apps' homepage URL to
+   https://openspineconsortium.com/symphony/, as the manifests in
+   symphony-app's flip say. Keep the Setup URL of both Apps on the
+   form, with "Redirect on update" ticked.
 2. Rename the five repositories (Settings, General): sdlc-protocol to
    symphony-protocol, sdlc-marketplace to symphony-marketplace,
    sdlc-template to symphony-template, sdlc-app to symphony-app,
@@ -40,9 +45,9 @@ do is listed first, in the order to do it.
    docs/store/TEST_BEFORE_UPLOAD.md first: the extension's buttons were
    checked against a logged-out read of a live repository page, but
    github.com/new needs a login, so the Create button is unverified on
-   the live page. The extension links the new names (the slugs symphony
-   and symphony-setup, the repository symphony-start), so steps 1 and 2
-   come before the upload.
+   the live page. The extension links the new names (the slugs
+   symphony-dev and symphony-setup, the repository symphony-start), so
+   steps 1 and 2 come before the upload.
 6. Optional: update the five repositories' descriptions on GitHub
    (they still say OpenSpine SDLC); press Run workflow on sdlc-start's
    Sweep once to see the sweep's dispatch path, since its schedule has
