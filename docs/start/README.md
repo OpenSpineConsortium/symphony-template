@@ -23,6 +23,7 @@ symphony-template is internal to its enterprise, so only the enterprise's member
 | You want | Page | You need |
 | --- | --- | --- |
 | One person, one account, a new project | [solo.md](solo.md) | Claude Pro, Max, Team or an Enterprise seat with Claude Code; a GitHub account; git, gh and Python 3.12 or later |
+| A new project from Claude Code, the Apps filling it, a cloud session on it | [claude-code.md](claude-code.md) | the same, on your own computer; the symphony plugin does the steps as `/symphony:new` |
 | Many cloud sessions on one project at once, on one account or several | [parallel.md](parallel.md) | solo.md done; each account's own plan |
 | Several people, each on their own account; or a team of agents in Actions | [team.md](team.md) | solo.md done; each person's own plan |
 | Volunteers on their own accounts, in an organization | [crowd.md](crowd.md) | a GitHub organization, a public copy of the template |
