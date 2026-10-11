@@ -107,6 +107,15 @@ is listed first.
   steps from Symphony Setup's account picker to the preselected page for
   the repository its note names. Whether GitHub carries the state through
   both hops is the owner's one test (the form's Repository field).
+- The form's Kind and Merge are required dropdowns with a default
+  (symphony-start#30): Auto and "Merge the pull request for me" are
+  preselected, since an optional dropdown opened on "None" and a
+  checkbox has no default; the kinds say what they are (a Claude project,
+  or the coordination protocol added to existing code). The extension
+  1.4.0 steps in on Symphony Setup's permissions page too (GitHub skips
+  the picker for an account with no organization), and 1.4.1 opens the
+  popup's links through the browser's new-tab call, so a private window
+  keeps them.
 - The six merged adoptions of 2026-10-11 are the owner's to undo with the
   script undo-symphony.sh given in chat (revert, ruleset, labels,
   branches, opt-out file), signed in as GregorySchwing; this session has
@@ -216,6 +225,9 @@ Stated by the owner in conversation, this session and earlier:
 - The installs are chained on GitHub's side: SymphonyBoard's Setup URL
   is Symphony Setup's install page, Symphony Setup's is the form; the
   extension steps from the picker to the preselected page.
+- The form's Kind and Merge are preselected dropdowns (Auto; merge for
+  me), the sharing opt-out the one box; the run merges unless the
+  person chose to review first.
 - An adopted repository carries the GitHub topic symphony, set by the
   adoption run (Setup App) and by setup-repo.sh; the extension reads it
   from the page and shows Ready for Symphony instead of Migrate.
