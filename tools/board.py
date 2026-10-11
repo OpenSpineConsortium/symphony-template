@@ -1,7 +1,7 @@
 """Render the board and nudge the pull requests that wait: a shim.
 
 The board's code now lives in the claim protocol's library,
-OpenSpineConsortium/sdlc-protocol, vendored here as tools/sdlc_protocol
+OpenSpineConsortium/symphony-protocol, vendored here as tools/sdlc_protocol
 (tools/VENDORED names the version and the commit). This file stays because
 .github/workflows/board.yml and every copy of the template already made
 run "python3 tools/board.py ...": it hands the same arguments to

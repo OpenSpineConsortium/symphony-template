@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 
 python3 tools/check_docs.py
 # The claim protocol's copy must be byte for byte what tools/VENDORED
-# records: a change to it is made in OpenSpineConsortium/sdlc-protocol and
+# records: a change to it is made in OpenSpineConsortium/symphony-protocol and
 # arrives by that repository's sync pull request in the template, or by its
 # scripts/vendor.py in a repository made from it, so a hand edit fails here.
 # A hand edit that rewrote VENDORED to match passes this line and fails

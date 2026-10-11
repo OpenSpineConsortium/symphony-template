@@ -13,8 +13,8 @@ name: Checks
 # never writes a workflow file (GITHUB_TOKEN may not change one): the push
 # trigger leaves out the claim branches, whose pull request runs the check, so
 # no run is ever skipped under the name "check" and a required check cannot be
-# satisfied by a skipped run. It leaves out sdlc-protocol's sync branch for
-# the same reason: that repository's sync workflow pushes sdlc-protocol/sync
+# satisfied by a skipped run. It leaves out symphony-protocol's sync branch for
+# the same reason: that repository's sync workflow pushes symphony-protocol/sync
 # with the GitHub App's token, which, unlike a workflow's own GITHUB_TOKEN,
 # starts this workflow, and then opens or updates the branch's pull request,
 # which runs the check again on the same commit. It leaves out crowd/setup
@@ -25,7 +25,7 @@ name: Checks
 # METRICS.json and JUDGE.json: a maintainer's judge pushes JUDGE.json there
 # with their own credentials (docs/setup/metrics.md), which, unlike
 # GITHUB_TOKEN, start this workflow, and the branch has no checks to run.
-# Before the checks the job clones OpenSpineConsortium/sdlc-protocol, which
+# Before the checks the job clones OpenSpineConsortium/symphony-protocol, which
 # is public, so the clone needs no token, and names the clone to them in
 # SDLC_PROTOCOL. check.sh's vendoring.py verify holds tools/sdlc_protocol to
 # tools/VENDORED, but both sit in this tree, and a pull request that edits
@@ -66,7 +66,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
   push:
-    branches-ignore: ["claude/**", "sdlc-protocol/**", "crowd/setup", "metrics"]
+    branches-ignore: ["claude/**", "symphony-protocol/**", "crowd/setup", "metrics"]
 
 permissions:
   contents: read
@@ -83,12 +83,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Clone sdlc-protocol, the library the copy is held to
-        run: git clone --quiet https://github.com/OpenSpineConsortium/sdlc-protocol "$RUNNER_TEMP/sdlc-protocol"
+      - name: Clone symphony-protocol, the library the copy is held to
+        run: git clone --quiet https://github.com/OpenSpineConsortium/symphony-protocol "$RUNNER_TEMP/symphony-protocol"
 
       - name: Run the checks
         env:
-          SDLC_PROTOCOL: ${{ runner.temp }}/sdlc-protocol
+          SDLC_PROTOCOL: ${{ runner.temp }}/symphony-protocol
         run: bash scripts/check.sh
 
       - name: Hold a crowd repository to its rules

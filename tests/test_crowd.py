@@ -1663,7 +1663,7 @@ def head_of(bare):
 
 
 class PublishTemplate(unittest.TestCase):
-    SRC, DEST = "spine/sdlc-template", "pubowner/crowd-template"
+    SRC, DEST = "spine/symphony-template", "pubowner/crowd-template"
 
     def setUp(self):
         self.folder = tempfile.mkdtemp(prefix="crowd-publish-")

@@ -49,13 +49,13 @@ PRIVATE = ("Secret plan for widgets", "Fix the login page", "mona-secret", "lisa
            "feature/login-page", "the body says secret things", "secret text in a comment", REPO,
            "src/secret_module.py", "Sounds good", "secret words of the judge")
 NUMBERS = (99, 101, 102, 103, 104, 4711, 4712, 4713, 4714, 4715, 4716)
-# OpenSpineConsortium's collector (sdlc-app, its collect script's VERSION)
+# OpenSpineConsortium's collector (symphony-app, its collect script's VERSION)
 # keeps protocol_version only when the whole value is a release, alone or
 # followed by a space and 7 to 40 hex digits of the commit.
 COLLECTOR_VERSION = re.compile(r"[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}( [0-9a-f]{7,40})?")
 # An epoch second, as GitHub's X-RateLimit-Reset header is.
 RESET = 1791637200
-# OpenSpineConsortium's collector (sdlc-app, its collect workflow) reads the
+# OpenSpineConsortium's collector (symphony-app, its collect workflow) reads the
 # branch metrics at 04:17 UTC, so the day's record must be there by then.
 COLLECTOR_READ = 4 * 60 + 17
 

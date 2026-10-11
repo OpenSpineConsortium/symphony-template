@@ -1,7 +1,7 @@
 """Hold a claude/<issue> pull request to the claim protocol, in CI: a shim.
 
 The check's code now lives in the claim protocol's library,
-OpenSpineConsortium/sdlc-protocol, vendored here as tools/sdlc_protocol
+OpenSpineConsortium/symphony-protocol, vendored here as tools/sdlc_protocol
 (tools/VENDORED names the version and the commit). This file stays because
 .github/workflows/ci.yml and every copy of the template already made run
 "python3 tools/check_protocol.py": it hands the same arguments to
