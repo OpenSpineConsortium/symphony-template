@@ -59,6 +59,7 @@ Read `.claude/session.md` at the start of a session: it holds the completed work
 - The two GitHub Apps have one privacy statement, PRIVACY.md in OpenSpineConsortium/symphony-start, rendered by the site at /symphony/apps-privacy.html and linked from the Apps' descriptions; the extension keeps its own (version 2 with the migrate note).
 - The Chrome Web Store release kit is its own private repository, OpenSpineConsortium/chrome-store-release-kit, called as a reusable workflow at main by every extension repository of the owner's; symphony-extension releases through it on each push to main, and the store upload waits on the five CWS_ secrets and CWS_ON_PUSH.
 - The main App's logo is GitHub's mark in the icon's warm white with the orange baton, the Setup App's a gear, the ring and tile unchanged; the owner accepted the risk under GitHub's logo policy.
+- An adopted repository carries the GitHub topic symphony: the adoption run sets it through the Setup App and scripts/setup-repo.sh adds it from a clone, and the extension reads the repository page's About sidebar for it, with no API call, to show "Ready for Symphony" (a link to the board) in place of "Migrate to Symphony"; a repository adopted before the topic existed gets it by hand under About.
 ### Constraints
 - The cloud environment blocks cooperbench.com, arxiv.org, cursor.com and docs.github.com; CooperBench's paper and data come from the GitHub repository cooperbench/website.
 - The cloud environment withholds CLAUDE_CODE_OAUTH_TOKEN; coordbench reads COORDBENCH_CLAUDE_TOKEN, each account its own.
