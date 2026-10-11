@@ -65,42 +65,58 @@ GPU grid; those became an issue in coordbench.
 
 - Everything above is merged. No pull request of this session is open
   apart from the one carrying this checkpoint.
-- The Setup App is not registered yet, so every adoption pull request
-  says the front door has no Setup App yet and the steps by hand stand;
-  the front door is otherwise live and unchanged for adopters.
-- The two test pull requests of the earlier live runs,
-  sdlc-template-test#14 and sdlc-start-test#1, are still the owner's to
-  merge or close.
+- The Setup App is live: registered as openspine-sdlc-setup (id 5268543)
+  by register.py --setup, installed on sdlc-start for the probe, and
+  SDLC_SETUP_APP_ID and SDLC_SETUP_APP_PRIVATE_KEY set on sdlc-start. Two
+  live tests passed. sdlc-start#7, mode new into the throwaway
+  OpenSpineConsortium/sdlc-setup-test with both Apps installed: its pull
+  request sdlc-setup-test#1 carries the section Settings, and the API
+  shows the ruleset "Protect the default branch" active with its four
+  rules, auto-merge and delete-on-merge on, secret scanning and push
+  protection on; the copy's check is green and the public log printed
+  only the four fixed lines. sdlc-start#9, mode new into sdlc-start-test
+  without the Setup App: the mint failed, the probe succeeded, the pull
+  request sdlc-start-test#3 says the App is not installed and points at
+  the by-hand step, and no owner issue was opened.
+- The first two attempts of sdlc-start#7 failed at the template's token:
+  the main App's installation on the organization had lost sdlc-template,
+  because the install link, opened for the test repository with "Only
+  select repositories", replaces an existing installation's list. The
+  main App is now on "All repositories"; sdlc-start#8 says so in the
+  owner's steps. The main App was on the organization before this.
+- Test repositories: sdlc-setup-test#1 and sdlc-start-test#3 are open
+  (sdlc-start-test#1 was closed by this session for the second test);
+  sdlc-template-test#14 is still open. The Setup App is still installed
+  on sdlc-setup-test and is the owner's to uninstall, as its pull request
+  says. The proxy refused deleting a branch, which the owner did by hand.
 - The auto-mode permission classifier allowed everything this session
   asked (attaching coordbench, the pull requests, the merges, the issue);
   the proxy still refuses the Actions variables and secrets API paths.
 
 ## Remaining tasks
 
-1. The owner's steps for the Setup App (sdlc-start's README, For the
-   owner, steps 7 and 8): from a clone of sdlc-app,
-   `python3 scripts/register.py --setup --org OpenSpineConsortium`; if
-   GitHub gives a slug other than openspine-sdlc-setup, change the
-   install link in sdlc-start's .github/ISSUE_TEMPLATE/adopt.yml, its
-   README and tests/test_form.py (SETUP_APP_INSTALL); install the Setup
-   App on OpenSpineConsortium/sdlc-start and only it, for the probe; then
-   `gh variable set SDLC_SETUP_APP_ID --repo OpenSpineConsortium/sdlc-start --body <id>`
-   and `python3 scripts/register.py --env-file .sdlc-setup-app.env --print-key | gh secret set SDLC_SETUP_APP_PRIVATE_KEY --repo OpenSpineConsortium/sdlc-start`.
-2. A live test of the Setup App, once step 1 is done: a throwaway
-   repository with one commit and both Apps installed, the form in mode
-   new, then the pull request's section Settings against the
-   repository's rules, general settings and code security pages, the
-   closing comment, and the uninstall; then a request without the Setup
-   App, whose pull request should say so; sdlc-start-test can serve
-   again once its branch sdlc/adopt is deleted.
-3. The Polyphony rename, which the owner put after the setup App: the
+1. Towards one click, which the owner asked for (an adoption is four
+   steps today: create the repository, install the Apps, fill the form,
+   merge). Proposed, not yet agreed as issues: a prefilled form link,
+   `.../sdlc-start/issues/new?template=adopt.yml&repository=OWNER/NAME`,
+   in the App's description and the README (GitHub fills an issue form's
+   text fields from the URL); two marketplace skills with the rename,
+   /polyphony:new and /polyphony:migrate, which do everything but the
+   install click (gh repo create, the form issue opened as the user, the
+   pull request watched and merged on their word); buttons on
+   github.com, which only a browser extension can add (the owner's
+   Beethoven extension), each a link to the install page and the
+   prefilled form; and true one click by making the App's installation
+   the request, sdlc-app's stage 2 webhook server opening the form issue
+   for the installer, which needs a hosted endpoint.
+2. The Polyphony rename, which the owner put after the setup App: the
    App first (name and slug, 14 slug links and 56 name mentions across
    the repositories), then the repositories, then the user-facing
    identifiers; each layer its own pull requests.
-4. coordbench#6, the fan-out issue: the per-agent token in
+3. coordbench#6, the fan-out issue: the per-agent token in
    drivers.py, equal concurrency per arm, the grid route with Podman or
    Apptainer and the gateway variables; the pilot first in one session.
-5. Carried: actions/create-github-app-token@v1 warns about Node 20, move
+4. Carried: actions/create-github-app-token@v1 warns about Node 20, move
    to v2 (inputs to check first); existing-repo.md should say the front
    door's existing mode replaces the by-hand way; try crowd mode on a
    real organization copy; the 42 gradeable flash pairs; judge.py against
@@ -193,6 +209,11 @@ Stated by the owner in conversation, this session and earlier:
 - A cloud session's container has 4 CPUs, 15 GB of memory and about
   30 GB of free disk; Docker's daemon is installed and starts on demand;
   a background command stops after two hours.
+- A GitHub App's installation on an organization has one repository
+  list: the install link, opened for another repository with "Only
+  select repositories", replaces that list; a repository of the
+  organization's is added under Configure. The proxy refuses the
+  organization's installations endpoints and deleting a branch.
 - Workflows cannot be resumed across sessions; a review left unfinished
   is re-run from its record. A workflow's agents run two at a time on
   this machine's four CPUs.

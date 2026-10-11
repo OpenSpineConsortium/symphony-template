@@ -56,4 +56,5 @@ Read `.claude/session.md` at the start of a session: it holds the completed work
 - The cloud session's proxy refuses the Actions variables and secrets API paths, and the auto-mode permission classifier can refuse an outward write (a label through gh api, a repository attached mid-session); the GitHub tools' pull request and merge calls were allowed.
 - A cloud session's tools reach only its own account's sessions, environments and routines; there is no cross-account messaging, and Remote Control drives a session on the owner's own computer.
 - A cloud session's container has 4 CPUs, 15 GB of memory and about 30 GB of free disk; Docker's daemon is installed and starts on demand; a background command stops after two hours.
+- A GitHub App's installation on an organization has one repository list: the install link opened with "Only select repositories" replaces it; a repository of the organization's is added under Configure, and the main App stays on "All repositories".
 <!-- cswap:checkpoint:end -->
