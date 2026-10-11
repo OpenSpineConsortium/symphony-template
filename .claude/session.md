@@ -1,128 +1,136 @@
 # Session checkpoint
 
-Written 2026-10-10 at the end of the main account's session, for the next
-session on any account. This session built the setup-only App the last
-checkpoint recommended, so an adoption through the front door applies
-the repository's settings in the same run, and answered the owner's
-questions about running coordbench over several sessions, accounts and a
-GPU grid; those became an issue in coordbench.
+Written 2026-10-11 in the main account's session, for the next session
+on any account. This session made installing the App the request, two
+ways: the install now ends on the adoption form with the installation
+filled in, so the pull request is open within about two minutes with no
+server and no typing, and a scheduled sweep answers an installation that
+never reaches the form, within the hour. Both are merged on sdlc-start;
+the owner's one action and the two live tests are below.
 
 ## Completed work
 
-- The Setup App, merged as sdlc-app#4 and sdlc-start#6 from the branch
-  claude/magical-shannon-ak167f of each. A second GitHub App, OpenSpine
-  SDLC Setup (sdlc-app's manifest-setup.json: Administration write and
-  Metadata read, no webhook, public), registered by
-  `python3 scripts/register.py --setup --org OpenSpineConsortium` into
-  .sdlc-setup-app.env. The adopter installs it on the one repository for
-  the one run and uninstalls it afterwards; installing it is the consent,
-  so the form has no field for it. In adopt.yml, after the push of
-  sdlc/adopt, the run mints that App's token for the one repository,
-  scripts/setup.py applies what scripts/setup-repo.sh applies (the
-  ruleset of the template's docs/setup/ruleset-main.json, in mode
-  existing without the required check; delete-on-merge and auto-merge;
-  secret scanning, then push protection), revokes the token, and
-  adopt.py body renders the report as the section Settings, from which
-  the next steps follow. Where the mint fails, a probe on the owner's
-  own installation (the Setup App on sdlc-start, metadata read) tells an
-  adopter who did not install it from a broken front door; the second is
-  told to the owner in the issue "Setup App of this front door is not
-  working" on sdlc-start, since GitHub reports a red run only to the
-  person who opened the request. A settings step that dies before its
-  report, and a run that fails after the token was made, say so. The
-  run's log gets one fixed line per setting; GitHub's words go to the
-  report and the pull request.
-- Reviewed by a five-dimension workflow (34 agents): 29 findings, all
-  verified, all fixed, then a verification pass (6 agents) that found two
-  partly fixed and five minor leftovers, fixed too: among them, every 3xx
-  and non-JSON answer counted as done (now a redirect handler and a
-  non-2xx refusal), the probe, the words for each outcome, "Only select
-  repositories" in every install instruction, and the owner's alert by
-  issue rather than by a red run. 139 tests in sdlc-start on 3.12, also
-  against the real template; 137 in sdlc-app; actionlint clean on all
-  three repositories' workflows.
-- The template's start pages, links table and owner checklist say that
-  the front door applies the settings with the Setup App installed (this
-  pull request).
-- Answered, with coordbench read in full: a cloud session has 4 CPUs,
-  15 GB and about 30 GB of disk, Docker's daemon is installed and
-  bench/cooperbench/setup.sh starts it; agents spend about 90 percent of
-  their time waiting on the model; the ceiling is the subscription's
-  usage window, not cores; run.py already has --concurrency, resume and
-  pooled reports; sessions cannot reach another account's sessions, and
-  Claude has no local inference. The owner's design, one orchestrator
-  with claude -p workers each on one of their own accounts' tokens, and
-  the grid route with a self-hosted model, are coordbench#6, opened by
-  this session.
-- The name: "polyphony" is free as a GitHub App name (the page 404s);
-  the rename's three layers were costed in conversation (the App's name
-  and slug; the repositories to polyphony-*, with GitHub's redirects; the
-  user-facing identifiers, the plugin sdlc, the skills /sdlc:, the branch
-  sdlc/adopt, the switch .github/sdlc-metrics, while the package
-  sdlc_protocol and the SDLC_* variables may stay).
+- The install ends on the form, sdlc-start#14 (closes sdlc-start#12).
+  GitHub sends whoever installs the App to its Setup URL with
+  installation_id in the query string, and an issue form fills in a
+  field of that name, so with the Setup URL set to the form the person
+  lands on it with the Installation field filled in, chooses the kind
+  and the metrics and submits. The repository field is optional: the
+  form carries a name or the installation's number. With the number,
+  adopt.yml signs the App's JWT (scripts/jwt.sh), mints the
+  installation's token with metadata alone, lists the repositories it
+  reaches and takes the one it holds once the author is read as its
+  administrator; not this App's installation, several repositories and
+  an author who is not an administrator get one identical answer, so a
+  guessed number learns nothing; the name is masked and never passed on,
+  and adopt-run.yml gets the ids. A repository given by ids is "your
+  repository" in the answers on the public issue, with the links left
+  out (SAID, PULLS_LINK, BRANCHES_LINK, SETTINGS_WORDS in the run's
+  environment). The owner's step 9 in sdlc-start's README is the Setup
+  URL with "Redirect on update".
+- The sweep, sdlc-start#13 (closes sdlc-start#10): installing the App
+  without the form is a request too. Every ten minutes sweep.yml signs
+  the App's JWT, scripts/sweep.py lists the installations and their
+  repositories and writes the candidates (installation id, repository
+  id, mode read from the tree) to a file, and the workflow dispatches
+  adopt-run.yml per candidate with ids only. adopt-run.yml is the
+  adoption itself, reusable: workflow_call from adopt.yml and
+  workflow_dispatch from the sweep; the ids path resolves the name with
+  a metadata-only token and masks the name, the owner's, the requester's
+  login and the default branch before anything prints them. The form
+  wins (a 30-minute grace on the installation's updated_at or
+  created_at; repositories named on open adopt issues, read from the
+  JSON gh writes, are left alone); the sweep skips offered (branch
+  sdlc/adopt), adopted (PROTOCOL.md), declined (closed pull request from
+  sdlc/adopt), refused (the App's open issue "OpenSpine SDLC could not
+  open its pull request"), opted out (.github/sdlc-adopt says off),
+  archived, no commit, no Issues, and the organization's own; an
+  installation short of a write permission is passed over without a
+  token; a time budget of 420 seconds under the JWT's life, incremental
+  writes and a rotating start. A refusal or a failure after the push on
+  that path is told in one issue of the App's in the repository, which
+  the sweep reads as told until it is closed. A five-lens review (five
+  reviewers, stopped before its refutation stage to save time) found
+  seven defects, all fixed before the merge: among them the pending list
+  was never filled, because a heredoc on the same command took the
+  pipe's place as python's stdin. 215 tests in sdlc-start on 3.12, also
+  against the real template; actionlint clean.
+- Answered in conversation: the sweep is slower than the form by design
+  and cannot match it without an event source; GitHub hosts no always-on
+  compute a webhook can reach; a hosted webhook service would cost a few
+  dollars a month and a host to keep, with the App's key on it; the Setup
+  URL path gives the form's latency with no server, so that was built.
 
 ## Current state
 
-- Everything above is merged. No pull request of this session is open
-  apart from the one carrying this checkpoint.
-- The Setup App is live: registered as openspine-sdlc-setup (id 5268543)
-  by register.py --setup, installed on sdlc-start for the probe, and
-  SDLC_SETUP_APP_ID and SDLC_SETUP_APP_PRIVATE_KEY set on sdlc-start. Two
-  live tests passed. sdlc-start#7, mode new into the throwaway
-  OpenSpineConsortium/sdlc-setup-test with both Apps installed: its pull
-  request sdlc-setup-test#1 carries the section Settings, and the API
-  shows the ruleset "Protect the default branch" active with its four
-  rules, auto-merge and delete-on-merge on, secret scanning and push
-  protection on; the copy's check is green and the public log printed
-  only the four fixed lines. sdlc-start#9, mode new into sdlc-start-test
-  without the Setup App: the mint failed, the probe succeeded, the pull
-  request sdlc-start-test#3 says the App is not installed and points at
-  the by-hand step, and no owner issue was opened.
-- The first two attempts of sdlc-start#7 failed at the template's token:
-  the main App's installation on the organization had lost sdlc-template,
-  because the install link, opened for the test repository with "Only
-  select repositories", replaces an existing installation's list. The
-  main App is now on "All repositories"; sdlc-start#8 says so in the
-  owner's steps. The main App was on the organization before this.
-- Test repositories: sdlc-setup-test#1 and sdlc-start-test#3 are open
-  (sdlc-start-test#1 was closed by this session for the second test);
-  sdlc-template-test#14 is still open. The Setup App is still installed
-  on sdlc-setup-test and is the owner's to uninstall, as its pull request
-  says. The proxy refused deleting a branch, which the owner did by hand.
-- The auto-mode permission classifier allowed everything this session
-  asked (attaching coordbench, the pull requests, the merges, the issue);
-  the proxy still refuses the Actions variables and secrets API paths.
+- sdlc-start's main is aecf938 (#14 merged at 03:46 UTC) on top of
+  8ad4d84 (#13). A two-lens review of #14 (privacy of the ids path,
+  Actions semantics) was running when this was written; any confirmed
+  finding goes in a small pull request from a fresh branch.
+- Not yet done by the owner: the Setup URL on the App's settings page,
+  https://github.com/organizations/OpenSpineConsortium/settings/apps/openspine-sdlc,
+  Post installation, set to
+  https://github.com/OpenSpineConsortium/sdlc-start/issues/new?template=adopt.yml
+  with "Redirect on update" ticked. Until then the person finds the form
+  through the README, and the sweep answers an installation after the
+  grace. The first install after setting it shows whether GitHub appends
+  its parameters to a URL that already has a query string, which the
+  path relies on; the form prefilling a field from a query parameter was
+  seen earlier in this session.
+- Live tests pending. The one-click path: the owner installs the App on a
+  fresh repository and submits the form it lands on; or, without the
+  Setup URL, opens the form with
+  &installation_id=NUMBER (the number is at the end of the Configure
+  URL on https://github.com/settings/installations) for
+  Gregory-Schwing-MD-PhD/test-non-org, where the App is installed. The
+  sweep: test-non-org (public, user-owned, one GitHub-made README on
+  main, id 1413815475) should get its pull request on the sweep's first
+  tick; at 03:47 UTC the schedule had not fired yet (GitHub delays a
+  newly added schedule), and sweep.yml's runs can be read on sdlc-start's
+  Actions tab. What to check on either: the log masks the name, the
+  issue (one-click path) says "your repository", the pull request's
+  opening says the form asked (one-click) or the installation did
+  (sweep), the codeowners note for a user owner, the labels and the
+  setup issue, and no owner issue on sdlc-start.
+- The template's start pages say installing the App is a request too
+  (this pull request); the two sentences predate #14 and still hold.
+- Test repositories: sdlc-setup-test#1 and sdlc-start-test#3 are open;
+  sdlc-template-test#14 is open; the Setup App is still installed on
+  sdlc-setup-test and is the owner's to uninstall.
+- This session attached Gregory-Schwing-MD-PhD/test-non-org (push access)
+  and cloned it to /home/user/test-non-org; a cloud session's attached
+  repositories die with the container.
 
 ## Remaining tasks
 
-1. Towards one click, which the owner asked for (an adoption is four
-   steps today: create the repository, install the Apps, fill the form,
-   merge). Proposed, not yet agreed as issues: a prefilled form link,
-   `.../sdlc-start/issues/new?template=adopt.yml&repository=OWNER/NAME`,
-   in the App's description and the README (GitHub fills an issue form's
-   text fields from the URL); two marketplace skills with the rename,
-   /polyphony:new and /polyphony:migrate, which do everything but the
-   install click (gh repo create, the form issue opened as the user, the
-   pull request watched and merged on their word); buttons on
-   github.com, which only a browser extension can add (the owner's
-   Beethoven extension), each a link to the install page and the
-   prefilled form; and true one click by making the App's installation
-   the request, sdlc-app's stage 2 webhook server opening the form issue
-   for the installer, which needs a hosted endpoint.
-2. The Polyphony rename, which the owner put after the setup App: the
-   App first (name and slug, 14 slug links and 56 name mentions across
-   the repositories), then the repositories, then the user-facing
+1. Finish the two live tests above and fix what they show; fold in the
+   two-lens review's confirmed findings; then write the memory fact for
+   the front door's two paths in docs/memory/ (none yet names the sweep
+   or the Setup URL path) in the pull request that follows.
+2. The marketplace skills (sdlc-marketplace#2), /polyphony:new and
+   /polyphony:migrate after the rename, which do everything but the
+   install click: gh repo create, the install page opened, the form
+   issue opened as the user (now with the installation prefilled from
+   the install's redirect, or named), the pull request watched and merged
+   on the person's word. The browser extension's buttons
+   (sdlc-start#11) link to the install page and the form.
+3. The Polyphony rename, which the owner put after the setup App: the
+   App first (name and slug), then the repositories, then the user-facing
    identifiers; each layer its own pull requests.
-3. coordbench#6, the fan-out issue: the per-agent token in
-   drivers.py, equal concurrency per arm, the grid route with Podman or
-   Apptainer and the gateway variables; the pilot first in one session.
-4. Carried: actions/create-github-app-token@v1 warns about Node 20, move
-   to v2 (inputs to check first); existing-repo.md should say the front
-   door's existing mode replaces the by-hand way; try crowd mode on a
-   real organization copy; the 42 gradeable flash pairs; judge.py against
-   a real model; the marketplace ruleset's unattributed-changes field;
-   sdlc-app stage 2 (hosting the webhook); a public copy of the template
-   is still the owner's decision and may not be needed.
+4. coordbench#6, the fan-out issue: the per-agent token in drivers.py,
+   equal concurrency per arm, the grid route; the pilot first in one
+   session.
+5. Carried: actions/create-github-app-token@v1 warns about Node 20, move
+   to v2; existing-repo.md should say the front door's existing mode
+   replaces the by-hand way; try crowd mode on a real organization copy;
+   the 42 gradeable flash pairs; judge.py against a real model; the
+   marketplace ruleset's unattributed-changes field; sdlc-app stage 2
+   (the webhook server) only if two minutes still reads as slow: it
+   would dispatch sweep.yml for one installation with a short grace and
+   add no logic; a public copy of the template is still the owner's
+   decision and may not be needed. If the owner wants no scheduled
+   sweep, delete sweep.yml and scripts/sweep.py with their tests; the
+   rest stands.
 
 To continue on another account: connect GitHub at claude.ai/code with
 access to the OpenSpineConsortium repositories, open a session on
@@ -182,6 +190,18 @@ Stated by the owner in conversation, this session and earlier:
 - The Polyphony rename comes after the setup App: the App first, then
   the repositories, then the user-facing identifiers; the package
   sdlc_protocol and the SDLC_* variables may stay.
+- Installing the App is the request. The fast path is the install's
+  redirect to the form with the installation filled in, which gives the
+  form's latency with no server; the sweep is the fallback for an
+  installation that never reaches the form. A webhook, if ever hosted,
+  dispatches sweep.yml for one installation with a short grace and adds
+  no logic of its own.
+- A repository given by ids, from the sweep or from the form, is never
+  named on the public side: not in a log, a run input, a step output, a
+  job summary or an issue; the run resolves and masks the name and
+  answers "your repository". A guessed installation number learns
+  nothing: not the App's, several repositories and not an administrator
+  are one answer.
 
 ## Constraints
 
@@ -218,3 +238,13 @@ Stated by the owner in conversation, this session and earlier:
   is re-run from its record. A workflow's agents run two at a time on
   this machine's four CPUs.
 - The scratchpad and the workflows' journals die with the container.
+- GitHub hosts no always-on compute a webhook can reach: Actions runs on
+  repository events, a schedule or an API call with a token, and a
+  webhook delivery carries none; a newly added schedule may wait a long
+  time for its first run.
+- The sweep never touches the organization's own repositories (--own),
+  since the main App is on "All repositories" there; a repository whose
+  Issues are off is left to the form.
+- A heredoc on a command that is also fed by a pipe takes the pipe's
+  place as stdin; in a workflow, write the data to a file and read it by
+  path.
