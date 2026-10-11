@@ -54,15 +54,15 @@ token.
 Each opens the exact page; the sections below say what to do there.
 
 - Install the Claude GitHub App: https://github.com/apps/claude/installations/new
-- The same, with this organization and repository preselected (the form GitHub documents for an app's install URL, with the ids the API reports for OpenSpineConsortium/sdlc-template, not tried live from a session): https://github.com/apps/claude/installations/new/permissions?suggested_target_id=285817514&repository_ids[]=1411163972
+- The same, with this organization and repository preselected (the form GitHub documents for an app's install URL, with the ids the API reports for OpenSpineConsortium/symphony-template, not tried live from a session): https://github.com/apps/claude/installations/new/permissions?suggested_target_id=285817514&repository_ids[]=1411163972
 - Connect GitHub to Claude: Sign in with GitHub at https://claude.ai/code; your connectors, to disconnect it: https://claude.ai/customize/connectors
 - Claude Code in the cloud (sessions, environment settings): https://claude.ai/code
 - How cloud environments, variables and network access work: https://code.claude.com/docs/en/cloud-environments
-- The repository's rulesets (New ruleset, Import): https://github.com/OpenSpineConsortium/sdlc-template/settings/rules
-- The repository's general settings (auto-delete, auto-merge): https://github.com/OpenSpineConsortium/sdlc-template/settings
-- Secret scanning and push protection: https://github.com/OpenSpineConsortium/sdlc-template/settings/security_analysis
-- New repository secret: https://github.com/OpenSpineConsortium/sdlc-template/settings/secrets/actions/new
-- New repository variable: https://github.com/OpenSpineConsortium/sdlc-template/settings/variables/actions/new
+- The repository's rulesets (New ruleset, Import): https://github.com/OpenSpineConsortium/symphony-template/settings/rules
+- The repository's general settings (auto-delete, auto-merge): https://github.com/OpenSpineConsortium/symphony-template/settings
+- Secret scanning and push protection: https://github.com/OpenSpineConsortium/symphony-template/settings/security_analysis
+- New repository secret: https://github.com/OpenSpineConsortium/symphony-template/settings/secrets/actions/new
+- New repository variable: https://github.com/OpenSpineConsortium/symphony-template/settings/variables/actions/new
 - Organization secrets and variables (shared by every repository of the organization): https://github.com/organizations/OpenSpineConsortium/settings/secrets/actions
 - Organization rulesets (applied to every repository of the organization): https://github.com/organizations/OpenSpineConsortium/settings/rules
 - Projects in Claude Code: https://claude.ai/code/projects/browse
@@ -138,13 +138,13 @@ items above may already be open to it.
    rates is wanted; with it off, work simply stops at the plan's limit.
 2. **Connect GitHub to Claude** on the new account: claude.ai, Settings,
    Connectors, GitHub (or claude.ai/code prompts for it). The GitHub user
-   must have write access to OpenSpineConsortium/sdlc-template.
+   must have write access to OpenSpineConsortium/symphony-template.
 3. **The Claude GitHub App** (github.com/apps/claude) must be installed on
-   the OpenSpineConsortium organisation with access to sdlc-template, so
+   the OpenSpineConsortium organisation with access to symphony-template, so
    cloud sessions can push. An organisation owner installs it once; a new
    account reuses it.
 4. **Start a cloud session** at claude.ai/code on
-   OpenSpineConsortium/sdlc-template, on the default network access level,
+   OpenSpineConsortium/symphony-template, on the default network access level,
    and type "continue": the session reads main's .claude/session.md, the
    last checkpoint, first. docs/start/prompts.md has the sentences for
    the everyday moves.
@@ -202,7 +202,7 @@ the 42 gradable pairs over four arms are about 294 sessions (about $125 of
 plan usage, spread over several usage windows); a pilot on one task is
 about 42 sessions.
 
-## 3. The repository's GitHub settings (sdlc-template and every copy)
+## 3. The repository's GitHub settings (symphony-template and every copy)
 
 `bash scripts/setup-repo.sh` does 1 to 4 and checks 5 in one run
 (above); a repository adopted through the front door with its Setup App
@@ -227,7 +227,7 @@ docs/setup/github.md describes:
    or a team for review and never an organization; a copy made by an app
    still names the organization, so change that line by pull request
    (docs/setup/github.md, section 7).
-6. **Template**: sdlc-template is already marked as a template repository.
+6. **Template**: symphony-template is already marked as a template repository.
 7. **Field metrics**: nothing to set. .github/workflows/metrics.yml writes
    the project's aggregates to the branch `metrics` once a day, which
    OpenSpineConsortium's collector reads only where the Symphony App
@@ -272,95 +272,96 @@ beta on Pro and Max.
 ## 6. The other repositories
 
 The template is one of five repositories under OpenSpineConsortium;
-docs/project.md says what each is for, and sdlc-protocol's
-[ECOSYSTEM.md](https://github.com/OpenSpineConsortium/sdlc-protocol/blob/main/ECOSYSTEM.md)
+docs/project.md says what each is for, and symphony-protocol's
+[ECOSYSTEM.md](https://github.com/OpenSpineConsortium/symphony-protocol/blob/main/ECOSYSTEM.md)
 maps which of them copies which of the library's modules. The first
 round of setting them up is done. Checked on 2026-10-10: each of the
-four has main as its default branch, sdlc-protocol has the release tag
+four has main as its default branch, symphony-protocol has the release tag
 v0.1.0 on f139a079d881ff245511625e443f6eff1318c727, and #12 and #13 are
-merged. The App Symphony (slug openspine-sdlc, id 5258276) is
+merged. The App Symphony (slug openspine-symphony, id 5258276) is
 registered, and its id and key are set on this repository.
 
-### The sync: one push to sdlc-protocol reaches every repository
+### The sync: one push to symphony-protocol reaches every repository
 
-A change to the protocol is made in sdlc-protocol alone. Its CI runs each
+A change to the protocol is made in symphony-protocol alone. Its CI runs each
 consumer's own check on the change before it merges (the jobs
 `downstream (<name>)`), and the push to its main starts its workflow
 Sync, which vendors the change into each consumer and opens the pull
-request `sdlc-protocol/sync` there, as the App, with auto-merge on where
+request `symphony-protocol/sync` there, as the App, with auto-merge on where
 the repository allows it. Nobody copies anything by hand. Until the
 variable below is set, the sync skips itself, stays green and says in its
 run's summary what is missing. Once, in this order:
 
 1. **Install the App on all five repositories**: the organization's
    settings, GitHub Apps, Symphony, Configure, and choose "All
-   repositories" or add sdlc-protocol, sdlc-template, coordbench,
-   sdlc-marketplace and sdlc-app
+   repositories" or add symphony-protocol, symphony-template, coordbench,
+   symphony-marketplace and symphony-app
    (https://github.com/organizations/OpenSpineConsortium/settings/installations).
    The sync's token is scoped to one consumer at a time, and the App
    needs no permission beyond the ones it was registered with (contents
    and pull requests, write).
-2. **Give sdlc-protocol the App's id and key**, the same values this
-   repository has. From a clone of sdlc-app, whose .sdlc-app.env
+2. **Give symphony-protocol the App's id and key**, the same values this
+   repository has. From a clone of symphony-app, whose .sdlc-app.env
    register.py wrote, so the key goes through a pipe and never onto the
    screen:
 
    ```
-   gh variable set SDLC_APP_ID --repo OpenSpineConsortium/sdlc-protocol --body 5258276
-   python3 scripts/register.py --print-key | gh secret set SDLC_APP_PRIVATE_KEY --repo OpenSpineConsortium/sdlc-protocol
+   gh variable set SDLC_APP_ID --repo OpenSpineConsortium/symphony-protocol --body 5258276
+   python3 scripts/register.py --print-key | gh secret set SDLC_APP_PRIVATE_KEY --repo OpenSpineConsortium/symphony-protocol
    ```
 
    Where the two are already set at the organization with `--visibility
-   all`, sdlc-protocol, being public, has them, and this step is done.
+   all`, symphony-protocol, being public, has them, and this step is done.
 3. **Allow auto-merge on the three consumers the sync arms it for**.
    `bash scripts/setup-repo.sh` turns it on here (section 3); these
    commands do it for all three, and change nothing where it is on already:
 
    ```
-   gh api -X PATCH repos/OpenSpineConsortium/sdlc-template -F allow_auto_merge=true
+   gh api -X PATCH repos/OpenSpineConsortium/symphony-template -F allow_auto_merge=true
    gh api -X PATCH repos/OpenSpineConsortium/coordbench -F allow_auto_merge=true
-   gh api -X PATCH repos/OpenSpineConsortium/sdlc-marketplace -F allow_auto_merge=true
+   gh api -X PATCH repos/OpenSpineConsortium/symphony-marketplace -F allow_auto_merge=true
    ```
 
-   The sync does not arm auto-merge for sdlc-app, which ecosystem.json
+   The sync does not arm auto-merge for symphony-app, which ecosystem.json
    gives `"auto_merge": false` (docs/start/protocol.md, step 6), so you
    merge the App's sync pull request yourself.
 4. **Require the check `check` on each consumer's main**, with a ruleset,
    so auto-merge waits for it to be green. Here
    docs/setup/ruleset-main.json already does (section 3); the same file
-   imports into coordbench, sdlc-marketplace and sdlc-app (their Settings,
-   Rules, Rulesets, New ruleset, Import a ruleset); on sdlc-app the check
-   then gates your own merge (step 3). On sdlc-protocol require `check`
+   imports into coordbench, symphony-marketplace and symphony-app (their Settings,
+   Rules, Rulesets, New ruleset, Import a ruleset); on symphony-app the check
+   then gates your own merge (step 3). On symphony-protocol require `check`
    and, if you like, the `downstream (<name>)` jobs, so a change that
    breaks a consumer cannot merge there.
 5. **Land the pull requests that brought the sync**, one per repository
    from the branch `claude/festive-edison-al7xu2`, the four consumers'
-   first. sdlc-protocol's `downstream` jobs vendor its change into each
+   first. symphony-protocol's `downstream` jobs vendor its change into each
    consumer's main and run that consumer's check there, and until a
    consumer's own pull request has merged, its tests on main still read
-   the old record of one line and fail. Then sdlc-protocol's, with a merge
+   the old record of one line and fail. Then symphony-protocol's, with a merge
    commit rather than a squash, so the commit the consumers' records name
    stays the last one that changed the package and the first sync finds
-   every consumer up to date. Push sdlc-protocol's branch first all the
-   same: each consumer's CI clones sdlc-protocol and fails when the clone
+   every consumer up to date. Push symphony-protocol's branch first all the
+   same: each consumer's CI clones symphony-protocol and fails when the clone
    has no commit of the one its VENDORED names, which until the library's
    pull request merges is on that branch alone. The consumers' branches
    change their .github/workflows/ci.yml, so they go up with a token that
    has the workflow scope.
-6. **Release sdlc-protocol 0.2.0** once its pull request is merged:
-   `gh release create v0.2.0 --repo OpenSpineConsortium/sdlc-protocol
+6. **Release symphony-protocol 0.2.0** once its pull request is merged
+   (done on 2026-10-10, as v0.2.0, under the library's name of the day):
+   `gh release create v0.2.0 --repo OpenSpineConsortium/symphony-protocol
    --target <the merge commit> --title "sdlc-protocol 0.2.0"`.
-7. **Run the sync once by hand** to see it work: sdlc-protocol's Actions
+7. **Run the sync once by hand** to see it work: symphony-protocol's Actions
    tab, Sync, Run workflow. Its summary has a row per consumer: up to
    date, or the pull request it opened or updated and whether auto-merge
    is on.
 
 Afterwards, a sync pull request that waits because main moved under it
 (the ruleset requires a branch to be up to date) needs no hand: the next
-push to sdlc-protocol, the weekly run or Run workflow rebuilds the branch
+push to symphony-protocol, the weekly run or Run workflow rebuilds the branch
 on the consumer's main as it then is.
 
-Nothing is to be done for sdlc-marketplace in this repository:
+Nothing is to be done for symphony-marketplace in this repository:
 .claude/settings.json names the marketplace but enables no plugin, because
 the plugin runs the same hooks this repository's settings already run, and
 enabling it here would run each of them twice; the plugin is for
@@ -368,11 +369,11 @@ repositories not made from the template (its README says how to install it).
 
 ## 7. Where things stand
 
-- main: the template, with the claim protocol vendored from sdlc-protocol
+- main: the template, with the claim protocol vendored from symphony-protocol
   under tools/sdlc_protocol and tools/board.py, check_protocol.py, team.py
   and guard_push.py as shims over it; experiment/ moved out to
   OpenSpineConsortium/coordbench; the App's token in template-init.
-- The sync of section 6 and sdlc-protocol 0.2.0, whose record lists the
+- The sync of section 6 and symphony-protocol 0.2.0, whose record lists the
   sha256 of every copied file and each consumer's check holds its copy
   to, came as one pull request per repository from the branch
   `claude/festive-edison-al7xu2`, to land in the order of section 6,

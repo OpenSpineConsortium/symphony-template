@@ -18,7 +18,7 @@ name: Template init
 # first Board run at the next six-hourly fallback or the first issue or
 # pull request a person opens. Where the variable SDLC_APP_ID and the
 # secret SDLC_APP_PRIVATE_KEY are set (the GitHub App of
-# OpenSpineConsortium/sdlc-app, docs/setup/owner-checklist.md), the job
+# OpenSpineConsortium/symphony-app, docs/setup/owner-checklist.md), the job
 # makes that App's installation token and uses it for the API calls and
 # the push instead, and what it does then starts the Checks and the Board
 # at once; like GITHUB_TOKEN, the App's token may not write a workflow.

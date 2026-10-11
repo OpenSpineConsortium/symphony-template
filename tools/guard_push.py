@@ -4,7 +4,7 @@ Claude Code runs this as a PreToolUse hook on the Bash tool
 (.claude/settings.json): the tool call arrives as JSON on stdin, exit
 code 2 stops it, and stderr goes back into the session as the reason.
 The rules are .claude/rules/board.md's, and their code now lives in the
-claim protocol's library, OpenSpineConsortium/sdlc-protocol, vendored
+claim protocol's library, OpenSpineConsortium/symphony-protocol, vendored
 here as tools/sdlc_protocol (tools/VENDORED names the version and the
 commit). This file stays because the hook and every copy of the template
 already made run "python3 tools/guard_push.py".

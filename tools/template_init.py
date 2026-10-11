@@ -36,7 +36,7 @@ import marked_section
 
 API = "https://api.github.com"
 API_VERSION = "2022-11-28"
-USER_AGENT = "sdlc-template-init"
+USER_AGENT = "symphony-template-init"
 TIMEOUT = 60
 PLACEHOLDER_NAMES = ("PROJECT_NAME", "REPO", "OWNER", "CODE_OWNER", "DEFAULT_BRANCH", "YEAR")
 REMOVED = (".template",)

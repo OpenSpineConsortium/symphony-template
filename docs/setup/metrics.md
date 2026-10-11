@@ -196,7 +196,7 @@ python3 tools/metrics.py push
 
 ## Who reads the files
 
-OpenSpineConsortium's collector lives in the private repository OpenSpineConsortium/sdlc-app. Once a day, at 04:17 UTC, after this repository's run at 03:43, it lists the repositories that installed the Symphony App, reads METRICS.json and JUDGE.json at the ref `metrics` of each and no other path, keeps only those whose sharing is on, and stores each day's files under HMAC-SHA256 of the repository's node id with a salt only the collector holds, never under the repository's name. A repository whose switch is off shows the collector `"sharing": "off"` and nothing more. A repository without the App is never read; its branch `metrics` is written all the same and stays the project's own record.
+OpenSpineConsortium's collector lives in the private repository OpenSpineConsortium/symphony-app. Once a day, at 04:17 UTC, after this repository's run at 03:43, it lists the repositories that installed the Symphony App, reads METRICS.json and JUDGE.json at the ref `metrics` of each and no other path, keeps only those whose sharing is on, and stores each day's files under HMAC-SHA256 of the repository's node id with a salt only the collector holds, never under the repository's name. A repository whose switch is off shows the collector `"sharing": "off"` and nothing more. A repository without the App is never read; its branch `metrics` is written all the same and stays the project's own record.
 
 ## The branch and the rules
 

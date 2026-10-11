@@ -1,15 +1,15 @@
 # The protocol in a repository you already have
 
-A repository not made from the template takes the protocol in two halves. The symphony plugin from [OpenSpineConsortium/sdlc-marketplace](https://github.com/OpenSpineConsortium/sdlc-marketplace) brings the Claude Code side to every local session: the skills `/symphony:claim`, `/symphony:remember` and `/symphony:checkpoint`, the command `/symphony:board`, a push guard before every Bash call, a document check after every edit, and the board at session start. The repository brings the files the plugin acts on, which a plugin cannot ship: the board's workflow, the protocol's text, the claim folder and the labels. ORG/NAME is your repository and NAME its clone; bash, on Windows in WSL.
+A repository not made from the template takes the protocol in two halves. The symphony plugin from [OpenSpineConsortium/symphony-marketplace](https://github.com/OpenSpineConsortium/symphony-marketplace) brings the Claude Code side to every local session: the skills `/symphony:claim`, `/symphony:remember` and `/symphony:checkpoint`, the command `/symphony:board`, a push guard before every Bash call, a document check after every edit, and the board at session start. The repository brings the files the plugin acts on, which a plugin cannot ship: the board's workflow, the protocol's text, the claim folder and the labels. ORG/NAME is your repository and NAME its clone; bash, on Windows in WSL.
 
 ## Steps
 
-1. **Clone the two sources beside your repository, and branch.** sdlc-protocol is public; TEMPLATE_OWNER/TEMPLATE_NAME is the template for a member of its enterprise and the public copy for anyone else ([README.md](README.md)), which exists only once the template's owner publishes one; until then, ask the owner for the five files the `cp` lines below take from it (board.yml, tidy.yml, board.py, check_docs.py and marked_section.py), put them under ../sdlc-template at the paths those lines read, and skip the second clone:
+1. **Clone the two sources beside your repository, and branch.** symphony-protocol is public; TEMPLATE_OWNER/TEMPLATE_NAME is the template for a member of its enterprise and the public copy for anyone else ([README.md](README.md)), which exists only once the template's owner publishes one; until then, ask the owner for the five files the `cp` lines below take from it (board.yml, tidy.yml, board.py, check_docs.py and marked_section.py), put them under ../symphony-template at the paths those lines read, and skip the second clone:
 
    ```bash
    cd ..
-   git clone --branch v0.2.0 https://github.com/OpenSpineConsortium/sdlc-protocol.git
-   gh repo clone TEMPLATE_OWNER/TEMPLATE_NAME sdlc-template
+   git clone --branch v0.2.0 https://github.com/OpenSpineConsortium/symphony-protocol.git
+   gh repo clone TEMPLATE_OWNER/TEMPLATE_NAME symphony-template
    cd NAME
    git switch -c sdlc-setup
    ```
@@ -17,10 +17,10 @@ A repository not made from the template takes the protocol in two halves. The sy
 2. **The library and the board's workflow.** vendor.py copies the protocol's package where the template keeps it, tools/sdlc_protocol, with its record tools/VENDORED; board.yml renders the board with GitHub's own token on every issue and pull request event, and tidy.yml deletes a closed issue's claim branch:
 
    ```bash
-   python3 ../sdlc-protocol/scripts/vendor.py . --consumer OpenSpineConsortium/sdlc-template
+   python3 ../symphony-protocol/scripts/vendor.py . --consumer OpenSpineConsortium/symphony-template
    mkdir -p .github/workflows
-   cp ../sdlc-template/.github/workflows/board.yml ../sdlc-template/.github/workflows/tidy.yml .github/workflows/
-   cp ../sdlc-template/tools/board.py tools/
+   cp ../symphony-template/.github/workflows/board.yml ../symphony-template/.github/workflows/tidy.yml .github/workflows/
+   cp ../symphony-template/tools/board.py tools/
    python3 tools/sdlc_protocol/vendoring.py verify tools
    ```
 
@@ -30,7 +30,7 @@ A repository not made from the template takes the protocol in two halves. The sy
 
    ```bash
    mkdir -p docs/agents/claims
-   cp ../sdlc-protocol/spec/PROTOCOL.md docs/agents/PROTOCOL.md
+   cp ../symphony-protocol/spec/PROTOCOL.md docs/agents/PROTOCOL.md
    printf '%s\n' '# Claim files' '' 'One file per claimed issue, docs/agents/claims/N.md, in the shape docs/agents/PROTOCOL.md gives under Claim; the pull request that finishes the issue deletes it.' > docs/agents/claims/README.md
    ```
 
@@ -50,11 +50,11 @@ A repository not made from the template takes the protocol in two halves. The sy
 5. **The plugin, for everyone who works here.** These write the marketplace and the plugin into the committed .claude/settings.json, beside whatever it holds; each collaborator runs the second line once after trusting the folder, since a project's setting names the plugin but does not download it:
 
    ```bash
-   claude plugin marketplace add OpenSpineConsortium/sdlc-marketplace --scope project
-   claude plugin install symphony@sdlc-marketplace --scope project
+   claude plugin marketplace add OpenSpineConsortium/symphony-marketplace --scope project
+   claude plugin install symphony@symphony-marketplace --scope project
    ```
 
-   You should see symphony in `claude plugin list`, and `/symphony:board` in a new session. Auto-update is off for a marketplace that is not Anthropic's: turn it on under `/plugin`, Marketplaces, sdlc-marketplace, Enable auto-update, or take the project preset with `"autoUpdate": true` from the marketplace's README. Just for yourself instead, in a session: `/plugin marketplace add OpenSpineConsortium/sdlc-marketplace`, then `/plugin install symphony@sdlc-marketplace`, which turns the push guard on in every repository you open.
+   You should see symphony in `claude plugin list`, and `/symphony:board` in a new session. Auto-update is off for a marketplace that is not Anthropic's: turn it on under `/plugin`, Marketplaces, symphony-marketplace, Enable auto-update, or take the project preset with `"autoUpdate": true` from the marketplace's README. Just for yourself instead, in a session: `/plugin marketplace add OpenSpineConsortium/symphony-marketplace`, then `/plugin install symphony@symphony-marketplace`, which turns the push guard on in every repository you open.
 
 6. **The labels the board reads:**
 
@@ -96,7 +96,7 @@ A repository not made from the template takes the protocol in two halves. The sy
   mkdir -p docs/memory
   printf '%s\n' '# Memory index' '' 'One line per fact under docs/memory/: a dash, the title as a link to its file, a colon and one line; the remember skill adds them.' > docs/memory/MEMORY.md
   printf '%s\n' '' '@docs/memory/MEMORY.md' '' '<!-- cswap:checkpoint:begin -->' '<!-- cswap:checkpoint:end -->' >> CLAUDE.md
-  cp ../sdlc-template/tools/check_docs.py ../sdlc-template/tools/marked_section.py tools/
+  cp ../symphony-template/tools/check_docs.py ../symphony-template/tools/marked_section.py tools/
   python3 tools/check_docs.py
   ```
 

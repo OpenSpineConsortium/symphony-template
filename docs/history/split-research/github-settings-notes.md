@@ -29,7 +29,7 @@ not be read from a primary source is marked unverified.
 - code.claude.com/docs: worked (WebFetch).
 - gh (2.89.0) and claude (2.1.295) are installed; their help text was read.
   gh api in this session answers only repository-scoped endpoints for
-  OpenSpineConsortium/sdlc-template; search and /orgs endpoints are refused.
+  OpenSpineConsortium/symphony-template; search and /orgs endpoints are refused.
 
 ## 1. Organization rulesets
 
@@ -269,7 +269,7 @@ automatically deleting head branches when pull requests are merged, or
 auto-merge."), both boolean, default false. Responses 200, 307, 403, 404,
 422. gh form: gh repo edit OWNER/REPO --delete-branch-on-merge
 --enable-auto-merge (both flags are in gh 2.89.0's help). The API
-currently reports both already true on OpenSpineConsortium/sdlc-template.
+currently reports both already true on OpenSpineConsortium/symphony-template.
 
 c. Secret scanning and push protection. Same PATCH, body
 security_and_analysis: {"secret_scanning": {"status": "enabled"},
@@ -392,7 +392,7 @@ suggested_target_id=ID_OF_USER_OR_ORG&repository_ids[]=REPO_A_ID. The form
 target_id= appears nowhere in the docs (the only matches are inside
 suggested_target_id and a cookie name), so it is unverified and the
 documented spelling should be used. For this organization the ids from GET
-/repos/OpenSpineConsortium/sdlc-template are owner.id 285817514 and
+/repos/OpenSpineConsortium/symphony-template are owner.id 285817514 and
 repository id 1411163972, so the documented link would be
 https://github.com/apps/claude/installations/new/permissions?
 suggested_target_id=285817514&repository_ids[]=1411163972. Not probed live

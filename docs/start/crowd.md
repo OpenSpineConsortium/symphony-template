@@ -27,12 +27,12 @@ Crowd mode opens a project to volunteers who each work under their own Claude Pr
 
 2. **Make the organization** on the Free plan at https://github.com/account/organizations/new?plan=free; no API makes one, and a public repository there has every feature crowd mode uses.
 
-3. **A public copy of the template.** sdlc-template is internal to its enterprise, so the template's owner publishes one from their own clone of it, once they agree, since its history goes public too. The template's owner runs this; the first crowd.py line only prints what would be published, and `--yes` publishes:
+3. **A public copy of the template.** symphony-template is internal to its enterprise, so the template's owner publishes one from their own clone of it, once they agree, since its history goes public too. The template's owner runs this; the first crowd.py line only prints what would be published, and `--yes` publishes:
 
    ```bash
-   gh repo clone OpenSpineConsortium/sdlc-template && cd sdlc-template
-   python3 scripts/crowd.py publish-template OpenSpineConsortium/sdlc-template TEMPLATE_OWNER/TEMPLATE_NAME
-   python3 scripts/crowd.py publish-template OpenSpineConsortium/sdlc-template TEMPLATE_OWNER/TEMPLATE_NAME --yes
+   gh repo clone OpenSpineConsortium/symphony-template && cd symphony-template
+   python3 scripts/crowd.py publish-template OpenSpineConsortium/symphony-template TEMPLATE_OWNER/TEMPLATE_NAME
+   python3 scripts/crowd.py publish-template OpenSpineConsortium/symphony-template TEMPLATE_OWNER/TEMPLATE_NAME --yes
    ```
 
    Then you, the crowd repository's owner, clone the copy, which gives you scripts/crowd.py for the steps below:
