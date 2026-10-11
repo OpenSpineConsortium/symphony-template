@@ -30,7 +30,10 @@
 #      and the script says so when the repository is private;
 #   3. turns on "Automatically delete head branches" and "Allow auto-merge"
 #      (auto-merge does nothing until a pull request asks for it, and team
-#      mode needs it);
+#      mode needs it), and adds the repository topic symphony, the sign on
+#      the repository's page that it is set up, which the front door's run
+#      sets too and the Symphony browser extension reads to show "Ready
+#      for Symphony" in place of "Migrate to Symphony";
 #   4. turns on secret scanning, then push protection, which GitHub accepts
 #      only once scanning is on; where the plan or the visibility offers
 #      neither (a Free organization's private repository has no Secret
@@ -169,6 +172,9 @@ fi
 # 3. The two toggles under General. Both are idempotent PATCHes.
 gh repo edit "$REPO" --delete-branch-on-merge --enable-auto-merge
 echo "general: delete head branches on merge, allow auto-merge: on"
+# The topic keeps the ones already there: --add-topic appends.
+gh repo edit "$REPO" --add-topic symphony
+echo "topic symphony: added"
 
 # 4. Secret scanning, then push protection. A failure here is the plan or
 # the visibility, not the script, so it is reported and the run goes on;
