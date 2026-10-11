@@ -18,7 +18,7 @@ ORG = ROOT / "docs" / "setup" / "ruleset-org.json"
 # The gh calls the research notes verified against gh 2.89.0 and the REST
 # description, one piece each.
 GH_CALLS = (
-    "rulesets", "--input", "repo edit", "--delete-branch-on-merge", "--enable-auto-merge",
+    "rulesets", "--input", "repo edit", "--delete-branch-on-merge", "--enable-auto-merge", "--add-topic symphony",
     "--enable-secret-scanning", "--enable-secret-scanning-push-protection",
     "label create", "variable set", "secret set", "codeowners/errors",
 )

@@ -16,7 +16,9 @@ installed there, but its GitHub proxy refuses gh's GraphQL commands, and
 the session has no admin rights. The script creates the ruleset
 docs/setup/ruleset-main.json unless one of that name is already listed
 for the repository, turns on "Automatically delete head branches" and
-"Allow auto-merge", turns on secret scanning and then push protection
+"Allow auto-merge", adds the topic symphony (the sign on the repository's
+page that it is set up, which the browser extension reads), turns on
+secret scanning and then push protection
 (and says so and carries on where the plan or the visibility offers
 neither: a Free organization's private repository has no Secret
 Protection), creates or updates the seven labels from the one list in
