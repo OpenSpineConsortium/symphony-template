@@ -10,11 +10,11 @@ do is listed first, in the order to do it.
 ## The owner's morning, in order
 
 1. Rename the two GitHub Apps, in each App's settings page: "OpenSpine
-   SDLC" to "Symphony Dev" (slug symphony-dev) and "OpenSpine SDLC
+   SDLC" to "SymphonyBoard" (slug symphonyboard) and "OpenSpine SDLC
    Setup" to "Symphony Setup" (slug symphony-setup). The owner wants no
-   OpenSpine in the name, and GitHub reserves an App name that matches
-   an existing account (Symphony, Symph and Symph0ny are all taken), so
-   the owner chose Symphony Dev on 2026-10-11. Set the main App's
+   OpenSpine in the name; GitHub refuses an App name that matches an
+   account (Symphony, Symph, Symph0ny) or another App (Symphony Dev),
+   so the owner chose SymphonyBoard on 2026-10-11. Set the main App's
    description to "Symphony: pull-request-gated Claude Code agents for
    your repository. Install it, press Create on the form, merge the pull
    request." and both Apps' homepage URL to
@@ -46,7 +46,7 @@ do is listed first, in the order to do it.
    checked against a logged-out read of a live repository page, but
    github.com/new needs a login, so the Create button is unverified on
    the live page. The extension links the new names (the slugs
-   symphony-dev and symphony-setup, the repository symphony-start), so
+   symphonyboard and symphony-setup, the repository symphony-start), so
    steps 1 and 2 come before the upload.
 6. Optional: update the five repositories' descriptions on GitHub
    (they still say OpenSpine SDLC); press Run workflow on sdlc-start's
