@@ -9,49 +9,36 @@ do is listed first, in the order to do it.
 
 ## The owner's morning, in order
 
-1. Rename the two GitHub Apps, in each App's settings page: "OpenSpine
-   SDLC" to "SymphonyBoard" (slug symphonyboard) and "OpenSpine SDLC
-   Setup" to "Symphony Setup" (slug symphony-setup). The owner wants no
-   OpenSpine in the name; GitHub refuses an App name that matches an
-   account (Symphony, Symph, Symph0ny) or another App (Symphony Dev),
-   so the owner chose SymphonyBoard on 2026-10-11. Set the main App's
-   description to "Symphony: pull-request-gated Claude Code agents for
-   your repository. Install it, press Create on the form, merge the pull
-   request." and both Apps' homepage URL to
-   https://openspineconsortium.com/symphony/, as the manifests in
-   symphony-app's flip say. Keep the Setup URL of both Apps on the
-   form, with "Redirect on update" ticked.
-2. Rename the five repositories (Settings, General): sdlc-protocol to
-   symphony-protocol, sdlc-marketplace to symphony-marketplace,
-   sdlc-template to symphony-template, sdlc-app to symphony-app,
-   sdlc-start to symphony-start. GitHub redirects the old names, so
-   nothing merged breaks; the flips below only resolve after this.
-3. Create the empty private repository OpenSpineConsortium/symphony-extension
-   (the session's GitHub tools may not create one: 403), then push the
-   extension into it. The source is in this session's container at
-   /home/user/symphony-extension (four commits on main) and was sent to
-   the owner as symphony-extension.bundle (the history; `git clone
-   symphony-extension.bundle`, then `git remote set-url origin ...` and
-   push) and as symphony-extension-source.tar.gz (the files alone).
-4. Merge the six flip pull requests, in this order, re-running a red
-   check first (they are red only because the new names did not exist):
-   OpenSpineConsortium/sdlc-protocol#4, sdlc-marketplace#4,
-   sdlc-template#34, sdlc-app#6, sdlc-start#22, then the site's
-   openspineconsortium.github.io#7.
-5. Submit Symphony for Chrome: docs/store/SUBMISSION.md in the extension
-   repository, step by step, with the zip symphony-1.0.0-chrome.zip
-   (sent to the owner; `npm ci && npm run zip` rebuilds it) and the texts
-   of docs/store/LISTING.md. Do the hand test in
-   docs/store/TEST_BEFORE_UPLOAD.md first: the extension's buttons were
-   checked against a logged-out read of a live repository page, but
+Done on 2026-10-11, in this order: the Apps renamed (SymphonyBoard,
+slug symphonyboard, and Symphony Setup, slug symphony-setup; the main
+App's description and both homepages set to
+https://openspineconsortium.com/symphony/, both Setup URLs on the form
+with "Redirect on update"), the five repositories renamed
+(symphony-protocol, symphony-marketplace, symphony-template,
+symphony-app, symphony-start; GitHub redirects the old names), the
+extension pushed to OpenSpineConsortium/symphony-extension (main, six
+commits), and the six flip pull requests merged: symphony-marketplace#4
+first, because symphony-protocol#4's downstream job vendors the flipped
+library into the marketplace's main, whose old test looked the
+marketplace up by its old name only; then symphony-protocol#4,
+symphony-template#34, symphony-app#6, symphony-start#22 and the site's
+openspineconsortium.github.io#7. The protocol's sync ran on the merge
+and opened nothing, since the package did not change; the site deployed
+with the new links.
+
+1. Submit Symphony for Chrome: docs/store/SUBMISSION.md in
+   OpenSpineConsortium/symphony-extension, step by step, with the zip
+   symphony-1.0.0-chrome.zip (sent to the owner; `npm ci && npm run zip`
+   rebuilds it) and the texts of docs/store/LISTING.md. Do the hand test
+   in docs/store/TEST_BEFORE_UPLOAD.md first: the extension's buttons
+   were checked against a logged-out read of a live repository page, but
    github.com/new needs a login, so the Create button is unverified on
-   the live page. The extension links the new names (the slugs
-   symphonyboard and symphony-setup, the repository symphony-start), so
-   steps 1 and 2 come before the upload.
-6. Optional: update the five repositories' descriptions on GitHub
-   (they still say OpenSpine SDLC); press Run workflow on sdlc-start's
-   Sweep once to see the sweep's dispatch path, since its schedule has
-   not fired by itself in seven hours.
+   the live page.
+2. Optional: update the five repositories' descriptions on GitHub (they
+   still say OpenSpine SDLC); press Run workflow on symphony-start's
+   Sweep once to see the sweep's dispatch path; uninstall the Setup App
+   from sdlc-setup-test; point the session's clones at the new names
+   (GitHub redirects the old ones meanwhile).
 
 ## Completed work
 
@@ -63,7 +50,7 @@ do is listed first, in the order to do it.
   .github/symphony-metrics and .github/symphony-adopt (the old names
   still read), the refusal issue's title, the plugin symphony with
   /symphony:board and /symphony:claim, the App manifests' names.
-- Tier two of the rename, prepared and reviewed, unmerged: one pull
+- Tier two of the rename, merged on 2026-10-11: one pull
   request per repository on the branch claude/symphony-flip flips the
   repository names, the App slugs (and the bot login), the marketplace's
   name (symphony@symphony-marketplace) and the sync branch
