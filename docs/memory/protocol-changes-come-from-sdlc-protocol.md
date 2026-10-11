@@ -19,7 +19,7 @@ change with nothing done by hand. sdlc-protocol's CI runs the template's own
 check against the change (the job `downstream (sdlc-template)`) before it
 merges, and the push to its main starts its workflow Sync, which vendors the
 change into the template and opens, or updates, the pull request from the
-branch `sdlc-protocol/sync`, made with the App OpenSpine SDLC's token so the
+branch `sdlc-protocol/sync`, made with the App Symphony's token so the
 template's CI runs on it, with auto-merge on where the repository allows it;
 the template's check decides. The same sync reaches coordbench,
 sdlc-marketplace and sdlc-app: sdlc-protocol's ecosystem.json lists which

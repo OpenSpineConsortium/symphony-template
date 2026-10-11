@@ -240,7 +240,7 @@ These stay conventions, made loud but not prevented, because GitHub gives every 
 - Before a session on your machine, read what changed in the shared paths, the instruction files of every folder included: `git fetch origin && git log -p HEAD..origin/{{DEFAULT_BRANCH}} -- '*CLAUDE.md' '*CLAUDE.local.md' '*AGENTS.md' '*.claude/*' .mcp.json tools scripts tests docs/project.md docs/agents docs/memory`.
 - Keep your cloud sessions Private, and permission prompts on for a local worker.
 
-Field metrics need nothing of crowd mode ([docs/setup/metrics.md](metrics.md)): .github/workflows/metrics.yml names no secret but GITHUB_TOKEN and writes aggregates alone to the branch `metrics`, and the judge runs only when a maintainer runs it, on their own machine and their own Claude account. A crowd project that should share nothing says off in .github/sdlc-metrics, by pull request like any file.
+Field metrics need nothing of crowd mode ([docs/setup/metrics.md](metrics.md)): .github/workflows/metrics.yml names no secret but GITHUB_TOKEN and writes aggregates alone to the branch `metrics`, and the judge runs only when a maintainer runs it, on their own machine and their own Claude account. A crowd project that should share nothing says off in .github/symphony-metrics, by pull request like any file.
 
 ## What is to be built
 

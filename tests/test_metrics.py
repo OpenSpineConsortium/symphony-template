@@ -224,8 +224,8 @@ def collect(folder, environ, opener, extra=()):
     return code, json.loads(out.read_text()), out.read_text()
 
 
-def switch(folder, text):
-    path = Path(folder) / ".github" / "sdlc-metrics"
+def switch(folder, text, name="symphony-metrics"):
+    path = Path(folder) / ".github" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
 
@@ -238,6 +238,19 @@ class Switch(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(record, {"schema": "sdlc-metrics/1", "sharing": "off"})
         self.assertEqual(list(record), ["schema", "sharing"])
+
+    def test_the_switch_under_its_old_name_still_counts_and_the_new_name_wins(self):
+        """A repository set up before the rename carries .github/sdlc-metrics;
+        it is read when the new file is absent, and the new file decides
+        when both are there."""
+        with tempfile.TemporaryDirectory() as folder:
+            switch(folder, "off\n", name="sdlc-metrics")
+            code, record, _ = collect(folder, {"GITHUB_TOKEN": "t"}, NoCalls())
+        self.assertEqual((code, record["sharing"]), (0, "off"))
+        with tempfile.TemporaryDirectory() as folder:
+            switch(folder, "off\n", name="sdlc-metrics")
+            switch(folder, "on\n")
+            self.assertEqual(metrics.sharing(folder, {}), metrics.ON)
 
     def test_off_in_the_variable_wins_over_on_in_the_file_and_needs_no_token(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -1085,7 +1098,7 @@ class Workflow(unittest.TestCase):
         self.assertIn("\n  workflow_dispatch:\n", self.TEXT)
 
     def test_a_change_to_the_switch_on_the_default_branch_starts_it_and_a_fork_never_runs_it(self):
-        self.assertIn('\non:\n  push:\n    paths: [".github/sdlc-metrics"]\n', self.TEXT)
+        self.assertIn('\non:\n  push:\n    paths: [".github/symphony-metrics", ".github/sdlc-metrics"]\n', self.TEXT)
         folded = self.TEXT.split("    if: >-\n", 1)[1].split("\n    runs-on:", 1)[0]
         self.assertEqual(" ".join(line.strip() for line in folded.splitlines()),
                          "github.event.repository.is_template == false "

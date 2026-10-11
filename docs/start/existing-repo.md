@@ -1,6 +1,6 @@
 # The protocol in a repository you already have
 
-A repository not made from the template takes the protocol in two halves. The sdlc plugin from [OpenSpineConsortium/sdlc-marketplace](https://github.com/OpenSpineConsortium/sdlc-marketplace) brings the Claude Code side to every local session: the skills `/sdlc:claim`, `/sdlc:remember` and `/sdlc:checkpoint`, the command `/sdlc:board`, a push guard before every Bash call, a document check after every edit, and the board at session start. The repository brings the files the plugin acts on, which a plugin cannot ship: the board's workflow, the protocol's text, the claim folder and the labels. ORG/NAME is your repository and NAME its clone; bash, on Windows in WSL.
+A repository not made from the template takes the protocol in two halves. The symphony plugin from [OpenSpineConsortium/sdlc-marketplace](https://github.com/OpenSpineConsortium/sdlc-marketplace) brings the Claude Code side to every local session: the skills `/symphony:claim`, `/symphony:remember` and `/symphony:checkpoint`, the command `/symphony:board`, a push guard before every Bash call, a document check after every edit, and the board at session start. The repository brings the files the plugin acts on, which a plugin cannot ship: the board's workflow, the protocol's text, the claim folder and the labels. ORG/NAME is your repository and NAME its clone; bash, on Windows in WSL.
 
 ## Steps
 
@@ -51,10 +51,10 @@ A repository not made from the template takes the protocol in two halves. The sd
 
    ```bash
    claude plugin marketplace add OpenSpineConsortium/sdlc-marketplace --scope project
-   claude plugin install sdlc@sdlc-marketplace --scope project
+   claude plugin install symphony@sdlc-marketplace --scope project
    ```
 
-   You should see sdlc in `claude plugin list`, and `/sdlc:board` in a new session. Auto-update is off for a marketplace that is not Anthropic's: turn it on under `/plugin`, Marketplaces, sdlc-marketplace, Enable auto-update, or take the project preset with `"autoUpdate": true` from the marketplace's README. Just for yourself instead, in a session: `/plugin marketplace add OpenSpineConsortium/sdlc-marketplace`, then `/plugin install sdlc@sdlc-marketplace`, which turns the push guard on in every repository you open.
+   You should see symphony in `claude plugin list`, and `/symphony:board` in a new session. Auto-update is off for a marketplace that is not Anthropic's: turn it on under `/plugin`, Marketplaces, sdlc-marketplace, Enable auto-update, or take the project preset with `"autoUpdate": true` from the marketplace's README. Just for yourself instead, in a session: `/plugin marketplace add OpenSpineConsortium/sdlc-marketplace`, then `/plugin install symphony@sdlc-marketplace`, which turns the push guard on in every repository you open.
 
 6. **The labels the board reads:**
 
@@ -84,13 +84,13 @@ A repository not made from the template takes the protocol in two halves. The sd
 9. **Claim the first issue.** Open one labelled todo, run `claude` in the clone and paste:
 
    ```
-   Claim issue N with /sdlc:claim and carry it to a ready pull request, as docs/agents/PROTOCOL.md says. Where the skill names bash scripts/check.sh, run this repository's own checks instead. Do not merge.
+   Claim issue N with /symphony:claim and carry it to a ready pull request, as docs/agents/PROTOCOL.md says. Where the skill names bash scripts/check.sh, run this repository's own checks instead. Do not merge.
    ```
 
 ## What stays different from a copy of the template
 
 - Cloud sessions do not install the plugins a repository declares, so there the push guard and the board at session start are missing, and the ruleset of step 8 is the fence, where the plan enforces it (a Free private repository has none); a Project can add the plugin under Project settings, Plugins. A copy of the template wires the same hooks in its own .claude/settings.json, which cloud sessions do load.
-- `/sdlc:remember` and `/sdlc:checkpoint` act on docs/memory/, tools/marked_section.py and the checkpoint markers in CLAUDE.md, which only the template carries; the block below adds them, with an empty memory index rather than the template's, whose facts are about the template, and the import that makes every session read it. Both skills run `bash scripts/check.sh`, which this repository lacks: run `python3 tools/check_docs.py` and your own checks there, as step 9's prompt says for the claim skill. tools/check_docs.py is different: once it is in tools/, the plugin runs it after every edit under docs/, .claude/, tools/ or .github/ and to CLAUDE.md or README.md, and reports every problem that stands, wherever it is, back to the session (exit 2); the edit stays written. It holds CLAUDE.md to exactly one pair of checkpoint markers, which step 4 does not add, every tracked file in those places to ASCII with LF endings, every `@` import in CLAUDE.md to a file that exists, every tracked file to holding nothing shaped like a common secret, and docs/memory/MEMORY.md, where docs/memory/ exists, to listing each fact file there. So copy it only after the markers are in and those files pass; the markers first, from the clone:
+- `/symphony:remember` and `/symphony:checkpoint` act on docs/memory/, tools/marked_section.py and the checkpoint markers in CLAUDE.md, which only the template carries; the block below adds them, with an empty memory index rather than the template's, whose facts are about the template, and the import that makes every session read it. Both skills run `bash scripts/check.sh`, which this repository lacks: run `python3 tools/check_docs.py` and your own checks there, as step 9's prompt says for the claim skill. tools/check_docs.py is different: once it is in tools/, the plugin runs it after every edit under docs/, .claude/, tools/ or .github/ and to CLAUDE.md or README.md, and reports every problem that stands, wherever it is, back to the session (exit 2); the edit stays written. It holds CLAUDE.md to exactly one pair of checkpoint markers, which step 4 does not add, every tracked file in those places to ASCII with LF endings, every `@` import in CLAUDE.md to a file that exists, every tracked file to holding nothing shaped like a common secret, and docs/memory/MEMORY.md, where docs/memory/ exists, to listing each fact file there. So copy it only after the markers are in and those files pass; the markers first, from the clone:
 
   ```bash
   mkdir -p docs/memory
