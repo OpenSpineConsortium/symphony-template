@@ -278,7 +278,7 @@ maps which of them copies which of the library's modules. The first
 round of setting them up is done. Checked on 2026-10-10: each of the
 four has main as its default branch, symphony-protocol has the release tag
 v0.1.0 on f139a079d881ff245511625e443f6eff1318c727, and #12 and #13 are
-merged. The App Symphony Dev (slug symphony-dev, id 5258276) is
+merged. The App SymphonyBoard (slug symphonyboard, id 5258276) is
 registered, and its id and key are set on this repository.
 
 ### The sync: one push to symphony-protocol reaches every repository
