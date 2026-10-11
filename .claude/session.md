@@ -63,50 +63,41 @@ the owner's one action and the two live tests are below.
 
 ## Current state
 
-- sdlc-start's main is aecf938 (#14 merged at 03:46 UTC) on top of
-  8ad4d84 (#13). A two-lens review of #14 (privacy of the ids path,
-  Actions semantics) was running when this was written; any confirmed
-  finding goes in a small pull request from a fresh branch.
-- Not yet done by the owner: the Setup URL on the App's settings page,
-  https://github.com/organizations/OpenSpineConsortium/settings/apps/openspine-sdlc,
-  Post installation, set to
-  https://github.com/OpenSpineConsortium/sdlc-start/issues/new?template=adopt.yml
-  with "Redirect on update" ticked. Until then the person finds the form
-  through the README, and the sweep answers an installation after the
-  grace. The first install after setting it shows whether GitHub appends
-  its parameters to a URL that already has a query string, which the
-  path relies on; the form prefilling a field from a query parameter was
-  seen earlier in this session.
-- Live tests pending. The one-click path: the owner installs the App on a
-  fresh repository and submits the form it lands on; or, without the
-  Setup URL, opens the form with
-  &installation_id=NUMBER (the number is at the end of the Configure
-  URL on https://github.com/settings/installations) for
-  Gregory-Schwing-MD-PhD/test-non-org, where the App is installed. The
-  sweep: test-non-org (public, user-owned, one GitHub-made README on
-  main, id 1413815475) should get its pull request on the sweep's first
-  tick; at 03:47 UTC the schedule had not fired yet (GitHub delays a
-  newly added schedule), and sweep.yml's runs can be read on sdlc-start's
-  Actions tab. What to check on either: the log masks the name, the
-  issue (one-click path) says "your repository", the pull request's
-  opening says the form asked (one-click) or the installation did
-  (sweep), the codeowners note for a user owner, the labels and the
-  setup issue, and no owner issue on sdlc-start.
-- The template's start pages say installing the App is a request too
-  (this pull request); the two sentences predate #14 and still hold.
+- The one-press path is live and tested. sdlc-start's main is 5e20baf:
+  #14 (the install ends on the form, the ids path), #15 (the form one
+  button), #17 (the request job resolves by id and learns no name, after
+  a two-lens review), #18 (the form down to three fields and four
+  sentences; the run picks the newest unadopted repository of an
+  installation). The owner had already set the Setup URL to the form.
+  Live: the owner installed the App on a fresh repository, GitHub sent
+  them to the form with the installation filled in (170148056), one
+  press of Create, and 49 seconds later the pull request, the labels and
+  the setup issue were in the repository and the issue (sdlc-start#19)
+  answered and closed; the public log showed the name, the owner, the
+  default branch and the login as masked words. The Setup App was not
+  on that repository, so the settings were left to the by-hand steps,
+  as the pull request says.
+- The sweep (sdlc-start#13) is merged as the fallback; its schedule had
+  not fired by 04:15 UTC (GitHub delays a new schedule), so its dispatch
+  path is unproven live; the ids path it shares with the form is proven
+  by #19. If the owner wants no scheduled sweep, delete sweep.yml and
+  scripts/sweep.py with their tests; the rest stands.
+- The template's start pages, the links table and the memory fact
+  the-front-door-is-one-press.md say install, press Create, merge (this
+  pull request).
 - Test repositories: sdlc-setup-test#1 and sdlc-start-test#3 are open;
   sdlc-template-test#14 is open; the Setup App is still installed on
-  sdlc-setup-test and is the owner's to uninstall.
+  sdlc-setup-test and is the owner's to uninstall. test-non-org may or
+  may not still be in an installation of the owner's.
 - This session attached Gregory-Schwing-MD-PhD/test-non-org (push access)
   and cloned it to /home/user/test-non-org; a cloud session's attached
   repositories die with the container.
 
 ## Remaining tasks
 
-1. Finish the two live tests above and fix what they show; fold in the
-   two-lens review's confirmed findings; then write the memory fact for
-   the front door's two paths in docs/memory/ (none yet names the sweep
-   or the Setup URL path) in the pull request that follows.
+1. Watch the sweep's first scheduled run on sdlc-start (Actions tab,
+   Sweep) and read its log: counts only, and one dispatch per candidate
+   if any installation has an unadopted repository older than the grace.
 2. The marketplace skills (sdlc-marketplace#2), /polyphony:new and
    /polyphony:migrate after the rename, which do everything but the
    install click: gh repo create, the install page opened, the form
@@ -190,9 +181,12 @@ Stated by the owner in conversation, this session and earlier:
 - The Polyphony rename comes after the setup App: the App first, then
   the repositories, then the user-facing identifiers; the package
   sdlc_protocol and the SDLC_* variables may stay.
-- Installing the App is the request. The fast path is the install's
-  redirect to the form with the installation filled in, which gives the
-  form's latency with no server; the sweep is the fallback for an
+- Installing the App is the request. The install's redirect (the App's
+  Setup URL) lands on the form with the installation filled in, and one
+  press of Create is the request: the run picks the installation's
+  newest repository with no adoption yet, reads the kind from the tree
+  and shares aggregates unless a box says otherwise; the form assumes the
+  person knows what they are doing. The sweep is the fallback for an
   installation that never reaches the form. A webhook, if ever hosted,
   dispatches sweep.yml for one installation with a short grace and adds
   no logic of its own.
