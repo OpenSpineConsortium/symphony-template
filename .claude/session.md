@@ -92,6 +92,20 @@ is listed first.
   and links it from the install card, the footer and the strip; the
   install card shows the two logos; the Start steps say both Apps.
 
+- "Ready for Symphony": an adopted repository carries the GitHub topic
+  symphony, set by the adoption run through the Setup App
+  (symphony-start#26) and by scripts/setup-repo.sh (#41); the extension
+  (1.2.0, release 1.2.0.13) reads the About sidebar's topic link from the
+  page, with no API call, and turns the header button into Ready for
+  Symphony, a link to the board, with no banner. A repository adopted
+  before the topic existed (the owner's GOMC, the sweep's adoptions, the
+  test repositories) gets the topic by hand under About.
+- The six merged adoptions of 2026-10-11 are the owner's to undo with the
+  script undo-symphony.sh given in chat (revert, ruleset, labels,
+  branches, opt-out file), signed in as GregorySchwing; this session has
+  no access to that account's repositories. The four open test
+  adoptions were closed from here.
+
 ## Current state
 
 - Merged on main: symphony-start#24; the site's master carries the
@@ -192,6 +206,9 @@ Stated by the owner in conversation, this session and earlier:
 - The Chrome Web Store release kit is its own private repository,
   OpenSpineConsortium/chrome-store-release-kit, called as a reusable
   workflow at main; any future extension of the owner's calls it.
+- An adopted repository carries the GitHub topic symphony, set by the
+  adoption run (Setup App) and by setup-repo.sh; the extension reads it
+  from the page and shows Ready for Symphony instead of Migrate.
 - The main App's logo is GitHub's mark adapted to the icon's colours
   with the orange baton, the Setup App's a gear, the ring and tile
   unchanged; the owner accepted the risk under GitHub's logo policy.
