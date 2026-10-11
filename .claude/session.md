@@ -10,11 +10,12 @@ do is listed first, in the order to do it.
 ## The owner's morning, in order
 
 1. Rename the two GitHub Apps, in each App's settings page: "OpenSpine
-   SDLC" to "OpenSpine Symphony" (slug openspine-symphony) and "OpenSpine
-   SDLC Setup" to "OpenSpine Symphony Setup" (slug openspine-symphony-setup).
-   Check the slug GitHub shows after the rename; every flip below names
-   those two. Keep the Setup URL of both Apps on the form, with "Redirect
-   on update" ticked.
+   SDLC" to "Symphony" (slug symphony) and "OpenSpine SDLC Setup" to
+   "Symphony Setup" (slug symphony-setup); the owner wants no OpenSpine
+   in the name. A GitHub App's name is unique across all of GitHub, so
+   if one is taken, pick another and give the session the slug GitHub
+   shows: every flip below and the extension name those two. Keep the
+   Setup URL of both Apps on the form, with "Redirect on update" ticked.
 2. Rename the five repositories (Settings, General): sdlc-protocol to
    symphony-protocol, sdlc-marketplace to symphony-marketplace,
    sdlc-template to symphony-template, sdlc-app to symphony-app,
@@ -23,9 +24,10 @@ do is listed first, in the order to do it.
 3. Create the empty private repository OpenSpineConsortium/symphony-extension
    (the session's GitHub tools may not create one: 403), then push the
    extension into it. The source is in this session's container at
-   /home/user/symphony-extension (one commit on main) and was sent to the
-   owner as symphony-extension-source.tar.gz; from a clone of that
-   archive: git init, add, commit, `git remote add origin ...`, push.
+   /home/user/symphony-extension (four commits on main) and was sent to
+   the owner as symphony-extension.bundle (the history; `git clone
+   symphony-extension.bundle`, then `git remote set-url origin ...` and
+   push) and as symphony-extension-source.tar.gz (the files alone).
 4. Merge the six flip pull requests, in this order, re-running a red
    check first (they are red only because the new names did not exist):
    OpenSpineConsortium/sdlc-protocol#4, sdlc-marketplace#4,
@@ -38,9 +40,9 @@ do is listed first, in the order to do it.
    docs/store/TEST_BEFORE_UPLOAD.md first: the extension's buttons were
    checked against a logged-out read of a live repository page, but
    github.com/new needs a login, so the Create button is unverified on
-   the live page. The extension links the new names
-   (openspine-symphony, symphony-start), so steps 1 and 2 come before
-   the upload.
+   the live page. The extension links the new names (the slugs symphony
+   and symphony-setup, the repository symphony-start), so steps 1 and 2
+   come before the upload.
 6. Optional: update the five repositories' descriptions on GitHub
    (they still say OpenSpine SDLC); press Run workflow on sdlc-start's
    Sweep once to see the sweep's dispatch path, since its schedule has
