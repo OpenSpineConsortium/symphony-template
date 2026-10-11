@@ -1,126 +1,128 @@
 # Session checkpoint
 
-Written 2026-10-11 in the main account's session, for the next session
-on any account. Overnight, on the owner's word ("drive this to
-completion"), this session renamed the product to Symphony in two tiers,
-built Symphony for Chrome with its store package and a promo film, and
-put a Symphony page on openspineconsortium.com. What only the owner can
-do is listed first, in the order to do it.
+Written 2026-10-11, evening, in the main account's session, for the next
+session on any account. The rename to Symphony is done and merged in all
+five repositories, the Apps and the site; the day's later work was the
+Chrome Web Store release kit as its own repository, Symphony for Chrome's
+releases through it, the fix for the eight-repository adoption, the
+Migrate button that carries its repository, both Apps required on the
+form, and the GitHub Apps' privacy statement. What only the owner can do
+is listed first.
 
-## The owner's morning, in order
+## The owner's list, in order
 
-Done on 2026-10-11, in this order: the Apps renamed (SymphonyBoard,
-slug symphonyboard, and Symphony Setup, slug symphony-setup; the main
-App's description and both homepages set to
-https://openspineconsortium.com/symphony/, both Setup URLs on the form
-with "Redirect on update"), the five repositories renamed
-(symphony-protocol, symphony-marketplace, symphony-template,
-symphony-app, symphony-start; GitHub redirects the old names), the
-extension pushed to OpenSpineConsortium/symphony-extension (main, six
-commits), and the six flip pull requests merged: symphony-marketplace#4
-first, because symphony-protocol#4's downstream job vendors the flipped
-library into the marketplace's main, whose old test looked the
-marketplace up by its old name only; then symphony-protocol#4,
-symphony-template#34, symphony-app#6, symphony-start#22 and the site's
-openspineconsortium.github.io#7. The protocol's sync ran on the merge
-and opened nothing, since the package did not change; the site deployed
-with the new links.
-
-1. Submit Symphony for Chrome: docs/store/SUBMISSION.md in
-   OpenSpineConsortium/symphony-extension, step by step, with the zip
-   symphony-1.0.0-chrome.zip (sent to the owner; `npm ci && npm run zip`
-   rebuilds it) and the texts of docs/store/LISTING.md. Do the hand test
-   in docs/store/TEST_BEFORE_UPLOAD.md first: the extension's buttons
-   were checked against a logged-out read of a live repository page, but
-   github.com/new needs a login, so the Create button is unverified on
-   the live page.
-2. Optional: update the five repositories' descriptions on GitHub (they
-   still say OpenSpine SDLC); press Run workflow on symphony-start's
-   Sweep once to see the sweep's dispatch path; uninstall the Setup App
-   from sdlc-setup-test; point the session's clones at the new names
-   (GitHub redirects the old ones meanwhile).
+1. Revert the eight adoptions of 2026-10-11: symphony-start issue #23
+   (installation 170355452, "Merge the pull request for me" ticked, no
+   repository named) adopted and merged Symphony into eight repositories
+   of GregorySchwing's before run 38165412998 was cancelled (ids
+   1391648997, 1394286173, 921196031, 1096074276, 889730726, 817893214,
+   773105702, 749539564; four more were cancelled before any push). The
+   merged pull requests are listed at
+   https://github.com/pulls?q=is%3Apr+author%3Aapp%2Fsymphonyboard+is%3Amerged;
+   revert each, or name the repositories to a session with access and it
+   opens the reverts. The labels and, in a new repository, the setup
+   issue stay to delete.
+2. Upload the Apps' logos and set their descriptions: on each App's
+   settings page (https://github.com/organizations/OpenSpineConsortium/settings/apps/symphonyboard
+   and .../symphony-setup), Display information, Logo: the PNGs the site
+   now hosts, https://openspineconsortium.com/symphony/symphonyboard-logo.png
+   (GitHub's mark in warm white with the orange baton, the extension's
+   icon ring and tile) and
+   https://openspineconsortium.com/symphony/symphony-setup-logo.png (the
+   gear); the SVG sources sit beside them. Add to each description the
+   privacy page: https://openspineconsortium.com/symphony/apps-privacy.html.
+3. Submit Symphony for Chrome 1.1.0 (docs/store/SUBMISSION.md in
+   OpenSpineConsortium/symphony-extension): the zip is the release the
+   kit made for the latest main
+   (https://github.com/OpenSpineConsortium/symphony-extension/releases/latest/download/symphony-chrome.zip);
+   do the hand test in docs/store/TEST_BEFORE_UPLOAD.md first, the
+   Migrate chain above all, since no session can press it. Then set the
+   five CWS_ secrets and CWS_ON_PUSH=upload on the extension repository,
+   and every merge to main uploads itself.
+4. Optional: update the repositories' descriptions on GitHub; press Run
+   workflow on symphony-start's Sweep once; uninstall the Setup App from
+   sdlc-setup-test.
 
 ## Completed work
 
-- Tier one of the rename, merged: the product is Symphony in every text
-  of the five repositories (sdlc-marketplace#3, sdlc-template#33,
-  sdlc-protocol#3, sdlc-app#5, sdlc-start#21). What a merge could carry
-  changed with it: the form's title "Adopt Symphony", the adoption
-  branch symphony/adopt (sdlc/adopt still read), the switches
-  .github/symphony-metrics and .github/symphony-adopt (the old names
-  still read), the refusal issue's title, the plugin symphony with
-  /symphony:board and /symphony:claim, the App manifests' names.
-- Tier two of the rename, merged on 2026-10-11: one pull
-  request per repository on the branch claude/symphony-flip flips the
-  repository names, the App slugs (and the bot login), the marketplace's
-  name (symphony@symphony-marketplace) and the sync branch
-  symphony-protocol/sync. A reviewer per repository read every hunk;
-  the findings that stood were folded in (the protocol's downstream job
-  names the library's clone with SDLC_PROTOCOL so a consumer never
-  skips the comparison; the marketplace's tag name and vendor README;
-  the App's "still open" bullet; the front door reads the bot's login
-  from the token step's app-slug output). Every local check green.
-- Symphony for Chrome (/home/user/symphony-extension, WXT 0.21,
-  TypeScript, 51 tests): "Create Symphony repository" beside GitHub's
-  own button on github.com/new, the banner "Finish setting up Symphony"
-  on the repository just made (a fifteen-minute note in storage.local,
-  the one permission), "Migrate to Symphony" in every repository's
-  header, a popup with three links. github.com only, no request to
-  anyone, no remote code; the hygiene test holds the source and the
-  built package to that. The header is found by the Primer React test
-  ids github.com serves today, then by the older classic markup. The
-  store package: docs/store (LISTING.md, SUBMISSION.md,
-  TEST_BEFORE_UPLOAD.md), icons, a promo tile, two screenshots,
-  PRIVACY.md version 1, MIT LICENSE, a CI workflow with no secret.
-- The promo film (promo/ in the extension repository): a Canvas page
-  where every frame is a function of time, rendered frame by frame in
-  headless Chromium and encoded with ffmpeg; 1920x1080, 30 fps, 23.6 s,
-  H.264 and VP9. The person at twelve o'clock sends pulses to the GitHub
-  mark; six Claude marks come out from behind the person and go
-  counter-clockwise round the circle to the slots around the top; all
-  seven draw the same arrow and pulse together; fade out; "Symphony"
-  fades in; "Powered by Claude" types itself with the mark inline.
-- The site (openspineconsortium.github.io#6, merged): /symphony/ in the
-  Beethoven home's style with the film, the three presses and three
-  cards; /symphony/privacy.html rendered from the extension's
-  PRIVACY.md (TEXTS: symphony-privacy, SYMPHONY_REPO); a Symphony tab,
-  footer column and sitemap entry; the home page's closing section; one
-  stamp on every page. The page links the current slugs and names; #7
-  flips them after the rename.
+- The rename, both tiers, merged everywhere (template #34, #36 to #39
+  the checkpoints; the five flips and the site's #7). The Apps are
+  SymphonyBoard (slug symphonyboard) and Symphony Setup (slug
+  symphony-setup); GitHub refused Symphony, Symph, Symph0ny (accounts)
+  and Symphony Dev (another App).
+- The Chrome Web Store release kit moved out of claude-swap-cloud into
+  OpenSpineConsortium/chrome-store-release-kit (private; Actions access
+  "Accessible from repositories in the organization"): the reusable
+  workflow .github/workflows/release-kit.yml and release-kit/ (package
+  and store actions, tests, a fixture extension, CI green). A caller's
+  push to main builds the zip, numbers it <manifest>.<commit count>,
+  makes the GitHub release extension-v<version> with <name>-<version>-chrome.zip
+  and <name>-chrome.zip, and uploads to the store when CWS_ON_PUSH is
+  upload or publish with the five CWS_ secrets; unset, the run stays
+  green and says "Not configured". claude-swap-cloud was left alone.
+- Symphony for Chrome releases through the kit (.github/workflows/release.yml):
+  1.0.0.9 the first, 1.0.0.10 the Symphony-orange buttons, then the
+  create-button fix (ours follows GitHub's disabled state and comes back
+  after a press), then 1.1.0 (below). CI's artifact step needed
+  include-hidden-files for .output.
+- The eight-repository adoption fixed in symphony-start#24, merged: one
+  press adopts one repository (resolve.py LIMIT 1, the newest with no
+  adoption yet, or the one the form names); the form's Repository field
+  has the id state, so the repository the extension's button carries
+  through GitHub's install link arrives filled in; both Apps are
+  required on the form's two paths (the installation path keeps only a
+  repository Symphony Setup reaches; the named path refuses, with the
+  Setup App's install link preselected on that repository, when it is
+  not installed there); the sweep adopts without it, as before.
+- Symphony for Chrome 1.1.0: Migrate and the post-Create banner open
+  SymphonyBoard's permissions page with target_id, suggested_target_id,
+  repository_ids[] (from the page's octolytics-dimension-repository_id
+  tag) and state=OWNER/NAME; a thirty-minute note symphony.migrate
+  chains the Setup App's install after the Board's from the form page,
+  adds the repository to the form's address when GitHub left it out,
+  and, on an installation's settings page reached from Migrate (the
+  Board installed already), offers the Setup App's install in a banner;
+  PRIVACY.md version 2; hygiene tests hold the rest.
+- The two GitHub Apps' privacy statement, PRIVACY.md in symphony-start,
+  from a six-agent reading of the App's, the front door's and the
+  template's code with every claim verified or corrected (six
+  permissions, not five; the installation's number and a typed name on
+  the public log; the dataset's git history; the sweep reads opted-out
+  repositories too). The site renders it at /symphony/apps-privacy.html
+  and links it from the install card, the footer and the strip; the
+  install card shows the two logos; the Start steps say both Apps.
 
 ## Current state
 
-- Merged on main: the five tier-one pull requests and the site's #6.
-  Open, waiting on the owner: sdlc-protocol#4 (check green, downstream
-  jobs red by the missing names), sdlc-marketplace#4, sdlc-template#34,
-  sdlc-app#6 (checks red by the missing names), sdlc-start#22 (green),
-  openspineconsortium.github.io#7.
-- The extension is one commit on main in this container only, not on
-  GitHub; the owner received the zip, the source archive and the mp4.
-  The site's privacy page and product page are deployed by GitHub Pages
-  from master; the session's proxy cannot open openspineconsortium.com,
-  so they were checked only in the local build and a local render.
-- The sweep's schedule on sdlc-start has had no run since the workflow
-  landed (seven hours); its dispatch path is still unproven live.
-- The claude/magical-shannon-ak167f branches are level with main in
-  every repository; this checkpoint is their next commit.
+- Merged on main: symphony-start#24; the site's master carries the
+  Apps' privacy page and the logos (f4d6497, deployed by Pages).
+- Symphony for Chrome 1.1.0 is on main in OpenSpineConsortium/symphony-extension;
+  the kit's release run numbers it on the push (see the Releases page).
+  The store listing is not submitted yet: the owner does that by hand
+  once, then the secrets make every later merge upload itself.
+- The eight merged adoptions are not reverted (the owner's list, 1).
+- The App's webhook is registered inactive; the privacy statement says
+  what the server does from the day it is turned on.
+- The claude/magical-shannon-ak167f branch is level with main; this
+  checkpoint is its next commit.
 
 ## Remaining tasks
 
-1. The owner's morning list above; then delete the claude/symphony-flip
-   branches once merged, and the site's.
-2. After the flips: the memory fact the-front-door-is-one-press.md and
-   docs/start pages read fine; coordbench's own texts still say
-   sdlc-protocol (not renamed; its downstream job passes), a pull
-   request there when convenient.
-3. The marketplace skills /symphony:new and /symphony:migrate
-   (sdlc-marketplace#2), which do everything but the install click.
+1. The owner's list above.
+2. Live test of the Migrate chain on a repository of the owner's: the
+   permissions page preselected, the Setup App's install page opening
+   by itself from the form, the form arriving with the repository filled
+   in, one pull request; and the settings-page banner when SymphonyBoard
+   was installed already. Nothing in a cloud session can press it.
+3. coordbench's own texts still say sdlc-protocol; a pull request there
+   when convenient. The marketplace skills /symphony:new and
+   /symphony:migrate (symphony-marketplace#2).
 4. Carried: actions/create-github-app-token@v1 to v2; existing-repo.md
    should say the front door's existing mode replaces the by-hand way;
    crowd mode on a real organization copy; the 42 gradeable flash
    pairs; judge.py against a real model; the marketplace ruleset's
-   unattributed-changes field; coordbench#6; sdlc-app stage 2 only if
-   two minutes still reads as slow.
+   unattributed-changes field; coordbench#6; the App's stage 2 (the
+   webhook server) only if two minutes still reads as slow.
 
 ## Decisions
 
@@ -164,26 +166,48 @@ Stated by the owner in conversation, this session and earlier:
   hosted, dispatches sweep.yml for one installation and adds no logic.
 - A repository given by ids is never named on the public side; a
   guessed installation number gets one answer whatever is wrong.
-- The product is Symphony. The rename is in two tiers: tier one, merged,
-  renames the product in prose and the identifiers a merge can carry
-  (the form's title, the branch symphony/adopt, the switches
-  .github/symphony-metrics and .github/symphony-adopt, the plugin
-  symphony); tier two, five pull requests kept open until the owner
-  renames the repositories and the Apps, flips the repository names,
-  the App slugs, the marketplace's name and the sync branch. What stays:
-  the package sdlc_protocol, the SDLC_* variables and secrets, the
-  VENDORED record's first token sdlc-protocol, the plugin folder
-  plugins/sdlc, the schema ids, the check run name sdlc/protocol, and
-  the readers of the old names a repository adopted before carries.
-- Symphony for Chrome links the new names, since it ships after the
-  rename; the site links the current names, with a flip pull request,
-  since it is live now.
+- The product is Symphony; the rename is two tiers, both merged on
+  2026-10-11. What stays: the package sdlc_protocol, the SDLC_*
+  variables and secrets, the VENDORED record's first token
+  sdlc-protocol, the plugin folder plugins/sdlc, the schema ids, the
+  check run name sdlc/protocol, and the readers of the old names.
+- The Apps are SymphonyBoard and Symphony Setup, slugs symphonyboard and
+  symphony-setup, with no OpenSpine in the name; the main App's homepage
+  is https://openspineconsortium.com/symphony/.
+- One press adopts one repository: the repository the form names, else
+  the newest the installation reaches with no adoption yet (LIMIT 1);
+  the person presses Create again for the next.
+- The extension's Migrate button and the post-Create banner carry the
+  repository through GitHub's own install link (target_id,
+  suggested_target_id, repository_ids[] and state=OWNER/NAME); the
+  form's Repository field has the id state so it arrives filled in; the
+  extension's note symphony.migrate chains the Setup App's install after
+  SymphonyBoard's and bridges an already-installed Board from its
+  settings page.
+- Both Apps are required on the form's two paths; the sweep adopts
+  without the Setup App.
+- The two GitHub Apps have one privacy statement, PRIVACY.md in
+  symphony-start, rendered by the site at /symphony/apps-privacy.html
+  and linked from the Apps' descriptions; the extension keeps its own.
+- The Chrome Web Store release kit is its own private repository,
+  OpenSpineConsortium/chrome-store-release-kit, called as a reusable
+  workflow at main; any future extension of the owner's calls it.
+- The main App's logo is GitHub's mark adapted to the icon's colours
+  with the orange baton, the Setup App's a gear, the ring and tile
+  unchanged; the owner accepted the risk under GitHub's logo policy.
 
 ## Constraints
 
 - The cloud environment blocks cooperbench.com, arxiv.org, cursor.com,
-  docs.github.com and openspineconsortium.com (the proxy refuses the
-  CONNECT); GitHub's docs come from raw.githubusercontent.com.
+  docs.github.com, dagshub.com and openspineconsortium.com (DNS or the
+  proxy's CONNECT); GitHub's documentation is read from the github/docs
+  repository's content files on raw.githubusercontent.com, and
+  github.com's HTML pages answer 403 to curl.
+- GitHub's install link takes target_id (what GitHub's own buttons
+  send), suggested_target_id and repository_ids[] (the OAuth-to-App
+  migration guide; up to 100; omitted means all repositories) and state,
+  which GitHub returns on the Setup URL after an install; an issue form
+  fills the field whose id matches a query parameter.
 - The cloud environment withholds CLAUDE_CODE_OAUTH_TOKEN; coordbench
   reads COORDBENCH_CLAUDE_TOKEN, each account its own.
 - gh issue and gh pr are refused in cloud sessions; the proxy also
@@ -191,8 +215,18 @@ Stated by the owner in conversation, this session and earlier:
   repository, creating one in the organization, deleting a branch and
   the organization's installations endpoints; the GitHub tools cannot
   create a repository in the organization either (403). Both are the
-  owner's.
-- sdlc-template is internal to its enterprise; sdlc-start and its
+  owner's. The GitHub tools take the session's scoped repository names,
+  the old ones (sdlc-*), and gh api on a renamed repository redirects to
+  a repositories/{id} path the proxy refuses; git pushes to the old
+  names redirect fine.
+- Parallel Bash calls in a cloud session share one working directory
+  and a cd in one call lands another's commands elsewhere or resets the
+  shell's directory: use absolute paths or git -C in every call.
+- A reusable workflow in a private repository needs Actions access
+  "Accessible from repositories in the organization" on that
+  repository; a run that failed at workflow resolution cannot be re-run
+  (403), a new push is needed.
+- sdlc-template is internal to its enterprise; symphony-start and its
   Actions logs are public.
 - The auto-mode permission classifier can refuse an outward write; the
   GitHub tools' pull request, merge and issue calls were allowed.
@@ -212,9 +246,12 @@ Stated by the owner in conversation, this session and earlier:
   logged out on 2026-10-11): the action list is
   ul[data-testid="repo-header-actions"], the Star button
   a[data-testid="star-button"], the owner's id and login in the
-  octolytics-dimension-user_id and user_login meta tags;
-  #repository-container-header and ul.pagehead-actions are gone.
-  github.com/new needs a login to read.
+  octolytics-dimension-user_id and user_login meta tags, the
+  repository's id and owner/name in octolytics-dimension-repository_id
+  and repository_nwo; #repository-container-header and
+  ul.pagehead-actions are gone. github.com/new needs a login to read.
 - The vendored record's first line, sdlc-protocol <version> <commit>,
   is rendered by vendoring.py in every copy: renaming it is a release
   that re-vendors every consumer, so the rename leaves it.
+- actions/upload-artifact v4 skips dotted folders unless
+  include-hidden-files is true.
