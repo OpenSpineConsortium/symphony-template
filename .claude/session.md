@@ -100,6 +100,13 @@ is listed first.
   Symphony, a link to the board, with no banner. A repository adopted
   before the topic existed (the owner's GOMC, the sweep's adoptions, the
   test repositories) gets the topic by hand under About.
+- The installs are chained on GitHub's side (symphony-start#28): the
+  owner sets SymphonyBoard's Setup URL to Symphony Setup's install page
+  and keeps Symphony Setup's on the form, so an install from the README
+  or the App's page reaches both Apps and the form; the extension (1.3.0)
+  steps from Symphony Setup's account picker to the preselected page for
+  the repository its note names. Whether GitHub carries the state through
+  both hops is the owner's one test (the form's Repository field).
 - The six merged adoptions of 2026-10-11 are the owner's to undo with the
   script undo-symphony.sh given in chat (revert, ruleset, labels,
   branches, opt-out file), signed in as GregorySchwing; this session has
@@ -206,6 +213,9 @@ Stated by the owner in conversation, this session and earlier:
 - The Chrome Web Store release kit is its own private repository,
   OpenSpineConsortium/chrome-store-release-kit, called as a reusable
   workflow at main; any future extension of the owner's calls it.
+- The installs are chained on GitHub's side: SymphonyBoard's Setup URL
+  is Symphony Setup's install page, Symphony Setup's is the form; the
+  extension steps from the picker to the preselected page.
 - An adopted repository carries the GitHub topic symphony, set by the
   adoption run (Setup App) and by setup-repo.sh; the extension reads it
   from the page and shows Ready for Symphony instead of Migrate.
