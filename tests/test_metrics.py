@@ -541,6 +541,44 @@ class Collect(unittest.TestCase):
         # is no truncated pull request: those are the window's finished ones.
         self.assertEqual(record["parallel"]["truncated"], 0)
 
+    def test_a_pull_request_opened_in_the_window_is_at_work_whatever_its_commits_dates(self):
+        """The other half of the rule: a pull request opened in the window is
+        work in the window, though every commit it carries was made before,
+        a branch pushed in August and opened in October."""
+        opened = pull(106, "claude/4720", "mona-secret", "2026-10-06T00:00:00Z", "2026-10-06T00:00:00Z", "6" * 40,
+                      state="open")
+        routes = {**ROUTES, f"{API}/pulls": [PULLS[0], opened, *PULLS[1:]],
+                  f"{API}/pulls/106": {"number": 106, "mergeable": True, "mergeable_state": "clean"},
+                  f"{API}/pulls/106/commits": [commit("6" * 40, "2026-08-01T00:00:00Z", login="mona-secret")],
+                  f"{API}/pulls/106/reviews": [],
+                  f"{API}/commits/{'6' * 40}/check-runs": runs()}
+        with tempfile.TemporaryDirectory() as folder:
+            code, record, _ = collect(folder, {"GITHUB_TOKEN": "t"}, FakeGitHub(routes))
+        self.assertEqual(code, 0)
+        # Lisa's 103, open since October 5, and Mona's 106 are each other's
+        # partner, so both are open beside another person.
+        self.assertEqual({name: row["open"] for name, row in record["by_setting"].items() if row["open"]},
+                         {"several_people": 2})
+
+    def test_the_look_back_comments_are_read_only_when_the_windows_own_work_began_before_it(self):
+        """A pull request that began and ended in the look-back bears on no
+        count of the window's, so its early start costs no read of the
+        look-back's comments: here every counted pull request began in the
+        window, and Mona's 98, merged in August, is a unit of the look-back
+        whose commits are not read either."""
+        earlier = pull(98, "claude/4709", "mona-secret", "2026-08-20T00:00:00Z", "2026-08-25T00:00:00Z", "8" * 40,
+                       merged="2026-08-25T00:00:00Z")
+        routes = {**ROUTES, f"{API}/pulls": [*PULLS, earlier]}
+        opener = FakeGitHub(routes)
+        with tempfile.TemporaryDirectory() as folder:
+            code, record, _ = collect(folder, {"GITHUB_TOKEN": "t"}, opener)
+        self.assertEqual(code, 0)
+        for section in ("parallel", "by_setting", "pairs"):
+            self.assertEqual(record[section], EXPECTED[section], section)
+        look_back = metrics.iso(metrics.look_back_start(metrics.Window.ending(metrics.parse_time(NOW), 30)))
+        self.assertNotIn(look_back, [query.get("since") for query in opener.queries])
+        self.assertEqual(len(opener.calls), 1 + 5 + 3 + 5 + 3 + 3 + 1)
+
 
 class ProtocolVersion(unittest.TestCase):
     def test_it_is_the_release_and_seven_hex_digits_which_the_collector_keeps(self):
@@ -1063,6 +1101,25 @@ class Breakdown(unittest.TestCase):
                 "parallel, by_setting or pairs"), shown)
             for secret in ("ann-secret", A1, "src/secret_"):
                 self.assertNotIn(secret, text + shown)
+
+    def test_a_failed_breakdown_read_leaves_the_breakdown_out_and_keeps_every_existing_key(self):
+        """A read only the breakdown makes, which GitHub fails, here 314's
+        commits answering 404, leaves the record a copy of the template from
+        before the breakdown writes: every existing key, measured as before,
+        and no parallel, by_setting or pairs."""
+        routes = world_routes()
+        del routes[f"{API}/pulls/314/commits"]
+        with tempfile.TemporaryDirectory() as folder:
+            code, record, text, shown, _, _ = collect_world(folder, routes=routes)
+        self.assertEqual(code, 0)
+        self.assertEqual(tuple(record), metrics.RECORD_KEYS[:-3])
+        self.assertEqual((record["counts"], record["durations_seconds"], record["rates"]),
+                         (WORLD_COUNTS, WORLD_DURATIONS, WORLD_RATES))
+        self.assertTrue(shown.rstrip("\n").endswith(
+            "the breakdown was left out because GitHub failed one of its reads (HTTP 404), so the record has no "
+            "parallel, by_setting or pairs"), shown)
+        for secret in ("ann-secret", A1, "src/secret_"):
+            self.assertNotIn(secret, text + shown)
 
     def test_an_old_comment_edited_lately_changes_nothing(self):
         """GitHub's since is the last update, so a mark made before the

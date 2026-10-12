@@ -26,9 +26,9 @@ each file, how each measure lines up with the benchmark's, and the switch.
            stops before it would leave the board fewer requests than
            RESERVE, says so, and writes nothing. The breakdown reads only
            once every other key is measured, so it never costs one: when
-           its reads would reach the reserve the record is written without
-           it, and when only the changed files, read last, are left, with
-           the counts that need them null.
+           its reads would reach the reserve, or GitHub fails one of them,
+           the record is written without it, and when only the changed
+           files, read last, are left, with the counts that need them null.
   judge    run by a maintainer on their own machine, with their own gh and
            their own Claude Code (claude -p) on their own subscription, never
            with ANTHROPIC_API_KEY. It reads each recent pull request's
@@ -1172,7 +1172,8 @@ def read_breakdown(api, facts, rest, comments, window):
     stopped; the commits of those that can have been at work beside the
     window's; the look-back's comments, when the window's work began before
     it; and last the changed files. Only the changed files give way to the
-    board's reserve here; OutOfBudget from any other read is the caller's."""
+    board's reserve here; OutOfBudget, or any other GitHubError, from
+    another read is the caller's, which then leaves the breakdown out."""
     earlier, _ = updated_since(rest, look_back_start(window))
     units = work_units(api, facts, earlier, window)
     if began_before(units, window):
@@ -1837,13 +1838,18 @@ def collect(args, environ, opener=None, sleep=time.sleep):
     facts, extra_claims, comments, rest = read_repository(api, window)
     measured = measures(facts, extra_claims, comments, window)
     # The breakdown never costs a key measured before it: when its reads
-    # would reach the board's reserve, the record is written without it,
-    # the record a copy of the template from before the breakdown writes.
+    # would reach the board's reserve, or GitHub fails one of them, the
+    # record is written without it, the record a copy of the template from
+    # before the breakdown writes.
     try:
         broken_out, unread = read_breakdown(api, facts, rest, comments, window)
     except OutOfBudget:
         left = ("; the breakdown was left out to keep the board's reserve, so the record has no parallel, "
                 "by_setting or pairs")
+    except GitHubError as problem:
+        answer = f"HTTP {problem.status}" if problem.status else "no answer"
+        left = (f"; the breakdown was left out because GitHub failed one of its reads ({answer}), so the record "
+                "has no parallel, by_setting or pairs")
     else:
         measured.update(broken_out)
         left = (f"; the changed files of {unread} pull requests were left unread to keep the board's reserve, so "

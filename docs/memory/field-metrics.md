@@ -16,8 +16,10 @@ several sessions (one_person_sessions) are never pooled with several people
 (several_people). The breakdown reads back one more window, reads changed
 files last and only for pull requests with a partner, and writes counts
 only. It reads only once every other key is measured, so a run whose
-breakdown would reach the board's reserve still writes the other keys,
-without parallel, by_setting and pairs; and an open pull request counts
+breakdown reads other than the changed files would reach the board's
+reserve, or fail, still writes the other keys, without parallel,
+by_setting and pairs (changed files left unread only make their counts
+null); and an open pull request counts
 only when it was opened or given a commit in the window, since the board's
 comment at every push to the default branch renews a parked one's
 updated_at.
