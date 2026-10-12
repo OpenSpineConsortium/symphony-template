@@ -314,25 +314,27 @@ run's summary what is missing. Once, in this order:
 
    Where the two are already set at the organization with `--visibility
    all`, symphony-protocol, being public, has them, and this step is done.
-3. **Allow auto-merge on the three consumers the sync arms it for**.
+3. **Allow auto-merge on the four consumers the sync arms it for**.
    `bash scripts/setup-repo.sh` turns it on here (section 3); these
-   commands do it for all three, and change nothing where it is on already:
+   commands do it for all four, and change nothing where it is on already:
 
    ```
    gh api -X PATCH repos/OpenSpineConsortium/symphony-template -F allow_auto_merge=true
    gh api -X PATCH repos/OpenSpineConsortium/coordbench -F allow_auto_merge=true
    gh api -X PATCH repos/OpenSpineConsortium/symphony-marketplace -F allow_auto_merge=true
+   gh api -X PATCH repos/OpenSpineConsortium/symphony-app -F allow_auto_merge=true
    ```
 
-   The sync does not arm auto-merge for symphony-app, which ecosystem.json
-   gives `"auto_merge": false` (docs/start/protocol.md, step 6), so you
-   merge the App's sync pull request yourself.
+   symphony-app is private, and GitHub offers auto-merge on a private
+   repository only on a paid plan, which the organization has; on GitHub
+   Free its line is refused, the sync's run says so, and you merge the
+   App's sync pull request yourself (docs/start/protocol.md, step 6).
 4. **Require the check `check` on each consumer's main**, with a ruleset,
    so auto-merge waits for it to be green. Here
    docs/setup/ruleset-main.json already does (section 3); the same file
    imports into coordbench, symphony-marketplace and symphony-app (their Settings,
-   Rules, Rulesets, New ruleset, Import a ruleset); on symphony-app the check
-   then gates your own merge (step 3). On symphony-protocol require `check`
+   Rules, Rulesets, New ruleset, Import a ruleset); on symphony-app, as on
+   the others, auto-merge then waits for it. On symphony-protocol require `check`
    and, if you like, the `downstream (<name>)` jobs, so a change that
    breaks a consumer cannot merge there.
 5. **Land the pull requests that brought the sync**, one per repository
