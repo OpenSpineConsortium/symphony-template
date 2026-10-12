@@ -463,18 +463,20 @@ def conflicts(facts, comments):
 
 
 def released_claims(comments):
-    """How many claims were released: the release comments as the board
-    reads them (claims.is_release_comment: the marker as the first line,
-    by the owner, a member or a collaborator), where one on an issue that
-    had another less than a day before is the same release said again and
-    is not counted twice. An hourly coordinator said it again before it
-    learnt to skip a claim it had released; a later claim on the issue
-    cannot be released within a day of the last release, since it must go
-    a day without a commit first."""
+    """How many claims were released: the comments that open with the
+    release marker (claims.starts_with_release_marker), where one on an
+    issue that had another less than a day before is the same release said
+    again and is not counted twice. An hourly coordinator said it again
+    before it learnt to skip a claim it had released; a later claim on the
+    issue cannot be released within a day of the last release, since it
+    must go a day without a commit first. Whoever wrote the comment counts:
+    the board asks GitHub whether an author may write, which a count need
+    not, and the workflow's token may show the owner's account, a private
+    member of the organization, as a mere contributor."""
     times = {}
     for c in comments:
         number, when = issue_number(c), time_of(c, "created_at")
-        if claims.is_release_comment(c) and number is not None and when is not None:
+        if claims.starts_with_release_marker(c) and number is not None and when is not None:
             times.setdefault(number, []).append(when)
     count = 0
     for found in times.values():
@@ -680,10 +682,10 @@ REVIEW_WORDS = {"APPROVED": "review: approved", "CHANGES_REQUESTED": "review: ch
 HEADER = ("Conversation of a pull request: {count} messages in time order, each as [message id] time sender -> "
           "recipient (all for a broadcast): content. The people are named A, B, C and so on in the order they "
           "first speak; bot is any app or bot account.")
-# The protocol's own comments are posted again and again by design: the
-# board's "main moved" on every move of the default branch, its "idle" on
-# every quiet day, the coordinator's release. They are nobody's words, and
-# App F would read them as spammy repetition, so they stay out.
+# The protocol's own comments are posted by rule: the board's "main moved"
+# on every move of the default branch and its "idle" on every quiet day,
+# again and again, and the coordinator's release. They are nobody's words,
+# and App F would read them as spammy repetition, so they stay out.
 PROTOCOL_MARKERS = (MAIN_MOVED_PREFIX, board.IDLE_MARKER, RELEASE_MARKER)
 
 

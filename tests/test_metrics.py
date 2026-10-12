@@ -508,9 +508,8 @@ class ReleasedClaims(unittest.TestCase):
         self.assertEqual(metrics.released_claims(comments), 3)
         self.assertEqual(metrics.released_claims(list(reversed(comments))), 3)
 
-    def test_only_a_release_the_board_would_act_on_counts(self):
+    def test_only_a_comment_that_opens_with_the_marker_counts(self):
         comments = [
-            comment(7, "2026-10-01T10:00:00Z", self.RELEASE, association="NONE"),
             comment(8, "2026-10-01T10:00:00Z", "> " + self.RELEASE),
             comment(9, "2026-10-01T10:00:00Z", "Why released?\n" + self.RELEASE),
             dict(comment(10, "2026-10-01T10:00:00Z", self.RELEASE), issue_url=""),
@@ -518,6 +517,12 @@ class ReleasedClaims(unittest.TestCase):
         ]
         self.assertEqual(metrics.released_claims(comments), 0)
         self.assertEqual(metrics.released_claims([]), 0)
+
+    def test_whoever_wrote_it_counts(self):
+        # The workflow's token may show the owner's account, a private
+        # member of the organization, as a contributor.
+        comments = [comment(7, "2026-10-01T10:00:00Z", self.RELEASE, association="CONTRIBUTOR")]
+        self.assertEqual(metrics.released_claims(comments), 1)
 
 
 class Unchanged(unittest.TestCase):

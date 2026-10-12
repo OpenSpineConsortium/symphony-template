@@ -247,7 +247,7 @@ Each item, with its reason and size, is in [the gap list](../history/crowdsourci
 
 - An owner-only @claude that reads its token from an environment.
 - A board that spends less: fewer triggers or a debounce, then rendering by the symphony-app's token, with `board` protected.
-- Released claims that return to the queue, one idle threshold, `merge_group` in ci.yml, and a quiet "main moved" under a merge queue.
+- One idle threshold, `merge_group` in ci.yml, and a quiet "main moved" under a merge queue.
 - A session hook that shows the reader's own queue first, deal-out of the queue across accounts, and the account taken from the pusher's login.
 - A server-side check that only the claimer pushes to `claude/N`; per-issue checkpoint files; the claim skill's REST calls for cloud sessions.
 - Area coordinators and review routines, a planner woken by merges, nested epics, a conflict resolver, a scoreboard, and claims for people without Write.
