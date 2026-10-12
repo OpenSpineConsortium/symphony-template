@@ -25,6 +25,11 @@ name: Checks
 # METRICS.json and JUDGE.json: a maintainer's judge pushes JUDGE.json there
 # with their own credentials (docs/setup/metrics.md), which, unlike
 # GITHUB_TOKEN, start this workflow, and the branch has no checks to run.
+# It also runs by hand, and when .github/workflows/protocol.yml asks: that
+# workflow pushes symphony-protocol/sync and opens its pull request with
+# GITHUB_TOKEN, which start no workflow, so it starts this one on the
+# branch itself, and the job check leaves its check run on the branch's
+# head, where the pull request's required check looks for it.
 # Before the checks the job clones OpenSpineConsortium/symphony-protocol, which
 # is public, so the clone needs no token, and names the clone to them in
 # SDLC_PROTOCOL. check.sh's vendoring.py verify holds tools/sdlc_protocol to
@@ -67,6 +72,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
   push:
     branches-ignore: ["claude/**", "symphony-protocol/**", "crowd/setup", "metrics"]
+  workflow_dispatch:
 
 permissions:
   contents: read
