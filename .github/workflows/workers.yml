@@ -25,7 +25,12 @@ name: Workers
 # at a time per worker. In crowd mode (docs/project.md,
 # docs/setup/crowdsourcing.md) nothing starts, whatever the registry says:
 # each contributor runs their own worker on their own account, and the
-# repository holds no token.
+# repository holds no token. After each session the leg records what it
+# spent, tokens by model and seconds, with tools/usage.py run from a copy
+# made before the session, since the session may leave the checkout on an
+# older branch, and keeps the record as an artifact, symphony-usage-*,
+# which the metrics workflow reads (docs/setup/metrics.md, What the work
+# cost); while the metrics switch is off there is no record.
 
 on:
   schedule:
@@ -119,6 +124,9 @@ jobs:
       - name: Point at the setup when the token is not there
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN != 'true'
         run: echo "The repository secret CLAUDE_CODE_OAUTH_TOKEN is not set; docs/setup/claude-action.md says how. Doing nothing."
+      - name: Keep a copy of the usage recorder, which the run cannot move
+        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
+        run: cp tools/usage.py "$RUNNER_TEMP/usage.py"
       - uses: anthropics/claude-code-action@v1
         id: claude
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
@@ -131,6 +139,25 @@ jobs:
             --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
           prompt: |
             You are the worker ${{ matrix.worker }} on the repository ${{ github.repository }}. Run `git fetch origin ${{ env.DEFAULT_BRANCH }} && git show origin/${{ env.DEFAULT_BRANCH }}:docs/agents/routines/worker.md` and do what the last fenced block of that page says, exactly and nothing else, as the worker ${{ matrix.worker }}. This run, ${{ steps.next.outputs.move }} issue #${{ steps.next.outputs.issue }}: the workflow chose it, so that the workers running at the same time each take a different issue.
+      - name: Record what the run spent, for the field metrics
+        if: always() && steps.claude.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+          SDLC_METRICS: ${{ vars.SDLC_METRICS }}
+          ISSUE: ${{ steps.next.outputs.issue }}
+        run: >-
+          python3 "$RUNNER_TEMP/usage.py" actions --root "$GITHUB_WORKSPACE"
+          --execution-file "${EXECUTION_FILE:-$RUNNER_TEMP/claude-execution-output.json}"
+          --out "$RUNNER_TEMP/symphony-usage/record.json" --workflow workers --job work --worker "$WORKER" --issue "$ISSUE"
+      - name: Keep the record where the metrics workflow reads it
+        if: always() && steps.claude.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: symphony-usage-${{ github.run_id }}-${{ github.run_attempt }}-work-${{ matrix.worker }}
+          path: ${{ runner.temp }}/symphony-usage/record.json
+          if-no-files-found: ignore
       - name: Go another round while this worker has work
         if: steps.claude.outcome == 'success'
         env:

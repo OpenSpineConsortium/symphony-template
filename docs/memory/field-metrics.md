@@ -1,4 +1,4 @@
-Field metrics: .github/workflows/metrics.yml writes the protocol's aggregates, never a name or any text, to METRICS.json on the branch metrics daily with GITHUB_TOKEN alone; a maintainer's judge adds App F counts as JUDGE.json; .github/symphony-metrics or the variable SDLC_METRICS turns sharing off.
+Field metrics: .github/workflows/metrics.yml writes the protocol's aggregates, never a name or any text, to METRICS.json on the branch metrics daily with GITHUB_TOKEN alone, what the work cost among them; a maintainer's judge adds App F counts as JUDGE.json; .github/symphony-metrics or the variable SDLC_METRICS turns sharing off.
 
 tools/metrics.py collect reads the last 30 days of pull requests, reviews,
 check runs, claude/<n> branches and comments from the REST API and writes
@@ -19,7 +19,8 @@ only. It reads only once every other key is measured, so a run whose
 breakdown reads other than the changed files would reach the board's
 reserve, or fail, still writes the other keys, without parallel,
 by_setting and pairs (changed files left unread only make their counts
-null); and an open pull request counts
+null), and without economics and coordination, which read after it; and
+an open pull request counts
 only when it was opened or given a commit in the window, since the board's
 comment at every push to the default branch renews a parked one's
 updated_at.
@@ -48,9 +49,33 @@ local claude, keeps codes only, and pushes JUDGE.json (--push, or push
 afterwards) to origin, which must be the repository judged, as an ordinary
 commit the push guard lets through.
 
-Two conventions the counts rest on: the coordinator routine starts each
-release comment with `<!-- sdlc-coordinator: claim-released -->` (both
-coordinator prompts carry it; it is the vendored protocol's
+What the work cost comes from two records, neither needing a routine, an
+API key or a server (tools/usage.py). A session's PreToolUse hook on Bash
+reads its transcript before each git commit, and the commit-msg hook the
+session-start hook installs adds a trailer, `Symphony-Usage: v1
+session=<8> seconds=<n> <model>=input,cache5m,cache1h,cacheread,output`,
+the usage since the session's last commit; a run in Actions (workers.yml,
+coordinator.yml, claude.yml) reads claude-code-action's execution file
+with a copy of usage.py made before the session and uploads its record as
+an artifact named symphony-usage-*. collect lists and downloads those
+records (actions: read; the redirect is fetched without the token, which
+urllib would otherwise send to the storage host), at most 200 new a run,
+carrying what it read in the Actions cache (--usage-cache). economics is
+the window's bill (trailers on commits made in it, runs recorded in it)
+over what it delivered (pull requests of people and of the Claude
+workflows that ended in it), priced at the API list prices of
+tools/economics.py's PRICES; coordination splits those pull requests into
+alone and parallel (other such work beside for more than 60 seconds), the
+coordinator's unattributed runs on the parallel side, and gives seven
+ratios, each over 1 where parallel did better: tokens and dollars per
+measured merge, latency, throughput, first check passed, commits per
+merge, failures per pull request. The switch stops the records at their
+source too, and SDLC_METRICS=off in a person's environment keeps their
+sessions' usage off their commits.
+
+Two conventions the counts rest on: the coordinator, the board's run or a
+coordinator routine, starts each release comment with
+`<!-- sdlc-coordinator: claim-released -->` (it is the vendored protocol's
 claims.RELEASE_MARKER, on which the board also renames a released claim's
 branch, and released_claims counts a release said again within a day
 once), and the board's "main moved" comment says "conflicting with" for a

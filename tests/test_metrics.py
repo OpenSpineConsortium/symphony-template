@@ -19,6 +19,7 @@ import tempfile
 import unittest
 import urllib.error
 import urllib.parse
+import zipfile
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from functools import partial
@@ -214,10 +215,11 @@ EXPECTED = {
 
 class Answer:
     def __init__(self, body, headers=None):
-        self.body, self.status, self.headers = json.dumps(body).encode(), 200, headers or {}
+        raw = body if isinstance(body, bytes) else json.dumps(body).encode()
+        self.body, self.status, self.headers = raw, 200, headers or {}
 
-    def read(self):
-        return self.body
+    def read(self, size=-1):
+        return self.body if size < 0 else self.body[:size]
 
     def __enter__(self):
         return self
@@ -226,26 +228,41 @@ class Answer:
         return False
 
 
+class Redirect:
+    """A route GitHub answers with a redirect to target, as it answers an
+    artifact's download."""
+
+    def __init__(self, target):
+        self.target = target
+
+
 class FakeGitHub:
     """Stands in for urllib's opener: answers by path, one page each, and
     a 404 for any path it has no answer for, so a call the code should not
     make fails the test that made it. Given a number of requests left, it
-    counts them down in the rate-limit headers as GitHub does."""
+    counts them down in the rate-limit headers as GitHub does, on its own
+    API's answers only. It keeps each request's host and headers too."""
 
     def __init__(self, routes, remaining=None):
         self.routes, self.calls, self.queries, self.remaining = routes, [], [], remaining
+        self.sent = []
 
     def open(self, request, timeout=None):
         parts = urllib.parse.urlsplit(request.full_url)
         self.calls.append(parts.path)
         self.queries.append(dict(urllib.parse.parse_qsl(parts.query)))
+        self.sent.append((parts.netloc, {name.lower(): value for name, value in request.header_items()}))
         headers = {}
-        if self.remaining is not None:
+        if self.remaining is not None and parts.netloc == "api.github.com":
             self.remaining -= 1
             headers = {"X-RateLimit-Remaining": str(self.remaining), "X-RateLimit-Reset": str(RESET)}
         if parts.path not in self.routes:
             raise urllib.error.HTTPError(request.full_url, 404, "Not Found", headers, io.BytesIO(b"{}"))
-        return Answer(self.routes[parts.path], headers)
+        answer = self.routes[parts.path]
+        if isinstance(answer, Redirect):
+            raise urllib.error.HTTPError(request.full_url, 302, "Found", {**headers, "Location": answer.target},
+                                         io.BytesIO(b""))
+        return Answer(answer, headers)
 
 
 class SpentHour:
@@ -504,8 +521,9 @@ class Collect(unittest.TestCase):
         # detail), the branches with two claim commits, and the comments.
         # The breakdown adds nothing here: nothing was at work beside
         # anything, so no changed files are read, and 99, in the look-back,
-        # is no unit, so its commits are not read either.
-        self.assertEqual(len(opener.calls), 1 + 5 + 3 + 5 + 3 + 3 + 1)
+        # is no unit, so its commits are not read either. Last, the listing
+        # of the Actions runs' usage records, which this fake answers 404.
+        self.assertEqual(len(opener.calls), 1 + 5 + 3 + 5 + 3 + 3 + 1 + 1)
 
     def test_a_parked_pull_request_is_beside_nobody_until_its_own_work_comes_back(self):
         """Under the template's ruleset a pull request behind the default
@@ -526,8 +544,9 @@ class Collect(unittest.TestCase):
         for section in ("parallel", "by_setting", "pairs"):
             self.assertEqual(record[section], EXPECTED[section], section)
         # Its commits, its reviews and its detail, as before the breakdown,
-        # and nothing more: no changed file, since nothing was beside anything.
-        self.assertEqual(len(opener.calls), 21 + 3)
+        # and nothing more but the usage records' listing: no changed file,
+        # since nothing was beside anything.
+        self.assertEqual(len(opener.calls), 21 + 3 + 1)
         # A commit made in the window, a rebase here, puts it back at work,
         # beside everything since August.
         routes[f"{API}/pulls/105/commits"] = [commit("5" * 40, "2026-08-01T00:00:00Z", "2026-10-09T11:00:00Z",
@@ -577,7 +596,125 @@ class Collect(unittest.TestCase):
             self.assertEqual(record[section], EXPECTED[section], section)
         look_back = metrics.iso(metrics.look_back_start(metrics.Window.ending(metrics.parse_time(NOW), 30)))
         self.assertNotIn(look_back, [query.get("since") for query in opener.queries])
-        self.assertEqual(len(opener.calls), 1 + 5 + 3 + 5 + 3 + 3 + 1)
+        self.assertEqual(len(opener.calls), 1 + 5 + 3 + 5 + 3 + 3 + 1 + 1)
+
+
+class Economics(unittest.TestCase):
+    """What the work cost, from the sessions' trailers and the Actions runs'
+    records, read after the breakdown and never in its way."""
+
+    def collect(self, folder, routes=None, cache=None):
+        opener = FakeGitHub(routes or world_routes())
+        out = Path(folder) / "METRICS.json"
+        extra = ["--usage-cache", str(cache)] if cache else []
+        args = metrics.parse_args(["collect", "--repo", REPO, "--out", str(out), "--root", str(folder), "--now", NOW,
+                                   *extra])
+        with redirect_stdout(io.StringIO()) as shown:
+            self.assertEqual(metrics.collect(args, {"GITHUB_TOKEN": "t"}, opener=opener, sleep=lambda s: None), 0)
+        return json.loads(out.read_text()), shown.getvalue(), opener
+
+    def test_the_world_costs_what_its_trailers_and_records_say(self):
+        with tempfile.TemporaryDirectory() as folder:
+            record, shown, _ = self.collect(folder)
+        self.assertEqual(record["economics"], WORLD_ECONOMICS)
+        self.assertEqual(record["coordination"], WORLD_COORDINATION)
+        self.assertEqual(tuple(record["economics"]), metrics.economics.ECONOMICS_KEYS)
+        for side in ("alone", "parallel"):
+            self.assertEqual(tuple(record["coordination"][side]), metrics.economics.GROUP_KEYS)
+        self.assertEqual(tuple(record["coordination"]["ratios"]), metrics.economics.RATIO_KEYS)
+        self.assertNotIn("usage records", shown)
+
+    def test_the_token_goes_to_the_api_and_never_to_the_storage_host(self):
+        with tempfile.TemporaryDirectory() as folder:
+            _, _, opener = self.collect(folder)
+        hosts = {host for host, _ in opener.sent}
+        self.assertEqual(hosts, {"api.github.com", "storage.example"})
+        for host, headers in opener.sent:
+            self.assertEqual("authorization" in headers, host == "api.github.com", host)
+
+    def test_a_run_reads_only_the_records_its_cache_does_not_hold(self):
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / "usage.json"
+            first, _, opener = self.collect(folder, cache=cache)
+            self.assertEqual(sum(path.endswith("/zip") for path in opener.calls), 2)
+            kept = json.loads(cache.read_text())
+            self.assertEqual(sorted(kept["records"]), ["9001", "9002"])
+            second, _, opener = self.collect(folder, cache=cache)
+        self.assertEqual(sum(path.endswith("/zip") for path in opener.calls), 0)
+        self.assertEqual(second["economics"], first["economics"])
+
+    def test_records_over_the_limit_wait_for_the_next_run(self):
+        with tempfile.TemporaryDirectory() as folder, mock.patch.object(metrics, "USAGE_LIMIT", 1):
+            record, shown, opener = self.collect(folder)
+        self.assertEqual((record["economics"]["actions_runs"], record["economics"]["actions_runs_unread"]), (1, 1))
+        self.assertEqual([path for path in opener.calls if path.endswith("/zip")],
+                         [f"{API}/actions/artifacts/9001/zip"])
+        self.assertTrue(shown.rstrip("\n").endswith("; 1 Actions runs' usage records were left for the next run"),
+                        shown)
+
+    def test_records_that_cannot_be_listed_leave_only_the_cached_ones(self):
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / "usage.json"
+            self.collect(folder, cache=cache)
+            routes = world_routes()
+            del routes[f"{API}/actions/artifacts"]
+            record, shown, _ = self.collect(folder, routes=routes, cache=cache)
+            kept = json.loads(cache.read_text())
+        self.assertEqual(record["economics"]["actions_runs"], 2)
+        self.assertIsNone(record["economics"]["actions_runs_unread"])
+        self.assertEqual(sorted(kept["records"]), ["9001", "9002"])
+        self.assertTrue(shown.rstrip("\n").endswith(
+            "; the Actions runs' usage records could not be listed, so only those read before count"), shown)
+
+    def test_a_spent_hour_leaves_every_record_after_it_for_the_next_run(self):
+        class SpentAtDownloads(FakeGitHub):
+            def open(self, request, timeout=None):
+                if request.full_url.endswith("/zip"):
+                    self.calls.append(urllib.parse.urlsplit(request.full_url).path)
+                    body = io.BytesIO(b'{"message": "API rate limit exceeded for installation ID 1."}')
+                    raise urllib.error.HTTPError(request.full_url, 403, "Forbidden", {}, body)
+                return super().open(request, timeout)
+
+        opener = SpentAtDownloads(world_routes())
+        with tempfile.TemporaryDirectory() as folder:
+            out = Path(folder) / "METRICS.json"
+            args = metrics.parse_args(["collect", "--repo", REPO, "--out", str(out), "--root", folder, "--now", NOW])
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(metrics.collect(args, {"GITHUB_TOKEN": "t"}, opener=opener,
+                                                 sleep=lambda seconds: None), 0)
+            record = json.loads(out.read_text())
+        self.assertEqual((record["economics"]["actions_runs"], record["economics"]["actions_runs_unread"]), (0, 2))
+        self.assertEqual(sum(path.endswith("/zip") for path in opener.calls), 1)
+
+    def test_what_is_no_record_of_ours_is_passed_over(self):
+        routes = world_routes()
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("record.json", json.dumps({"v": 1, "source": "somewhere else"}))
+        routes["/usage/9001.zip"] = buffer.getvalue()
+        routes["/usage/9002.zip"] = b"not a zip"
+        listing = json.loads(json.dumps(WORLD_ARTIFACTS))
+        listing["artifacts"].append(artifact(9005, "symphony-usage-80-1-claude", "2026-10-05T00:00:00Z",
+                                             size=metrics.USAGE_MAX_BYTES + 1))
+        routes[f"{API}/actions/artifacts"] = listing
+        with tempfile.TemporaryDirectory() as folder:
+            record, _, opener = self.collect(folder, routes=routes)
+        self.assertEqual((record["economics"]["actions_runs"], record["economics"]["actions_runs_unread"]), (0, 0))
+        self.assertNotIn(f"{API}/actions/artifacts/9005/zip", opener.calls)
+        self.assertEqual(record["economics"]["tokens_total"], WORLD_ECONOMICS["tokens_total"] - 332300 - 109100)
+
+    def test_the_listing_stops_at_the_first_page_made_before_the_look_back(self):
+        old = artifact(8000, "symphony-usage-1-1-claude", "2026-07-01T00:00:00Z")
+        api = metrics.Budgeted("t", REPO, opener=FakeGitHub({f"{API}/actions/artifacts": {"artifacts": [old]}}),
+                               sleep=lambda seconds: None)
+        self.assertEqual(metrics.usage_artifacts(api, metrics.parse_time("2026-08-11T12:00:00Z")), [])
+
+    def test_a_revert_is_a_merged_pull_request_titled_as_the_revert_button_titles_it(self):
+        window = metrics.Window.ending(metrics.parse_time(NOW), 30)
+        facts = [metrics.PullFacts({"number": 1, "title": 'Revert "Add the thing"', "merged_at": "2026-10-02T00:00:00Z"}),
+                 metrics.PullFacts({"number": 2, "title": "Revert the thing", "merged_at": "2026-10-02T00:00:00Z"}),
+                 metrics.PullFacts({"number": 3, "title": 'Revert "Old"', "merged_at": "2026-08-02T00:00:00Z"})]
+        self.assertEqual(metrics.reverts(facts, window), 1)
 
 
 class ProtocolVersion(unittest.TestCase):
@@ -692,8 +829,27 @@ def commit_sha(number, index):
     return f"{number:04d}{index:02d}e" + "f" * 33
 
 
-def trailer(session):
-    return f"Work.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nClaude-Session: {LINK}{session}"
+def trailer(session, usage=""):
+    """A cloud session's trailers, with a Symphony-Usage line when usage
+    gives its value."""
+    lines = f"Work.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nClaude-Session: {LINK}{session}"
+    return lines + (f"\nSymphony-Usage: v1 {usage}" if usage else "")
+
+
+def usage_record(workflow, job, models, seconds, issue=None, pull=None):
+    """The record a run in Actions uploads (tools/usage.py), zipped as
+    upload-artifact keeps it."""
+    record = {"v": 1, "source": "actions", "workflow": workflow, "job": job, "worker": "", "issue": issue,
+              "pull": pull, "at": "2026-10-06T00:00:00Z", "seconds": seconds, "api_seconds": seconds,
+              "turns": 12, "reported_usd": 0.0, "error": False, "models": models}
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("record.json", json.dumps(record))
+    return buffer.getvalue()
+
+
+def artifact(number, name, created, expired=False, size=600):
+    return {"id": number, "name": name, "created_at": created, "expired": expired, "size_in_bytes": size}
 
 
 def world_commit(number, index, authored, message="Work, no trailer."):
@@ -759,26 +915,38 @@ WORLD_PULLS = [
     world_pull(317, "ben-secret", "2026-07-20T00:00:00Z", "2026-08-01T00:00:00Z", "claude/517",
                merged="2026-08-01T00:00:00Z"),
 ]
+# The usage the sessions' commits carry (tools/usage.py), in the trailer's
+# order: uncached input, cache writes kept five minutes and an hour, cache
+# reads, output. 313's commit was made before the window, so it is on no
+# bill of the window, though it counts for 313, which ended in it.
 WORLD_COMMITS = {
-    301: [world_commit(301, 1, "2026-10-01T09:00:00Z", trailer(A1)),
-          world_commit(301, 2, "2026-10-01T12:00:00Z", trailer(A1)),
+    301: [world_commit(301, 1, "2026-10-01T09:00:00Z", trailer(
+              A1, "session=a1a1a1a1 seconds=2400 claude-opus-5-5=2100,61000,0,880000,18500")),
+          world_commit(301, 2, "2026-10-01T12:00:00Z", trailer(
+              A1, "session=a1a1a1a1 seconds=1500 claude-opus-5-5=900,22000,0,540000,9800")),
           world_commit(301, 3, "2026-10-01T12:30:00Z", trailer(B1))],
     302: [world_commit(302, 1, "2026-10-01T10:30:00Z"), world_commit(302, 2, "2026-10-01T13:00:00Z")],
     303: [world_commit(303, 1, "2026-10-01T15:00:00Z", trailer(B1))],
-    304: [world_commit(304, 1, "2026-10-03T09:50:00Z", trailer(B1)),
+    304: [world_commit(304, 1, "2026-10-03T09:50:00Z", trailer(
+              B1, "session=b1b1b1b1 seconds=1200 claude-sonnet-5-5=1500,30000,0,420000,7600")),
           world_commit(304, 2, "2026-10-03T10:56:00Z", trailer(B1))],
     305: [world_commit(305, 1, "2026-10-03T10:55:00Z")],
     306: [world_commit(306, 1, "2026-10-05T09:00:00Z")],
-    307: [world_commit(307, 1, "2026-10-05T11:00:00Z", trailer(A1))],
+    307: [world_commit(307, 1, "2026-10-05T11:00:00Z", trailer(
+              A1, "session=a1a1a1a1 seconds=900 claude-haiku-5-5=300,4000,0,30000,900 "
+                  "claude-opus-5-5=700,18000,0,260000,5200"))],
     # The Sept 20 commit is more than seven days before the opening.
     308: [world_commit(308, 1, "2026-09-20T09:00:00Z", trailer(B1)),
-          world_commit(308, 2, "2026-10-07T09:00:00Z", trailer(B1))],
+          world_commit(308, 2, "2026-10-07T09:00:00Z", trailer(
+              B1, "session=b1b1b1b1 seconds=1600 claude-sonnet-5-5=1800,35000,0,610000,11200"))],
     309: [world_commit(309, 1, "2026-10-07T10:05:00Z")],
     310: [world_commit(310, 1, "2026-10-02T00:00:00Z")],
     311: [world_commit(311, 1, "2026-10-09T09:00:00Z", trailer(A2)),
           world_commit(311, 2, "2026-10-09T09:30:00Z", f"Local work.\n\nSymphony-Session: {TOKEN}")],
-    312: [world_commit(312, 1, "2026-10-09T11:00:00Z", trailer(B1))],
-    313: [world_commit(313, 1, "2026-09-05T09:00:00Z", trailer(A1))],
+    312: [world_commit(312, 1, "2026-10-09T11:00:00Z", trailer(
+              B1, "session=b1b1b1b1 seconds=600 claude-sonnet-5-5=400,9000,0,120000,2100"))],
+    313: [world_commit(313, 1, "2026-09-05T09:00:00Z", trailer(
+              A1, "session=a1a1a1a1 seconds=3000 claude-opus-5-5=2500,70000,0,1000000,20000"))],
     314: [world_commit(314, 1, "2026-09-01T09:00:00Z", trailer(A2))],
     315: [world_commit(315, 1, "2026-07-01T09:00:00Z", trailer(A2))],
     319: [world_commit(319, 1, "2026-10-05T12:30:00Z")],
@@ -814,8 +982,28 @@ WORLD_COMMENTS = [
 ]
 
 
+# The Actions runs' usage records, newest first as GitHub lists them: the
+# @claude run that made 309, the coordinator's plan of an epic, which names
+# no pull request, an artifact of another workflow, and an expired record.
+STORAGE = "https://storage.example"
+WORLD_ARTIFACTS = {"total_count": 4, "artifacts": [
+    artifact(9003, "build-output", "2026-10-08T00:00:00Z"),
+    artifact(9001, "symphony-usage-71-1-claude", "2026-10-07T10:28:00Z"),
+    artifact(9002, "symphony-usage-70-1-plan", "2026-10-06T08:00:00Z"),
+    artifact(9000, "symphony-usage-60-1-claude", "2026-09-30T08:00:00Z", expired=True),
+]}
+WORLD_RECORDS = {
+    9001: usage_record("claude", "claude", {"claude-sonnet-5-5": [900, 25000, 0, 300000, 6400]}, 340.5, pull=309),
+    9002: usage_record("coordinator", "plan", {"claude-opus-5-5": [600, 15000, 0, 90000, 3500]}, 95.0, issue=900),
+}
+
+
 def world_routes():
-    routes = {f"{API}/pulls": WORLD_PULLS, f"{API}/branches": [], f"{API}/issues/comments": WORLD_COMMENTS}
+    routes = {f"{API}/pulls": WORLD_PULLS, f"{API}/branches": [], f"{API}/issues/comments": WORLD_COMMENTS,
+              f"{API}/actions/artifacts": WORLD_ARTIFACTS}
+    for number, record in WORLD_RECORDS.items():
+        routes[f"{API}/actions/artifacts/{number}/zip"] = Redirect(f"{STORAGE}/usage/{number}.zip?sig=x")
+        routes[f"/usage/{number}.zip"] = record
     for number, listed in WORLD_COMMITS.items():
         routes[f"{API}/pulls/{number}/commits"] = listed
         routes[f"{API}/pulls/{number}/reviews"] = WORLD_REVIEWS.get(number, [])
@@ -847,6 +1035,35 @@ WORLD_DURATIONS = {"claim_to_first_pull_request_median": 600, "claim_to_first_pu
                    "open_to_merge_median": 7200, "open_to_merge_p90": 604800, "first_review_median": 3300,
                    "first_review_p90": 5400}
 WORLD_RATES = {"merge_rate": 0.9167, "first_check_pass_rate": None}
+# The world's economics, as docs/setup/metrics.md shows them. The bill is
+# the trailers of the six commits made in the window that carry one and
+# the two records of runs in it; the delivery is the eleven pull requests
+# of people and of the Claude workflows that ended in it (319, dependabot's,
+# is neither), of which six have usage against them: 301, 304, 307, 308,
+# 309 by its record and 313 by a commit made before the window.
+WORLD_ECONOMICS = {
+    "prices_as_of": "2026-10-06", "pull_requests": 11, "pull_requests_measured": 6, "merged": 10, "sessions": 2,
+    "actions_runs": 2, "actions_runs_unread": 0, "tokens_input": 9200, "tokens_cache_write": 219000,
+    "tokens_cache_read": 3250000, "tokens_output": 65200, "tokens_total": 3543400, "tokens_unpriced": 0,
+    "estimated_usd": 2.5122, "coordinator_usd": 0.1654, "claude_seconds": 8635, "commits": 16, "check_failures": 0,
+    "reverts": 0, "tokens_by_family": {"fable": 0, "opus": 1927300, "sonnet": 1580900, "haiku": 35200, "other": 0},
+    "tokens_per_merge": 354340.0, "usd_per_merge": 0.25122, "claude_seconds_per_merge": 863.5,
+    "commits_per_merge": 1.6,
+}
+# Every pull request of the world had other work beside it, so the alone
+# side is empty and no ratio can be taken; the parallel side carries the
+# coordinator's plan, which names none of them.
+WORLD_COORDINATION = {
+    "alone": {"pull_requests": 0, "merged": 0, "measured": 0, "measured_merged": 0, "tokens": 0,
+              "estimated_usd": 0.0, "claude_seconds": 0, "commits": 0, "check_failures": 0, "first_check_passed": 0,
+              "first_check_counted": 0, "open_to_merge_median": None, "active_seconds": 0},
+    "parallel": {"pull_requests": 11, "merged": 10, "measured": 6, "measured_merged": 6, "tokens": 4504400,
+                 "estimated_usd": 3.4039, "claude_seconds": 10940, "commits": 16, "check_failures": 0,
+                 "first_check_passed": 0, "first_check_counted": 0, "open_to_merge_median": 10800,
+                 "active_seconds": 6383400},
+    "ratios": {"tokens_per_merge": None, "usd_per_merge": None, "latency": None, "throughput": None,
+               "first_check_pass": None, "commits_per_merge": None, "failures_per_pull_request": None},
+}
 # The world's breakdown, as docs/setup/metrics.md shows it: every setting's
 # row in SETTING_KEYS order and every relation's in PAIR_KEYS order.
 WORLD_EXPECTED = {
@@ -1085,15 +1302,19 @@ class Breakdown(unittest.TestCase):
         # the listing, two for each of the 15 recent pull requests, 19
         # check-run lists, 3 details, the branches, the window's comments.
         # Then 314's commits; then the look-back's comments, since 313's and
-        # 315's work began before the window; then the files.
-        self.assertEqual(len(self.calls), 67)
+        # 315's work began before the window; then the files; and last the
+        # Actions runs' usage records: the listing, and for each of the two
+        # records the API's redirect and the storage host's file.
+        self.assertEqual(len(self.calls), 72)
         self.assertEqual((self.calls[54], self.opener.queries[54]["since"]),
                          (f"{API}/issues/comments", "2026-09-10T12:00:00Z"))
         self.assertEqual(self.calls[55], f"{API}/pulls/314/commits")
         self.assertEqual((self.calls[56], self.opener.queries[56]["since"]),
                          (f"{API}/issues/comments", "2026-08-11T12:00:00Z"))
-        self.assertEqual(self.calls[57:], [f"{API}/pulls/{n}/files"
-                                           for n in (301, 302, 303, 304, 305, 306, 307, 313, 314, 315)])
+        self.assertEqual(self.calls[57:67], [f"{API}/pulls/{n}/files"
+                                             for n in (301, 302, 303, 304, 305, 306, 307, 313, 314, 315)])
+        self.assertEqual(self.calls[67:], [f"{API}/actions/artifacts", f"{API}/actions/artifacts/9001/zip",
+                                           "/usage/9001.zip", f"{API}/actions/artifacts/9002/zip", "/usage/9002.zip"])
         self.assertFalse([path for path in self.calls if re.search(r"/pulls/31[67]\b", path)])
 
     def test_files_are_read_last_and_left_null_under_the_reserve(self):
@@ -1117,7 +1338,8 @@ class Breakdown(unittest.TestCase):
             self.assertEqual(record[key], block, key)
         self.assertTrue(shown.rstrip("\n").endswith(
             "in 60 calls; the changed files of 7 pull requests were left unread to keep the board's reserve, so the "
-            "counts that need them are null"), shown)
+            "counts that need them are null; the Actions runs' usage records could not be listed, so only those "
+            "read before count"), shown)
 
     def test_the_breakdown_gives_way_to_the_reserve_and_never_costs_an_existing_key(self):
         """The existing keys are measured from the reads collect made before
@@ -1129,13 +1351,13 @@ class Breakdown(unittest.TestCase):
             with tempfile.TemporaryDirectory() as folder:
                 code, record, text, shown, _, opener = collect_world(folder, remaining=metrics.RESERVE + spent)
             self.assertEqual(code, 0, spent)
-            self.assertEqual(tuple(record), metrics.RECORD_KEYS[:-3], spent)
+            self.assertEqual(tuple(record), metrics.RECORD_KEYS[:-len(metrics.BREAKDOWN_KEYS)], spent)
             self.assertEqual((record["counts"], record["durations_seconds"], record["rates"]),
                              (WORLD_COUNTS, WORLD_DURATIONS, WORLD_RATES), spent)
             self.assertEqual(opener.calls, self.calls[:spent], spent)
             self.assertTrue(shown.rstrip("\n").endswith(
                 f"in {spent} calls; the breakdown was left out to keep the board's reserve, so the record has no "
-                "parallel, by_setting or pairs"), shown)
+                "parallel, by_setting, pairs, economics or coordination"), shown)
             for secret in ("ann-secret", A1, "src/secret_"):
                 self.assertNotIn(secret, text + shown)
 
@@ -1149,12 +1371,12 @@ class Breakdown(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             code, record, text, shown, _, _ = collect_world(folder, routes=routes)
         self.assertEqual(code, 0)
-        self.assertEqual(tuple(record), metrics.RECORD_KEYS[:-3])
+        self.assertEqual(tuple(record), metrics.RECORD_KEYS[:-len(metrics.BREAKDOWN_KEYS)])
         self.assertEqual((record["counts"], record["durations_seconds"], record["rates"]),
                          (WORLD_COUNTS, WORLD_DURATIONS, WORLD_RATES))
         self.assertTrue(shown.rstrip("\n").endswith(
             "the breakdown was left out because GitHub failed one of its reads (HTTP 404), so the record has no "
-            "parallel, by_setting or pairs"), shown)
+            "parallel, by_setting, pairs, economics or coordination"), shown)
         for secret in ("ann-secret", A1, "src/secret_"):
             self.assertNotIn(secret, text + shown)
 
@@ -1218,10 +1440,11 @@ class Breakdown(unittest.TestCase):
         # The 11 calls before the breakdown (the listing, 604's two, 703's
         # two, 702's two and the runs of its commit made in the window and
         # of its first head, the branches, the comments), then 707's commits,
-        # the look-back's comments and three changed-file lists.
+        # the look-back's comments, three changed-file lists and the usage
+        # records' listing.
         self.assertEqual([path for path in opener.calls[11:] if path.endswith("/commits")],
                          [f"{API}/pulls/707/commits"])
-        self.assertEqual(len(opener.calls), 16)
+        self.assertEqual(len(opener.calls), 17)
 
     def test_a_pair_counts_once_in_the_record_whose_window_holds_its_later_end(self):
         window = metrics.Window.ending(metrics.parse_time(NOW), 30)
@@ -2274,10 +2497,11 @@ class Workflow(unittest.TestCase):
                          "&& (github.event_name != 'push' || github.ref_name == github.event.repository.default_branch) "
                          "&& github.event.repository.fork == false")
 
-    def test_its_permissions_are_these_four(self):
+    def test_its_permissions_are_these_five(self):
+        # actions: read lists and downloads the Actions runs' usage records.
         block = self.TEXT.split("\npermissions:\n", 1)[1].split("\n\n", 1)[0]
         self.assertEqual(block.splitlines(), ["  contents: write", "  pull-requests: read", "  issues: read",
-                                              "  checks: read"])
+                                              "  checks: read", "  actions: read"])
 
     def test_it_skips_the_template_and_a_pending_copy(self):
         self.assertIn("    if: >-\n      github.event.repository.is_template == false\n", self.TEXT)
@@ -2354,6 +2578,7 @@ class Page(unittest.TestCase):
         sample = next(s for s in self.samples() if s["schema"] == "sdlc-metrics/1" and "counts" in s)
         for key, block in WORLD_EXPECTED.items():
             self.assertEqual(sample[key], block, key)
+        self.assertEqual((sample["economics"], sample["coordination"]), (WORLD_ECONOMICS, WORLD_COORDINATION))
         self.assertEqual((sample["counts"], sample["durations_seconds"], sample["rates"]),
                          (WORLD_COUNTS, WORLD_DURATIONS, WORLD_RATES))
 

@@ -6,7 +6,12 @@
 # .github/workflows/board.yml, so it is read from origin/board and never from
 # the checkout (docs/agents/STATE.md here only describes it). The hook never
 # fails the session: every path ends in exit 0, each fetch is cut off after
-# ten seconds, and the output stays under about 130 lines.
+# ten seconds, and the output stays under about 130 lines. It also puts the
+# commit-msg hook of tools/usage.py in place, silently, so each commit the
+# session makes carries what the session spent since its last one, for the
+# field metrics (docs/setup/metrics.md, What the work cost); usage.py
+# leaves a clone's own commit-msg hook alone, and does nothing while the
+# metrics switch is off.
 
 set -u
 
@@ -33,6 +38,8 @@ fetch_origin() {
     git fetch --quiet origin "$@" >/dev/null 2>&1
   fi
 }
+
+python3 tools/usage.py install >/dev/null 2>&1 || true
 
 default=$(default_branch)
 upstream="origin/$default"
