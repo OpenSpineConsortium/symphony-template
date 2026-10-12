@@ -3,11 +3,13 @@
 Writing @claude on an issue, a pull request or a review runs a Claude Code
 session in Actions (.github/workflows/claude.yml): it reads CLAUDE.md and
 the rules like every other session, answers, fixes, or takes the work the
-comment asks for. Until the one secret below exists, the workflow ends at
-its first step with a pointer and does nothing, so nothing here is
-required. In crowd mode (docs/setup/crowdsourcing.md) none of this page
-applies: the repository holds no Claude token, and the workflow never
-starts while the repository variable CLAUDE_CROWD is true.
+comment asks for. The same secret runs the workers registered to run in
+Actions and the coordinator workflow (both below). Until the one secret
+below exists, each of these workflows says so in its run and does nothing
+more, so nothing here is required. In crowd mode
+(docs/setup/crowdsourcing.md) none of this page applies: the repository
+holds no Claude token, and the workflows never start while the repository
+variable CLAUDE_CROWD is true.
 
 ## No API billing
 
@@ -46,53 +48,65 @@ By hand, where that command is not at hand:
   there; an account working in this repository pushes claim branches, not
   forks (docs/agents/PROTOCOL.md).
 
-## The worker on a schedule, optional
+## Workers in Actions, optional
 
-.github/workflows/claude-worker.yml runs the worker routine's own
-discipline (docs/agents/routines/worker.md) from Actions on the same
-token: every six hours a cheap step asks GitHub whether the queue holds
-an unclaimed blocker or todo issue or an open claim pull request needs
-carrying,
-and only then starts a Claude session, so an empty queue costs seconds
-of a runner and no plan usage. It is off until the repository variable
-CLAUDE_WORKER is set to true, under
-https://github.com/{{REPO}}/settings/variables/actions; delete the
-variable to stop it. Run it from the workflow's own page with "Run
-workflow" to try it once. An account that already runs the worker as a
-claude.ai routine does not need this one too: pick either, not both, or
-they will race for the same queue under the same account label.
+A worker in Actions is one file under .github/symphony/workers/ that says
+"runs": "actions" (docs/agents/WORKERS.md), and
+.github/symphony/workers/README.md lists its settings. Add one with the
+"Add a worker" issue form,
+https://github.com/{{REPO}}/issues/new?template=worker.yml, whose
+workflow opens the pull request that adds the file, or add the file by
+hand in a pull request of its own. Once it merges,
+.github/workflows/workers.yml runs every such worker on this token, one
+run per worker, in parallel: every six hours, whenever an issue is
+queued or given to one of them, and again while a worker still has
+work, up to the "rounds" its file allows in a row. Before any Claude
+session starts, a cheap step on GitHub's own token (tools/team.py) deals
+the open work among them, by area first, so no two race for one issue
+and a worker with nothing to do costs seconds of a runner and no plan
+usage. Each worker's model and turns per run come from its file. Run the
+workflow from its own page with "Run workflow", naming one worker or
+none for all, to try it once; delete a worker's file by pull request to
+stop it. A worker whose file says "lands": "auto-merge" turns on
+auto-merge for its finished pull request, which needs "Allow
+auto-merge" under Settings, General; turning off "Require branches to be
+up to date" in the default branch's rules saves a run per worker each
+time another lands. Give each worker its own name, after its job: a
+routine and a worker in Actions under one name would each take the
+other's claims for their own.
 
-## Team mode, optional
+## The coordinator workflow
 
-A team is a lead and members running in parallel (docs/agents/TEAM.md).
-To turn it on, besides the token above:
+The same token runs the part of the coordinator that needs judgement,
+.github/workflows/coordinator.yml (docs/agents/WORKERS.md); the board's
+own run does the rest, releasing idle claims and telling open work that
+overlaps, on GitHub's token alone. Label an issue epic and Claude plans
+it into tasks that each own their files, given to the registered workers
+whose area fits, or to the open queue where none is registered, and
+starts the workers in Actions; the epic then loses the label todo, and
+the board lists each task given to a worker under "Given to workers",
+out of the Queue, so nobody else takes it. A worker that labels its task
+blocked calls the coordinator to settle what it needs. When an epic's
+last task closes, the coordinator checks the default branch as a whole,
+since every task can pass alone while the whole fails, and fixes what the
+pieces broke together on a pull request that lands by auto-merge, so
+"Allow auto-merge" is needed here too. Every week it runs the
+coordinator prompt, docs/agents/routines/coordinator.md, which splits
+requests into issues and tidies the shared memory. Nothing turns it on
+but the token, and no coordinator routine is needed beside it.
 
-1. Set the repository variables CLAUDE_TEAM to the members' names as a
-   JSON list, as in ["w1","w2","w3"], and CLAUDE_WORKER to true, under
-   https://github.com/{{REPO}}/settings/variables/actions. The lead stays
-   off until both are set, since a plan no member works is usage wasted.
-   The team replaces the main account's worker routine: turn that routine
-   off, or it and the members race for the same queue.
-2. Under Settings, General, turn on "Allow auto-merge", so a member's
-   finished pull request lands by itself when the check passes. Turning
-   off "Require branches to be up to date" in the default branch's
-   rules saves a run per member each time another lands; the lead's
-   integration pass then checks the whole.
-3. Open an issue describing the work and label it epic. Once the lead
-   has planned it, the epic loses the label todo, and the board's queue
-   leaves out the epic and its members' tasks, so no other account takes
-   them.
-
-CLAUDE_MAX_ROUNDS (6 if unset) bounds how many rounds a member runs in a
-row, and CLAUDE_ALLOWED_TOOLS replaces the tools the sessions may use
-when a project's checks need more than git, gh, python3 and
-scripts/check.sh. Every member and the lead draw on the main account's
-one usage window, so three members spend it about three times as fast
-as one session.
+CLAUDE_ALLOWED_TOOLS, a repository variable, replaces the tools the
+sessions of claude.yml, workers.yml and coordinator.yml may use when a
+project's checks need more than git, gh, python3 and scripts/check.sh;
+the workers themselves are files, not variables. Every worker in
+Actions and the coordinator draw on the main account's one usage window,
+so three workers in Actions spend it about three times as fast as one
+session, and a Max plan suits several of them better than Pro.
 
 ## Keeping the token
 
 Treat the token like a password: it is the main account's subscription.
 It expires after about a year; run `claude setup-token` again and replace
 the secret. To turn @claude off, delete the secret, and the workflow is a
-quiet no-op again.
+quiet no-op again, as are the workers in Actions and the coordinator
+workflow, which run on the same secret.

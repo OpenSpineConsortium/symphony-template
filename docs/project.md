@@ -8,7 +8,7 @@ Not yet written. One paragraph: what this project makes, for whom, and what done
 
 ## Scope
 
-In scope: the areas this project owns, each in one line; docs/agents/OWNERSHIP.md maps them to accounts.
+In scope: the areas this project owns, each in one line; docs/agents/OWNERSHIP.md maps them to workers.
 
 Out of scope, by decision: what this project does not do, each with the reason, so nobody proposes it again.
 
@@ -37,5 +37,5 @@ Every account's Project uses the same model and the same effort, so the work rea
 ## Owners
 
 - Repository owner: {{OWNER}}, who merges to {{DEFAULT_BRANCH}}; .github/CODEOWNERS names {{CODE_OWNER}}, the owner's own login, or in an organization's copy the person who made the copy, because GitHub asks a user or a team for review and never an organization (docs/setup/github.md, section 7).
-- Main Claude account: the first account, whose Project runs the worker routine (docs/agents/routines/worker.md) and, once a second account joins, the coordinator (docs/agents/routines/coordinator.md); its label is account:main.
-- Other accounts: none yet. Each gets a label of its own (docs/setup/github.md, Labels) and a row in docs/agents/OWNERSHIP.md.
+- Workers: each person's sessions, under the person's GitHub login, and the routines and workers in GitHub Actions the registry .github/symphony/workers/ names (docs/agents/WORKERS.md); none registered yet. Each worker's label is worker:<name>, made when it first needs it.
+- The Claude token: the secret CLAUDE_CODE_OAUTH_TOKEN, from one account's `claude setup-token`, on whose plan @claude, the workers in Actions and the coordinator workflow run (docs/setup/claude-action.md); not set until the setup issue's second box is ticked.

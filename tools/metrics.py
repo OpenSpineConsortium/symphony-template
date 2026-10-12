@@ -157,9 +157,10 @@ CONFLICT_WORDS = board.main_moved_text("conflicting", "{base}", "{sha}").split("
 DIRTY = "dirty"
 # The kind of a pull request a person opened. One an app or a bot opened is
 # the repository's own Claude workflows at work when its branch starts with
-# AGENT_BRANCH, the prefix the claim protocol and claude-code-action share
-# (claude-worker.yml), so team mode's members and @claude among them; any
-# other is automation, such as dependabot or the adoption App.
+# AGENT_BRANCH, the prefix the claim protocol and claude-code-action share,
+# so the workers in Actions (workers.yml), the coordinator (coordinator.yml)
+# and @claude among them; any other is automation, such as dependabot or
+# the adoption App.
 PERSON = "person"
 AGENT_BRANCH = "claude/"
 # An author date further back than this before the opening belongs to an

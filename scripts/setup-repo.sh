@@ -41,9 +41,9 @@
 #      which lacks the two flags, is reported as that and not as the plan;
 #   5. creates or updates the labels, read from LABELS in
 #      tools/template_init.py, so the list lives in one place;
-#   6. sets each repository variable given as --var NAME=VALUE; the ones
-#      this repository reads are CLAUDE_WORKER, CLAUDE_TEAM,
-#      CLAUDE_MAX_ROUNDS and CLAUDE_ALLOWED_TOOLS (docs/setup/claude-action.md);
+#   6. sets each repository variable given as --var NAME=VALUE; the one
+#      this repository reads is CLAUDE_ALLOWED_TOOLS (docs/setup/claude-action.md),
+#      since its workers are files, not variables (docs/agents/WORKERS.md);
 #   7. with --token, stores the repository secret CLAUDE_CODE_OAUTH_TOKEN:
 #      you run `claude setup-token` in another terminal and paste the token
 #      at gh's hidden prompt. The token is never on a command line, never in
@@ -80,10 +80,10 @@ changes nothing either when it cannot read that variable.
 
   OWNER/NAME        the repository; by default the one this clone's
                     remote points at
-  --var NAME=VALUE  set a repository variable; repeatable. The variables
-                    this repository reads: CLAUDE_WORKER, CLAUDE_TEAM,
-                    CLAUDE_MAX_ROUNDS, CLAUDE_ALLOWED_TOOLS
-                    (docs/setup/claude-action.md)
+  --var NAME=VALUE  set a repository variable; repeatable. The variable
+                    this repository reads: CLAUDE_ALLOWED_TOOLS
+                    (docs/setup/claude-action.md); its workers are files
+                    under .github/symphony/workers/ (docs/agents/WORKERS.md)
   --token           store the secret CLAUDE_CODE_OAUTH_TOKEN from a hidden
                     prompt: run `claude setup-token` in another terminal
                     first and paste what it prints

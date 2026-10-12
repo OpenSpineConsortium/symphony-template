@@ -8,7 +8,7 @@ repository; each one goes only where this page says.
 
 ## One command for the GitHub side
 
-Every repository setting of section 3 and the variables of section 4 are
+Every repository setting of section 3 and the variable of section 4 are
 one run of `bash scripts/setup-repo.sh` from a clone, on your own
 computer, with the GitHub CLI signed in (`gh auth login`) as a user with
 admin rights on the repository; a cloud session cannot run it: gh is
@@ -21,7 +21,7 @@ page that it is set up, which the browser extension reads), turns on
 secret scanning and then push protection
 (and says so and carries on where the plan or the visibility offers
 neither: a Free organization's private repository has no Secret
-Protection), creates or updates the seven labels from the one list in
+Protection), creates or updates the six labels from the one list in
 tools/template_init.py, sets each variable given as `--var NAME=VALUE`,
 and with `--token` stores the secret CLAUDE_CODE_OAUTH_TOKEN from gh's
 hidden prompt, so the token is never on a command line, in a file or on
@@ -103,7 +103,7 @@ could not be read from a primary source, it says so.
   repository cannot read them at all, so there they serve only the
   organization's public repositories. From the command line:
   `gh secret set CLAUDE_CODE_OAUTH_TOKEN --org ORG --visibility all` and
-  `gh variable set CLAUDE_WORKER --org ORG --visibility all --body true`;
+  `gh variable set NAME --org ORG --visibility all --body VALUE`;
   gh's default visibility is "private", which on a Free organization
   would make the value readable nowhere. One organization-wide
   CLAUDE_CODE_OAUTH_TOKEN means every repository draws on the main
@@ -215,14 +215,17 @@ docs/setup/github.md describes:
 1. **Rules**: Rules, Rulesets, New ruleset, Import a ruleset, and choose
    docs/setup/ruleset-main.json (protects the default branch, requires the
    check named "check").
-2. **General**: tick "Automatically delete head branches". For team mode
-   also tick "Allow auto-merge", and optionally untick "Require branches
-   to be up to date" in the ruleset.
+2. **General**: tick "Automatically delete head branches". Tick "Allow
+   auto-merge" too, so the pull requests of a worker whose file says
+   "lands": "auto-merge", and the coordinator's integrations, land once
+   the check is green; with several such workers, optionally untick
+   "Require branches to be up to date" in the ruleset.
 3. **Code security**: turn on secret scanning and push protection.
 4. **Labels**: a copy gets them from template-init (todo, claimed,
-   in-review, blocker, account:main, epic, blocked). The template
-   repository itself has none; add them by hand only if this repository's
-   own issues should be labelled.
+   in-review, blocker, epic, blocked); a worker's label, worker:<name>,
+   is made when the worker first needs it. The template repository itself
+   has none; add them by hand only if this repository's own issues should
+   be labelled.
 5. **Code owners**: open .github/CODEOWNERS on GitHub and see that no
    line is marked as an error. template-init names the owner there, or in
    an organization's copy the person who made it, since GitHub asks a user
@@ -237,7 +240,7 @@ docs/setup/github.md describes:
    variable `SDLC_METRICS` = `off`, turns sharing off. Like `board`, the
    branch must stay outside every ruleset (docs/setup/metrics.md).
 
-## 4. Claude inside GitHub Actions (optional; @claude, the worker, team mode)
+## 4. Claude inside GitHub Actions (optional; @claude, the workers, the coordinator)
 
 1. **The token as a repository secret**: run `/install-github-app` in
    Claude Code on your computer, as the main account. One OAuth flow
@@ -246,23 +249,30 @@ docs/setup/github.md describes:
    Settings, Secrets and variables, Actions, New repository secret
    `CLAUDE_CODE_OAUTH_TOKEN`. Replace it when it expires (about a year).
    docs/setup/claude-action.md has the details.
-2. **Repository variables** (Settings, Secrets and variables, Actions,
-   Variables, or `scripts/setup-repo.sh --var NAME=VALUE`), each optional:
-   - `CLAUDE_WORKER` = `true`: the scheduled worker in Actions. Pick it or
-     the worker routine in a claude.ai Project, not both.
-   - `CLAUDE_TEAM` = a JSON list of member names, as `["w1","w2","w3"]`:
-     team mode (docs/agents/TEAM.md); needs `CLAUDE_WORKER` too, and
-     "Allow auto-merge" above.
-   - `CLAUDE_MAX_ROUNDS` (default 6): how many rounds a member runs in a row.
-   - `CLAUDE_ALLOWED_TOOLS`: replaces the tools the Actions sessions may use.
-3. **Coordinator routine** (optional, once a second account joins):
-   docs/agents/routines/coordinator.md. Its API trigger's address and bearer
-   token go into the repository secrets `COORDINATOR_TRIGGER_URL` and
-   `COORDINATOR_TRIGGER_TOKEN` only while every writer of the repository is
-   you, since any writer's workflow can read them and each fire spends the
-   main account's usage; otherwise leave the trigger out
-   (docs/start/team.md, steps 1 and 6), and the hourly schedule and the
-   pull request events carry the routine.
+2. **Workers in Actions** (optional): one file each under
+   .github/symphony/workers/ that says `"runs": "actions"`, added with the
+   "Add a worker" issue form
+   (https://github.com/OpenSpineConsortium/symphony-template/issues/new?template=worker.yml),
+   which opens the pull request that adds it, or by hand
+   (docs/agents/WORKERS.md). .github/workflows/workers.yml runs each on
+   the token above, with the model, turns and rounds its file gives; no
+   variable turns them on.
+3. **The repository variable** `CLAUDE_ALLOWED_TOOLS` (optional; Settings,
+   Secrets and variables, Actions, Variables, or
+   `scripts/setup-repo.sh --var NAME=VALUE`): replaces the tools the
+   Actions sessions may use.
+4. **The coordinator**: nothing to set. The board's own run releases idle
+   claims and tells open work that overlaps, and with the token above
+   .github/workflows/coordinator.yml plans epics, settles blocked tasks,
+   integrates finished epics and runs the coordinator prompt weekly. A
+   repository without the token runs that prompt as a routine on one
+   account instead (docs/agents/routines/coordinator.md). Its API
+   trigger's address and bearer token go into the repository secrets
+   `COORDINATOR_TRIGGER_URL` and `COORDINATOR_TRIGGER_TOKEN` only while
+   every writer of the repository is you, since any writer's workflow can
+   read them and each fire spends that account's usage; otherwise leave
+   the trigger out (docs/start/team.md, step 1), and the routine's
+   schedule carries it.
 
 ## 5. A claude.ai Project per account (optional)
 

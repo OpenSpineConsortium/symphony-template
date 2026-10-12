@@ -1,10 +1,10 @@
 # Prompts to paste
 
-Each block is one message for a Claude Code session on the repository: `claude` in your clone, a cloud session at https://claude.ai/code, or a thread of the account's Project, itself a cloud session. Every session already reads CLAUDE.md, the protocol, the memory index and the board, so the prompts stay short. Put the issue's number for N, the repository for ORG/NAME and your own account's label where account:main stands.
+Each block is one message for a Claude Code session on the repository: `claude` in your clone, a cloud session at https://claude.ai/code, or a thread of the account's Project, itself a cloud session. Every session already reads CLAUDE.md, the protocol, the memory index and the board, so the prompts stay short. Put the issue's number for N, the repository for ORG/NAME and a worker's name for `<name>`. No prompt needs to say whose claim a session makes: it claims under your GitHub login, or under the name SYMPHONY_WORKER gives where its environment sets it ([docs/agents/WORKERS.md](../agents/WORKERS.md)).
 
 ## Work
 
-**Claim the next issue,** when one session works at a time; it takes blockers first, then the lowest-numbered unclaimed issue in the Queue:
+**Claim the next issue,** when one session works at a time; it takes what the board's Given to workers section gives you first, then blockers, then the lowest-numbered unclaimed issue in the Queue, one that fits your area when you registered one:
 
 ```
 Read the board, take the next issue as docs/agents/routines/worker.md's steps 2 to 5 say, claim it with the claim skill and carry it to a ready pull request; work on the branch claude/<issue>, not this session's own branch. If the push of claude/<issue> is refused, another session holds it: take the next one. Do not merge.
@@ -19,22 +19,16 @@ Claim issue N with the claim skill and carry it to a ready pull request, as docs
 **Add this line in a cloud session,** a Project's thread or a routine's run included, since each is one and its GitHub proxy refuses gh's GraphQL commands:
 
 ```
-gh issue and gh pr are refused here, so add the labels, post the plan and open the draft pull request with your GitHub tools or gh api (repos/ORG/NAME/issues/N/labels, repos/ORG/NAME/issues/N/comments, repos/ORG/NAME/pulls). Mark the pull request ready with your GitHub tool update_pull_request (draft false), not gh api, which cannot change a draft; if you have no such tool, say so and stop before you delete the claim file.
+gh issue and gh pr are refused here, so add the labels, post the plan and open the draft pull request with your GitHub tools or gh api (repos/ORG/NAME/issues/N/labels, repos/ORG/NAME/issues/N/comments, repos/ORG/NAME/pulls). Mark the pull request ready with your GitHub tool update_pull_request (draft false), not gh api, which cannot change a draft; if you have no such tool, comment "finished; ready to mark" on the pull request and stop before you delete the claim file.
 ```
 
-**Add this line on any account but the main one,** so the board says whose claim it is:
+**Run a worker once,** to see what a routine will do before you schedule it:
 
 ```
-My account label is account:alice and the claim file's Account line is alice.
+Do what the full prompt in docs/agents/routines/worker.md, its last block, says, once, as it stands, as the worker <name>.
 ```
 
-**Run the worker once,** to see what the routine will do before you schedule it:
-
-```
-Do what the full prompt in docs/agents/routines/worker.md, its last block, says, once, as it stands, with my account label account:main.
-```
-
-**Make the worker routine,** in the account's Project conversation, so it runs as the Project's threads: paste the short prompt from docs/agents/routines/worker.md, which reads the full prompt from that page on every run, add the cloud line above at its end with your repository for ORG/NAME, N then standing for whichever issue the run takes (every run is a cloud session, and the prompt's claim step uses gh issue and gh pr), then:
+**Make a routine,** in the account's Project conversation, so it runs as the Project's threads. Register it first with the "Add a worker" form at https://github.com/ORG/NAME/issues/new?template=worker.yml, "routine" under Where it runs and a name after its job, never your login; the form's answer on the issue is the short prompt from docs/agents/routines/worker.md with that name filled in, which reads the full prompt from that page on every run. Paste it, add the cloud line above at its end with your repository for ORG/NAME, N then standing for whichever issue the run takes (every run is a cloud session, and the prompt's claim step uses gh issue and gh pr), then:
 
 ```
 Run this every hour, a few minutes past the hour.
@@ -42,7 +36,7 @@ Run this every hour, a few minutes past the hour.
 
 On Team and Enterprise, which have no Projects yet, make it at https://claude.ai/code/routines with New routine instead: the same prompt, the repository, your environment and a Schedule trigger hourly a few minutes past the hour ([parallel.md](parallel.md), step 6).
 
-**Split a piece of work into issues,** so parallel sessions each get files no other session touches:
+**Split a piece of work into issues,** so parallel sessions each get files no other session touches; where the repository holds a Claude token, the label epic on the request has the coordinator do the same and give the pieces to registered workers ([team.md](team.md), last section):
 
 ```
 Split the work below into one Task issue per piece, each with a Goal, an Acceptance line and the Files likely touched, labelled todo, with no two issues touching the same file; where two pieces meet, write the interface between them into both. Show me the list before you open them. The work:
@@ -82,7 +76,7 @@ Remember this with the remember skill, in this pull request: <the fact, in one s
 Review pull request #N: read the issue it closes and the plan posted on it as a comment (a ready pull request has deleted its claim file; the branch's first commit still holds it), check that the diff does what the issue asks and nothing else, that bash scripts/check.sh passes on its branch and that it finishes as docs/agents/PROTOCOL.md says. Leave your findings as one review comment. Do not push and do not merge.
 ```
 
-**Or ask @claude on the pull request itself,** which runs in Actions on the main account's token, so only on a repository where you are the one writer and stored CLAUDE_CODE_OAUTH_TOKEN ([solo.md](solo.md), steps 3 and 6); once anyone else has Write ([team.md](team.md), step 1), or in crowd mode, the comment does nothing, so use the review prompt above:
+**Or ask @claude on the pull request itself,** which runs in Actions on the repository's Claude token, so only on a repository where you are the one writer and stored CLAUDE_CODE_OAUTH_TOKEN ([solo.md](solo.md), steps 3 and 6); once anyone else has Write ([team.md](team.md), step 1), or in crowd mode, the comment does nothing, so use the review prompt above:
 
 ```
 @claude review this pull request against the issue it closes and docs/agents/PROTOCOL.md; comment, and do not push.

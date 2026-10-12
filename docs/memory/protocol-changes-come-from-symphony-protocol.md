@@ -10,8 +10,9 @@ sits in the same tree, so the same pull request could rewrite it to match;
 CI therefore clones symphony-protocol, which is public, and names the clone in
 SDLC_PROTOCOL, and tests/test_vendored.py compares every file of the copy
 with the library's at the commit VENDORED names, failing when they differ
-or when the clone has no such commit. A fix to the board, the protocol
-check, team mode's clerk or the push guard is therefore a pull request to
+or when the clone has no such commit. A fix to the board, the
+coordinator's releases and overlaps, the registry of workers, the protocol
+check, the clerk or the push guard is therefore a pull request to
 symphony-protocol.
 
 The template itself, OpenSpineConsortium/symphony-template, then receives the
@@ -43,10 +44,10 @@ which copies what the template takes, and a pull request; in the template
 the same command needs no `--consumer`, since its remote names it.
 
 What is this repository's own changes here as usual: the shims
-tools/board.py, check_protocol.py, team.py and guard_push.py, the workflows
-and the hooks. The owner's one-time setup for the sync is
+tools/board.py, check_protocol.py, team.py, workers.py and guard_push.py,
+the workflows and the hooks. The owner's one-time setup for the sync is
 docs/setup/owner-checklist.md, section 6.
 
-Source: symphony-protocol 0.3.1, its ecosystem.json and its README's sections
+Source: symphony-protocol 0.4.0, its ecosystem.json and its README's sections
 "How a change reaches the other repositories", "The owner's one-time setup
 for the sync" and "Releases"; this repository's .github/workflows/protocol.yml.

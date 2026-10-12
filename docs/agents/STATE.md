@@ -4,6 +4,8 @@ The live board is the file STATE.md on the branch `board` of this repository (ht
 
 The branch `board` holds exactly one commit, rewritten on every run that changed the board, and nothing else is ever on it. The board never lands on {{DEFAULT_BRANCH}}, so no board commit moves the default branch or puts an open pull request behind it, and the rules that protect {{DEFAULT_BRANCH}} never stand in the board's way (docs/setup/github.md). The branch does not exist until the first run. Where the GitHub App of OpenSpineConsortium/symphony-app is set up (docs/setup/owner-checklist.md), template-init pushes its commit with the App's token, and that push starts the first run at once. Otherwise the commit is pushed with GitHub's own token, which starts no workflow, so the first board comes with the first issue or pull request a person opens after setup, or at the next six-hourly fallback run, whichever is sooner; until then the session hook says the board has not been written yet. Nobody edits the board by hand, and this page changes only when the layout tools/board.py renders does (the code is the vendored library's, tools/sdlc_protocol/board.py).
 
+The same run is the coordinator's step (docs/agents/WORKERS.md), on the repository's own token and with no Claude usage: before it renders the board, it releases every claim whose branch has gone a day without a commit, unless the work is finished and waits for review, and tells each piece of open work about other work that changes the same files (docs/agents/PROTOCOL.md, Release and Overlaps), so the board it writes already shows both.
+
 ## Layout
 
 tools/board.py renders the board in this shape. Rows are sorted and the file carries no wall-clock value, so it changes only when the repository did; an empty section keeps its header and holds one row, "(none)".
@@ -12,19 +14,25 @@ tools/board.py renders the board in this shape. Rows are sorted and the file car
 # Board
 As of commit <short sha> on <default branch>. Rewritten by .github/workflows/board.yml; do not edit by hand.
 ## Claims (open claude/<issue> branches and docs/agents/claims/<issue>.md)
-| Issue | Branch | Account | PR | Files it touches |
+| Issue | Branch | Worker | PR | Files it touches |
 ## Open pull requests
 | PR | Title | Branch | State (clean, behind, conflicting, blocked, unknown) | Last update |
-## Queue (open issues labelled todo, unclaimed)
+## Overlaps (files that more than one piece of open work changes; land the work in this order: a blocker first, then work marked ready, then the oldest)
+| File | Open work, in the order it should land |
+## Queue (open issues labelled todo, unclaimed and given to no worker)
 | Issue | Title | Labels |
+## Given to workers (open issues labelled todo that a worker's label names, not yet claimed)
+| Issue | Title | Worker |
 ## Blockers (open issues labelled blocker)
 | Issue | Title | Labels |
 ## Recently merged (the last 5)
 | PR | Title | Branch | Merged |
 ```
 
-- Claims: every open branch `claude/<issue>` and its claim file, with the account from the claim file's `- Account:` line, the pull request when one is open, and the files that pull request changes; before there is a pull request, the `- ` lines under "## Files to touch" in the claim file. Once the finishing pull request has deleted the claim file, the account comes from the issue's account label. A branch whose issue is closed is a leftover: its row says "issue closed" and "delete the branch" until someone deletes it, which GitHub does on merge when docs/setup/github.md's setting is on. A claim the coordinator released has no row: the board leaves it out, with its pull request, as soon as it reads the release, and renames its branch to `released/<issue>-<sha>` (docs/agents/PROTOCOL.md, Release).
-- Open pull requests: State is how the branch stands to the default branch, in GitHub's words: clean (mergeable), behind (the default branch moved past it; the board comments "main moved" once per head commit), conflicting, blocked (a required check or review is missing) or unknown (GitHub has not computed it yet). Last update is the pull request's last change.
-- Queue: the open issues labelled todo that have neither a branch `claude/<issue>` nor the label claimed; a released claim's branch does not count. Team mode's work is left out: an epic, which the lead splits, and a task the lead gave a member (label agent:<name>), which only that member takes (docs/agents/TEAM.md).
-- Blockers: the open issues labelled blocker.
+- Claims: every open branch `claude/<issue>` and its claim file, with the worker from the claim file's `- Worker:` line (or the older `- Account:`), the pull request when one is open, and the files that pull request changes; before there is a pull request, the `- ` lines under "## Files to touch" in the claim file. Once the finishing pull request has deleted the claim file, the worker comes from the issue's worker label (`worker:<name>`, or the older `account:<name>` or `agent:<name>`), and with neither the row says "no claim file yet". A branch whose issue is closed is a leftover: its row says "issue closed" and "delete the branch" until someone deletes it, which GitHub does on merge when docs/setup/github.md's setting is on. A claim the coordinator released has no row: the board leaves it out, with its pull request, as soon as it reads the release, and renames its branch to `released/<issue>-<sha>` in the same run (docs/agents/PROTOCOL.md, Release).
+- Open pull requests: every open pull request but a released claim's, which the rename of its branch closes. State is how the branch stands to the default branch, in GitHub's words: clean (mergeable), behind (the default branch moved past it; the board comments "main moved" once per head commit), conflicting, blocked (a required check or review is missing) or unknown (GitHub has not computed it yet). Last update is the pull request's last change.
+- Overlaps: every file that more than one piece of open work changes, with that work in the order it should land. A piece of open work is an open pull request, by the files it changes, or by the files its claim file lists while it changes nothing but that file; or a claim with no pull request yet, by the files its claim file lists, under its issue's number. Claim files themselves never count, since each claim has its own. The order is a blocker first, since it stops everyone; then work marked ready, which waits only for its merge; then the oldest, by number. Each piece after the first brings the default branch in once the one before it has landed, and the coordinator's step tells each piece once, in a comment, about the work it meets (docs/agents/PROTOCOL.md, Overlaps).
+- Queue: the open issues labelled todo that have neither a branch `claude/<issue>` nor the label claimed, and that no worker's label names; a released claim's branch does not count. An epic is left out too, since the coordinator plans it into tasks rather than anyone taking it whole (docs/agents/PROTOCOL.md, Planning).
+- Given to workers: the open issues labelled todo that a worker's label names (`worker:<name>`, or an older spelling) and that nobody has claimed yet, with neither the label claimed nor a branch `claude/<issue>`, and the worker each one is given to. Only that worker takes them, and it takes them before anything in the Queue: a task the coordinator gave it out of an epic, or an issue someone labelled for it by hand. An epic is left out here too. Once the worker claims the issue, it moves to Claims.
+- Blockers: the open issues labelled blocker, claimed or not.
 - Recently merged: the five pull requests merged last, newest first, so a session sees what landed. The list depends on the repository alone, never on when the previous board was written: a merge fires two runs, and a window counted from the previous board's commit lost the merge in the second.

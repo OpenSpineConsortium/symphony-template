@@ -2304,10 +2304,18 @@ class Workflow(unittest.TestCase):
 
 
 class Coordinator(unittest.TestCase):
-    def test_both_coordinator_prompts_mark_a_release_as_metrics_counts_it(self):
-        for page in ("docs/agents/routines/coordinator.md", "docs/setup/crowd/coordinator.md"):
-            prompt = (ROOT / page).read_text(encoding="utf-8").split("```")[-2]
-            self.assertIn(f"`{metrics.RELEASE_MARKER}` as the comment's first line", prompt, page)
+    def test_the_coordinators_release_starts_with_the_marker_metrics_counts(self):
+        # The coordinator releases in the board's own run, with the claim
+        # protocol's words, so metrics and the release read one marker.
+        from sdlc_protocol import board, claims, coordinator
+        self.assertEqual(metrics.RELEASE_MARKER, claims.RELEASE_MARKER)
+        snap = board.Snapshot.from_dict({
+            "branches": ["claude/12"],
+            "claim_issues": {"12": {"state": "open", "labels": ["claimed", "todo"]}},
+            "releases": {"12": {"released_at": "", "sha": "aaaaaaa1111111", "committed_at": "2026-09-18T12:00:00Z"}},
+        })
+        text = coordinator.release_text(snap, "12", coordinator.Holding())
+        self.assertTrue(text.startswith(metrics.RELEASE_MARKER + "\n"), text)
 
 
 class Page(unittest.TestCase):

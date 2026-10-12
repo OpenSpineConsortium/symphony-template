@@ -1,0 +1,153 @@
+name: Workers
+
+# Runs the workers of the registry that run in GitHub Actions, the files
+# under .github/symphony/workers/ that say "runs": "actions"
+# (docs/agents/WORKERS.md), one leg per worker, in parallel, on this
+# repository's Claude token. The first job lists them with
+# tools/workers.py on the default branch, and with none registered the run
+# ends there. Each leg first asks tools/team.py what its worker should do,
+# on GITHUB_TOKEN alone: its own claim that needs work, the task it was
+# given, its share of the unclaimed blockers and queued issues whose files
+# fit its area, or nothing. Only the first three start a Claude session, so
+# a worker with nothing to do costs seconds of a runner and no usage, and
+# workers asking at once are dealt different issues rather than race for
+# one. The session runs the worker prompt, docs/agents/routines/worker.md,
+# under the worker's name, the same prompt a routine runs, with the
+# worker's own model and turns; the issue the clerk chose is named in it.
+# After a session, a leg that still has work dispatches itself again
+# (workflow_dispatch, which GITHUB_TOKEN may start), up to the worker's
+# rounds in a row; the six-hourly schedule picks up the rest, and an issue
+# queued (todo, blocker) or given to a worker (worker:<name>) while nobody
+# holds it wakes the workers at once, or only the one it was given to. Such
+# a run's actor is the github-actions bot, so the action is told to accept
+# it. Claude runs need the secret CLAUDE_CODE_OAUTH_TOKEN
+# (docs/setup/claude-action.md) and draw on that account's plan. One run
+# at a time per worker. In crowd mode (docs/project.md,
+# docs/setup/crowdsourcing.md) nothing starts, whatever the registry says:
+# each contributor runs their own worker on their own account, and the
+# repository holds no token.
+
+on:
+  schedule:
+    - cron: '43 */6 * * *'
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      worker:
+        description: "One worker to run; empty runs every worker in Actions"
+        required: false
+        default: ""
+      round:
+        description: "How many rounds this worker has run in a row"
+        required: false
+        default: "1"
+
+jobs:
+  registry:
+    if: >-
+      vars.CLAUDE_CROWD != 'true'
+      && (github.event_name != 'issues'
+          || (!contains(github.event.issue.labels.*.name, 'claimed')
+              && (github.event.label.name == 'todo' || github.event.label.name == 'blocker'
+                  || startsWith(github.event.label.name, 'worker:'))))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      workers: ${{ steps.list.outputs.workers }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - name: List the workers that run in Actions
+        id: list
+        env:
+          ONLY: ${{ inputs.worker }}
+          LABEL: ${{ github.event.label.name }}
+        run: |
+          set -eu
+          case "${LABEL:-}" in worker:*) ONLY="${LABEL#worker:}" ;; esac
+          all=$(python3 tools/workers.py list --runs actions)
+          workers=$(python3 -c 'import json, sys; names = json.loads(sys.argv[1]); only = sys.argv[2]; print(json.dumps([n for n in names if not only or n == only]))' "$all" "${ONLY:-}")
+          echo "workers in Actions: $all; this run: $workers"
+          echo "workers=$workers" >> "$GITHUB_OUTPUT"
+
+  work:
+    needs: registry
+    if: needs.registry.outputs.workers != '' && needs.registry.outputs.workers != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: ${{ fromJSON(needs.registry.outputs.workers) }}
+    concurrency:
+      group: worker-${{ matrix.worker }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      checks: read
+      actions: write
+      id-token: write
+    env:
+      HAVE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      WORKER: ${{ matrix.worker }}
+      REGISTRY: .github/symphony/workers
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - name: Read the worker's settings and ask what it should do
+        id: next
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          answer=$(python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY" --label "worker:$WORKER")
+          echo "$WORKER: $answer"
+          echo "move=${answer%% *}" >> "$GITHUB_OUTPUT"
+          echo "issue=${answer##* }" >> "$GITHUB_OUTPUT"
+          for setting in model max_turns rounds; do
+            echo "$setting=$(python3 tools/workers.py --dir "$REGISTRY" get "$WORKER" "$setting")" >> "$GITHUB_OUTPUT"
+          done
+      - name: Point at the setup when the token is not there
+        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN != 'true'
+        run: echo "The repository secret CLAUDE_CODE_OAUTH_TOKEN is not set; docs/setup/claude-action.md says how. Doing nothing."
+      - uses: anthropics/claude-code-action@v1
+        id: claude
+        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: "github-actions,claude"
+          claude_args: |
+            --max-turns ${{ steps.next.outputs.max_turns }}
+            ${{ steps.next.outputs.model != '' && format('--model {0}', steps.next.outputs.model) || '' }}
+            --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
+          prompt: |
+            You are the worker ${{ matrix.worker }} on the repository ${{ github.repository }}. Run `git fetch origin ${{ env.DEFAULT_BRANCH }} && git show origin/${{ env.DEFAULT_BRANCH }}:docs/agents/routines/worker.md` and do what the last fenced block of that page says, exactly and nothing else, as the worker ${{ matrix.worker }}. This run, ${{ steps.next.outputs.move }} issue #${{ steps.next.outputs.issue }}: the workflow chose it, so that the workers running at the same time each take a different issue.
+      - name: Go another round while this worker has work
+        if: steps.claude.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          ROUND: ${{ inputs.round || '1' }}
+          ROUNDS: ${{ steps.next.outputs.rounds }}
+        run: |
+          set -eu
+          if [ "$ROUND" -ge "$ROUNDS" ]; then
+            echo "$WORKER ran $ROUND rounds in a row; the schedule picks up the rest"
+            exit 0
+          fi
+          answer=$(python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY" --label "worker:$WORKER")
+          if [ "$answer" = "none" ]; then
+            echo "$WORKER has nothing left"
+            exit 0
+          fi
+          gh workflow run workers.yml --repo "$GITHUB_REPOSITORY" -f worker="$WORKER" -f round="$((ROUND + 1))"
+          echo "$WORKER: round $((ROUND + 1)) dispatched for '$answer'"
