@@ -1,4 +1,4 @@
-A change to the claim protocol is made in OpenSpineConsortium/symphony-protocol, whose sync pull request brings it to OpenSpineConsortium/symphony-template and whose scripts/vendor.py brings it, by hand, to a repository made from the template; tools/sdlc_protocol is never edited in place.
+A change to the claim protocol is made in OpenSpineConsortium/symphony-protocol, whose sync pull request brings it to OpenSpineConsortium/symphony-template and whose release tags a repository made from the template takes by its own workflow, protocol.yml; tools/sdlc_protocol is never edited in place.
 
 tools/sdlc_protocol is a vendored copy of the package sdlc_protocol, and
 tools/VENDORED records it: the release and the commit on the first line,
@@ -27,17 +27,26 @@ repository takes which modules, and its ECOSYSTEM.md, generated from that
 list, maps all five.
 
 A repository made from the template is not on that list, so no sync pull
-request reaches it, and none is worth waiting for. Its owner, or a session
-asked to, vendors a release from a clone of symphony-protocol with
+request reaches it. Its own .github/workflows/protocol.yml takes each
+release instead: symphony-protocol tags every version that reaches its main
+by itself (its release.yml), and the copy's workflow, weekly and by hand,
+vendors the newest tag when it is newer than tools/VENDORED, on the branch
+`symphony-protocol/sync`, and opens the pull request with GITHUB_TOKEN, or
+an issue linking it where GitHub Actions may not open pull requests. A
+push or pull request made with GITHUB_TOKEN starts no workflow, so the run
+starts ci.yml on the branch (its workflow_dispatch) for the required
+check, and arms auto-merge, which lands it once the check is green where
+the repository allows it. tools/protocol_update.py holds what it decides
+and says. By hand it is
 `python3 <symphony-protocol>/scripts/vendor.py <this repository> --consumer OpenSpineConsortium/symphony-template`,
-which copies what the template takes, and lands it by pull request. In the
-template the same command needs no `--consumer`, since its remote names it.
+which copies what the template takes, and a pull request; in the template
+the same command needs no `--consumer`, since its remote names it.
 
 What is this repository's own changes here as usual: the shims
 tools/board.py, check_protocol.py, team.py and guard_push.py, the workflows
 and the hooks. The owner's one-time setup for the sync is
 docs/setup/owner-checklist.md, section 6.
 
-Source: symphony-protocol 0.2.0, its ecosystem.json and its README's sections
-"How a change reaches the other repositories" and "The owner's one-time
-setup for the sync".
+Source: symphony-protocol 0.3.1, its ecosystem.json and its README's sections
+"How a change reaches the other repositories", "The owner's one-time setup
+for the sync" and "Releases"; this repository's .github/workflows/protocol.yml.

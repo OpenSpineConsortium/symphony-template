@@ -4,27 +4,27 @@ A repository not made from the template takes the protocol in two halves. The sy
 
 ## Steps
 
-1. **Clone the two sources beside your repository, and branch.** symphony-protocol is public; TEMPLATE_OWNER/TEMPLATE_NAME is the template for a member of its enterprise and the public copy for anyone else ([README.md](README.md)), which exists only once the template's owner publishes one; until then, ask the owner for the five files the `cp` lines below take from it (board.yml, tidy.yml, board.py, check_docs.py and marked_section.py), put them under ../symphony-template at the paths those lines read, and skip the second clone:
+1. **Clone the two sources beside your repository, and branch.** symphony-protocol is public; TEMPLATE_OWNER/TEMPLATE_NAME is the template for a member of its enterprise and the public copy for anyone else ([README.md](README.md)), which exists only once the template's owner publishes one; until then, ask the owner for the seven files the `cp` lines below take from it (board.yml, tidy.yml, protocol.yml, board.py, protocol_update.py, check_docs.py and marked_section.py), put them under ../symphony-template at the paths those lines read, and skip the second clone:
 
    ```bash
    cd ..
-   git clone --branch v0.2.0 https://github.com/OpenSpineConsortium/symphony-protocol.git
+   git clone --branch v0.3.1 https://github.com/OpenSpineConsortium/symphony-protocol.git
    gh repo clone TEMPLATE_OWNER/TEMPLATE_NAME symphony-template
    cd NAME
    git switch -c sdlc-setup
    ```
 
-2. **The library and the board's workflow.** vendor.py copies the protocol's package where the template keeps it, tools/sdlc_protocol, with its record tools/VENDORED; board.yml renders the board with GitHub's own token on every issue and pull request event, and tidy.yml deletes a closed issue's claim branch:
+2. **The library and the board's workflow.** vendor.py copies the protocol's package where the template keeps it, tools/sdlc_protocol, with its record tools/VENDORED; board.yml renders the board with GitHub's own token on every issue and pull request event, tidy.yml deletes a closed issue's claim branch, and protocol.yml, with tools/protocol_update.py, brings each later release in by pull request:
 
    ```bash
    python3 ../symphony-protocol/scripts/vendor.py . --consumer OpenSpineConsortium/symphony-template
    mkdir -p .github/workflows
-   cp ../symphony-template/.github/workflows/board.yml ../symphony-template/.github/workflows/tidy.yml .github/workflows/
-   cp ../symphony-template/tools/board.py tools/
+   cp ../symphony-template/.github/workflows/board.yml ../symphony-template/.github/workflows/tidy.yml ../symphony-template/.github/workflows/protocol.yml .github/workflows/
+   cp ../symphony-template/tools/board.py ../symphony-template/tools/protocol_update.py tools/
    python3 tools/sdlc_protocol/vendoring.py verify tools
    ```
 
-   You should see `vendor: wrote tools/VENDORED: sdlc-protocol 0.2.0 f530a6694477466c5826a6626681c8c84c8f1aa9, 15 file hashes` and then `vendored sdlc-protocol 0.2.0 at f530a66: 15 files match VENDORED`. Later releases come the same way ([protocol.md](protocol.md), step 7), with the verify line above and this repository's own checks in place of `bash scripts/check.sh`, which only the template has; nothing reaches this repository by itself.
+   You should see `vendor: wrote tools/VENDORED: sdlc-protocol 0.3.1 2649fce00fc81c136ae99b79696ccf8ac16a1aad, 15 file hashes` and then `vendored sdlc-protocol 0.3.1 at 2649fce: 15 files match VENDORED`. Later releases come by themselves: protocol.yml vendors each new one on the branch `symphony-protocol/sync` and opens the pull request, or an issue linking it where GitHub Actions may not open one ([protocol.md](protocol.md), step 7). It asks for ci.yml on that branch, which only the template has, so here the run's summary says it could not, and this repository's own checks on the pull request decide.
 
 3. **The protocol's text and the claim folder.** spec/PROTOCOL.md is the protocol in prose with no placeholders, the claim file's shape included, and the skills read it at docs/agents/PROTOCOL.md:
 
