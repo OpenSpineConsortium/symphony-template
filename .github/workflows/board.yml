@@ -19,9 +19,14 @@ name: Board
 # again. The same run comments once on a pull request that fell behind the
 # default branch after a push to it, and once on a pull request idle for
 # more than a day; the comments carry HTML markers so a second run posts
-# nothing twice. One run at a time; when events come in a burst GitHub
-# keeps only the newest waiting run, which renders the newest state, so no
-# finished board lags.
+# nothing twice. It also renames the branch of a claim the coordinator
+# released to released/<issue>-<sha> (docs/agents/PROTOCOL.md, Release),
+# which frees the name for the next claim, keeps the work and closes the
+# branch's pull request, and says so once on the issue; contents: write
+# covers the rename, and a rename GitHub refuses is only logged, so the
+# board is still written. One run at a time; when events come in a burst
+# GitHub keeps only the newest waiting run, which renders the newest
+# state, so no finished board lags.
 #
 # The checkout is the default branch itself, whatever event started the
 # run, so the board describes that branch's head (git rev-parse HEAD
@@ -110,7 +115,7 @@ jobs:
           git fetch --quiet origin +refs/heads/board:refs/remotes/origin/board 2>/dev/null \
             || echo "no board branch yet"
 
-      - name: Render the board and comment on waiting pull requests
+      - name: Render the board, rename released claims' branches and comment on waiting pull requests
         if: steps.gate.outputs.skip != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

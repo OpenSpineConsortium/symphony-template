@@ -34,8 +34,11 @@ commit the push guard lets through.
 
 Two conventions the counts rest on: the coordinator routine starts each
 release comment with `<!-- sdlc-coordinator: claim-released -->` (both
-coordinator prompts carry it), and the board's "main moved" comment says
-"conflicting with" for a conflict; change either and metrics.py with it.
+coordinator prompts carry it; it is the vendored protocol's
+claims.RELEASE_MARKER, on which the board also renames a released claim's
+branch, and released_claims counts a release said again within a day
+once), and the board's "main moved" comment says "conflicting with" for a
+conflict; change either and metrics.py with it.
 OpenSpineConsortium's collector, in symphony-app, reads only the two files at
 the ref metrics of repositories that installed the Symphony App and
 stores them under a salted hash of the repository.

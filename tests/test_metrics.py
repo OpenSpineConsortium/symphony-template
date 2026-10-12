@@ -89,9 +89,9 @@ def runs(*items):
     return {"total_count": len(items), "check_runs": list(items)}
 
 
-def comment(issue, created, body):
+def comment(issue, created, body, association="COLLABORATOR"):
     return {"issue_url": f"https://api.github.com{API}/issues/{issue}", "created_at": created, "body": body,
-            "user": user("lisa-secret")}
+            "user": user("lisa-secret"), "author_association": association}
 
 
 SHA = {name: name * 40 for name in "abcdef9"}
@@ -486,6 +486,38 @@ class Durations(unittest.TestCase):
         self.assertEqual(metrics.ratio(1, 3), 0.3333)
         self.assertEqual(metrics.ratio(2, 3), 0.6667)
         self.assertIsNone(metrics.ratio(0, 0))
+
+
+class ReleasedClaims(unittest.TestCase):
+    RELEASE = metrics.RELEASE_MARKER + "\nReleased: no commit for a day."
+
+    def test_the_marker_is_the_vendored_protocols(self):
+        self.assertEqual(metrics.RELEASE_MARKER, metrics.claims.RELEASE_MARKER)
+        self.assertEqual(metrics.RELEASE_MARKER, "<!-- sdlc-coordinator: claim-released -->")
+
+    def test_a_release_said_again_within_a_day_counts_once(self):
+        # An hourly coordinator repeated the release of one idle claim; a
+        # second claim on the issue is released a day or more later.
+        comments = [
+            comment(7, "2026-10-01T10:00:00Z", self.RELEASE),
+            comment(7, "2026-10-01T11:00:00Z", self.RELEASE),
+            comment(7, "2026-10-01T12:00:00Z", self.RELEASE),
+            comment(7, "2026-10-04T09:00:00Z", self.RELEASE),
+            comment(8, "2026-10-01T11:30:00Z", self.RELEASE),
+        ]
+        self.assertEqual(metrics.released_claims(comments), 3)
+        self.assertEqual(metrics.released_claims(list(reversed(comments))), 3)
+
+    def test_only_a_release_the_board_would_act_on_counts(self):
+        comments = [
+            comment(7, "2026-10-01T10:00:00Z", self.RELEASE, association="NONE"),
+            comment(8, "2026-10-01T10:00:00Z", "> " + self.RELEASE),
+            comment(9, "2026-10-01T10:00:00Z", "Why released?\n" + self.RELEASE),
+            dict(comment(10, "2026-10-01T10:00:00Z", self.RELEASE), issue_url=""),
+            dict(comment(11, "2026-10-01T10:00:00Z", self.RELEASE), created_at=None),
+        ]
+        self.assertEqual(metrics.released_claims(comments), 0)
+        self.assertEqual(metrics.released_claims([]), 0)
 
 
 class Unchanged(unittest.TestCase):

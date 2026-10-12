@@ -20,7 +20,7 @@ Push a new branch `claude/<issue number>` from the default branch whose first co
 
 ## Announce
 
-Add the label claimed and the account's label to the issue, and post the plan as a comment, so the board and the people reading the issue see the same thing the branch says.
+Add the label claimed and the account's label to the issue, taking off any other account's label an earlier claim left there, and post the plan as a comment, so the board and the people reading the issue see the same thing the branch says.
 
 ## Work in the open
 
@@ -28,7 +28,7 @@ Open a draft pull request at once, from the branch to the default branch, with "
 
 ## Finish
 
-The pull request deletes its claim file, says "Closes #N", passes `bash scripts/check.sh` and is marked ready; the issue gets the label in-review. The owner merges; the merge closes the issue, and the next board no longer lists the claim. Delete the branch after the merge if the repository does not do it by itself (docs/setup/github.md). An issue closed without a merge loses its branch too: .github/workflows/tidy.yml deletes `claude/<issue>` once no open pull request uses it.
+The pull request deletes its claim file, says "Closes #N", passes `bash scripts/check.sh` and is marked ready; the issue gets the label in-review. The owner merges; the merge closes the issue, and the next board no longer lists the claim. Delete the branch after the merge if the repository does not do it by itself (docs/setup/github.md). An issue closed without a merge loses its branch too: .github/workflows/tidy.yml deletes `claude/<issue>` once no open pull request uses it, and with it any `released/<issue>-<sha>` a released claim left (Release).
 
 ## Blockers
 
@@ -36,7 +36,9 @@ An issue labelled blocker stops everyone: work it stands in the way of waits unt
 
 ## Release
 
-A claim with no commit for 24 hours is released by the coordinator routine (docs/agents/routines/coordinator.md): it comments on the issue, removes the label claimed, and leaves a checkpoint comment saying what the branch holds and what seems left, so the next account can pick the issue up or start over. The branch stays as it is; the next account reads it and starts its own from the default branch.
+A claim with no commit for 24 hours is released by the coordinator routine (docs/agents/routines/coordinator.md). It first posts a comment on the issue whose first line is `<!-- sdlc-coordinator: claim-released -->` and which says why and whose the claim was, then takes the label claimed and the holder's account label off the issue, and leaves a checkpoint comment saying what the branch holds and what seems left, so the next account can carry the work on or start over. It never pushes to the branch, deletes it or renames it, and it skips a claim it has released already.
+
+The board does the rest. A claim counts as released when its issue is open and no longer labelled claimed, and its latest release comment, by the repository's owner, a member of its organization or a collaborator, came when the branch had gone without a commit for more than 24 hours, with no commit since. The board then leaves the claim and its pull request off the page and lists the issue in the Queue again, and .github/workflows/board.yml renames the branch to `released/<issue>-<short sha of its head>`: the name `claude/<issue>` is free, the work stays under the new name, GitHub closes the branch's pull request with the rename, and the board says on the issue where the branch went. The next account claims the issue by the steps above, a new branch `claude/<issue>` from the default branch, and may carry the released work on in it after the claim commit, keeping its own claim file (.claude/skills/claim says how). A release comment made sooner, or by anyone else, frees nothing, and a commit pushed to the branch before the rename, its holder coming back, keeps the claim. Until the board has renamed the branch, a push of the name is still refused; the board renames it in the run that the label's removal starts.
 
 ## Team mode
 

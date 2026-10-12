@@ -108,8 +108,9 @@ FAILED = {"failure", "timed_out"}
 CLOCK_GRACE = timedelta(seconds=60)
 # The coordinator routine starts every release comment with this line
 # (docs/agents/routines/coordinator.md, step 2), so releases can be counted
-# without reading what the comment says.
-RELEASE_MARKER = "<!-- sdlc-coordinator: claim-released -->"
+# without reading what the comment says. It is the vendored protocol's, the
+# line its board renames a released claim's branch on.
+RELEASE_MARKER = claims.RELEASE_MARKER
 # The board's "main moved" comment carries a marker and says "behind" or
 # "conflicting with"; only the second is a conflict. Both pieces come from
 # the vendored board, so a change of its words there changes them here.
@@ -461,6 +462,28 @@ def conflicts(facts, comments):
     return len((dirty | marked) - {None})
 
 
+def released_claims(comments):
+    """How many claims were released: the release comments as the board
+    reads them (claims.is_release_comment: the marker as the first line,
+    by the owner, a member or a collaborator), where one on an issue that
+    had another less than a day before is the same release said again and
+    is not counted twice. An hourly coordinator said it again before it
+    learnt to skip a claim it had released; a later claim on the issue
+    cannot be released within a day of the last release, since it must go
+    a day without a commit first."""
+    times = {}
+    for c in comments:
+        number, when = issue_number(c), time_of(c, "created_at")
+        if claims.is_release_comment(c) and number is not None and when is not None:
+            times.setdefault(number, []).append(when)
+    count = 0
+    for found in times.values():
+        found.sort()
+        count += sum(1 for before, after in zip([None] + found, found)
+                     if before is None or after - before > claims.IDLE_AFTER)
+    return count
+
+
 def window_runs(facts, window):
     """The check runs on the window's commits that finished in the window,
     each once: a commit in two pull requests brings its runs twice."""
@@ -545,7 +568,7 @@ def measures(facts, extra_claims, comments, window):
         sum(1 for r in runs if r.get("conclusion") in PASSED),
         sum(1 for r in runs if r.get("conclusion") in FAILED),
         conflicts(facts, comments),
-        sum(1 for c in comments if RELEASE_MARKER in (c.get("body") or "")),
+        released_claims(comments),
         contributors(facts, window),
     )))
     durations = dict(zip(DURATION_KEYS, (*summary(claim_waits(opened)), *summary(merge_waits(merged)),
