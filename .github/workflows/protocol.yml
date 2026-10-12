@@ -15,7 +15,8 @@ name: Protocol
 # quiet week starts nothing, and once the default branch carries the
 # newest release it closes the update's pull request or issue still open.
 #
-# GITHUB_TOKEN does it all, so no secret is named. A push or a pull request
+# GITHUB_TOKEN does it all, so no secret is named, and only the steps that
+# call GitHub hold it: the library's script runs without it. A push or a pull request
 # made with it starts no workflow, so the run asks for the check on the
 # branch itself (ci.yml's workflow_dispatch), and the check run it leaves
 # on the branch's head is the one the pull request needs. It may open a
@@ -60,7 +61,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       BRANCH: symphony-protocol/sync
@@ -91,6 +91,7 @@ jobs:
       - name: Close the update still open, the default branch carrying the newest release
         if: steps.plan.outputs.needed == 'false'
         env:
+          GH_TOKEN: ${{ github.token }}
           RECORDED: ${{ steps.plan.outputs.recorded }}
         run: |
           set -eu
@@ -133,6 +134,15 @@ jobs:
           python3 tools/protocol_update.py message --tag "$TAG" > "$RUNNER_TEMP/message.txt"
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit --quiet --file "$RUNNER_TEMP/message.txt"
+
+      - name: Push it to the branch symphony-protocol/sync unless the branch holds it already
+        id: push
+        if: steps.vendor.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          set -eu
           basic="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           # The branch already holds this copy when its commit has the same
           # tree on the same default branch; pushing it again would only
@@ -154,10 +164,11 @@ jobs:
       - name: Open or update the pull request, or the issue where Actions may open none
         if: steps.vendor.outputs.changed == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.plan.outputs.tag }}
           RECORDED: ${{ steps.plan.outputs.recorded }}
           RECORDED_COMMIT: ${{ steps.plan.outputs.recorded_commit }}
-          PUSHED: ${{ steps.vendor.outputs.pushed }}
+          PUSHED: ${{ steps.push.outputs.pushed }}
         run: |
           set -eu
           tool="python3 tools/protocol_update.py"

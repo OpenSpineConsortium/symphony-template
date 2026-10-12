@@ -234,6 +234,15 @@ class Workflow(unittest.TestCase):
         self.assertIn("GH_TOKEN: ${{ github.token }}", self.text)
         self.assertNotIn("secrets.", self.text)
 
+    def test_only_the_steps_that_call_github_hold_the_token(self):
+        """The library's scripts/vendor.py, cloned from another repository,
+        runs in a step that holds no token."""
+        job_env = self.text.split("\n    env:\n", 1)[1].split("\n    steps:\n", 1)[0]
+        self.assertNotIn("GH_TOKEN", job_env)
+        self.assertNotIn("GH_TOKEN", step_named(self.text, "Vendor the newest release"))
+        for name in ("Close the update still open", "Push it to the branch", "Open or update the pull request"):
+            self.assertIn("GH_TOKEN: ${{ github.token }}", step_named(self.text, name), name)
+
     def test_one_run_at_a_time_and_a_newer_one_waits(self):
         self.assertIn("concurrency:\n  group: protocol\n  cancel-in-progress: false\n", self.text)
 
