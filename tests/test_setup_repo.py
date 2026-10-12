@@ -1,9 +1,11 @@
 """scripts/setup-repo.sh parses, documents every option, reads the labels
 from tools/template_init.py so the list lives in one place, and carries
 every gh call the owner's checklist relies on; docs/setup/ruleset-org.json
-holds the same rules as ruleset-main.json, so the two cannot drift apart.
-gh itself is not run here: the script needs a signed-in CLI with admin
-rights, which no test has."""
+holds the same rules as ruleset-main.json, so the two cannot drift apart;
+and every ruleset the template ships targets the default branch alone, so
+none can stand in the way of a branch the workflows rewrite. gh itself is
+not run here: the script needs a signed-in CLI with admin rights, which no
+test has."""
 
 import json
 import re
@@ -60,6 +62,28 @@ class Script(unittest.TestCase):
         for line in calls:
             self.assertNotIn("--body", line)
             self.assertNotIn(" -b ", line)
+
+
+class EveryShippedRuleset(unittest.TestCase):
+    """The workflows rewrite branches of their own with GitHub's token: the
+    board force-pushes board, the metrics workflow metrics and the protocol
+    workflow symphony-protocol/sync, and the board renames a released
+    claim's branch out of claude/ into released/. GitHub lets only an
+    administrator do that to a branch a ruleset covers, so a ruleset over
+    any of them strands a claim or leaves a branch stale. Every ruleset the
+    template ships, which setup-repo.sh, crowd.py and an organization's
+    owner apply, therefore targets the default branch and nothing else, and
+    a change that widens one fails here before any repository takes it."""
+
+    def test_each_targets_the_default_branch_and_nothing_else(self):
+        files = sorted((ROOT / "docs" / "setup").glob("ruleset-*.json"))
+        self.assertEqual([path.name for path in files],
+                         ["ruleset-crowd.json", "ruleset-main.json", "ruleset-org.json"])
+        for path in files:
+            with self.subTest(ruleset=path.name):
+                ruleset = json.loads(path.read_text())
+                self.assertEqual(ruleset["target"], "branch")
+                self.assertEqual(ruleset["conditions"]["ref_name"], {"include": ["~DEFAULT_BRANCH"], "exclude": []})
 
 
 class OrganizationRuleset(unittest.TestCase):
