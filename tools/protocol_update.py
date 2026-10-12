@@ -74,10 +74,10 @@ def release_tags(library):
     return found.stdout.split()
 
 
-def plan(library, record=RECORD):
+def plan(library, record):
     """What the workflow does next, as its step's outputs: whether the
     copy needs the newest release, which tag that is, and the version and
-    commit the copy records now."""
+    commit the record says the copy is now."""
     recorded, commit, _ = vendoring.parse_record(Path(record).read_text(encoding="ascii"))
     tag = newest_release(release_tags(library))
     needed = bool(tag) and is_newer(tag, recorded)
@@ -156,7 +156,7 @@ def main(argv=None):
     parser.add_argument("--url")
     args = parser.parse_args(argv)
     texts = {
-        "plan": lambda: outputs(plan(args.library)),
+        "plan": lambda: outputs(plan(args.library, RECORD)),
         "title": lambda: title(args.tag) + "\n",
         "message": lambda: message(args.tag),
         "body": lambda: body(args.tag, args.recorded, args.recorded_commit),
