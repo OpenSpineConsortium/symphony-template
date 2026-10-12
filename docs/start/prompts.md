@@ -31,10 +31,10 @@ My account label is account:alice and the claim file's Account line is alice.
 **Run the worker once,** to see what the routine will do before you schedule it:
 
 ```
-Do what the prompt in docs/agents/routines/worker.md says, once, as it stands, with my account label account:main.
+Do what the full prompt in docs/agents/routines/worker.md, its last block, says, once, as it stands, with my account label account:main.
 ```
 
-**Make the worker routine,** in the account's Project conversation, so it runs as the Project's threads: paste the prompt from docs/agents/routines/worker.md, add the cloud line above at its end with your repository for ORG/NAME, N then standing for whichever issue the run takes (every run is a cloud session, and the prompt's claim step uses gh issue and gh pr), then:
+**Make the worker routine,** in the account's Project conversation, so it runs as the Project's threads: paste the short prompt from docs/agents/routines/worker.md, which reads the full prompt from that page on every run, add the cloud line above at its end with your repository for ORG/NAME, N then standing for whichever issue the run takes (every run is a cloud session, and the prompt's claim step uses gh issue and gh pr), then:
 
 ```
 Run this every hour, a few minutes past the hour.

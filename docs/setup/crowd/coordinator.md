@@ -5,13 +5,19 @@ In crowd mode the coordinator runs on the owner's own Claude account, as a routi
 ## How to make it
 
 1. At https://claude.ai/code/routines choose New routine; make it there, outside any Project.
-2. Paste the prompt below as it stands; {{REPO}} is already this repository's name.
+2. Paste the short prompt below as it stands; {{REPO}} is already this repository's name. Every run reads the full prompt, the last block on this page, from {{DEFAULT_BRANCH}}, so a change to it reaches the routine at its next run once its pull request merges, and nobody pastes it again.
 3. Choose the repository {{REPO}} and the Default environment.
 4. Add a schedule trigger, hourly, a few minutes past the hour, and no other trigger: no pull request events, and no API trigger, whose token would have to be stored somewhere.
 5. Remove every connector.
 6. Create it, then choose Run now once and read the transcript.
 
 ## The prompt
+
+```
+You coordinate the repository {{REPO}}. Run `git fetch origin {{DEFAULT_BRANCH}} && git show origin/{{DEFAULT_BRANCH}}:docs/agents/routines/coordinator.md` and do what the last fenced block of that page says, exactly and nothing else. Read it again on every run, since it changes by pull request.
+```
+
+The full prompt, which every run reads from here:
 
 ```
 You coordinate the repository {{REPO}}, which is a Claude project kept as files. First read the board: run `git fetch origin board && git show origin/board:STATE.md`. The board is the file STATE.md on the branch board; docs/agents/STATE.md on {{DEFAULT_BRANCH}} only describes it, and before the first board run the branch does not exist yet, in which case there is no board and you read the open issues and pull requests directly. Then read CLAUDE.md, docs/agents/PROTOCOL.md (how work is claimed) and the open issues and pull requests. Then do only the following, and nothing else.

@@ -71,7 +71,7 @@ Crowd mode opens a project to volunteers who each work under their own Claude Pr
 
    Say: "Claim issue N with the claim skill; my account label is account:OWNER_LOGIN and the claim file's Account line is OWNER_LOGIN." N is the Task issue setup opened, and the sentence matters because the claim skill otherwise labels the claim account:main. Write the goal in that pull request and merge it as crowdsourcing.md's step 6 says, then one epic per area with its tasks as sub-issues (step 7). Only Maintain or Admin queues work.
 
-8. **The coordinator, on your own account, outside any Project:** at https://claude.ai/code/routines, New routine, the prompt from docs/agents/routines/coordinator.md in the clone of step 7, where setup's merged pull request made it the crowd page (the template copy's is the Project-bound one), the repository ORG/NAME, the Default environment, an hourly Schedule trigger a few minutes past the hour, no other trigger and no connector; then Run now once and read the transcript.
+8. **The coordinator, on your own account, outside any Project:** at https://claude.ai/code/routines, New routine, the short prompt from docs/agents/routines/coordinator.md in the clone of step 7, which reads the full prompt from that page on every run, where setup's merged pull request made it the crowd page (the template copy's is the Project-bound one), the repository ORG/NAME, the Default environment, an hourly Schedule trigger a few minutes past the hour, no other trigger and no connector; then Run now once and read the transcript.
 
 9. **Invite, and remove:**
 
@@ -125,7 +125,7 @@ Crowd mode opens a project to volunteers who each work under their own Claude Pr
 
    A cloud session, yours or a worker's, pushes, comments "finished; ready to mark" and stops at a draft: finish it on your machine with `git fetch origin && git switch claude/N` and the lines above. Do not merge your own pull request, even when GitHub would let you.
 
-6. **A worker on your own account, optional:** this prints the crowd worker prompt with your login and area filled in, for a routine at https://claude.ai/code/routines, a Desktop task or `/loop` ([crowdsourcing.md](../setup/crowdsourcing.md#part-2-a-contributor), step 9); a cloud worker's finished claims wait as drafts for you to finish as step 5 says:
+6. **A worker on your own account, optional:** this prints the crowd worker's short prompt with your login and area filled in, which reads the full prompt from the repository on every run, for a routine at https://claude.ai/code/routines, a Desktop task or `/loop` ([crowdsourcing.md](../setup/crowdsourcing.md#part-2-a-contributor), step 9); a cloud worker's finished claims wait as drafts for you to finish as step 5 says:
 
    ```bash
    python3 scripts/crowd.py doctor --worker --area AREA
