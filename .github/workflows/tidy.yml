@@ -8,11 +8,12 @@ name: Tidy
 # job: "Automatically delete head branches" (docs/setup/github.md) covers
 # it natively, with no workflow run. A pull request closed without a merge
 # keeps its branch too: the work may be picked up again, and releasing a
-# stale claim is the coordinator routine's call, renaming its branch the
-# board's. Runs on GITHUB_TOKEN alone; the deletion starts the board
-# workflow, which then drops the claim row. The released branches are
-# listed by the prefix released/<issue>- (git/matching-refs, an empty list
-# when there is none), whose dash keeps issue 5 from matching issue 50's.
+# stale claim, and renaming its branch, is the board's run's (the
+# coordinator's step in it). Runs on GITHUB_TOKEN alone; the deletion
+# starts the board workflow, which then drops the claim row. The released
+# branches are listed by the prefix released/<issue>- (git/matching-refs,
+# an empty list when there is none), whose dash keeps issue 5 from
+# matching issue 50's.
 
 on:
   issues:

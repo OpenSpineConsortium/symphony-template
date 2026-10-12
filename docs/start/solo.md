@@ -50,7 +50,7 @@ You should see your account under "Login method" when you type `/status` in Clau
 
    You should see the new repository with the template's files.
 
-2. **Wait for "Set up this project".** The first push runs the workflow "Template init", which fills your names into the files, makes the seven labels and opens that issue; its checklist is the rest of this page. Open https://github.com/ORG/NAME/issues: you should see it within a few minutes, and a green "Template init" run at https://github.com/ORG/NAME/actions. If it never comes, do it by hand:
+2. **Wait for "Set up this project".** The first push runs the workflow "Template init", which fills your names into the files, makes the six labels and opens that issue; its checklist is the rest of this page. Open https://github.com/ORG/NAME/issues: you should see it within a few minutes, and a green "Template init" run at https://github.com/ORG/NAME/actions. If it never comes, do it by hand:
 
    ```bash
    gh repo clone ORG/NAME
@@ -68,7 +68,7 @@ You should see your account under "Login method" when you type `/status` in Clau
 
 3. **The GitHub side, in one command, on your own computer.** A cloud session cannot run it: its GitHub proxy refuses gh's GraphQL commands, and the session has no admin rights. Leave out the first two lines if step 2 already made the clone. In a second terminal run `claude setup-token`, approve it in the browser, and paste the token it prints at the hidden prompt of the first; nothing you paste is shown or saved.
 
-   `--token` stores that token as the repository's secret CLAUDE_CODE_OAUTH_TOKEN, which stays yours only while you are the repository's one writer: anyone with Write can push a workflow that reads it, and every writer's @claude comment spends your plan ([README.md](README.md), Accounts and tokens). A repository in an organization has writers you did not add: the organization's owners are admins of every repository in it, and its base permission can give every member Write. So in an organization, first open https://github.com/ORG/NAME/settings/access, the owners at https://github.com/orgs/ORG/people?query=role%3Aowner and the base permission at https://github.com/organizations/ORG/settings/member_privileges; if anyone besides you can write, leave `--token` out and skip step 6 and step 7's Actions worker, which run on it ([team.md](team.md), step 1).
+   `--token` stores that token as the repository's secret CLAUDE_CODE_OAUTH_TOKEN, which stays yours only while you are the repository's one writer: anyone with Write can push a workflow that reads it, and every writer's @claude comment spends your plan ([README.md](README.md), Accounts and tokens). A repository in an organization has writers you did not add: the organization's owners are admins of every repository in it, and its base permission can give every member Write. So in an organization, first open https://github.com/ORG/NAME/settings/access, the owners at https://github.com/orgs/ORG/people?query=role%3Aowner and the base permission at https://github.com/organizations/ORG/settings/member_privileges; if anyone besides you can write, leave `--token` out and skip step 6 and step 7's worker in Actions, which run on it ([team.md](team.md), step 1).
 
    ```bash
    gh repo clone ORG/NAME
@@ -78,7 +78,7 @@ You should see your account under "Login method" when you type `/status` in Clau
 
    It touches [Rules](https://github.com/ORG/NAME/settings/rules), [General](https://github.com/ORG/NAME/settings), [Advanced Security](https://github.com/ORG/NAME/settings/security_analysis), [Labels](https://github.com/ORG/NAME/labels) and [Actions secrets](https://github.com/ORG/NAME/settings/secrets/actions). You should see one line per step, among them `ruleset "Protect the default branch": created from docs/setup/ruleset-main.json`, `general: delete head branches on merge, allow auto-merge: on`, `secret CLAUDE_CODE_OAUTH_TOKEN: set` (`skipped` without `--token`) and `code owners: GitHub resolves every owner in .github/CODEOWNERS`. On a private repository it also prints a note that GitHub Free does not enforce its ruleset, which does not hold in an organization of the enterprise. Run it again at any time; nothing is done twice.
 
-   On Windows without WSL, store the token from PowerShell, under the same condition, and do the rest of this step by hand from the first box of "Set up this project"; gh asks for the value at a hidden prompt. That route also serves steps 4, 6 and 8, but step 5's local session and step 7's setup-repo.sh line need bash and python3, which WSL provides: without it, do step 5 from a cloud session, with the prompt in [README.md](README.md), step 5, and set step 7's variable at https://github.com/ORG/NAME/settings/variables/actions/new (CLAUDE_WORKER with `true`); its `gh workflow run` line runs in PowerShell.
+   On Windows without WSL, store the token from PowerShell, under the same condition, and do the rest of this step by hand from the first box of "Set up this project"; gh asks for the value at a hidden prompt. That route also serves steps 4, 6, 7 and 8, but step 5's local session needs bash and python3, which WSL provides: without it, do step 5 from a cloud session, with the prompt in [README.md](README.md), step 5. Step 7's `gh workflow run` line runs in PowerShell.
 
    ```powershell
    claude setup-token
@@ -100,7 +100,7 @@ You should see your account under "Login method" when you type `/status` in Clau
    Claim issue N with the claim skill and carry it to a ready pull request, as docs/agents/PROTOCOL.md says; ask me for the goal, the scope and the model and effort, and write them into docs/project.md. Do not merge.
    ```
 
-   You should see the branch `claude/N` on GitHub, the issue labelled claimed and account:main with the plan as a comment, a draft pull request saying "Closes #N", and at the end the pull request ready with the label in-review. Merge it yourself at https://github.com/ORG/NAME/pulls; the merge closes the issue. To do the same from a cloud session instead, use the prompt in [README.md](README.md), step 5.
+   You should see the branch `claude/N` on GitHub, the issue labelled claimed and `worker:LOGIN` (your GitHub login, the name your sessions claim under) with the plan as a comment, a draft pull request saying "Closes #N", and at the end the pull request ready with the label in-review. Merge it yourself at https://github.com/ORG/NAME/pulls; the merge closes the issue. To do the same from a cloud session instead, use the prompt in [README.md](README.md), step 5.
 
 6. **@claude in Actions, on your own token.** Write on any issue:
 
@@ -110,14 +110,13 @@ You should see your account under "Login method" when you type `/status` in Clau
 
    You should see a run of "Claude" at https://github.com/ORG/NAME/actions/workflows/claude.yml and its answer on the issue. Each run spends your own plan's usage (the five-hour window and the weekly limit), which is why the workflow caps its turns. Only someone with write access starts it, and each of them spends your plan: that is why step 3 stores the token only while you are the one writer. Keep usage credits off unless you want overage billed at API rates.
 
-7. **Keep it going, optional: one worker, not two.** Either the Actions worker, which every six hours starts Claude only when the queue has work:
+7. **Keep it going, optional: a worker that runs on its own.** Either a worker in Actions, which runs on step 3's token and every six hours, and whenever an issue is queued, starts Claude only when there is work for it; or a routine on claude.ai, which runs on your plan on its own schedule. Add either with the "Add a worker" form at https://github.com/ORG/NAME/issues/new?template=worker.yml: a name after its job (`nightly`, say), never your login, so it never takes your own sessions' claims for its own, and "actions" or "routine" under Where it runs. You should see the form's answer on the issue, with the pull request that adds `.github/symphony/workers/<name>.json`; merge it. A worker in Actions needs nothing more; to see it run at once:
 
    ```bash
-   bash scripts/setup-repo.sh --var CLAUDE_WORKER=true
-   gh workflow run claude-worker.yml --repo ORG/NAME
+   gh workflow run workers.yml --repo ORG/NAME
    ```
 
-   (you should see a "Worker" run at https://github.com/ORG/NAME/actions/workflows/claude-worker.yml), or the worker routine on claude.ai, made as [docs/agents/routines/worker.md](../agents/routines/worker.md) says in the Project of step 8, so on Pro and Max do that step first; on Team and Enterprise, which have no Projects yet, make it at https://claude.ai/code/routines with New routine, the same prompt, the repository and a Schedule trigger, as [team.md](team.md), step 6 does for the coordinator. Either way, add the line under "Add this line in a cloud session" in [prompts.md](prompts.md) at the end of its prompt, since every run is a cloud session. Both on one account would race for the same queue under the same label.
+   (you should see a "Workers" run at https://github.com/ORG/NAME/actions/workflows/workers.yml, with a leg for your worker). For a routine, the form's answer is the prompt to paste: make the routine with it as [docs/agents/routines/worker.md](../agents/routines/worker.md) says, in the Project of step 8, so on Pro and Max do that step first; on Team and Enterprise, which have no Projects yet, make it at https://claude.ai/code/routines with New routine, the same prompt, the repository and a Schedule trigger, as [parallel.md](parallel.md), step 6, says. Add the line under "Add this line in a cloud session" in [prompts.md](prompts.md) at the end of a routine's prompt, since every run is a cloud session. One worker is enough, and two under names of their own never hold the same issue, since the branch `claude/<issue>` is the lock.
 
 8. **A thin Project, optional (Pro and Max).** At https://claude.ai/code/projects/browse make a Project that links ORG/NAME and nothing else, with its instructions, description and memory left blank, since every thread reads them from the repository ([claude-project.md](../setup/claude-project.md)). Then close "Set up this project" when every box is ticked.
 

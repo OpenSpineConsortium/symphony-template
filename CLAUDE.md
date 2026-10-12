@@ -6,6 +6,7 @@ This repository is a Claude project kept as files: its instructions, its goal, i
 
 - The goal, the scope and who owns what, loaded into every session by this line: @docs/project.md
 - How work is claimed, done in the open and finished, loaded the same way: @docs/agents/PROTOCOL.md
+- Who works here: every session, routine and worker in GitHub Actions is a worker under a name of its own, labelled worker:<name> (docs/agents/WORKERS.md). A session's name is the GitHub login of the person it works for, unless its environment sets SYMPHONY_WORKER; a routine's or a worker in Actions' is the one its prompt gives.
 - The board: the file STATE.md on the branch `board`, rewritten by the board workflow from the open issues, the claim branches and the pull requests. It lives on another branch, which no import reaches: read it with `git fetch origin board && git show origin/board:STATE.md`; the session hook prints it at the start of every session, and docs/agents/STATE.md on {{DEFAULT_BRANCH}} only describes it.
 
 Before any work: fetch, read the board, check the claim on the issue you mean to take. One issue, one branch `claude/<issue>`, one pull request.
@@ -18,7 +19,7 @@ A fact worth keeping is one file under docs/memory/ with one index line in MEMOR
 
 ## Conventions
 
-- The board first (.claude/rules/board.md): fetch, read the board (STATE.md on the branch `board`) and PROTOCOL.md, check the claim; never push to another account's branch; never force-push the default branch or any branch that is not your own claim. A hook refuses the pushes this rule forbids, and /board (.claude/commands/board.md) reprints the whole board mid-session.
+- The board first (.claude/rules/board.md): fetch, read the board (STATE.md on the branch `board`) and PROTOCOL.md, check the claim; never push to another worker's branch; never force-push the default branch or any branch that is not your own claim. A hook refuses the pushes this rule forbids, and /board (.claude/commands/board.md) reprints the whole board mid-session.
 - Memory (.claude/rules/memory.md): one fact per file, a kebab-case name, a one-line description first, one index line; never a secret.
 - Writing (.claude/rules/writing.md): plain prose that says why, short functions, names that read as English, no emoji, ASCII and LF, no new dependencies; tag a durable fact in conversation as Decision: or Constraint: so a checkpoint keeps it.
 - Skills: .claude/skills/claim, .claude/skills/remember and .claude/skills/checkpoint are the three procedures, in the order a piece of work meets them.

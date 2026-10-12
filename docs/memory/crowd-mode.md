@@ -23,14 +23,18 @@ area's rows to CODEOWNERS and OWNERSHIP.md in place.
 
 What GitHub then enforces:
 
-- claude.yml, claude-lead.yml and claude-worker.yml never start while
-  CLAUDE_CROWD is true: each job's `if` puts `vars.CLAUDE_CROWD != 'true' &&`
-  first. GitHub compares it without case and trims nothing, so "true " leaves
-  the gate open, and the guard reads it the same way. An unset variable
-  reads as empty, so elsewhere each condition is exactly the old one.
+- claude.yml, coordinator.yml and workers.yml never start while
+  CLAUDE_CROWD is true: each job that waits on no other puts
+  `vars.CLAUDE_CROWD != 'true' &&` first in its `if`, and the rest wait on
+  those. GitHub compares it without case and trims nothing, so "true "
+  leaves the gate open, and the guard reads it the same way. An unset
+  variable reads as empty, so outside crowd mode the gate stays open.
+  add-worker.yml still adds a routine there, but refuses a worker in
+  Actions, since the repository holds no Claude token.
 - The required check runs `tools/crowd_check.py guard`, which fails while a
-  Claude secret or CLAUDE_WORKER or CLAUDE_TEAM reaches the repository and
-  crowd mode shows anywhere; while the default branch says on and
+  Claude secret, or either variable that switched on the Actions worker and
+  team mode before the registry of workers replaced them, reaches the
+  repository and crowd mode shows anywhere; while the default branch says on and
   CLAUDE_CROWD is not true; and when a pull request changes
   .claude/session.md or CLAUDE.md's checkpoint block while the default
   branch says on. A checkpoint is a pull request comment there. The job
@@ -38,8 +42,9 @@ What GitHub then enforces:
   job names and check runs the pull request's code: ci.yml's job values,
   which runs nothing of the repository's, compares each secret with nothing
   and hands check only the names that are set.
-- board.yml's step that calls the coordinator's trigger never runs while
-  CLAUDE_CROWD is true.
+- board.yml's step that calls a coordinator routine's trigger never runs
+  while CLAUDE_CROWD is true; the coordinator's releases and overlap
+  comments in the same run need no Claude token and run all the same.
 - .github/workflows/queue.yml takes todo or blocker off again when someone
   without Maintain or Admin adds one, opens an issue with one, or edits a
   queued issue's title or body.

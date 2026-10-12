@@ -8,7 +8,7 @@ Crowd mode opens a project to volunteers who each work under their own Claude Pr
 | --- | --- |
 | `crowd.py setup [--dry-run] [--area AREA] [--owner LOGIN] [--template OWNER/NAME] [--members-only] [--open-pull-requests] [--wait SECONDS] ORG/NAME` | Turn a public copy of the template into a crowd repository. |
 | `crowd.py finish [--dry-run] [--owner LOGIN] ORG/NAME` | Check, pin and merge the crowd/setup pull request, then audit. |
-| `crowd.py invite [--dry-run] [--area AREA] [--maintainer] [--owner LOGIN] ORG/NAME LOGIN [LOGIN ...]` | Invite people into the teams, with their labels. |
+| `crowd.py invite [--dry-run] [--area AREA] [--maintainer] [--owner LOGIN] ORG/NAME LOGIN [LOGIN ...]` | Invite people into the teams, each with their worker label. |
 | `crowd.py remove [--dry-run] ORG/NAME LOGIN` | Remove someone from the organization and the repository. |
 | `crowd.py audit [--owner LOGIN] ORG/NAME` | Check the repository against crowd mode; exit 1 on any failure. |
 | `crowd.py publish-template [--dry-run] [--yes] SRC DEST` | Publish a public copy of a template (route A). |
@@ -69,7 +69,7 @@ Crowd mode opens a project to volunteers who each work under their own Claude Pr
    claude
    ```
 
-   Say: "Claim issue N with the claim skill; my account label is account:OWNER_LOGIN and the claim file's Account line is OWNER_LOGIN." N is the Task issue setup opened, and the sentence matters because the claim skill otherwise labels the claim account:main. Write the goal in that pull request and merge it as crowdsourcing.md's step 6 says, then one epic per area with its tasks as sub-issues (step 7). Only Maintain or Admin queues work.
+   Say: "Claim issue N with the claim skill; my worker label is worker:OWNER_LOGIN and the claim file's Worker line is OWNER_LOGIN." N is the Task issue setup opened, and the sentence puts your login on the claim file's Worker line, by which the audit reads your claim branches as yours. Write the goal in that pull request and merge it as crowdsourcing.md's step 6 says, then one epic per area with its tasks as sub-issues (step 7). Only Maintain or Admin queues work.
 
 8. **The coordinator, on your own account, outside any Project:** at https://claude.ai/code/routines, New routine, the short prompt from docs/agents/routines/coordinator.md in the clone of step 7, which reads the full prompt from that page on every run, where setup's merged pull request made it the crowd page (the template copy's is the Project-bound one), the repository ORG/NAME, the Default environment, an hourly Schedule trigger a few minutes past the hour, no other trigger and no connector; then Run now once and read the transcript.
 

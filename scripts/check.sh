@@ -16,6 +16,10 @@ python3 tools/check_docs.py
 # tests/test_vendored.py, which compares the copy with the library itself
 # in the clone SDLC_PROTOCOL names (CI clones it; .github/workflows/ci.yml).
 python3 tools/sdlc_protocol/vendoring.py verify tools
+# Every worker's file under .github/symphony/workers/ must hold together
+# (docs/agents/WORKERS.md): a misspelt setting or a name that is no label
+# fails here, before the workflows that read the registry would.
+python3 tools/workers.py check
 python3 -m unittest discover -s tests -v
 
 # The project's own checks go here: its linter, its test runner, its build.

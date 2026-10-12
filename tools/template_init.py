@@ -47,16 +47,17 @@ NO_CODE_OWNER_NOTE = (
     " no user made this copy: replace it with a user or a team, docs/setup/github.md section 7)"
 )
 SETUP_ISSUE_TITLE = "Set up this project"
-# The labels GitHub Issues needs to be the queue, and the two team mode
-# adds: name, colour, description.
+# The labels GitHub Issues needs to be the queue, and the two the
+# coordinator's planning reads: name, colour, description, the claim
+# protocol's own list (sdlc_protocol.labels.LABELS) word for word. A
+# worker's label, worker:<name>, is made when the worker first needs it.
 LABELS = (
     ("todo", "0e8a16", "In the queue, open for a claim"),
     ("claimed", "fbca04", "A claude/<issue> branch holds it"),
     ("in-review", "1d76db", "A pull request is open and waiting"),
     ("blocker", "b60205", "Stops everyone until it is settled"),
-    ("account:main", "5319e7", "Work for the main Claude account"),
-    ("epic", "8b5cf6", "A spec the team lead plans into tasks (docs/agents/TEAM.md)"),
-    ("blocked", "e99695", "A member waits on a peer or the lead (docs/agents/TEAM.md)"),
+    ("epic", "8b5cf6", "A request the coordinator plans into tasks (docs/agents/WORKERS.md)"),
+    ("blocked", "e99695", "A worker waits on a peer or the coordinator (docs/agents/WORKERS.md)"),
 )
 
 
@@ -360,10 +361,10 @@ def setup_issue_body(repo, default_branch, app_link=APP_INSTALL):
         "who each work on their own Claude account, run `python3 scripts/crowd.py setup` instead, which rewrites "
         f"this checklist ([docs/setup/crowdsourcing.md]({base}/docs/setup/crowdsourcing.md)):",
         "",
-        f"- [ ] Run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand: import the branch rules under [Rules]({settings}/rules) (New ruleset, Import a ruleset, docs/setup/ruleset-main.json from your clone), tick \"Automatically delete head branches\" and \"Allow auto-merge\" under [General]({settings}), turn on secret scanning and push protection under [Code security]({settings}/security_analysis), check the seven labels under [Labels](https://github.com/{repo}/labels), and open [.github/CODEOWNERS]({base}/.github/CODEOWNERS) to see that GitHub marks no line of it as an error ([docs/setup/github.md]({base}/docs/setup/github.md), section 7).",
+        f"- [ ] Run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand: import the branch rules under [Rules]({settings}/rules) (New ruleset, Import a ruleset, docs/setup/ruleset-main.json from your clone), tick \"Automatically delete head branches\" and \"Allow auto-merge\" under [General]({settings}), turn on secret scanning and push protection under [Code security]({settings}/security_analysis), check the six labels under [Labels](https://github.com/{repo}/labels), and open [.github/CODEOWNERS]({base}/.github/CODEOWNERS) to see that GitHub marks no line of it as an error ([docs/setup/github.md]({base}/docs/setup/github.md), section 7).",
         f"- [ ] One OAuth flow for the Claude side: from Claude Code signed in as the main account, run /install-github-app and pick this repository; it installs the Claude GitHub App and writes the secret CLAUDE_CODE_OAUTH_TOKEN, which turns on @claude. By hand: [install the app]({app_link}), then run `claude setup-token` and paste the token as a [new repository secret]({settings}/secrets/actions/new) named CLAUDE_CODE_OAUTH_TOKEN ([docs/setup/claude-action.md]({base}/docs/setup/claude-action.md)).",
         f"- [ ] Make the thin Project for each Claude account ([docs/setup/claude-project.md]({base}/docs/setup/claude-project.md)).",
-        f"- [ ] Make the worker routine in the main account's Project ([docs/agents/routines/worker.md]({base}/docs/agents/routines/worker.md)), or run it from Actions instead: a [new repository variable]({settings}/variables/actions/new) named CLAUDE_WORKER with the value true, and another named CLAUDE_TEAM with a JSON list of member names to run a team with a lead ([docs/agents/TEAM.md]({base}/docs/agents/TEAM.md)); the coordinator ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)) joins once a second account does.",
+        f"- [ ] Add the workers that should run on their own, if any, with the [\"Add a worker\" issue form](https://github.com/{repo}/issues/new?template=worker.yml): a worker in GitHub Actions on the token above, or a routine on a Claude account ([docs/agents/WORKERS.md]({base}/docs/agents/WORKERS.md), [docs/agents/routines/worker.md]({base}/docs/agents/routines/worker.md)). People's sessions need nothing, and neither does the coordinator: the board's own run releases idle claims and tells overlapping work, and with the token set the coordinator workflow plans epics and tidies the memory every week ([docs/agents/routines/coordinator.md]({base}/docs/agents/routines/coordinator.md)).",
         f"- [ ] Fill in [docs/project.md]({base}/docs/project.md) and [docs/agents/OWNERSHIP.md]({base}/docs/agents/OWNERSHIP.md), and pick the spending profile in [docs/setup/tiers.md]({base}/docs/setup/tiers.md).",
         "- [ ] Run `bash scripts/check.sh` once locally.",
         "",

@@ -1,15 +1,16 @@
-"""The vendored claim protocol, and the three tools that now hand off to it.
+"""The vendored claim protocol, and the four tools that now hand off to it.
 
-The board, the protocol check and team mode's clerk moved to the library
-OpenSpineConsortium/symphony-protocol, whose own tests cover the rules and hold
+The board, the protocol check, the clerk and the registry of workers live
+in the library OpenSpineConsortium/symphony-protocol, whose own tests cover
+the rules and hold
 them to this repository's old tools byte for byte. What is left to test
 here is the copy and the wiring: that tools/sdlc_protocol is the release
 tools/VENDORED names, unchanged, with the sha256 of each of its files on
 the record's lines after the first; that scripts/check.sh holds the copy
 to that record, so a hand edit fails the required check; that template-init
 leaves the copy and the record as they are in a repository made from the
-template; and that tools/board.py, check_protocol.py and team.py still
-answer as the workflows that call them expect.
+template; and that tools/board.py, check_protocol.py, team.py and
+workers.py still answer as the workflows that call them expect.
 
 The record sits in this tree beside the copy, so a pull request that edits
 the copy can rewrite the file's line in VENDORED too, and the check above
@@ -73,7 +74,7 @@ COMPARISON = "TheCopy.test_every_file_is_the_librarys_at_that_commit"
 FIRST_LINE = re.compile(r"sdlc-protocol (\S+) (\S+)")
 DIGEST_LINE = re.compile(r"([0-9a-f]{64})  (\S+)")
 VERIFY = "python3 tools/sdlc_protocol/vendoring.py verify tools"
-SHIMS = ("board", "check_protocol", "team")
+SHIMS = ("board", "check_protocol", "team", "workers")
 REPO = "octo/widgets"
 
 
@@ -362,7 +363,7 @@ class OneIssue:
 
 
 class TheTeamClerk(unittest.TestCase):
-    """claude-lead.yml reads one line from route; the clerk's other answers
+    """coordinator.yml reads one line from route; the clerk's other answers
     are the library's to test."""
 
     def route(self, issue):

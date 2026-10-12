@@ -48,8 +48,10 @@ REACHES_CLAUDE = re.compile(r"anthropics/claude-code-action|secrets\.CLAUDE_CODE
 # routine on its owner's subscription.
 TRIGGER_SECRET = re.compile(r"secrets\.COORDINATOR_TRIGGER_[A-Z]+\s*\}\}")
 
-# The job-level conditions the three Claude workflows had before crowd mode,
-# held here so the gate in front of each is proven to leave them whole.
+# The job-level condition in front of which each Claude workflow puts the
+# gate, held here so the gate is proven to leave it whole: @claude's from
+# before crowd mode, and the workers' and the coordinator's, which replaced
+# the worker's and the lead's.
 OLD_CONDITIONS = {
     ("claude.yml", "claude"): (
         "(github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) || "
@@ -58,14 +60,18 @@ OLD_CONDITIONS = {
         "(github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || "
         "contains(github.event.issue.title, '@claude')))"
     ),
-    ("claude-worker.yml", "worker"): "vars.CLAUDE_WORKER == 'true'",
-    ("claude-lead.yml", "route"): (
-        "vars.CLAUDE_TEAM != '' && vars.CLAUDE_WORKER == 'true' "
-        "&& (github.event_name == 'workflow_dispatch' "
+    ("workers.yml", "registry"): (
+        "github.event_name != 'issues' "
+        "|| (!contains(github.event.issue.labels.*.name, 'claimed') "
+        "&& (github.event.label.name == 'todo' || github.event.label.name == 'blocker' "
+        "|| startsWith(github.event.label.name, 'worker:')))"
+    ),
+    ("coordinator.yml", "route"): (
+        "(github.event_name == 'workflow_dispatch' && inputs.event != 'tidy') "
         "|| (github.event.action == 'labeled' && github.event.label.name == 'epic') "
         "|| (github.event.action == 'labeled' && github.event.label.name == 'blocked' "
         "&& contains(github.event.issue.body, 'Epic: #')) "
-        "|| (github.event.action == 'closed' && contains(github.event.issue.body, 'Epic: #')))"
+        "|| (github.event.action == 'closed' && contains(github.event.issue.body, 'Epic: #'))"
     ),
 }
 
@@ -199,7 +205,7 @@ class ClaudeWorkflowsInCrowdMode(unittest.TestCase):
             jobs = jobs_of(path.name)
             for name in jobs:
                 self.assertTrue(gated(jobs, name), f"{path.name}: job {name} can start in crowd mode")
-        self.assertLessEqual({"claude.yml", "claude-lead.yml", "claude-worker.yml"}, found)
+        self.assertLessEqual({"claude.yml", "coordinator.yml", "workers.yml"}, found)
 
     def test_every_step_that_can_start_a_routine_is_gated(self):
         # A routine's trigger runs on its owner's subscription; a pair that
@@ -217,15 +223,15 @@ class ClaudeWorkflowsInCrowdMode(unittest.TestCase):
                         self.assertTrue(condition.startswith(CROWD_OFF + " "), (path.name, step[0], condition))
         self.assertIn(("board.yml", "- name: Tell the coordinator routine"), found)
 
-    def test_the_leads_later_jobs_need_route_and_ask_for_no_status_function(self):
-        jobs = jobs_of("claude-lead.yml")
+    def test_the_coordinators_later_jobs_need_route_and_ask_for_no_status_function(self):
+        jobs = jobs_of("coordinator.yml")
         for name in ("plan", "unblock", "integrate"):
             self.assertEqual(needs_of(jobs[name]), ["route"], name)
             for function in STATUS_FUNCTIONS:
                 self.assertNotIn(function, key_of(jobs[name], "if"), name)
 
     def test_each_says_so_in_its_header(self):
-        for workflow in ("claude.yml", "claude-lead.yml", "claude-worker.yml", "board.yml"):
+        for workflow in ("claude.yml", "coordinator.yml", "workers.yml", "board.yml"):
             header = (WORKFLOWS / workflow).read_text(encoding="utf-8").split("\non:", 1)[0]
             self.assertIn("In crowd mode", header, workflow)
 

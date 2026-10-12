@@ -16,17 +16,23 @@ name: Board
 # the default branch never stands in the way; a ruleset must target only
 # the default branch for the same reason (docs/setup/github.md). A push
 # made with GITHUB_TOKEN starts no workflow, so this run cannot start itself
-# again. The same run comments once on a pull request that fell behind the
-# default branch after a push to it, and once on a pull request idle for
-# more than a day; the comments carry HTML markers so a second run posts
-# nothing twice. It also renames the branch of a claim the coordinator
-# released to released/<issue>-<sha> (docs/agents/PROTOCOL.md, Release),
-# which frees the name for the next claim, keeps the work and closes the
-# branch's pull request, and says so once on the issue; contents: write
-# covers the rename, and a rename GitHub refuses is only logged, so the
-# board is still written. One run at a time; when events come in a burst
-# GitHub keeps only the newest waiting run, which renders the newest
-# state, so no finished board lags.
+# again. Before the board is rendered, the same run is the coordinator's
+# code (docs/agents/WORKERS.md): it releases each claim whose branch has
+# gone a day without a commit, with a comment on its issue saying why,
+# whose, what the branch holds and the plan, then takes claimed and the
+# worker's label off; and it tells each piece of open work about other work
+# that changes the same files, once per new piece; the board shows those
+# files under Overlaps. The run comments once on a pull request that fell
+# behind the default branch after a push to it, and once on a pull request
+# idle for more than a day; the comments carry HTML markers so a second run
+# posts nothing twice. It renames the branch of a released claim to
+# released/<issue>-<sha> (docs/agents/PROTOCOL.md, Release), in the run
+# that released it, which frees the name for the next claim, keeps the work
+# and closes the branch's pull request, and says so once on the issue;
+# contents: write covers the rename, issues: write the labels, and a call
+# GitHub refuses is only logged, so the board is still written. One run at
+# a time; when events come in a burst GitHub keeps only the newest waiting
+# run, which renders the newest state, so no finished board lags.
 #
 # The checkout is the default branch itself, whatever event started the
 # run, so the board describes that branch's head (git rev-parse HEAD
@@ -42,7 +48,8 @@ name: Board
 # template whose "Template repository" box was never ticked, and a copy
 # whose template-init has not run yet. Both still hold the marker folder
 # .template/, which template-init deletes, so the run ends there without
-# writing anything. The last step tells the coordinator routine the board moved,
+# writing anything. The last step tells a coordinator routine the board
+# moved, for a repository that runs one (docs/agents/routines/coordinator.md),
 # only when it did and the two secrets are set; it fails softly, so a
 # routine that did not answer never turns the board red. In crowd mode
 # (docs/setup/crowdsourcing.md) that step never runs: while the variable

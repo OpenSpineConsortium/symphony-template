@@ -8,13 +8,13 @@ A repository not made from the template takes the protocol in two halves. The sy
 
    ```bash
    cd ..
-   git clone --branch v0.3.1 https://github.com/OpenSpineConsortium/symphony-protocol.git
+   git clone --branch v0.4.0 https://github.com/OpenSpineConsortium/symphony-protocol.git
    gh repo clone TEMPLATE_OWNER/TEMPLATE_NAME symphony-template
    cd NAME
    git switch -c sdlc-setup
    ```
 
-2. **The library and the board's workflow.** vendor.py copies the protocol's package where the template keeps it, tools/sdlc_protocol, with its record tools/VENDORED; board.yml renders the board with GitHub's own token on every issue and pull request event, tidy.yml deletes a closed issue's claim branch, and protocol.yml, with tools/protocol_update.py, brings each later release in by pull request:
+2. **The library and the board's workflow.** vendor.py copies the protocol's package where the template keeps it, tools/sdlc_protocol, with its record tools/VENDORED; board.yml renders the board with GitHub's own token on every issue and pull request event, and its run is also the coordinator's, which releases idle claims and tells open work that changes the same files; tidy.yml deletes a closed issue's claim branch; and protocol.yml, with tools/protocol_update.py, brings each later release in by pull request:
 
    ```bash
    python3 ../symphony-protocol/scripts/vendor.py . --consumer OpenSpineConsortium/symphony-template
@@ -24,7 +24,7 @@ A repository not made from the template takes the protocol in two halves. The sy
    python3 tools/sdlc_protocol/vendoring.py verify tools
    ```
 
-   You should see `vendor: wrote tools/VENDORED: sdlc-protocol 0.3.1 2649fce00fc81c136ae99b79696ccf8ac16a1aad, 15 file hashes` and then `vendored sdlc-protocol 0.3.1 at 2649fce: 15 files match VENDORED`. Later releases come by themselves: protocol.yml vendors each new one on the branch `symphony-protocol/sync` and opens the pull request, or an issue linking it where GitHub Actions may not open one ([protocol.md](protocol.md), step 7). It asks for ci.yml on that branch, which only the template has, so here the run's summary says it could not, and this repository's own checks on the pull request decide.
+   You should see `vendor: wrote tools/VENDORED: sdlc-protocol 0.4.0 <commit>, 17 file hashes`, the commit being the one the tag v0.4.0 names (`git -C ../symphony-protocol rev-parse HEAD`), and then `vendored sdlc-protocol 0.4.0 at <its first seven characters>: 17 files match VENDORED`. Later releases come by themselves: protocol.yml vendors each new one on the branch `symphony-protocol/sync` and opens the pull request, or an issue linking it where GitHub Actions may not open one ([protocol.md](protocol.md), step 7). It asks for ci.yml on that branch, which only the template has, so here the run's summary says it could not, and this repository's own checks on the pull request decide.
 
 3. **The protocol's text and the claim folder.** spec/PROTOCOL.md is the protocol in prose with no placeholders, the claim file's shape included, and the skills read it at docs/agents/PROTOCOL.md:
 
@@ -43,7 +43,7 @@ A repository not made from the template takes the protocol in two halves. The sy
 
    @docs/agents/PROTOCOL.md
 
-   Before any work: fetch, read the board with `git fetch origin board && git show origin/board:STATE.md`, and check the claim on the issue you mean to take. One issue, one branch `claude/<issue>`, one pull request. Never push to the default branch or to another account's claim branch.
+   Before any work: fetch, read the board with `git fetch origin board && git show origin/board:STATE.md`, and check the claim on the issue you mean to take. One issue, one branch `claude/<issue>`, one pull request. Never push to the default branch or to another worker's claim branch.
    EOF
    ```
 
@@ -63,15 +63,16 @@ A repository not made from the template takes the protocol in two halves. The sy
    gh label create claimed --repo ORG/NAME --color fbca04 --description "A claude/<issue> branch holds it"
    gh label create in-review --repo ORG/NAME --color 1d76db --description "A pull request is open and waiting"
    gh label create blocker --repo ORG/NAME --color b60205 --description "Stops everyone until it is settled"
-   gh label create account:main --repo ORG/NAME --color 5319e7 --description "Work for the main Claude account"
+   LOGIN=$(gh api user --jq .login)
+   gh label create "worker:$LOGIN" --repo ORG/NAME --color c5def5 --description "Held by or given to $LOGIN"
    ```
 
-   You should see them at https://github.com/ORG/NAME/labels. epic and blocked belong to team mode, which needs the template's other workflows.
+   You should see them at https://github.com/ORG/NAME/labels, the last one the label your own sessions claim under, `worker:` and your GitHub login; another person's is made the same way, with their login. epic and blocked belong to the coordinator's planning, which needs the template's other workflows.
 
 7. **Land it by pull request.** A push of files under .github/workflows/ needs gh's workflow scope; `gh auth refresh -s workflow` adds it if the push is refused. The personal install of step 5 writes no .claude/settings.json; if you took it, leave that path off the first line, since git stages nothing when one path matches no file:
 
    ```bash
-   git add .claude/settings.json .github/workflows/board.yml .github/workflows/tidy.yml tools docs/agents CLAUDE.md
+   git add .claude/settings.json .github/workflows/board.yml .github/workflows/tidy.yml .github/workflows/protocol.yml tools docs/agents CLAUDE.md
    git commit -m "Take up the claim protocol"
    git push -u origin sdlc-setup
    gh pr create --fill
@@ -101,4 +102,4 @@ A repository not made from the template takes the protocol in two halves. The sy
   ```
 
   You should see `docs ok` and the number of files it read; until then, each problem it prints is one the hook would report after an edit.
-- No @claude, Actions worker, team mode, coordinator trigger or protocol check in CI: those are the template's workflows and docs ([solo.md](solo.md), [team.md](team.md)). Keep one wiring of the hooks: a repository that has the template's hooks and enables the plugin runs each twice.
+- No @claude, workers in Actions, registry of workers, coordinator workflow, coordinator trigger or protocol check in CI: those are the template's workflows and docs ([solo.md](solo.md), [team.md](team.md)). The coordinator's releases and overlap comments are here all the same, since board.yml runs them with the board. Keep one wiring of the hooks: a repository that has the template's hooks and enables the plugin runs each twice.

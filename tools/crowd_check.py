@@ -50,8 +50,10 @@ SECRET_NAMES = (
     "COORDINATOR_TRIGGER_TOKEN",
     "SDLC_APP_PRIVATE_KEY",
 )
-# The variables that switch on the Actions worker and team mode, which run
-# on the owner's subscription and land by auto-merge.
+# The variables that switched on the Actions worker and team mode before
+# the registry of workers took their place (docs/agents/WORKERS.md). A crowd
+# repository has no use for either, and the guard still refuses them, so a
+# switch left over from an older copy cannot linger unseen.
 VARIABLE_NAMES = ("CLAUDE_WORKER", "CLAUDE_TEAM")
 # The variable the workflows read at job level: while it is true, the
 # Claude workflows never start.

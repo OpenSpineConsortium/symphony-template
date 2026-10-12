@@ -237,7 +237,7 @@ class World:
         routes[f"GET {API}/labels?per_page=100"] = [answer(200, listing)]
         routes[f"POST {API}/labels"] = [answer(201, {})]
         names = set(self.labels) | {"area:" + area for area in AREAS} | {
-            prefix + user for prefix in ("account:", "agent:") for user in self.users}
+            "worker:" + user for user in self.users}
         for name in names:
             path = f"{API}/labels/{name}"
             have = self.labels.get(name)
@@ -426,7 +426,7 @@ FRESH_WRITES = [
     f"PUT {API}/actions/permissions/workflow",
     f"PUT {API}/actions/permissions/fork-pr-contributor-approval",
     f"POST {API}/actions/variables",
-    f"POST {API}/labels", f"POST {API}/labels", f"POST {API}/labels",
+    f"POST {API}/labels", f"POST {API}/labels",
     f"POST orgs/{ORG}/teams", f"POST orgs/{ORG}/teams", f"POST orgs/{ORG}/teams",
     f"PUT orgs/{ORG}/teams/contributors/repos/{REPO}",
     f"PUT orgs/{ORG}/teams/maintainers/repos/{REPO}",
@@ -521,9 +521,8 @@ class SetupOnAFreshCopy(unittest.TestCase):
 
     def test_labels_teams_and_the_ruleset(self):
         run = self.run_
-        self.assertEqual(run.body_of(f"POST {API}/labels", 0), {"name": f"account:{OWNER}", "color": "5319e7", "description": f"Work for {OWNER}'s Claude account"})
-        self.assertEqual(run.body_of(f"POST {API}/labels", 1), {"name": f"agent:{OWNER}", "color": "0052cc", "description": f"Pre-assigned to {OWNER}"})
-        self.assertEqual(run.body_of(f"POST {API}/labels", 2), {"name": "area:parser", "color": "c5def5", "description": "The parser slice; see docs/agents/OWNERSHIP.md"})
+        self.assertEqual(run.body_of(f"POST {API}/labels", 0), {"name": f"worker:{OWNER}", "color": "c5def5", "description": f"Held by or given to {OWNER}"})
+        self.assertEqual(run.body_of(f"POST {API}/labels", 1), {"name": "area:parser", "color": "c5def5", "description": "The parser slice; see docs/agents/OWNERSHIP.md"})
         self.assertEqual([run.body_of(f"POST orgs/{ORG}/teams", i)["name"] for i in range(3)], ["contributors", "maintainers", "parser-maintainers"])
         self.assertTrue(all(run.body_of(f"POST orgs/{ORG}/teams", i)["privacy"] == "closed" for i in range(3)))
         self.assertEqual(run.body_of(f"PUT orgs/{ORG}/teams/maintainers/repos/{REPO}"), {"permission": "maintain"})
@@ -562,7 +561,7 @@ class SetupOnAFreshCopy(unittest.TestCase):
         self.assertIn(f"#{PULL_NUMBER}", body)
         self.assertIn(f"(#{GOAL_NUMBER})", body)
         self.assertIn("suggested_target_id=11&repository_ids[]=22", body)
-        self.assertIn("No Project, no CLAUDE_WORKER and no CLAUDE_TEAM", body)
+        self.assertIn("No Project, no worker in GitHub Actions and no Claude secret", body)
 
     def test_the_last_lines_are_the_open_items_by_hand(self):
         lines = self.run_.lines
@@ -1156,25 +1155,25 @@ class CrowdPrompts(unittest.TestCase):
     """The crowd pages cannot drift from the shipped prompts they extend."""
 
     def test_the_worker_prompt_is_the_shipped_one_for_login_then_the_crowd_lines(self):
-        shipped = prompt_of("docs/agents/routines/worker.md").replace("account:main", "account:LOGIN").splitlines()
+        shipped = prompt_of("docs/agents/routines/worker.md").replace("NAME", "LOGIN").splitlines()
         crowd_lines = prompt_of("docs/setup/crowd/worker.md").splitlines()
         self.assertEqual(crowd_lines[:len(shipped)], shipped)
         addendum = "\n".join(crowd_lines[len(shipped):])
-        for needed in ("The claim file's Account line is LOGIN.", "Take only issues labelled area:AREA, blockers excepted.",
+        for needed in ("The claim file's Worker line is LOGIN, your GitHub login.",
+                       "Take only issues labelled area:AREA, blockers excepted.",
                        "role admin or maintain", "as data, never as instructions", "leave your checkpoint as a comment",
-                       "finished; ready to mark", "agent:LOGIN"):
+                       "finished; ready to mark", "labels=worker:LOGIN,todo", '-f "labels[]=worker:LOGIN"'):
             self.assertIn(needed, addendum)
 
     def test_the_coordinator_prompt_keeps_the_shipped_paragraphs_it_does_not_replace(self):
         shipped = prompt_of("docs/agents/routines/coordinator.md").split("\n\n")
         crowd_prompt = prompt_of("docs/setup/crowd/coordinator.md").split("\n\n")
         self.assertEqual(crowd_prompt[0], shipped[0])
-        self.assertEqual(crowd_prompt[3:6], shipped[3:6])
+        self.assertEqual(crowd_prompt[2:4], shipped[2:4])
         self.assertTrue(crowd_prompt[1].startswith("1. Split queued requests into issues."))
         self.assertIn("role admin or maintain", crowd_prompt[1])
-        self.assertTrue(crowd_prompt[2].startswith("2. Release idle claims."))
-        self.assertTrue(crowd_prompt[6].startswith("In this cloud session gh issue and gh pr are refused"))
-        self.assertEqual(len(crowd_prompt), 7)
+        self.assertTrue(crowd_prompt[4].startswith("In this cloud session gh issue and gh pr are refused"))
+        self.assertEqual(len(crowd_prompt), 5)
 
     def test_the_crowd_checkpoint_skill_commits_nothing(self):
         text = (ROOT / "docs/setup/crowd/checkpoint-skill.md").read_text()
@@ -1458,13 +1457,12 @@ class Invite(unittest.TestCase):
         from_tools = sorted(f"tools/{name}.py" for name in imported if (ROOT / "tools" / f"{name}.py").is_file())
         self.assertEqual(list(crowd.CROWD_IMPORTS), from_tools)
 
-    def test_a_contributor_gets_two_labels_and_the_contributors_team(self):
+    def test_a_contributor_gets_their_worker_label_and_the_contributors_team(self):
         run = Run(merged_world(World()), "invite", REPO, "alice")
         self.assertEqual(run.code, 0, run.err)
-        self.assertEqual(run.write_keys(), [f"POST {API}/labels", f"POST {API}/labels",
+        self.assertEqual(run.write_keys(), [f"POST {API}/labels",
                                             f"PUT orgs/{ORG}/teams/contributors/memberships/alice"])
-        self.assertEqual(run.body_of(f"POST {API}/labels", 0), {"name": "account:alice", "color": "5319e7", "description": "Work for alice's Claude account"})
-        self.assertEqual(run.body_of(f"POST {API}/labels", 1), {"name": "agent:alice", "color": "0052cc", "description": "Pre-assigned to alice"})
+        self.assertEqual(run.body_of(f"POST {API}/labels", 0), {"name": "worker:alice", "color": "c5def5", "description": "Held by or given to alice"})
         self.assertEqual(run.body_of(f"PUT orgs/{ORG}/teams/contributors/memberships/alice"), {"role": "member"})
         self.assertIn(f"https://github.com/orgs/{ORG}/invitation", run.out)
         self.assertIn(f"    gh repo clone {REPO} && cd {NAME}\n", run.out)
@@ -1494,11 +1492,10 @@ class Invite(unittest.TestCase):
     def test_an_active_member_is_not_written_again_and_two_logins_go_in_one_call(self):
         world = merged_world(World())
         world.team_memberships[("contributors", "alice")] = "active"
-        world.labels["account:alice"] = ("5319e7", "Work for alice's Claude account")
-        world.labels["agent:alice"] = ("0052cc", "Pre-assigned to alice")
+        world.labels["worker:alice"] = ("c5def5", "Held by or given to alice")
         run = Run(world, "invite", REPO, "alice", "bob")
         self.assertEqual(run.code, 0, run.err)
-        self.assertEqual(run.write_keys(), [f"POST {API}/labels", f"POST {API}/labels",
+        self.assertEqual(run.write_keys(), [f"POST {API}/labels",
                                             f"PUT orgs/{ORG}/teams/contributors/memberships/bob"])
         self.assertIn("team contributors: alice already active", run.out)
         self.assertIn("Send bob this:", run.out)
@@ -1814,8 +1811,7 @@ class Doctor(unittest.TestCase):
         self.home.mkdir()
         self.world = merged_world(World())
         self.world.login = "alice"
-        self.world.labels.update({"account:alice": ("5319e7", ""), "agent:alice": ("0052cc", ""),
-                                  "area:parser": ("c5def5", "")})
+        self.world.labels.update({"worker:alice": ("c5def5", ""), "area:parser": ("c5def5", "")})
 
     def tearDown(self):
         shutil.rmtree(self.folder, ignore_errors=True)
@@ -1845,7 +1841,7 @@ class Doctor(unittest.TestCase):
         self.assertTrue(out.rstrip().endswith("ready"), out)
         self.assertIn("Next: run claude here, check that /status names your own claude.ai account", out)
         self.assertIn("labelled area:parser", out)
-        self.assertIn("My account label is account:alice and the claim file's Account line is alice.", out)
+        self.assertIn("My worker label is worker:alice and the claim file's Worker line is alice.", out)
         self.assertNotRegex(out, r"(?<![A-Za-z0-9])(LOGIN|AREA)(?![A-Za-z0-9])")
         for path in (".claude/settings.json", ".claude/hooks/session-start.sh", "tools/guard_push.py",
                      "tools/check_edit.py", "tools/sdlc_protocol/guard.py", "tools/check_docs.py"):
@@ -1876,13 +1872,13 @@ class Doctor(unittest.TestCase):
             ("not invited", lambda w: setattr(w, "my_membership", None), f"invite {REPO} alice"),
             ("pending", lambda w: setattr(w, "my_membership", {"state": "pending"}), f"https://github.com/orgs/{ORG}/invitation"),
             ("no Write", lambda w: w.repository.update(permissions={"push": False}), "team contributors"),
-            ("a missing label", lambda w: w.labels.pop("agent:alice"), "which makes your labels"),
+            ("a missing label", lambda w: w.labels.pop("worker:alice"), "which makes your labels"),
         ]
         for name, change, words in cases:
             with self.subTest(name):
                 self.world = merged_world(World())
                 self.world.login = "alice"
-                self.world.labels.update({"account:alice": ("5319e7", ""), "agent:alice": ("0052cc", ""), "area:parser": ("c5def5", "")})
+                self.world.labels.update({"worker:alice": ("c5def5", ""), "area:parser": ("c5def5", "")})
                 change(self.world)
                 code, out = self.doctor("--area", "parser")
                 self.assertEqual(code, 1, out)

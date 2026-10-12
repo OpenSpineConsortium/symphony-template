@@ -11,21 +11,24 @@ Put your repository for ORG/NAME (ORG is the user or the organization that owns 
 | https://github.com/ORG/NAME/settings/security_analysis | Settings, Advanced Security | secret scanning, then push protection |
 | https://github.com/ORG/NAME/settings/secrets/actions | Settings, Secrets and variables, Actions | the secrets: CLAUDE_CODE_OAUTH_TOKEN, COORDINATOR_TRIGGER_URL, COORDINATOR_TRIGGER_TOKEN, SDLC_APP_PRIVATE_KEY |
 | https://github.com/ORG/NAME/settings/secrets/actions/new | the same, New repository secret | one new secret |
-| https://github.com/ORG/NAME/settings/variables/actions | the same, Variables tab | CLAUDE_WORKER, CLAUDE_TEAM, CLAUDE_MAX_ROUNDS, CLAUDE_ALLOWED_TOOLS, CLAUDE_CROWD, SDLC_APP_ID, SDLC_METRICS |
+| https://github.com/ORG/NAME/settings/variables/actions | the same, Variables tab | CLAUDE_ALLOWED_TOOLS, CLAUDE_CROWD, SDLC_APP_ID, SDLC_METRICS; workers are files, not variables (the registry, below) |
 | https://github.com/ORG/NAME/settings/variables/actions/new | the same, New repository variable | one new variable |
 | https://github.com/ORG/NAME/settings/actions | Settings, Actions, General | whether Actions run, and the default token's rights |
 | https://github.com/ORG/NAME/settings/access | Settings, Collaborators & teams | Write for each person who claims issues, once the secrets above are out of the repository ([team.md](team.md), step 1) |
 | https://github.com/ORG/NAME/settings/installations | Settings, GitHub Apps | see that the Claude GitHub App reaches this repository |
-| https://github.com/ORG/NAME/labels | Issues, Labels | the seven labels, and `account:<name>` per account |
+| https://github.com/ORG/NAME/labels | Issues, Labels | the six labels, and `worker:<name>` per worker |
 | https://github.com/ORG/NAME/issues/new?template=task.yml | Issues, New issue, Task | a piece of work for the queue, labelled todo |
 | https://github.com/ORG/NAME/issues/new?template=blocker.yml | Issues, New issue, Blocker | something that stops everyone |
+| https://github.com/ORG/NAME/issues/new?template=worker.yml | Issues, New issue, Add a worker | a routine or a worker in Actions for the registry; its workflow opens the pull request that adds the file and answers with what to do next |
+| https://github.com/ORG/NAME/tree/main/.github/symphony/workers | Code, .github, symphony, workers | the registry: one file per routine or worker in Actions ([WORKERS.md](../agents/WORKERS.md)) |
 | https://github.com/ORG/NAME/blob/board/STATE.md | the branch board, STATE.md | the board |
 | https://github.com/ORG/NAME/branches | Code tab, branches | the claim branches |
 | https://github.com/ORG/NAME/blob/main/.github/CODEOWNERS | Code, .github, CODEOWNERS | GitHub marks a line it cannot resolve |
-| https://github.com/ORG/NAME/actions/workflows/board.yml | Actions, Board | the board's runs; Run workflow |
+| https://github.com/ORG/NAME/actions/workflows/board.yml | Actions, Board | the board's runs, with the coordinator's releases and overlap comments in their log; Run workflow |
 | https://github.com/ORG/NAME/actions/workflows/claude.yml | Actions, Claude | @claude's runs |
-| https://github.com/ORG/NAME/actions/workflows/claude-worker.yml | Actions, Worker | the Actions worker and team members; Run workflow |
-| https://github.com/ORG/NAME/actions/workflows/claude-lead.yml | Actions, Lead | team mode's lead |
+| https://github.com/ORG/NAME/actions/workflows/workers.yml | Actions, Workers | the workers in Actions, a leg per worker; Run workflow |
+| https://github.com/ORG/NAME/actions/workflows/coordinator.yml | Actions, Coordinator | the coordinator's planning of epics, settling of blocked tasks, integrating and weekly tidying; Run workflow |
+| https://github.com/ORG/NAME/actions/workflows/add-worker.yml | Actions, Add a worker | the runs that turn the form's answers into a pull request |
 | https://github.com/ORG/NAME/actions/workflows/template-init.yml | Actions, Template init | the first push's run |
 | https://github.com/ORG/NAME/actions/workflows/metrics.yml | Actions, Metrics | the daily field-metrics runs, and one by hand after setting SDLC_METRICS ([metrics.md](../setup/metrics.md)); Run workflow |
 | https://github.com/ORG/NAME/blob/metrics/METRICS.json | the branch metrics, METRICS.json | the aggregates the repository shares, or that sharing is off |
