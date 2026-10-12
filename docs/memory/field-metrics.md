@@ -8,6 +8,15 @@ when a key, a name, a title, a branch or a body from its fixtures reaches
 the file. Off from the file or the variable writes {"schema":
 "sdlc-metrics/1", "sharing": "off"} and calls no API.
 
+collect also sorts the pull requests that ended in the window into eight
+work settings and four kinds of pairs, by the opener's login and the
+session lines of their commits and descriptions (Claude-Session, the link
+alone, the footer, or Symphony-Session), read in memory only. One person's
+several sessions (one_person_sessions) are never pooled with several people
+(several_people). The breakdown reads back one more window, reads changed
+files last and only for pull requests with a partner, and writes counts
+only.
+
 The run is daily at 03:43 UTC, before OpenSpineConsortium's collector reads
 the branch at 04:17, and on a push to the default branch that changes
 .github/symphony-metrics, so a merge of off is read as off the same day; the
