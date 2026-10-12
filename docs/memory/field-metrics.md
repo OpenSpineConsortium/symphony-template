@@ -15,7 +15,12 @@ alone, the footer, or Symphony-Session), read in memory only. One person's
 several sessions (one_person_sessions) are never pooled with several people
 (several_people). The breakdown reads back one more window, reads changed
 files last and only for pull requests with a partner, and writes counts
-only.
+only. It reads only once every other key is measured, so a run whose
+breakdown would reach the board's reserve still writes the other keys,
+without parallel, by_setting and pairs; and an open pull request counts
+only when it was opened or given a commit in the window, since the board's
+comment at every push to the default branch renews a parked one's
+updated_at.
 
 The run is daily at 03:43 UTC, before OpenSpineConsortium's collector reads
 the branch at 04:17, and on a push to the default branch that changes

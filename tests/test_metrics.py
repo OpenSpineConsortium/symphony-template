@@ -22,6 +22,7 @@ import urllib.parse
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from functools import partial
+from itertools import permutations
 from pathlib import Path
 from unittest import mock
 
@@ -67,6 +68,12 @@ def user(login, kind="User"):
     return {"login": login, "type": kind}
 
 
+def base(ref="main"):
+    """A pull request's base as /pulls lists it, in a repository whose
+    default branch is main."""
+    return {"ref": ref, "repo": {"default_branch": "main"}}
+
+
 def commit(sha, authored, committed=None, login=None, email=None):
     return {"sha": sha, "author": user(login, "Bot" if login and login.endswith("[bot]") else "User") if login else None,
             "commit": {"author": {"name": "someone", "email": email or f"{login}@example.invalid", "date": authored},
@@ -77,7 +84,7 @@ def pull(number, ref, author, created, updated, head, state="closed", merged=Non
     return {"number": number, "title": "Secret plan for widgets" if number != 104 else "Fix the login page",
             "body": "the body says secret things", "state": state, "created_at": created, "updated_at": updated,
             "merged_at": merged, "closed_at": closed or merged, "user": user(author, kind),
-            "head": {"ref": ref, "sha": head}}
+            "head": {"ref": ref, "sha": head}, "base": base()}
 
 
 def review(login, state, submitted):
@@ -181,7 +188,9 @@ def breakdown_values(record):
 # 10:00 on Oct 2 (90000 s) and 102 from 22:00 on Oct 2 to 00:00 on Oct 4
 # (93600 s), and nothing overlaps, so both are solo, and 103, open, too;
 # the board-shaped comments are posted by lisa-secret, a person, so none is
-# a mark; 99 is closed with no dates and is no unit; 104 is a bot's, open.
+# a mark; 99 is closed with no dates and is no unit; 104, a bot's, is open
+# but neither opened nor given a commit in the window, only reviewed, so it
+# is stale and no unit either.
 EXPECTED = {
     "counts": {"claims": 4, "pull_requests_opened": 3, "merged": 1, "closed_unmerged": 1, "reviews": 3,
                "changes_requested": 1, "check_runs_passed": 5, "check_runs_failed": 4, "conflicts_seen": 2,
@@ -198,8 +207,7 @@ EXPECTED = {
     "by_setting": settings_with(
         solo={"pull_requests": 2, "merged": 1, "closed_unmerged": 1, "open": 1, "conflicted": 0, "released": 0,
               "changes_requested": 1, "claim_branches": 2, "partners": 0, "work_seconds": 183600,
-              "landings_under": 0, "landings_before_opening": 0, "file_overlap": 0},
-        automation=dict(zeros(metrics.SETTING_KEYS), open=1)),
+              "landings_under": 0, "landings_before_opening": 0, "file_overlap": 0}),
     "pairs": {name: zeros(metrics.PAIR_KEYS) for name in metrics.RELATIONS},
 }
 
@@ -499,6 +507,40 @@ class Collect(unittest.TestCase):
         # is no unit, so its commits are not read either.
         self.assertEqual(len(opener.calls), 1 + 5 + 3 + 5 + 3 + 3 + 1)
 
+    def test_a_parked_pull_request_is_beside_nobody_until_its_own_work_comes_back(self):
+        """Under the template's ruleset a pull request behind the default
+        branch gets the board's main-moved comment at every move of it,
+        which renews its updated_at though nobody has touched it since
+        August; only its opening or a commit in the window count as work."""
+        parked = pull(105, "claude/4719", "mona-secret", "2026-08-02T00:00:00Z", "2026-10-09T12:00:00Z", "5" * 40,
+                      state="open")
+        routes = {**ROUTES, f"{API}/pulls": [parked, *PULLS],
+                  f"{API}/pulls/105": {"number": 105, "mergeable": True, "mergeable_state": "behind"},
+                  f"{API}/pulls/105/commits": [commit("5" * 40, "2026-08-01T00:00:00Z", login="mona-secret")],
+                  f"{API}/pulls/105/reviews": [],
+                  **{f"{API}/pulls/{number}/files": [] for number in (101, 102, 103, 105)}}
+        opener = FakeGitHub(routes)
+        with tempfile.TemporaryDirectory() as folder:
+            code, record, _ = collect(folder, {"GITHUB_TOKEN": "t"}, opener)
+        self.assertEqual(code, 0)
+        for section in ("parallel", "by_setting", "pairs"):
+            self.assertEqual(record[section], EXPECTED[section], section)
+        # Its commits, its reviews and its detail, as before the breakdown,
+        # and nothing more: no changed file, since nothing was beside anything.
+        self.assertEqual(len(opener.calls), 21 + 3)
+        # A commit made in the window, a rebase here, puts it back at work,
+        # beside everything since August.
+        routes[f"{API}/pulls/105/commits"] = [commit("5" * 40, "2026-08-01T00:00:00Z", "2026-10-09T11:00:00Z",
+                                                     login="mona-secret")]
+        routes[f"{API}/commits/{'5' * 40}/check-runs"] = runs()
+        with tempfile.TemporaryDirectory() as folder:
+            _, record, _ = collect(folder, {"GITHUB_TOKEN": "t"}, FakeGitHub(routes))
+        self.assertEqual({name: row["pull_requests"] for name, row in record["by_setting"].items()
+                          if row["pull_requests"]}, {"undetermined": 2})
+        # Its work began before the look-back, but it has not ended, so it
+        # is no truncated pull request: those are the window's finished ones.
+        self.assertEqual(record["parallel"]["truncated"], 0)
+
 
 class ProtocolVersion(unittest.TestCase):
     def test_it_is_the_release_and_seven_hex_digits_which_the_collector_keeps(self):
@@ -590,7 +632,7 @@ def world_pull(number, login, created, updated, ref, merged=None, closed=None, s
     return {"number": number, "title": "Secret title", "body": body, "state": state, "draft": draft,
             "created_at": created, "updated_at": updated, "merged_at": merged, "closed_at": closed or merged,
             "merge_commit_sha": merge_sha(number) if merged else None, "user": user(login, kind),
-            "head": {"ref": ref, "sha": commit_sha(number, 0), "repo": {"full_name": REPO}}}
+            "head": {"ref": ref, "sha": commit_sha(number, 0), "repo": {"full_name": REPO}}, "base": base()}
 
 
 def mark(number, created, state, sha, login="github-actions[bot]", kind="Bot"):
@@ -764,32 +806,34 @@ WORLD_SETTINGS = {301: "one_person_sessions", 302: "several_people_and_sessions"
                   319: "automation"}
 
 
-def collect_world(folder, remaining=None):
-    """collect over the world: its exit code, its record, the file's text,
-    what it printed and said, and the fake API's calls."""
-    opener = FakeGitHub(world_routes(), remaining=remaining)
+def collect_world(folder, remaining=None, routes=None):
+    """collect over the world, or over other routes: its exit code, its
+    record, the file's text, what it printed and said, and the fake API."""
+    opener = FakeGitHub(routes or world_routes(), remaining=remaining)
     out = Path(folder) / "METRICS.json"
     args = metrics.parse_args(["collect", "--repo", REPO, "--out", str(out), "--root", str(folder), "--now", NOW])
     with redirect_stdout(io.StringIO()) as shown, redirect_stderr(io.StringIO()) as said:
         code = metrics.collect(args, {"GITHUB_TOKEN": "t"}, opener=opener, sleep=lambda seconds: None)
     text = out.read_text()
-    return code, json.loads(text), text, shown.getvalue(), said.getvalue(), opener.calls
+    return code, json.loads(text), text, shown.getvalue(), said.getvalue(), opener
 
 
 def world_units():
     api = metrics.Budgeted("t", REPO, opener=FakeGitHub(world_routes()), sleep=lambda seconds: None)
     window = metrics.Window.ending(metrics.parse_time(NOW), 30)
-    facts, _, _, earlier = metrics.read_repository(api, window)
+    facts, _, _, rest = metrics.read_repository(api, window)
+    earlier, _ = metrics.updated_since(rest, metrics.look_back_start(window))
     return metrics.work_units(api, facts, earlier, window), window
 
 
-def labelled_pull(number, login, sessions, start, end, kind="User", ref=None):
-    """A merged pull request from start to end, whose description names
-    each of its sessions by the link alone on a line."""
+def labelled_pull(number, login, sessions, start, end, kind="User", ref=None, into="main"):
+    """A pull request open from start to end and merged then, into main or
+    the branch into names, whose description names each of its sessions by
+    the link alone on a line."""
     return {"number": number, "user": user(login, kind), "state": "closed",
             "body": "".join(f"{LINK}session_{name}\n" for name in sessions), "created_at": start,
             "merged_at": end, "closed_at": end, "updated_at": end, "merge_commit_sha": merge_sha(number),
-            "head": {"ref": ref or f"claude/{number}", "repo": {"full_name": REPO}}}
+            "head": {"ref": ref or f"claude/{number}", "repo": {"full_name": REPO}}, "base": base(into)}
 
 
 def labelled_unit(number, login, sessions, start, end, first_commit=None, **pull_fields):
@@ -933,7 +977,8 @@ class Breakdown(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         with tempfile.TemporaryDirectory() as folder:
-            cls.code, cls.record, cls.text, cls.shown, cls.said, cls.calls = collect_world(folder)
+            cls.code, cls.record, cls.text, cls.shown, cls.said, cls.opener = collect_world(folder)
+        cls.calls = cls.opener.calls
 
     def test_the_world_sorts_every_setting_and_pair(self):
         self.assertEqual(self.code, 0)
@@ -960,26 +1005,30 @@ class Breakdown(unittest.TestCase):
         # yet still marks 313 conflicted and its onset.
         self.assertEqual((self.record["counts"]["conflicts_seen"], self.record["parallel"]["conflict_marks"]), (4, 3))
 
-    def test_the_breakdown_reads_one_look_back_commit_list_and_the_files_last(self):
-        # The 55 calls collect made before (the listing, two for each of the
-        # 15 recent pull requests, 19 check-run lists, 3 details, the
-        # branches, the comments), then 314's commits, then the files.
-        self.assertEqual(len(self.calls), 66)
+    def test_the_breakdown_reads_after_every_existing_key_and_the_files_last(self):
+        # The 55 calls collect made before the breakdown, in the same order:
+        # the listing, two for each of the 15 recent pull requests, 19
+        # check-run lists, 3 details, the branches, the window's comments.
+        # Then 314's commits; then the look-back's comments, since 313's and
+        # 315's work began before the window; then the files.
+        self.assertEqual(len(self.calls), 67)
+        self.assertEqual((self.calls[54], self.opener.queries[54]["since"]),
+                         (f"{API}/issues/comments", "2026-09-10T12:00:00Z"))
         self.assertEqual(self.calls[55], f"{API}/pulls/314/commits")
-        self.assertEqual([path for path in self.calls if path.endswith("/files")],
-                         [f"{API}/pulls/{n}/files" for n in (301, 302, 303, 304, 305, 306, 307, 313, 314, 315)])
-        self.assertEqual(self.calls[56:], [f"{API}/pulls/{n}/files"
+        self.assertEqual((self.calls[56], self.opener.queries[56]["since"]),
+                         (f"{API}/issues/comments", "2026-08-11T12:00:00Z"))
+        self.assertEqual(self.calls[57:], [f"{API}/pulls/{n}/files"
                                            for n in (301, 302, 303, 304, 305, 306, 307, 313, 314, 315)])
         self.assertFalse([path for path in self.calls if re.search(r"/pulls/31[67]\b", path)])
 
     def test_files_are_read_last_and_left_null_under_the_reserve(self):
         with tempfile.TemporaryDirectory() as folder:
-            code, record, _, shown, _, calls = collect_world(folder, remaining=360)
+            code, record, _, shown, _, opener = collect_world(folder, remaining=360)
         self.assertEqual(code, 0)
-        self.assertEqual(len(calls), 60)
-        self.assertEqual([path for path in calls if path.endswith("/files")],
-                         [f"{API}/pulls/{n}/files" for n in (301, 302, 303, 304)])
-        self.assertEqual(record["parallel"]["files_unread"], 6)
+        self.assertEqual(len(opener.calls), 60)
+        self.assertEqual([path for path in opener.calls if path.endswith("/files")],
+                         [f"{API}/pulls/{n}/files" for n in (301, 302, 303)])
+        self.assertEqual(record["parallel"]["files_unread"], 7)
         for name in metrics.SETTINGS:
             self.assertEqual(record["by_setting"][name]["file_overlap"],
                              None if name in metrics.PERSON_SETTINGS else 0, name)
@@ -987,13 +1036,204 @@ class Breakdown(unittest.TestCase):
             for key in metrics.FILE_PAIR_KEYS:
                 self.assertIsNone(record["pairs"][name][key], (name, key))
         expected = json.loads(json.dumps(WORLD_EXPECTED))
-        expected["parallel"]["files_unread"] = 6
+        expected["parallel"]["files_unread"] = 7
         metrics.null_file_counts(expected["by_setting"], expected["pairs"])
         for key, block in expected.items():
             self.assertEqual(record[key], block, key)
         self.assertTrue(shown.rstrip("\n").endswith(
-            "in 60 calls; the changed files of 6 pull requests were left unread to keep the board's reserve, so the "
+            "in 60 calls; the changed files of 7 pull requests were left unread to keep the board's reserve, so the "
             "counts that need them are null"), shown)
+
+    def test_the_breakdown_gives_way_to_the_reserve_and_never_costs_an_existing_key(self):
+        """The existing keys are measured from the reads collect made before
+        the breakdown, in the same order; when a breakdown read other than
+        the changed files would reach the board's reserve, the record is
+        written with those keys alone, not broken out."""
+        for spent in (55, 56):
+            # Refused at 314's commits, then at the look-back's comments.
+            with tempfile.TemporaryDirectory() as folder:
+                code, record, text, shown, _, opener = collect_world(folder, remaining=metrics.RESERVE + spent)
+            self.assertEqual(code, 0, spent)
+            self.assertEqual(tuple(record), metrics.RECORD_KEYS[:-3], spent)
+            self.assertEqual((record["counts"], record["durations_seconds"], record["rates"]),
+                             (WORLD_COUNTS, WORLD_DURATIONS, WORLD_RATES), spent)
+            self.assertEqual(opener.calls, self.calls[:spent], spent)
+            self.assertTrue(shown.rstrip("\n").endswith(
+                f"in {spent} calls; the breakdown was left out to keep the board's reserve, so the record has no "
+                "parallel, by_setting or pairs"), shown)
+            for secret in ("ann-secret", A1, "src/secret_"):
+                self.assertNotIn(secret, text + shown)
+
+    def test_an_old_comment_edited_lately_changes_nothing(self):
+        """GitHub's since is the last update, so a mark made before the
+        look-back and edited since is listed, first, as GitHub lists them
+        oldest first; it is left out by when it was made."""
+        routes = world_routes()
+        routes[f"{API}/issues/comments"] = [mark(313, "2026-08-01T00:00:00Z", "conflicting", "unknown"),
+                                            *WORLD_COMMENTS]
+        with tempfile.TemporaryDirectory() as folder:
+            _, record, _, _, _, _ = collect_world(folder, routes=routes)
+        for key, block in WORLD_EXPECTED.items():
+            self.assertEqual(record[key], block, key)
+        self.assertEqual(record["counts"], WORLD_COUNTS)
+
+    def test_the_look_back_reads_commits_only_where_they_can_bear(self):
+        """A look-back pull request's commits are read only when it is a
+        person's and ended after the earliest start of the window's people's
+        work, finished or open, taken after the branch floor: those without
+        a route here would answer 404 and fail the run if they were read."""
+        pulls = [
+            # Listed in the window for a comment, but ended in the look-back:
+            # its early start is no window work's.
+            world_pull(604, "ben-secret", "2026-08-20T09:00:00Z", "2026-09-20T00:00:00Z", "claude/604",
+                       merged="2026-09-01T00:00:00Z"),
+            world_pull(703, "ben-secret", "2026-09-06T12:00:00Z", "2026-09-12T00:00:00Z", "claude/703",
+                       merged="2026-09-12T00:00:00Z"),
+            # A branch used again: its commits carry its predecessor's, so the
+            # floor, which the listing alone gives, starts it at 701's merge.
+            world_pull(702, "ann-secret", "2026-09-11T09:00:00Z", "2026-09-11T12:00:00Z", "claude/session-x",
+                       merged="2026-09-11T12:00:00Z"),
+            # In the look-back: a person's ended after that start, read.
+            world_pull(707, "ben-secret", "2026-09-06T09:00:00Z", "2026-09-08T00:00:00Z", "claude/707",
+                       merged="2026-09-08T00:00:00Z"),
+            # A bot's ended after it, a person's ended before it, and the
+            # predecessor, ended exactly at it: none read.
+            world_pull(706, "dependabot[bot]", "2026-09-06T00:00:00Z", "2026-09-07T00:00:00Z", "dependabot/pip/z",
+                       merged="2026-09-07T00:00:00Z", kind="Bot"),
+            world_pull(701, "ann-secret", "2026-09-04T09:00:00Z", "2026-09-05T10:00:00Z", "claude/session-x",
+                       merged="2026-09-05T10:00:00Z"),
+            world_pull(705, "ben-secret", "2026-09-02T00:00:00Z", "2026-09-03T10:00:00Z", "claude/705",
+                       merged="2026-09-03T10:00:00Z"),
+            # Before the look-back: the listing stops here.
+            world_pull(708, "ben-secret", "2026-07-20T00:00:00Z", "2026-08-01T00:00:00Z", "claude/708",
+                       merged="2026-08-01T00:00:00Z"),
+        ]
+        commits = {604: [world_commit(604, 1, "2026-08-20T09:00:00Z")],
+                   703: [world_commit(703, 1, "2026-09-06T12:00:00Z")],
+                   702: [world_commit(702, 1, "2026-09-05T09:00:00Z", trailer(A1)),
+                         world_commit(702, 2, "2026-09-11T10:00:00Z", trailer(A2))],
+                   707: [world_commit(707, 1, "2026-09-06T09:00:00Z")]}
+        routes = {f"{API}/pulls": pulls, f"{API}/branches": [], f"{API}/issues/comments": [],
+                  **{f"{API}/pulls/{n}/commits": listed for n, listed in commits.items()},
+                  **{f"{API}/pulls/{n}/reviews": [] for n in (604, 703, 702)},
+                  **{f"{API}/commits/{commit_sha(702, i)}/check-runs": runs() for i in (1, 2)},
+                  **{f"{API}/pulls/{n}/files": [] for n in (702, 703, 707)}}
+        with tempfile.TemporaryDirectory() as folder:
+            code, _, _, _, _, opener = collect_world(folder, routes=routes)
+        self.assertEqual(code, 0)
+        # The 11 calls before the breakdown (the listing, 604's two, 703's
+        # two, 702's two and the runs of its commit made in the window and
+        # of its first head, the branches, the comments), then 707's commits,
+        # the look-back's comments and three changed-file lists.
+        self.assertEqual([path for path in opener.calls[11:] if path.endswith("/commits")],
+                         [f"{API}/pulls/707/commits"])
+        self.assertEqual(len(opener.calls), 16)
+
+    def test_a_pair_counts_once_in_the_record_whose_window_holds_its_later_end(self):
+        window = metrics.Window.ending(metrics.parse_time(NOW), 30)
+        day = "2026-10-02T"
+        recent = [labelled_unit(460, "ann", ["S1"], day + "09:00:00Z", day + "12:00:00Z"),
+                  labelled_unit(461, "ann", ["S2"], day + "10:00:00Z", day + "13:00:00Z")]
+        # Two of Ann's sessions at work together in the look-back, both ended
+        # before the window: their pair is the earlier record's alone.
+        back = [labelled_unit(462, "ann", ["S3"], "2026-08-19T09:00:00Z", "2026-08-20T09:00:00Z"),
+                labelled_unit(463, "ann", ["S4"], "2026-08-19T12:00:00Z", "2026-08-21T09:00:00Z")]
+        self.assertEqual(metrics.breakdown(recent + back, [], {}, 0, window)["pairs"],
+                         metrics.breakdown(recent, [], {}, 0, window)["pairs"])
+        earlier = metrics.Window.ending(metrics.parse_time("2026-09-01T00:00:00Z"), 30)
+        self.assertEqual(metrics.breakdown(back, [], {}, 0, earlier)["pairs"]["one_person_sessions"]["pairs"], 1)
+
+    def test_sessions_joined_through_a_third_pull_request_are_one_group(self):
+        window = metrics.Window.ending(metrics.parse_time(NOW), 30)
+        day = "2026-10-03T"
+        units = [labelled_unit(470, "ann", ["A", "B"], day + "09:00:00Z", day + "12:00:00Z"),
+                 labelled_unit(471, "ann", ["A"], day + "09:30:00Z", day + "12:00:00Z"),
+                 labelled_unit(472, "ann", ["B"], day + "10:00:00Z", day + "12:00:00Z")]
+        for order in permutations(units):
+            found = metrics.breakdown(list(order), [], {}, 0, window)["parallel"]
+            self.assertEqual((found["peak_parallel"], found["peak_sessions_one_person"]), (3, 1),
+                             [unit.number for unit in order])
+
+    def test_a_release_counts_from_the_first_commit_to_the_end(self):
+        """The coordinator releases a claim with no commit for a day, which
+        can come before the pull request opens."""
+        window = metrics.Window.ending(metrics.parse_time(NOW), 30)
+        day = "2026-10-04T"
+        unit = labelled_unit(480, "ann", ["S1"], day + "10:00:00Z", day + "12:00:00Z", first_commit=day + "09:00:00Z")
+
+        def released(at):
+            release = {"issue_url": f"https://api.github.com{API}/issues/480", "created_at": day + at,
+                       "body": metrics.RELEASE_MARKER + "\nReleased.", "user": user("ann-secret")}
+            return metrics.breakdown([unit], [release], {}, 0, window)["by_setting"]["solo"]["released"]
+
+        self.assertEqual([released(at) for at in ("08:59:00Z", "09:30:00Z", "12:00:00Z", "12:01:00Z")], [0, 1, 1, 0])
+
+    def test_a_landing_is_a_merge_into_the_default_branch_from_another_branch(self):
+        window = metrics.Window.ending(metrics.parse_time(NOW), 30)
+        day = "2026-10-06T"
+        ann = labelled_unit(710, "ann", ["S1"], day + "10:00:00Z", day + "14:00:00Z")
+        # A merge into a release branch moves nothing the board marks.
+        for into, landings in (("release/1.x", 0), ("main", 1)):
+            ben = labelled_unit(711, "ben", ["S3"], day + "11:00:00Z", day + "12:00:00Z", into=into)
+            found = metrics.breakdown([ann, ben], [], {}, 0, window)
+            self.assertEqual((found["by_setting"]["several_people"]["landings_under"],
+                              found["pairs"]["several_people"]["landings"]), (landings, landings), into)
+        # A branch used again starts at its predecessor's merge, which
+        # carries its own earlier work and is no landing for it; another
+        # branch's merge before its opening is.
+        day = "2026-10-07T"
+        first = labelled_unit(712, "ann", ["S1"], day + "10:00:00Z", day + "12:00:00Z", ref="claude/session-x")
+        again = labelled_unit(713, "ann", ["S1"], day + "13:00:00Z", day + "15:00:00Z", first_commit=day + "11:00:00Z",
+                              ref="claude/session-x")
+        other = labelled_unit(714, "ben", ["S3"], day + "12:15:00Z", day + "12:30:00Z")
+        metrics.floor_starts([first, again, other])
+        self.assertEqual(again.start, metrics.parse_time(day + "12:00:00Z"))
+        found = metrics.breakdown([first, again, other], [], {}, 0, window)
+        self.assertEqual(found["by_setting"]["several_people"]["landings_before_opening"], 1)
+        # Another branch's merge at the very moment the work began counts.
+        merged = labelled_unit(717, "ben", ["S3"], day + "08:00:00Z", day + "09:00:00Z")
+        started = labelled_unit(718, "ann", ["S1"], day + "09:30:00Z", day + "10:00:00Z", first_commit=day + "09:00:00Z")
+        found = metrics.breakdown([merged, started], [], {}, 0, window)
+        self.assertEqual(found["by_setting"]["solo"]["landings_before_opening"], 1)
+        # One branch's two pull requests at once, into main and into a
+        # release branch: the merge into main is the other's own work.
+        day = "2026-10-08T"
+        to_main = labelled_unit(715, "ann", ["S1"], day + "10:00:00Z", day + "12:00:00Z", ref="claude/session-y")
+        to_release = labelled_unit(716, "ann", ["S1"], day + "11:00:00Z", day + "13:00:00Z", ref="claude/session-y",
+                                   into="release/1.x")
+        found = metrics.breakdown([to_main, to_release], [], {}, 0, window)
+        self.assertEqual((found["by_setting"]["one_session"]["landings_under"],
+                          found["pairs"]["same_session"]["pairs"], found["pairs"]["same_session"]["landings"]),
+                         (0, 1, 0))
+
+    def test_a_pull_request_listed_twice_is_one_unit(self):
+        """GitHub pages its listing by page number, so an update while it is
+        read can push a pull request onto the next page a second time."""
+        twice = world_pull(320, "ann-secret", "2026-10-02T09:00:00Z", "2026-10-02T12:00:00Z", "claude/520",
+                           merged="2026-10-02T12:00:00Z")
+        routes = {f"{API}/pulls": [twice], f"{API}/branches": [], f"{API}/issues/comments": [],
+                  f"{API}/pulls/320/commits": [world_commit(320, 1, "2026-10-02T09:00:00Z", trailer(A1))],
+                  f"{API}/pulls/320/reviews": [], f"{API}/commits/{commit_sha(320, 1)}/check-runs": runs(),
+                  f"{API}/pulls/320/files": []}
+        with tempfile.TemporaryDirectory() as folder:
+            _, once, _, _, _, _ = collect_world(folder, routes=routes)
+        routes[f"{API}/pulls"] = [twice, dict(twice)]
+        with tempfile.TemporaryDirectory() as folder:
+            _, record, _, _, _, _ = collect_world(folder, routes=routes)
+        for key in ("parallel", "by_setting", "pairs"):
+            self.assertEqual(record[key], once[key], key)
+        self.assertEqual(record["by_setting"]["solo"]["pull_requests"], 1)
+        # Listed twice in the look-back, 314 is one partner, and its commits
+        # are read once.
+        routes = world_routes()
+        listing = routes[f"{API}/pulls"]
+        at = next(index for index, pull_ in enumerate(listing) if pull_["number"] == 314)
+        routes[f"{API}/pulls"] = listing[:at + 1] + [dict(listing[at])] + listing[at + 1:]
+        with tempfile.TemporaryDirectory() as folder:
+            _, record, _, _, _, opener = collect_world(folder, routes=routes)
+        for key, block in WORLD_EXPECTED.items():
+            self.assertEqual(record[key], block, key)
+        self.assertEqual(opener.calls, self.calls)
 
     def test_nothing_of_the_world_reaches_the_file_or_the_log(self):
         for secret in ("ann-secret", "ben-secret", A1, A2, B1, TOKEN, "claude.ai/code", "src/secret_",
@@ -1052,7 +1292,7 @@ def replica_commits(created, commits):
 def replica_pull(number, ref, created, merged, closed, body=""):
     return {"number": number, "user": user("replica-person"), "state": "closed", "body": body,
             "created_at": created, "merged_at": merged, "closed_at": closed, "updated_at": closed,
-            "head": {"ref": ref, "repo": {"full_name": REPO}}, "merge_commit_sha": merge_sha(number)}
+            "head": {"ref": ref, "repo": {"full_name": REPO}}, "base": base(), "merge_commit_sha": merge_sha(number)}
 
 
 def replica_body(labels):
@@ -1131,7 +1371,10 @@ class Histories(unittest.TestCase):
         self.assertEqual(column(settings, "work_seconds"),
                          {"solo": 141694, "one_session": 97771, "one_person_sessions": 14730})
         self.assertEqual(column(settings, "landings_under"), {"one_session": 5, "one_person_sessions": 5})
-        self.assertEqual(column(settings, "landings_before_opening"), {"one_session": 8})
+        # Two of one_session's pull requests reuse a session's branch, whose
+        # earlier pull request's merge, where the floor starts them, is their
+        # own work landing and no landing before their opening.
+        self.assertEqual(column(settings, "landings_before_opening"), {"one_session": 6})
         self.assertEqual(pick_all(found["pairs"], ("pairs", "both_active", "landings")),
                          {"same_session": {"pairs": 10, "both_active": 5, "landings": 5},
                           "one_person_sessions": {"pairs": 5, "both_active": 2, "landings": 5}})
@@ -1496,6 +1739,77 @@ class JudgeBySetting(unittest.TestCase):
                                                               "pulls/202/commits")])
         self.assertEqual(record["limit"], 1)
         self.assertEqual(record["by_setting"]["solo"]["pull_requests"], 1)
+
+    def test_a_limit_that_left_nothing_unjudged_is_written_as_null(self):
+        """Analyses leave out a record whose limit is set, since it judged
+        only the newest pull requests; a limit that cut nothing is none."""
+        for limit in ("2", "5"):
+            record, _, _ = self.judged(GH_ROUTES, ["--limit", limit])
+            self.assertIsNone(record["limit"], limit)
+            self.assertEqual(record, self.judged(GH_ROUTES)[0], limit)
+
+    def test_a_pull_request_listed_twice_is_judged_and_sorted_once(self):
+        """GitHub pages its listing by page number, so an update while it is
+        read can push a pull request onto the next page a second time."""
+        twice = {**GH_ROUTES, f"repos/{REPO}/pulls": [JUDGE_PULLS[0], dict(JUDGE_PULLS[0]), JUDGE_PULLS[1]]}
+        record, claude, gh = self.judged(twice)
+        once, once_claude, once_gh = self.judged(GH_ROUTES)
+        self.assertEqual(record, once)
+        self.assertEqual((len(claude.calls), len(gh.calls)), (len(once_claude.calls), len(once_gh.calls)))
+
+    def test_a_parked_pull_request_is_beside_nobody(self):
+        """Open since before the window, with no commit in it, and changed in
+        it only by the board's comments: beside nobody, so 201 stays solo."""
+        parked = {"number": 203, "body": "", "state": "open", "created_at": "2026-09-01T00:00:00Z",
+                  "updated_at": "2026-10-05T00:00:00Z", "user": user("mona-secret"),
+                  "title": "Secret plan for widgets", "head": {"ref": "claude/4713", "sha": SHA["c"]}}
+        routes = {**GH_ROUTES, f"repos/{REPO}/pulls": [parked, *JUDGE_PULLS],
+                  f"repos/{REPO}/pulls/203/commits": [session_commit(SHA["c"], "2026-09-01T00:00:00Z")],
+                  f"repos/{REPO}/issues/203/comments": [], f"repos/{REPO}/pulls/203/comments": [],
+                  f"repos/{REPO}/pulls/203/reviews": []}
+        record, _, _ = self.judged(routes)
+        self.assertEqual(record["by_setting"], self.judged(GH_ROUTES)[0]["by_setting"])
+
+    def test_push_takes_numbers_alone_under_the_keys_the_breakdown_added(self):
+        """The branch metrics is as public as the repository, so a file with
+        words under the new keys is refused as one the judge did not write."""
+        legacy = {"schema": "sdlc-judge/1", "generated_at": NOW, "model": "claude-sonnet-5-5",
+                  "prompt_variant": "appF-7", "conversations": 1, "counts": zeros(metrics.APPF_CODES),
+                  "groups": zeros(metrics.GROUPS)}
+
+        def current(**changes):
+            return dict(legacy, window_days=30, limit=None, multi_speaker=0,
+                        by_setting=metrics.empty_judge_settings()) | changes
+
+        def rows(change):
+            settings = metrics.empty_judge_settings()
+            change(settings)
+            return settings
+
+        refused = [
+            current(by_setting=rows(lambda s: s.update({"ann-secret": s.pop("solo")}))),
+            current(by_setting=dict(reversed(metrics.empty_judge_settings().items()))),
+            current(by_setting=rows(lambda s: s["solo"].update(title="Secret title"))),
+            current(by_setting=rows(lambda s: s["solo"]["counts"].update(C9=1))),
+            current(by_setting=rows(lambda s: s["solo"]["counts"].update(C1a="secret plan"))),
+            current(by_setting=rows(lambda s: s["solo"].update(pull_requests=True))),
+            current(by_setting=rows(lambda s: s.update(solo="secret plan"))),
+            current(by_setting=list(metrics.SETTINGS)),
+            current(window_days="ann-secret's thirty days"),
+            current(multi_speaker=1.5),
+            current(limit={"why": "secret plan"}),
+            current(limit=True),
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "JUDGE.json"
+            for record in refused:
+                path.write_text(json.dumps(record))
+                with self.assertRaises(metrics.JudgeError, msg=record) as caught:
+                    metrics.judge_file(path)
+                self.assertIn("not a JUDGE.json the judge wrote", str(caught.exception))
+            for record in (legacy, current(), current(limit=20)):
+                path.write_text(json.dumps(record))
+                self.assertEqual(metrics.judge_file(path), record)
 
     def test_push_takes_a_file_judged_before_the_breakdown(self):
         legacy = {"schema": "sdlc-judge/1", "generated_at": NOW, "model": "claude-sonnet-5-5",

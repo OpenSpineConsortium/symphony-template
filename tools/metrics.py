@@ -24,9 +24,11 @@ each file, how each measure lines up with the benchmark's, and the switch.
            the repository installed the Symphony App. GITHUB_TOKEN's hour
            is the whole repository's, the board's runs among it, so a run
            stops before it would leave the board fewer requests than
-           RESERVE, says so, and writes nothing; only the changed files,
-           read last, are left unread instead, and the counts that need
-           them are null.
+           RESERVE, says so, and writes nothing. The breakdown reads only
+           once every other key is measured, so it never costs one: when
+           its reads would reach the reserve the record is written without
+           it, and when only the changed files, read last, are left, with
+           the counts that need them null.
   judge    run by a maintainer on their own machine, with their own gh and
            their own Claude Code (claude -p) on their own subscription, never
            with ANTHROPIC_API_KEY. It reads each recent pull request's
@@ -74,7 +76,7 @@ import time
 import urllib.parse
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from itertools import combinations
+from itertools import chain, combinations
 from pathlib import Path
 from typing import NamedTuple
 
@@ -184,8 +186,9 @@ MARK = re.compile(re.escape(MARK_PREFIX) + r"([0-9a-f]{7,40}|unknown)" + re.esca
 # GITHUB_TOKEN has 1,000 requests an hour for the whole repository, and
 # the board's runs draw on the same hour. A run stops before it would leave
 # fewer than this many, writes nothing, and the branch metrics keeps its
-# last record until a run that fits. Each answer's headers say how many
-# are left and when the hour turns.
+# last record until a run that fits; only the breakdown's reads, made last,
+# give way instead, and the record is written without what they would have
+# read. Each answer's headers say how many are left and when the hour turns.
 HOURLY_BUDGET = 1000
 RESERVE = 300
 REMAINING_HEADER = "X-RateLimit-Remaining"
@@ -330,22 +333,52 @@ class Budgeted(GitHub):
                 "the workflow again once it has, at a quiet moment.")
 
 
+def pull_listing(api):
+    """Every pull request, most lately updated first, one at a time. A page
+    is asked for only once the one before it is read through, so a reader
+    that stops at the window asks for no page more than it needs, and can
+    come back later to read on into the look-back."""
+    for page in api.pages(f"/repos/{api.repo}/pulls", {"state": "all", "sort": "updated", "direction": "desc"}):
+        yield from page
+
+
+def updated_since(listing, since):
+    """The pull requests the listing gives next whose last update is at or
+    after since, or unknown, and the rest of the listing from the first one
+    updated before it. GitHub lists them by last update, newest first, so
+    that one ends them; a creation, a merge, a close or a review each moves
+    the update time."""
+    found = []
+    for pull in listing:
+        updated = time_of(pull, "updated_at")
+        if updated is not None and updated < since:
+            return found, chain([pull], listing)
+        found.append(pull)
+    return found, iter(())
+
+
+def once_each(items, seen, number=lambda pull: pull["number"]):
+    """The items whose pull request has not been listed before, each from
+    its first listing, the numbers noted in seen. GitHub pages its listing
+    by page number, so an update while it is read can push a pull request
+    onto the next page a second time."""
+    found = []
+    for item in items:
+        if number(item) not in seen:
+            seen.add(number(item))
+            found.append(item)
+    return found
+
+
 def listed_pulls(api, window):
     """Every pull request changed in the window (recent), and every one
-    changed in the look-back before it (earlier). GitHub lists them by last
-    update, newest first, so the listing stops at the first one older than
-    the look-back; a creation, a merge, a close or a review in the window
-    each moves the update time into it. The look-back's pull requests are
-    read only to see what was at work beside the window's before it began."""
-    recent, earlier = [], []
-    back_to = look_back_start(window)
-    for page in api.pages(f"/repos/{api.repo}/pulls", {"state": "all", "sort": "updated", "direction": "desc"}):
-        for pull in page:
-            updated = time_of(pull, "updated_at")
-            if updated is not None and updated < back_to:
-                return recent, earlier
-            (earlier if updated is not None and updated < window.start else recent).append(pull)
-    return recent, earlier
+    changed in the look-back before it (earlier), each once. The
+    look-back's pull requests are read only to see what was at work beside
+    the window's before it began."""
+    recent, rest = updated_since(pull_listing(api), window.start)
+    earlier, _ = updated_since(rest, look_back_start(window))
+    seen = set()
+    return once_each(recent, seen), once_each(earlier, seen)
 
 
 @dataclass
@@ -444,24 +477,44 @@ def branch_claims(api, window, known):
     return found
 
 
-def comments_since(api, since):
-    """The issue and pull request comments made since a moment. GitHub's
+def window_comments(api, window):
+    """The issue and pull request comments made in the window. GitHub's
     since is the last update, so an old comment edited lately is listed and
     then left out here."""
     listed = api.get_all(f"/repos/{api.repo}/issues/comments",
-                         {"since": iso(since), "sort": "created", "direction": "asc"})
-    return [c for c in listed if (made := time_of(c, "created_at")) is not None and made >= since]
+                         {"since": iso(window.start), "sort": "created", "direction": "asc"})
+    return [c for c in listed if window.holds(time_of(c, "created_at"))]
+
+
+def look_back_comments(api, window):
+    """The comments made in the look-back, before the window. GitHub's
+    since is the last update and the listing goes from the oldest made, so
+    it starts with older comments edited lately, which are left out, and
+    ends at the first comment made in the window, which window_comments
+    already has."""
+    start = look_back_start(window)
+    found = []
+    for page in api.pages(f"/repos/{api.repo}/issues/comments",
+                          {"since": iso(start), "sort": "created", "direction": "asc"}):
+        for c in page:
+            made = time_of(c, "created_at")
+            if made is not None and made >= window.start:
+                return found
+            if made is not None and made >= start:
+                found.append(c)
+    return found
 
 
 def read_repository(api, window):
-    """Everything collect measures, read from GitHub: the window's pull
-    requests with what each holds, the claims on branches without one, the
-    comments made since the look-back began, and the look-back's pull
-    requests as listed."""
-    recent, earlier = listed_pulls(api, window)
+    """What the keys before the breakdown measure, read from GitHub in the
+    calls they always took, in the same order: the window's pull requests
+    with what each holds, the claims on branches without one and the
+    window's comments; and the listing from where it stopped, at the first
+    pull request changed before the window, for the breakdown to read on."""
+    recent, rest = updated_since(pull_listing(api), window.start)
     facts = [pull_facts(api, pull, window) for pull in recent]
     known = {n for f in facts if (n := claim_number(f.pull)) is not None}
-    return facts, branch_claims(api, window, known), comments_since(api, look_back_start(window)), earlier
+    return facts, branch_claims(api, window, known), window_comments(api, window), rest
 
 
 # --- work settings -------------------------------------------------------------
@@ -471,11 +524,12 @@ class Unit:
     """One pull request as the breakdown sorts it, held in memory only: who
     opened it ("login:" and the lowercased login, "" for an app or a bot),
     its kind, the sessions it names, its opening, the start of its work, its
-    merge and its end (None while open), its merge commit, its claim, its
-    branch (the head's repository and name), its commits' author dates,
-    whether it changed in the window, whether it is a draft, GitHub's
-    mergeability while it is open, and the reviews by others. Only start
-    changes once it is built, and units are told apart by identity."""
+    merge and its end (None while open), its merge commit, whether its base
+    is the default branch, its claim, its branch (the head's repository and
+    name), its commits' author dates, whether it counts as changed in the
+    window (window_unit), whether it is a draft, GitHub's mergeability while
+    it is open, and the reviews by others. Only start changes once it is
+    built, and units are told apart by identity."""
 
     number: int
     person: str
@@ -486,6 +540,7 @@ class Unit:
     merged: datetime
     end: datetime
     merge_sha: str
+    into_default: bool
     claim: int
     branch: tuple
     authored: tuple
@@ -498,9 +553,10 @@ class Unit:
 
 def well_formed(pull, recent):
     """Whether a pull request is a unit: opened, and ended (merged or
-    closed), or open and changed in the window. One GitHub gives no end for
-    is none, and so is one open and unchanged since before the window, which
-    is stale and at work beside nobody."""
+    closed), or open and changed in the window (recent, as window_unit
+    tells it). One GitHub gives no end for is none, and so is one open and
+    neither opened nor given a commit in the window, which is stale and at
+    work beside nobody."""
     if time_of(pull, "created_at") is None:
         return False
     if time_of(pull, "merged_at") or time_of(pull, "closed_at"):
@@ -534,6 +590,15 @@ def sessions_of(pull, commits):
     return frozenset(name for text in texts for name in session_names(text))
 
 
+def into_default_branch(pull):
+    """Whether the pull request's base is the repository's default branch,
+    which the listing says: only a merge there moves the branch the board
+    marks the others against."""
+    base = pull.get("base") or {}
+    default = (base.get("repo") or {}).get("default_branch")
+    return bool(default) and base.get("ref") == default
+
+
 def work_start(created, authored):
     """When the work began: the earliest author date of its commits, or its
     opening when that is earlier. An author date more than WORK_HORIZON
@@ -551,7 +616,8 @@ def unit_of(pull, commits, recent, reviews=(), mergeable=None, mergeable_state=N
     return Unit(number=pull["number"], person=person(pull.get("user")) or "", kind=kind_of(pull),
                 sessions=sessions_of(pull, commits), created=created, start=work_start(created, authored),
                 merged=merged, end=merged or time_of(pull, "closed_at"),
-                merge_sha=pull.get("merge_commit_sha") or "", claim=claim_number(pull),
+                merge_sha=pull.get("merge_commit_sha") or "", into_default=into_default_branch(pull),
+                claim=claim_number(pull),
                 branch=(((head.get("repo") or {}).get("full_name")) or "", head.get("ref") or ""),
                 authored=authored, recent=recent, draft=bool(pull.get("draft")), mergeable=mergeable,
                 mergeable_state=mergeable_state, reviews=tuple(reviews))
@@ -614,31 +680,52 @@ def setting_of(unit, partners):
     return "one_session"
 
 
+def window_unit(pull, commits, window, reviews=(), mergeable=None, mergeable_state=None):
+    """A pull request listed in the window as a unit, or None. An open one
+    counts as changed in the window only when it was opened or given a
+    commit in it, by its own work: the board comments on a pull request
+    behind the default branch or in conflict with it at every push there,
+    which renews GitHub's updated_at on one nobody has touched for months,
+    and it would otherwise be at work beside everything since it opened."""
+    changed = (pull.get("state") != "open" or window.holds(time_of(pull, "created_at"))
+               or any(made_in(c, window) for c in commits))
+    return unit_of(pull, commits, changed, reviews, mergeable, mergeable_state)
+
+
 def earlier_units(api, earlier, units, window):
     """The look-back's pull requests as units, beside the window's (units).
     Commits cost a call each, so they are read only for a person's pull
     request that ended more than a clock's grace after the earliest start of
     the window's people's finished or open work, since only such a one can
-    have been at work beside it; without them, a unit starts at its opening."""
+    have been at work beside it. That start is taken after the branch floor,
+    which the listing's ends and branches give without a call, so a branch
+    used again costs no call for its pull request before. Without commits,
+    a unit starts at its opening."""
+    listed = [unit_of(pull, [], False) for pull in earlier]
+    floor_starts(units + [unit for unit in listed if unit is not None])
     first = min((u.start for u in units if u.kind == PERSON and (u.end is None or window.holds(u.end))),
                 default=None)
     found = []
-    for pull in earlier:
-        if not well_formed(pull, False):
+    for pull, unit in zip(earlier, listed):
+        if unit is None:
             continue
-        end = time_of(pull, "merged_at") or time_of(pull, "closed_at")
-        partner = first is not None and kind_of(pull) == PERSON and end - first > CLOCK_GRACE
-        commits = api.get_all(f"/repos/{api.repo}/pulls/{pull['number']}/commits") if partner else []
-        found.append(unit_of(pull, commits, False))
+        if first is not None and unit.kind == PERSON and unit.end - first > CLOCK_GRACE:
+            unit = unit_of(pull, api.get_all(f"/repos/{api.repo}/pulls/{pull['number']}/commits"), False)
+        found.append(unit)
     return found
 
 
 def work_units(api, facts, earlier, window):
     """collect's units: the window's pull requests, from what was read for
-    them already, then the look-back's, then the branch floor."""
-    units = [unit for f in facts if (unit := unit_of(f.pull, f.commits, True, others_reviews(f), f.mergeable,
-                                                       f.mergeable_state)) is not None]
-    units += earlier_units(api, earlier, units, window)
+    them already, then the look-back's, then the branch floor. A pull
+    request listed twice is one unit, from its first listing, while the
+    keys before the breakdown take the listing as it came, as they always
+    have."""
+    seen = set()
+    units = [unit for f in once_each(facts, seen, lambda f: f.pull["number"])
+             if (unit := window_unit(f.pull, f.commits, window, others_reviews(f), f.mergeable,
+                                     f.mergeable_state)) is not None]
+    units += earlier_units(api, once_each(earlier, seen), units, window)
     floor_starts(units)
     return units
 
@@ -646,8 +733,9 @@ def work_units(api, facts, earlier, window):
 def judge_units(gh, recent, earlier, window):
     """The judge's units, by collect's rules: it reads nothing else of the
     pull requests, so each well-formed listed one's commits cost a call."""
-    units = [unit_of(pull, gh.get_all(f"/repos/{gh.repo}/pulls/{pull['number']}/commits"), True)
-             for pull in recent if well_formed(pull, True)]
+    units = [unit for pull in recent if well_formed(pull, True)
+             and (unit := window_unit(pull, gh.get_all(f"/repos/{gh.repo}/pulls/{pull['number']}/commits"),
+                                      window)) is not None]
     units += earlier_units(gh, earlier, units, window)
     floor_starts(units)
     return units
@@ -904,6 +992,13 @@ def at_risk(unit, when, first):
     return mark is None or when < mark[0]
 
 
+def lands(unit):
+    """Whether the unit's merge moved the default branch, the one the board
+    marks the others against: a merge into another branch, a release branch
+    say, moves nothing it marks."""
+    return unit.merged is not None and unit.into_default
+
+
 def release_times(comments):
     """(issue number, when) of each coordinator release comment, by any
     author, as counts.released_claims takes them."""
@@ -916,8 +1011,11 @@ def empty_settings():
 
 
 def add_finished(row, unit, partners, first, releases, landings, files):
-    """Count one finished unit into its setting's row."""
-    merges = [other.merged for other in landings if other is not unit]
+    """Count one finished unit into its setting's row. The landings it
+    counts are other branches': a merge of its own branch, its earlier pull
+    request's where the floor starts it, carries its own earlier work and
+    puts it at no risk."""
+    merges = [other.merged for other in landings if other.branch != unit.branch]
     mine = files.get(unit.number, frozenset())
     row["pull_requests"] += 1
     row["merged"] += unit.merged is not None
@@ -936,13 +1034,14 @@ def add_finished(row, unit, partners, first, releases, landings, files):
 
 def add_pair(row, a, b, first, files):
     """Count one pair of people's pull requests at work together into its
-    relation's row. Its landing is the merge of the first to end while the
-    other was open and before the board marked the other conflicting; its
-    conflict onset is the other's first conflicting mark naming that merge."""
+    relation's row. Its landing is the merge of the first to end into the
+    default branch, from another branch, while the other was open and
+    before the board marked the other conflicting; its conflict onset is
+    the other's first conflicting mark naming that merge."""
     early, late = sorted((a, b), key=lambda unit: (unit.end, unit.number))
     since, until = max(a.start, b.start), min(a.end, b.end)
     shared = bool(files.get(a.number, frozenset()) & files.get(b.number, frozenset()))
-    landing = (early.merged is not None and late.created <= early.merged < late.end
+    landing = (lands(early) and early.branch != late.branch and late.created <= early.merged < late.end
                and at_risk(late, early.merged, first))
     onset = landing and late.number in first and names_landing(first[late.number][1], early.merge_sha)
     row["pairs"] += 1
@@ -990,7 +1089,8 @@ def peak_counts(person_units, window):
 
 def parallel_counts(units, ended, open_units, marks, landings, window, files_unread):
     """The repository's counts of who and what was at work, over the
-    people's pull requests that ended in the window or are open now."""
+    people's pull requests that ended in the window or are open now and
+    were opened or given a commit in it."""
     population = [unit for unit in ended + open_units if unit.kind == PERSON]
     sessions_by_person, people_by_session = {}, {}
     for unit in population:
@@ -1038,7 +1138,7 @@ def breakdown(units, comments, files, files_unread, window):
     marks = conflict_marks(comments)
     first = first_marks(marks)
     releases = release_times(comments)
-    landings = [unit for unit in units if unit.merged is not None]
+    landings = [unit for unit in units if lands(unit)]
     ended = finished(units, window)
     open_units = [unit for unit in units if unit.end is None]
     by_setting = empty_settings()
@@ -1056,6 +1156,29 @@ def breakdown(units, comments, files, files_unread, window):
         null_file_counts(by_setting, pairs)
     return {"parallel": parallel_counts(units, ended, open_units, marks, landings, window, files_unread),
             "by_setting": by_setting, "pairs": pairs}
+
+
+def began_before(units, window):
+    """Whether a unit the breakdown counts, ended in the window or open,
+    began its work before the window: only then can a comment made in the
+    look-back, a mark on it or a release of its claim, bear on a count."""
+    return any(unit.start < window.start for unit in units if unit.end is None or window.holds(unit.end))
+
+
+def read_breakdown(api, facts, rest, comments, window):
+    """The breakdown, and how many changed-file lists it left unread, from
+    reads made once every other key is measured, so it never costs one: the
+    look-back's pull requests, read on from where the window's listing
+    stopped; the commits of those that can have been at work beside the
+    window's; the look-back's comments, when the window's work began before
+    it; and last the changed files. Only the changed files give way to the
+    board's reserve here; OutOfBudget from any other read is the caller's."""
+    earlier, _ = updated_since(rest, look_back_start(window))
+    units = work_units(api, facts, earlier, window)
+    if began_before(units, window):
+        comments = look_back_comments(api, window) + comments
+    files, unread = read_files(api, files_needed(units, window))
+    return breakdown(units, comments, files, unread, window), unread
 
 
 def metrics_record(measured, window, version):
@@ -1544,6 +1667,9 @@ def judge(args, environ, gh, claude, which=shutil.which, git=None, out=sys.stdou
     window = Window.ending(now, args.window_days)
     recent, earlier = listed_pulls(gh, window)
     pulls = recent[:args.limit or None]
+    # Analyses leave out a record whose limit is set, as one that judged the
+    # newest pull requests alone, so a limit that cut nothing is none.
+    limit = args.limit if args.limit is not None and len(recent) > args.limit else None
     found = [(pull, text, speakers) for pull in pulls for text, speakers in [conversation(gh, pull)] if text]
     # Every listed pull request is sorted, whatever --limit says, since its
     # setting turns on what else was at work beside it.
@@ -1553,7 +1679,7 @@ def judge(args, environ, gh, claude, which=shutil.which, git=None, out=sys.stdou
         for pull, _, speakers in found:
             add_conversation(by_setting, settings, pull, speakers)
         multi = sum(1 for _, _, speakers in found if speakers >= 2)
-        record = judge_record(claude.model, len(found), {}, now, args.window_days, args.limit, multi, by_setting)
+        record = judge_record(claude.model, len(found), {}, now, args.window_days, limit, multi, by_setting)
         return show_dry_run(claude, [text for _, text, _ in found], len(pulls), record, environ, out)
     counts, judged, unreadable, multi = {}, 0, 0, 0
     for number, (pull, text, speakers) in enumerate(found, start=1):
@@ -1568,7 +1694,7 @@ def judge(args, environ, gh, claude, which=shutil.which, git=None, out=sys.stdou
         print(f"judge: {number} of {len(found)} coded", file=sys.stderr)
     if unreadable:
         print(f"judge: {unreadable} replies were not JSON after one retry and are left out", file=sys.stderr)
-    write_json(args.out, judge_record(claude.model, judged, counts, now, args.window_days, args.limit, multi,
+    write_json(args.out, judge_record(claude.model, judged, counts, now, args.window_days, limit, multi,
                                       by_setting))
     print(f"judge: {args.out} written: {judged} conversations, counts only", file=out)
     if args.push:
@@ -1649,9 +1775,37 @@ def judge_file(path):
     # A file judged before the breakdown holds the legacy keys alone, and
     # still pushes: it was the judge's then.
     if not isinstance(record, dict) or tuple(record) not in (JUDGE_KEYS, LEGACY_JUDGE_KEYS) \
-            or record.get("schema") != JUDGE_SCHEMA:
+            or record.get("schema") != JUDGE_SCHEMA or not numbers_alone(record):
         raise JudgeError(f"{path} is not a JUDGE.json the judge wrote; run the judge first")
     return record
+
+
+def whole(value):
+    """Whether a value is a whole number as JSON writes one: true and false
+    are not, though Python counts them among its ints."""
+    return type(value) is int
+
+
+def numbers_alone(record):
+    """Whether the keys the breakdown added hold the judge's numbers in the
+    judge's shape and nothing else: the branch metrics is as public as the
+    repository, so a file carrying words under them is no judge's."""
+    if tuple(record) == LEGACY_JUDGE_KEYS:
+        return True
+    rows = record["by_setting"]
+    return (whole(record["window_days"]) and whole(record["multi_speaker"])
+            and (record["limit"] is None or whole(record["limit"]))
+            and isinstance(rows, dict) and tuple(rows) == SETTINGS and all(map(judged_row, rows.values())))
+
+
+def judged_row(row):
+    """Whether one setting's row is the judge's: its keys in order, each a
+    whole number but counts, which holds App F's codes in order, each a
+    whole number."""
+    return (isinstance(row, dict) and tuple(row) == JUDGE_SETTING_KEYS
+            and all(whole(row[key]) for key in JUDGE_SETTING_KEYS if key != "counts")
+            and isinstance(row["counts"], dict) and tuple(row["counts"]) == APPF_CODES
+            and all(map(whole, row["counts"].values())))
 
 
 def push(args, gh, git=None, out=sys.stdout):
@@ -1680,17 +1834,21 @@ def collect(args, environ, opener=None, sleep=time.sleep):
     now = parse_time(args.now) if args.now else datetime.now(timezone.utc)
     window = Window.ending(now, args.window_days)
     api = Budgeted(environ.get("GITHUB_TOKEN"), args.repo, opener=opener, sleep=sleep)
-    facts, extra_claims, comments, earlier = read_repository(api, window)
-    # The existing keys read the window's comments alone, as they always
-    # have; the breakdown reads them back to the look-back's start.
-    measured = measures(facts, extra_claims, [c for c in comments if window.holds(time_of(c, "created_at"))],
-                        window)
-    units = work_units(api, facts, earlier, window)
-    files, unread = read_files(api, files_needed(units, window))
-    measured.update(breakdown(units, comments, files, unread, window))
+    facts, extra_claims, comments, rest = read_repository(api, window)
+    measured = measures(facts, extra_claims, comments, window)
+    # The breakdown never costs a key measured before it: when its reads
+    # would reach the board's reserve, the record is written without it,
+    # the record a copy of the template from before the breakdown writes.
+    try:
+        broken_out, unread = read_breakdown(api, facts, rest, comments, window)
+    except OutOfBudget:
+        left = ("; the breakdown was left out to keep the board's reserve, so the record has no parallel, "
+                "by_setting or pairs")
+    else:
+        measured.update(broken_out)
+        left = (f"; the changed files of {unread} pull requests were left unread to keep the board's reserve, so "
+                "the counts that need them are null") if unread else ""
     write_json(args.out, metrics_record(measured, window, protocol_version()))
-    left = (f"; the changed files of {unread} pull requests were left unread to keep the board's reserve, so the "
-            "counts that need them are null") if unread else ""
     print(f"metrics: {args.out} written over {args.window_days} days, in {api.calls} calls{left}")
     return 0
 
