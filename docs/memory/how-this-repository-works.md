@@ -9,7 +9,7 @@ A claude.ai Project belongs to one account, and its memory is private to that ac
 - docs/agents/PROTOCOL.md: how an issue is claimed (the first push of the branch `claude/<issue>`), worked in the open and finished.
 - docs/agents/claims/: one file per claimed issue while it is claimed; the pull request that finishes the issue deletes it.
 - docs/agents/OWNERSHIP.md: which account owns which area.
-- docs/agents/routines/worker.md: the prompt of the routine each working account runs in its Project, which takes the next issue from the board and carries it to a pull request.
+- docs/agents/routines/worker.md: the prompt of the routine each working account runs in its Project, which takes the next issue from the board and carries it to a pull request. A routine keeps only the page's short prompt, which reads the full one, the page's last block, from the default branch on every run, so a merged change to it needs nothing pasted again; the coordinator's page works the same way.
 - docs/agents/TEAM.md: team mode, a lead that plans an epic into tasks pre-assigned to members working in parallel, run by .github/workflows/claude-lead.yml and claude-worker.yml with tools/team.py doing the clerical steps.
 - docs/agents/routines/coordinator.md: the prompt of the routine the main account runs once a second account joins, which keeps the queue, the claims and the memory tidy.
 - docs/history/: the longer records; today its README and the research behind the split into five repositories.

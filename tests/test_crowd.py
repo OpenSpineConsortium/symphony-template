@@ -1210,17 +1210,42 @@ class CrowdPrompts(unittest.TestCase):
         self.assertNotRegex(text, r"(?i)\b(commit|update|edit|write to) (\.claude/session\.md|the block)")
         self.assertIn("a checkpoint is a comment on the session's pull request, never a commit", text)
 
-    def test_doctor_fills_the_worker_prompt(self):
+    def test_doctor_fills_the_short_worker_prompt(self):
         page = copy_text("docs/agents/routines/worker.md")
         crowd_page = copy_text("docs/setup/crowd/worker.md")
         self.assertNotEqual(page, crowd_page)
         filled = crowd.worker_prompt(crowd_page, "alice", "parser")
-        self.assertIn("account:alice", filled)
-        self.assertIn("Take only issues labelled area:parser, blockers excepted.", filled)
-        self.assertNotRegex(filled, r"(?<![A-Za-z0-9])(LOGIN|AREA)(?![A-Za-z0-9])")
+        self.assertIn("your GitHub login is alice.", filled)
+        self.assertIn("Your area is parser: read AREA in that prompt as parser.", filled)
+        self.assertNotIn(crowd.NO_AREA_LINE, filled)
         anywhere = crowd.worker_prompt(crowd_page, "alice", None)
-        self.assertNotIn("area:", anywhere)
-        self.assertEqual(len(anywhere.splitlines()), len(filled.splitlines()) - 1)
+        self.assertIn("You have no area: leave out that prompt's line naming area:AREA, and take any issue.", anywhere)
+        self.assertNotIn("Your area is", anywhere)
+        for prompt in (filled, anywhere):
+            self.assertNotIn(crowd.SHORT_LOGIN, prompt)
+            self.assertNotIn(crowd.SHORT_AREA, prompt)
+            self.assertEqual(len(prompt.splitlines()), 2)
+
+    def test_each_routine_keeps_a_short_prompt_that_reads_its_full_prompt_on_every_run(self):
+        """A routine's saved prompt changes only when someone pastes it
+        again, so it holds none of the rules: every run reads the full
+        prompt, the last block of the page the routine's page lands as, from
+        the default branch, and a merged change reaches it with nothing
+        pasted."""
+        landing = {"docs/agents/routines/coordinator.md": "docs/agents/routines/coordinator.md",
+                   "docs/agents/routines/worker.md": "docs/agents/routines/worker.md",
+                   **{source: target for source, target in crowd.SHIPPED_WHOLE if "/routines/" in target}}
+        self.assertEqual(len(landing), 4)
+        for page, lands_as in landing.items():
+            with self.subTest(page=page):
+                blocks = (ROOT / page).read_text().split("```")[1::2]
+                self.assertEqual(len(blocks), 2)
+                short = blocks[0].strip("\n")
+                branch = P["DEFAULT_BRANCH"]
+                self.assertIn(f"Run `git fetch origin {branch} && git show origin/{branch}:{lands_as}` and do what "
+                              f"the last fenced block of that page says, exactly and nothing else", short)
+                self.assertIn("Read it again on every run, since it changes by pull request.", short)
+                self.assertLess(len(short), 800)
 
 
 class CrowdRuleset(unittest.TestCase):
@@ -1875,14 +1900,18 @@ class Doctor(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'", self.next_line(out))
 
-    def test_worker_fills_the_prompt_and_drops_the_area_line_without_an_area(self):
+    def test_worker_fills_the_short_prompt_with_the_line_for_its_area_or_for_none(self):
         code, out = self.doctor("--worker")
         self.assertEqual(code, 0, out)
-        self.assertIn("your account's label is account:alice", out)
-        self.assertNotIn("Take only issues labelled area:", out)
-        self.assertNotRegex(out, r"(?<![A-Za-z0-9])LOGIN(?![A-Za-z0-9])")
+        self.assertIn("with this prompt, which reads the full one from that page on every run:", out)
+        self.assertIn("your GitHub login is alice.", out)
+        self.assertIn("You have no area: leave out that prompt's line naming area:AREA, and take any issue.", out)
+        self.assertNotIn("Your area is", out)
+        self.assertNotIn(crowd.SHORT_LOGIN, out)
         code, out = self.doctor("--worker", "--area", "parser")
-        self.assertIn("Take only issues labelled area:parser, blockers excepted.", out)
+        self.assertEqual(code, 0, out)
+        self.assertIn("Your area is parser: read AREA in that prompt as parser.", out)
+        self.assertNotIn(crowd.NO_AREA_LINE, out)
 
 
 class SetupRepoScript(unittest.TestCase):

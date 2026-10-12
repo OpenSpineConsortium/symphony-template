@@ -4,7 +4,7 @@ In crowd mode each contributor runs their own worker, on their own Claude accoun
 
 ## How to make it
 
-`python3 scripts/crowd.py doctor --worker --area AREA`, run in your clone, checks your setup and prints the prompt below with your login and your area filled in; without `--area` it leaves the area line out, and the worker takes any issue. Then make it one of three ways, one worker per account:
+`python3 scripts/crowd.py doctor --worker --area AREA`, run in your clone, checks your setup and prints the short prompt below with your login and your area filled in; without `--area` it keeps the line that takes any issue. Then make it one of three ways, one worker per account:
 
 - A routine, which runs with your computer off: at https://claude.ai/code/routines, New routine, made there and not in a Project; paste the prompt and pick the model docs/project.md names; add {{REPO}}; keep the Default environment; add a schedule, hourly, a few minutes past the hour; remove every connector; Create, then Run now once and read the transcript.
 - A Desktop task on your machine: in the Desktop app's Code tab, Routines, New routine, Local; paste the prompt; permission mode Manual; your clone, with the isolated worktree on; Hourly; Run now. Always-allow only read-only commands, and answer pushes and label changes yourself.
@@ -12,7 +12,15 @@ In crowd mode each contributor runs their own worker, on their own Claude accoun
 
 ## The prompt
 
-By hand, put your GitHub login for LOGIN and your area for AREA, or leave out the line naming area:AREA to take any issue.
+Your worker's own prompt is the short one below. By hand, put your GitHub login for <login> and keep one of its last two lines: the first, with your area for <area>, or the second, to take any issue. Every run reads the full prompt, the last block on this page, from {{DEFAULT_BRANCH}}, so a change to it reaches your worker at its next run once its pull request merges, and you paste nothing again.
+
+```
+You are a worker on the repository {{REPO}}, and your GitHub login is <login>. Run `git fetch origin {{DEFAULT_BRANCH}} && git show origin/{{DEFAULT_BRANCH}}:docs/agents/routines/worker.md` and do what the last fenced block of that page says, exactly and nothing else, with your login wherever it says LOGIN. Read it again on every run, since it changes by pull request.
+Your area is <area>: read AREA in that prompt as <area>.
+You have no area: leave out that prompt's line naming area:AREA, and take any issue.
+```
+
+The full prompt, which every run reads from here:
 
 ```
 You are a worker on the repository {{REPO}}, a Claude project kept as files; your account's label is account:LOGIN. First read the board: run `git fetch origin board && git show origin/board:STATE.md`. The board is the file STATE.md on the branch board; docs/agents/STATE.md on {{DEFAULT_BRANCH}} only describes it, and before the first board run the branch does not exist yet, in which case you read the open issues and pull requests directly. Then read CLAUDE.md and docs/agents/PROTOCOL.md. Then do the following, one issue per run, and nothing else.

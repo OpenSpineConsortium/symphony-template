@@ -4,7 +4,7 @@ One routine, on the main account (the one labelled account:main), keeps the queu
 
 ## How to make it
 
-Make the routine inside the main account's Project (docs/setup/claude-project.md), not on the routines page: open the Project's own conversation, paste the prompt below and ask for the schedule ("run this every hour"). It then runs as threads of that Project, each from a fresh clone of the Project's repository, and shows on the Project's Routines tab, where a stopped routine shows too (docs/setup/github.md). A routine made at claude.ai/code/routines, outside the Project, runs on its own and not as a thread of it. Every thread of the routine clones {{DEFAULT_BRANCH}}, where docs/agents/STATE.md only describes the board, which is why the prompt's first step fetches the branch `board` and shows the file.
+Make the routine inside the main account's Project (docs/setup/claude-project.md), not on the routines page: open the Project's own conversation, paste the short prompt below and ask for the schedule ("run this every hour"). It then runs as threads of that Project, each from a fresh clone of the Project's repository, and shows on the Project's Routines tab, where a stopped routine shows too (docs/setup/github.md). A routine made at claude.ai/code/routines, outside the Project, runs on its own and not as a thread of it. Every thread of the routine clones {{DEFAULT_BRANCH}}, where docs/agents/STATE.md only describes the board, which is why the full prompt's first step fetches the branch `board` and shows the file.
 
 ## Triggers to set
 
@@ -16,7 +16,13 @@ The schedule exists from the moment the routine is made. Once it exists, open it
 
 ## The prompt
 
-Paste the text below into the Project's conversation as the routine's prompt, as it stands; {{REPO}} is already this repository's name.
+The routine's own prompt is the short one below, pasted into the Project's conversation once, as it stands; {{REPO}} is already this repository's name. Every run reads the full prompt, the last block on this page, from {{DEFAULT_BRANCH}}, so a change to it reaches the routine at its next run once its pull request merges, and nobody pastes it again.
+
+```
+You coordinate the repository {{REPO}}. Run `git fetch origin {{DEFAULT_BRANCH}} && git show origin/{{DEFAULT_BRANCH}}:docs/agents/routines/coordinator.md` and do what the last fenced block of that page says, exactly and nothing else. Read it again on every run, since it changes by pull request.
+```
+
+The full prompt, which every run reads from here:
 
 ```
 You coordinate the repository {{REPO}}, which is a Claude project kept as files. First read the board: run `git fetch origin board && git show origin/board:STATE.md`. The board is the file STATE.md on the branch board; docs/agents/STATE.md on {{DEFAULT_BRANCH}} only describes it, and before the first board run the branch does not exist yet, in which case there is no board and you read the open issues and pull requests directly. Then read CLAUDE.md, docs/agents/PROTOCOL.md (how work is claimed) and the open issues and pull requests. Then do only the following, and nothing else.

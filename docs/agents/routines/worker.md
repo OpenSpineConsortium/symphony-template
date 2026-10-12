@@ -4,11 +4,17 @@ One routine per account that should do the work itself, so nobody starts a threa
 
 ## How to make it
 
-In the Project's own conversation, paste the prompt below and ask for the schedule ("run this every hour"), as docs/setup/claude-project.md says under "The main account"; a routine made on the routines page outside the Project does not run as its threads. On Team and Enterprise, which have no Projects yet, make it at https://claude.ai/code/routines with New routine, the same prompt, the repository and a Schedule trigger. Then open it, on the Project's Routines tab or on its own page there, and add the pull request events for {{REPO}}, so a review comment or a failed check wakes it between hours. Every run that finds work spends the plan's usage, and a run that finds none costs little; the Routines tab shows each run, and a routine stops when the plan's usage is spent or after 72 hours without its GitHub connection, which nothing in the repository reports. For another account, change `account:main` in the prompt to that account's label.
+In the Project's own conversation, paste the short prompt below and ask for the schedule ("run this every hour"), as docs/setup/claude-project.md says under "The main account"; a routine made on the routines page outside the Project does not run as its threads. On Team and Enterprise, which have no Projects yet, make it at https://claude.ai/code/routines with New routine, the same short prompt, the repository and a Schedule trigger. Then open it, on the Project's Routines tab or on its own page there, and add the pull request events for {{REPO}}, so a review comment or a failed check wakes it between hours. Every run that finds work spends the plan's usage, and a run that finds none costs little; the Routines tab shows each run, and a routine stops when the plan's usage is spent or after 72 hours without its GitHub connection, which nothing in the repository reports. For another account, change `account:main` in the short prompt to that account's label.
 
 ## The prompt
 
-Paste the text below as it stands; {{REPO}} is already this repository's name.
+The routine's own prompt is the short one below, pasted once, as it stands; {{REPO}} is already this repository's name. Every run reads the full prompt, the last block on this page, from {{DEFAULT_BRANCH}}, so a change to it reaches the routine at its next run once its pull request merges, and nobody pastes it again.
+
+```
+You are a worker on the repository {{REPO}}, and your account's label is account:main. Run `git fetch origin {{DEFAULT_BRANCH}} && git show origin/{{DEFAULT_BRANCH}}:docs/agents/routines/worker.md` and do what the last fenced block of that page says, exactly and nothing else, with your own label wherever it names account:main. Read it again on every run, since it changes by pull request.
+```
+
+The full prompt, which every run reads from here:
 
 ```
 You are a worker on the repository {{REPO}}, a Claude project kept as files; your account's label is account:main. First read the board: run `git fetch origin board && git show origin/board:STATE.md`. The board is the file STATE.md on the branch board; docs/agents/STATE.md on {{DEFAULT_BRANCH}} only describes it, and before the first board run the branch does not exist yet, in which case you read the open issues and pull requests directly. Then read CLAUDE.md and docs/agents/PROTOCOL.md. Then do the following, one issue per run, and nothing else.

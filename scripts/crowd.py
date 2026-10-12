@@ -384,6 +384,13 @@ MODE_OFF_LINE = re.compile(r"^- Crowd mode: off\..*$", re.MULTILINE)
 # touch them, as in tests/test_AREA/, a letter or a digit may not.
 AREA_WORD = re.compile(r"(?<![A-Za-z0-9])AREA(?![A-Za-z0-9])")
 LOGIN_WORD = re.compile(r"(?<![A-Za-z0-9])LOGIN(?![A-Za-z0-9])")
+# The worker page's short prompt, the one a contributor's routine keeps,
+# names the login and the area as <login> and <area>, since it tells the
+# run to read LOGIN and AREA in the full prompt as them; of its two area
+# lines it keeps the one that names the area, or with none the other.
+SHORT_LOGIN = "<login>"
+SHORT_AREA = "<area>"
+NO_AREA_LINE = "You have no area"
 AREA_INIT = '"""The {area} area\'s tests, which its team reviews (.github/CODEOWNERS)."""\n'
 
 CROWD_MODE_BLOCK = "\n".join([
@@ -2609,7 +2616,7 @@ def doctor(gh, args):
     if args.worker:
         print("Next: make your worker one of the three ways docs/agents/routines/worker.md names (a routine at "
               "https://claude.ai/code/routines outside any Project, a Desktop task, or /loop in its own worktree), "
-              "with this prompt:")
+              "with this prompt, which reads the full one from that page on every run:")
         print(worker_prompt((clone / WORKER_PAGE).read_text(encoding="utf-8"), login, args.area))
     else:
         print("Next: run claude here, check that /status names your own claude.ai account, and say:")
@@ -2885,15 +2892,19 @@ def filled_names(text, login, area):
 
 
 def worker_prompt(page, login, area):
-    """The worker page's prompt with LOGIN and AREA filled, and without the
-    area line when no area is given, so the worker takes any issue."""
+    """The worker page's short prompt, the one the worker keeps, with the
+    login and the area filled in. Every run reads the full prompt, the
+    page's last block, from the default branch, so a change to it reaches
+    the worker with nothing pasted again."""
     parts = page.split("```")
-    if len(parts) < 3:
-        raise CrowdError(f"{WORKER_PAGE} has no prompt block")
-    lines = parts[-2].strip("\n").splitlines()
-    if not area:
-        lines = [line for line in lines if AREA_PREFIX + "AREA" not in line]
-    return filled_names("\n".join(lines), login, area)
+    if len(parts) < 5:
+        raise CrowdError(f"{WORKER_PAGE} has no short prompt before its full prompt")
+    lines = parts[1].strip("\n").splitlines()
+    if area:
+        lines = [line.replace(SHORT_AREA, area) for line in lines if not line.startswith(NO_AREA_LINE)]
+    else:
+        lines = [line for line in lines if SHORT_AREA not in line]
+    return "\n".join(lines).replace(SHORT_LOGIN, login)
 
 
 # The command line.
