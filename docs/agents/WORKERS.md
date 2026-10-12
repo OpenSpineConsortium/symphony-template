@@ -55,3 +55,5 @@ A worker given a task of an epic:
 ## What it costs
 
 A worker with nothing to do costs no Claude usage: the dealing, the releases and the overlaps are code. Every Claude run in Actions, the workers' and the coordinator's alike, draws on the plan of the account whose token is CLAUDE_CODE_OAUTH_TOKEN, so three workers in Actions spend it about three times as fast as one; a routine draws on its own account's plan; a person's sessions on that person's. A Max plan suits several workers in Actions better than Pro.
+
+What it costs is measured where the field metrics are on (docs/setup/metrics.md, What the work cost): every session puts what it spent on its commits, and every Claude run in Actions keeps a record of its own, so the daily metrics give the tokens, the estimated price at API rates and the time each merged pull request took, and set work done alone beside work done in parallel, with ratios over 1 where working in parallel did better.

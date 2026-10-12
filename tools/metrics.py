@@ -62,6 +62,7 @@ runs as the maintainer, signed in as themselves.
 """
 
 import argparse
+import io
 import json
 import math
 import os
@@ -73,7 +74,10 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
+import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from itertools import chain, combinations
@@ -83,8 +87,9 @@ from typing import NamedTuple
 TOOLS = Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS))
 
+import economics  # noqa: E402
 from sdlc_protocol import board, claims  # noqa: E402
-from sdlc_protocol.adapters.github import GitHub, GitHubError, settled  # noqa: E402
+from sdlc_protocol.adapters.github import TIMEOUT, USER_AGENT, GitHub, GitHubError, error_detail, settled  # noqa: E402
 
 SCHEMA = "sdlc-metrics/1"
 JUDGE_SCHEMA = "sdlc-judge/1"
@@ -134,7 +139,9 @@ PARALLEL_KEYS = ("people", "sessions", "sessions_per_person_max", "pull_requests
 # Every name in these tuples is a constant of the tool and never comes from
 # data, so the file's words are the same in every repository's.
 RECORD_KEYS = ("schema", "generated_at", "window_days", "sharing", "protocol_version", "counts",
-               "durations_seconds", "rates", "parallel", "by_setting", "pairs")
+               "durations_seconds", "rates", "parallel", "by_setting", "pairs", "economics", "coordination")
+# The keys written with the breakdown, and left out with it.
+BREAKDOWN_KEYS = RECORD_KEYS[-5:]
 
 # A check run counts as passed or failed by its conclusion; neutral,
 # skipped, cancelled, stale and action_required say neither, and a run
@@ -195,6 +202,20 @@ HOURLY_BUDGET = 1000
 RESERVE = 300
 REMAINING_HEADER = "X-RateLimit-Remaining"
 RESET_HEADER = "X-RateLimit-Reset"
+# What Claude spent in GitHub Actions comes from the record each run
+# uploads as an artifact named with this prefix (tools/usage.py). Each
+# download costs a call of the hour, so a run reads at most USAGE_LIMIT new
+# ones, newest first, and keeps what it read in the file --usage-cache
+# names, which the workflow carries from one run to the next, so the next
+# run reads only what is new; an artifact or a file bigger than
+# USAGE_MAX_BYTES is no record of ours and is left unread.
+USAGE_PREFIX = "symphony-usage-"
+USAGE_LIMIT = 200
+USAGE_MAX_BYTES = 65536
+USAGE_CACHE_VERSION = 1
+REDIRECTS = (301, 302, 303, 307, 308)
+# GitHub's revert button opens a pull request whose title starts so.
+REVERT_TITLE = 'Revert "'
 
 
 # --- time --------------------------------------------------------------------
@@ -301,6 +322,15 @@ class OutOfBudget(GitHubError):
     """The hour's requests are down to the board's reserve."""
 
 
+class Unfollowed(urllib.request.HTTPRedirectHandler):
+    """Leaves a redirect for the caller, so the address it gives is fetched
+    without the token: urllib sends a redirected request every header of
+    the first, Authorization among them, to whatever host it names."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class Budgeted(GitHub):
     """The protocol library's client with the hour's budget watched: each
     answer says how many requests are left, and the next call is refused
@@ -311,6 +341,7 @@ class Budgeted(GitHub):
     def __init__(self, token, repo, reserve=RESERVE, **kwargs):
         super().__init__(token, repo, **kwargs)
         self.reserve, self.calls, self.remaining, self.reset = reserve, 0, None, None
+        self.unfollowed = kwargs.get("opener") or urllib.request.build_opener(Unfollowed)
 
     def request(self, method, url, body=None, missing_ok=False):
         if self.remaining is not None and self.remaining <= self.reserve:
@@ -321,11 +352,57 @@ class Budgeted(GitHub):
             if problem.status == 403 and "api rate limit exceeded" in problem.detail.lower():
                 self.remaining = 0
                 raise OutOfBudget(f"GitHub refused the call ({problem.detail}); {self.refusal()}") from None
+            # A call GitHub answered with an error still spent one of the
+            # hour's requests.
+            if problem.status:
+                self.calls += 1
             raise
+        self.counted(headers)
+        return data, headers
+
+    def counted(self, headers):
         self.calls += 1
         if (remaining := header_number(headers, REMAINING_HEADER)) is not None:
             self.remaining, self.reset = remaining, header_number(headers, RESET_HEADER)
-        return data, headers
+
+    def location(self, path):
+        """Where GitHub sends the download at path, asked without following
+        the redirect, since the file is served from another host, which is
+        never sent the token; None when GitHub answers with no redirect.
+        One call of the hour, counted like any other."""
+        if self.remaining is not None and self.remaining <= self.reserve:
+            raise OutOfBudget(self.refusal())
+        request = urllib.request.Request(self.url(path), headers=self.headers())
+        try:
+            with self.unfollowed.open(request, timeout=TIMEOUT) as answer:
+                headers, target = answer.headers, None
+        except urllib.error.HTTPError as problem:
+            if problem.code not in REDIRECTS:
+                self.calls += 1
+                detail = error_detail(problem)
+                if problem.code == 403 and "api rate limit exceeded" in detail.lower():
+                    self.remaining = 0
+                    raise OutOfBudget(f"GitHub refused the call ({detail}); {self.refusal()}") from None
+                raise GitHubError(f"GET {path}: HTTP {problem.code}", problem.code, detail) from None
+            headers, target = problem.headers, problem.headers.get("Location")
+        except OSError as problem:
+            raise GitHubError(f"GET {path}: {getattr(problem, 'reason', problem)}") from None
+        self.counted(headers)
+        return target
+
+    def download(self, url, limit):
+        """The bytes at a storage address a redirect gave, fetched with no
+        token at all, or None when they are more than limit; no call of the
+        hour, since the storage host is not GitHub's API."""
+        if urllib.parse.urlsplit(url).scheme != "https":
+            raise GitHubError("a download address that is not https is not fetched")
+        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        try:
+            with self.opener.open(request, timeout=TIMEOUT) as answer:
+                data = answer.read(limit + 1)
+        except OSError as problem:
+            raise GitHubError(f"download: {getattr(problem, 'reason', problem)}") from None
+        return data if len(data) <= limit else None
 
     def refusal(self):
         back = f"at {iso(datetime.fromtimestamp(self.reset, timezone.utc))}" if self.reset else "within the hour"
@@ -1193,8 +1270,9 @@ def began_before(units, window):
 
 
 def read_breakdown(api, facts, rest, comments, window):
-    """The breakdown, and how many changed-file lists it left unread, from
-    reads made once every other key is measured, so it never costs one: the
+    """The breakdown, how many changed-file lists it left unread, and the
+    units it sorted, from reads made once every other key is measured, so
+    it never costs one: the
     look-back's pull requests, read on from where the window's listing
     stopped; the commits of those that can have been at work beside the
     window's; the look-back's comments, when the window's work began before
@@ -1206,7 +1284,157 @@ def read_breakdown(api, facts, rest, comments, window):
     if began_before(units, window):
         comments = look_back_comments(api, window) + comments
     files, unread = read_files(api, files_needed(units, window))
-    return breakdown(units, comments, files, unread, window), unread
+    return breakdown(units, comments, files, unread, window), unread, units
+
+
+# --- economics -----------------------------------------------------------------
+
+def usage_artifacts(api, since):
+    """The usage records' artifacts made since since, with when each was
+    made, newest first as GitHub lists them; expired ones are left out. The
+    listing stops at the first page made wholly before since."""
+    found = []
+    for page in api.pages(f"/repos/{api.repo}/actions/artifacts"):
+        listed = (page.get("artifacts") or []) if isinstance(page, dict) else []
+        made = [(artifact, time_of(artifact, "created_at")) for artifact in listed]
+        found += [(artifact, when) for artifact, when in made
+                  if when is not None and when >= since and not artifact.get("expired")
+                  and isinstance(artifact.get("id"), int) and str(artifact.get("name") or "").startswith(USAGE_PREFIX)]
+        if not listed or all(when is not None and when < since for _, when in made):
+            break
+    return found
+
+
+def artifact_record(api, artifact):
+    """The usage record an artifact holds, as uploaded, or None when it
+    holds none that economics.actions_record reads."""
+    if (artifact.get("size_in_bytes") or 0) > USAGE_MAX_BYTES:
+        return None
+    target = api.location(f"/repos/{api.repo}/actions/artifacts/{artifact['id']}/zip")
+    data = api.download(target, USAGE_MAX_BYTES) if target else None
+    if data is None:
+        return None
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            files = [info for info in archive.infolist() if info.filename.endswith(".json")]
+            if len(files) != 1 or files[0].file_size > USAGE_MAX_BYTES:
+                return None
+            record = json.loads(archive.read(files[0]).decode("utf-8"))
+    except (zipfile.BadZipFile, ValueError, UnicodeDecodeError):
+        return None
+    return record if economics.actions_record(record) is not None else None
+
+
+def read_usage_cache(path):
+    """The records an earlier run kept, by artifact id, each with when its
+    artifact was made; an unreadable file is an empty one."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8")) if path else None
+    except (OSError, ValueError):
+        return {}
+    entries = data.get("records") if isinstance(data, dict) and data.get("v") == USAGE_CACHE_VERSION else None
+    return {key: entry for key, entry in (entries or {}).items()
+            if isinstance(entry, dict) and parse_time(entry.get("at")) is not None
+            and economics.actions_record(entry.get("record")) is not None}
+
+
+def write_usage_cache(path, kept):
+    if path:
+        write_json(path, {"v": USAGE_CACHE_VERSION, "records": kept})
+
+
+def read_usage(api, since, cached):
+    """The usage records of the Actions runs made since since, by artifact
+    id, the cached ones taken as they are and new ones downloaded, at most
+    USAGE_LIMIT, newest first; and how many were left unread, None when the
+    artifacts could not be listed at all (a workflow without actions: read,
+    or the board's reserve reached), when only the cached ones are kept."""
+    kept = {key: entry for key, entry in cached.items() if parse_time(entry["at"]) >= since}
+    try:
+        listed = usage_artifacts(api, since)
+    except GitHubError:
+        return kept, None
+    unread = fetched = 0
+    for artifact, when in listed:
+        key = str(artifact["id"])
+        if key in kept:
+            continue
+        if fetched >= USAGE_LIMIT:
+            unread += 1
+            continue
+        try:
+            record = artifact_record(api, artifact)
+        except OutOfBudget:
+            fetched, unread = USAGE_LIMIT, unread + 1
+            continue
+        except GitHubError:
+            unread += 1
+            continue
+        fetched += 1
+        if record is not None:
+            kept[key] = {"at": iso(when), "record": record}
+    return kept, unread
+
+
+def work_of(unit, facts):
+    """A finished unit as the economics read it, with its commits and failed
+    check runs from what collect read for it."""
+    commits = facts.commits if facts else []
+    failures = sum(1 for runs in (facts.runs.values() if facts else ()) for run in runs
+                   if run.get("conclusion") in FAILED)
+    return economics.Work(unit.number, claim=unit.claim, kind=unit.kind, start=unit.start, end=unit.end,
+                          merged=unit.merged, opened=unit.created, commits=commits, check_failures=failures,
+                          first_check=first_check_passed(facts) if facts else None)
+
+
+def works_and_others(units, facts, window):
+    """The units of people and of the repository's Claude workflows: those
+    that ended in the window as works, and the rest, open or ended before
+    it, as what can have been at work beside them."""
+    by_number = {f.pull["number"]: f for f in facts}
+    works, others = [], []
+    for unit in units:
+        if unit.kind not in economics.WORKING_KINDS:
+            continue
+        if window.holds(unit.end):
+            works.append(work_of(unit, by_number.get(unit.number)))
+        else:
+            others.append(economics.Work(unit.number, kind=unit.kind, start=unit.start, end=unit.end))
+    return works, others
+
+
+def window_commits(facts, window):
+    """The commits made in the window, of every pull request read, each
+    once: they carry the trailers of what sessions spent in it."""
+    seen, found = set(), []
+    for f in facts:
+        for commit in f.commits:
+            sha = commit.get("sha")
+            if sha not in seen and window.holds(commit_time(commit, "committer")):
+                seen.add(sha)
+                found.append(commit)
+    return found
+
+
+def reverts(facts, window):
+    return sum(1 for f in facts if window.holds(time_of(f.pull, "merged_at"))
+               and str(f.pull.get("title") or "").startswith(REVERT_TITLE))
+
+
+def economic_keys(api, facts, units, window, cache_path=None):
+    """economics and coordination, from the units the breakdown sorted, the
+    commits read for them and the usage records of the Actions runs since
+    the look-back began; read after the breakdown, so they never cost a
+    key before them."""
+    kept, unread = read_usage(api, look_back_start(window), read_usage_cache(cache_path))
+    write_usage_cache(cache_path, kept)
+    entries = sorted(kept.values(), key=lambda entry: entry["at"])
+    records = [economics.actions_record(entry["record"]) for entry in entries]
+    in_window = [record for entry, record in zip(entries, records) if window.holds(parse_time(entry["at"]))]
+    works, others = works_and_others(units, facts, window)
+    return {"economics": economics.economics(works, window_commits(facts, window), in_window, records,
+                                             reverts(facts, window), unread),
+            "coordination": economics.coordination(works, records, window.end, others, in_window)}
 
 
 def metrics_record(measured, window, version):
@@ -1869,18 +2097,24 @@ def collect(args, environ, opener=None, sleep=time.sleep):
     # record is written without it, the record a copy of the template from
     # before the breakdown writes.
     try:
-        broken_out, unread = read_breakdown(api, facts, rest, comments, window)
+        broken_out, unread, units = read_breakdown(api, facts, rest, comments, window)
     except OutOfBudget:
         left = ("; the breakdown was left out to keep the board's reserve, so the record has no parallel, "
-                "by_setting or pairs")
+                "by_setting, pairs, economics or coordination")
     except GitHubError as problem:
         answer = f"HTTP {problem.status}" if problem.status else "no answer"
         left = (f"; the breakdown was left out because GitHub failed one of its reads ({answer}), so the record "
-                "has no parallel, by_setting or pairs")
+                "has no parallel, by_setting, pairs, economics or coordination")
     else:
         measured.update(broken_out)
+        measured.update(economic_keys(api, facts, units, window, args.usage_cache))
         left = (f"; the changed files of {unread} pull requests were left unread to keep the board's reserve, so "
                 "the counts that need them are null") if unread else ""
+        runs_unread = measured["economics"]["actions_runs_unread"]
+        if runs_unread is None:
+            left += "; the Actions runs' usage records could not be listed, so only those read before count"
+        elif runs_unread:
+            left += f"; {runs_unread} Actions runs' usage records were left for the next run"
     write_json(args.out, metrics_record(measured, window, protocol_version()))
     print(f"metrics: {args.out} written over {args.window_days} days, in {api.calls} calls{left}")
     return 0
@@ -1916,6 +2150,8 @@ def parse_args(argv):
     gather.add_argument("--repo", required=True, help="OWNER/NAME")
     gather.add_argument("--out", required=True, help="where METRICS.json goes")
     gather.add_argument("--root", default=".", help=f"the checkout holding {SWITCH_FILE} (default: here)")
+    gather.add_argument("--usage-cache", help="a file of the Actions runs' usage records read before, read and "
+                                              "written back, so a run downloads only the new ones")
     code = commands.add_parser("judge", help="code recent pull request conversations with your own claude -p")
     code.add_argument("--repo", help="OWNER/NAME (default: the repository gh sees here)")
     code.add_argument("--limit", type=positive,

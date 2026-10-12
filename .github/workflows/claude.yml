@@ -15,7 +15,9 @@ name: Claude
 # In crowd mode (docs/project.md, docs/setup/crowdsourcing.md) the job never
 # starts: its condition needs the repository variable CLAUDE_CROWD not to be
 # true, and a repository that never set it reads it as empty, so there the
-# condition is exactly the one before it.
+# condition is exactly the one before it. After the session the job records
+# what it spent, as workers.yml does, as an artifact the metrics workflow
+# reads (docs/setup/metrics.md, What the work cost).
 
 on:
   issue_comment:
@@ -53,10 +55,34 @@ jobs:
         if: env.HAVE_TOKEN == 'true'
         with:
           fetch-depth: 0
+      - name: Keep a copy of the usage recorder, which the run cannot move
+        if: env.HAVE_TOKEN == 'true'
+        run: cp tools/usage.py "$RUNNER_TEMP/usage.py"
       - uses: anthropics/claude-code-action@v1
+        id: claude
         if: env.HAVE_TOKEN == 'true'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
             --max-turns 50
             --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
+      - name: Record what the run spent, for the field metrics
+        if: always() && steps.claude.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+          SDLC_METRICS: ${{ vars.SDLC_METRICS }}
+          ISSUE_NUMBER: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          PULL_NUMBER: ${{ github.event.pull_request.number || (github.event.issue.pull_request && github.event.issue.number) || '' }}
+        run: >-
+          python3 "$RUNNER_TEMP/usage.py" actions --root "$GITHUB_WORKSPACE"
+          --execution-file "${EXECUTION_FILE:-$RUNNER_TEMP/claude-execution-output.json}"
+          --out "$RUNNER_TEMP/symphony-usage/record.json" --workflow claude --job claude --issue "$ISSUE_NUMBER" --pull "$PULL_NUMBER"
+      - name: Keep the record where the metrics workflow reads it
+        if: always() && steps.claude.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: symphony-usage-${{ github.run_id }}-${{ github.run_attempt }}-claude
+          path: ${{ runner.temp }}/symphony-usage/record.json
+          if-no-files-found: ignore

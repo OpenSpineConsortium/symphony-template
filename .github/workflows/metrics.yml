@@ -4,9 +4,15 @@ name: Metrics
 # ran here over the last 30 days, in aggregates only: counts of claims, pull
 # requests, merges, reviews, check runs, conflicts, released claims and
 # contributors, the median and 90th percentile of three waits, and two
-# rates, and the same pull requests counted by work setting and in pairs
-# (who worked beside whom, by person and Claude Code session);
-# docs/setup/metrics.md lists every key and how each lines up with what
+# rates, the same pull requests counted by work setting and in pairs (who
+# worked beside whom, by person and Claude Code session), and what the work
+# cost in tokens and estimated dollars, with work done alone set beside
+# work done in parallel (economics and coordination); the costs come from
+# the Symphony-Usage trailers sessions put on their commits and the usage
+# records the Claude workflows upload as artifacts, which actions: read
+# lets the run list and download, and GitHub's Actions cache carries the
+# records read so far to the next run, so each run downloads only the new
+# ones; docs/setup/metrics.md lists every key and how each lines up with what
 # coordbench and CooperBench measure. tools/metrics.py collect reads them
 # from the REST API with GITHUB_TOKEN alone and writes no name, login,
 # session link, title, branch name, file name, URL, issue number or text,
@@ -69,6 +75,7 @@ permissions:
   pull-requests: read
   issues: read
   checks: read
+  actions: read
 
 concurrency:
   group: metrics
@@ -101,12 +108,37 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # The Actions runs' usage records read so far, so this run downloads
+      # only the new ones (docs/setup/metrics.md, What the work cost). The
+      # key is this run's and the restore takes the newest earlier one; a
+      # missing cache only means the next run reads more.
+      - name: Restore the usage records read before
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/usage-records.json
+          key: symphony-usage-records-${{ github.run_id }}
+          restore-keys: symphony-usage-records-
+
       - name: Collect the aggregates
         if: steps.gate.outputs.skip != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SDLC_METRICS: ${{ vars.SDLC_METRICS }}
-        run: python3 tools/metrics.py collect --repo "$GITHUB_REPOSITORY" --out "$RUNNER_TEMP/METRICS.json"
+        run: >-
+          python3 tools/metrics.py collect --repo "$GITHUB_REPOSITORY" --out "$RUNNER_TEMP/METRICS.json"
+          --usage-cache "$RUNNER_TEMP/usage-records.json"
+
+      # A run that wrote no records file (sharing off, or the breakdown left
+      # out with nothing restored) has nothing to keep; the save then only
+      # warns, and never fails the run.
+      - name: Keep the usage records for the next run
+        if: steps.gate.outputs.skip != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/usage-records.json
+          key: symphony-usage-records-${{ github.run_id }}
 
       - name: Write METRICS.json to the branch metrics when it changed
         if: steps.gate.outputs.skip != 'true'
