@@ -146,8 +146,9 @@ FAILED = {"failure", "timed_out"}
 CLOCK_GRACE = timedelta(seconds=60)
 # The coordinator routine starts every release comment with this line
 # (docs/agents/routines/coordinator.md, step 2), so releases can be counted
-# without reading what the comment says.
-RELEASE_MARKER = "<!-- sdlc-coordinator: claim-released -->"
+# without reading what the comment says. It is the vendored protocol's, the
+# line its board renames a released claim's branch on.
+RELEASE_MARKER = claims.RELEASE_MARKER
 # The board's "main moved" comment carries a marker and says "behind" or
 # "conflicting with"; only the second is a conflict. Both pieces come from
 # the vendored board, so a change of its words there changes them here.
@@ -861,6 +862,30 @@ def conflicts(facts, comments):
     return len((dirty | marked) - {None})
 
 
+def released_claims(comments):
+    """How many claims were released: the comments that open with the
+    release marker (claims.starts_with_release_marker), where one on an
+    issue that had another less than a day before is the same release said
+    again and is not counted twice. An hourly coordinator said it again
+    before it learnt to skip a claim it had released; a later claim on the
+    issue cannot be released within a day of the last release, since it
+    must go a day without a commit first. Whoever wrote the comment counts:
+    the board asks GitHub whether an author may write, which a count need
+    not, and the workflow's token may show the owner's account, a private
+    member of the organization, as a mere contributor."""
+    times = {}
+    for c in comments:
+        number, when = issue_number(c), time_of(c, "created_at")
+        if claims.starts_with_release_marker(c) and number is not None and when is not None:
+            times.setdefault(number, []).append(when)
+    count = 0
+    for found in times.values():
+        found.sort()
+        count += sum(1 for before, after in zip([None] + found, found)
+                     if before is None or after - before > claims.IDLE_AFTER)
+    return count
+
+
 def window_runs(facts, window):
     """The check runs on the window's commits that finished in the window,
     each once: a commit in two pull requests brings its runs twice."""
@@ -945,7 +970,7 @@ def measures(facts, extra_claims, comments, window):
         sum(1 for r in runs if r.get("conclusion") in PASSED),
         sum(1 for r in runs if r.get("conclusion") in FAILED),
         conflicts(facts, comments),
-        sum(1 for c in comments if RELEASE_MARKER in (c.get("body") or "")),
+        released_claims(comments),
         contributors(facts, window),
     )))
     durations = dict(zip(DURATION_KEYS, (*summary(claim_waits(opened)), *summary(merge_waits(merged)),
@@ -1001,9 +1026,10 @@ def lands(unit):
 
 def release_times(comments):
     """(issue number, when) of each coordinator release comment, by any
-    author, as counts.released_claims takes them."""
+    author, as counts.released_claims takes them: those that open with the
+    marker (claims.starts_with_release_marker)."""
     return [(issue_number(c), when) for c in comments
-            if RELEASE_MARKER in (c.get("body") or "") and (when := time_of(c, "created_at")) is not None]
+            if claims.starts_with_release_marker(c) and (when := time_of(c, "created_at")) is not None]
 
 
 def empty_settings():
@@ -1289,10 +1315,10 @@ REVIEW_WORDS = {"APPROVED": "review: approved", "CHANGES_REQUESTED": "review: ch
 HEADER = ("Conversation of a pull request: {count} messages in time order, each as [message id] time sender -> "
           "recipient (all for a broadcast): content. The people are named A, B, C and so on in the order they "
           "first speak; bot is any app or bot account.")
-# The protocol's own comments are posted again and again by design: the
-# board's "main moved" on every move of the default branch, its "idle" on
-# every quiet day, the coordinator's release. They are nobody's words, and
-# App F would read them as spammy repetition, so they stay out.
+# The protocol's own comments are posted by rule: the board's "main moved"
+# on every move of the default branch and its "idle" on every quiet day,
+# again and again, and the coordinator's release. They are nobody's words,
+# and App F would read them as spammy repetition, so they stay out.
 PROTOCOL_MARKERS = (MAIN_MOVED_PREFIX, board.IDLE_MARKER, RELEASE_MARKER)
 
 

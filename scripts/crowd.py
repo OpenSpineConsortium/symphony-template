@@ -2438,8 +2438,10 @@ def list_leftovers(ctx, login):
     for branch in claims:
         print(f"claim {branch}: held by {login}")
     if pulls or claims:
-        print(f"To release a claim: close its pull request with a comment naming released/N, rename the branch to "
-              f"released/N at {ctx.page('branches')}, and remove the label account:{login} from the issue.")
+        print(f"To release a claim now: close its pull request with a comment naming released/N-SHA, SHA being the "
+              f"first seven characters of its head commit, rename the branch to that name at {ctx.page('branches')}, "
+              f"and remove the labels claimed and account:{login} from the issue. A claim idle for a day the "
+              f"coordinator releases and the board renames by themselves.")
     else:
         print(f"{login}: no open pull request and no claim")
 
