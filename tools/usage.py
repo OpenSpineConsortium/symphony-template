@@ -61,7 +61,11 @@ sys.path.insert(0, str(TOOLS))
 
 TRAILER_KEY = "Symphony-Usage"
 TRAILER_VERSION = "v1"
-TRAILER_LINE = re.compile(r"(?im)^[ \t]*symphony-usage:[ \t]*v1[ \t]+(.+?)[ \t]*$")
+# The trailer's line, its value read to the line's end and split on
+# blanks: a lazy value followed by optional blanks before the end of the
+# line would be tried at every blank of a long run of them, and anyone who
+# can push writes a commit's message, which the metrics run reads.
+TRAILER_LINE = re.compile(r"(?im)^[ \t]*symphony-usage:[ \t]*v1[ \t]+(.+)$")
 # The five counts of a model's usage, in the order the trailer writes them.
 FIELDS = ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output")
 # A pause longer than this between two lines of a transcript is time
