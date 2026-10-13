@@ -372,7 +372,7 @@ class Budgeted(GitHub):
         if self.remaining is not None and self.remaining <= self.reserve:
             raise OutOfBudget(self.refusal())
         try:
-            data, headers = self.library_request(method, url, body, missing_ok)
+            data, headers = super().request(method, url, body, missing_ok)
         except GitHubError as problem:
             if problem.status == 403 and "api rate limit exceeded" in problem.detail.lower():
                 self.remaining = 0
@@ -384,25 +384,6 @@ class Budgeted(GitHub):
             raise
         self.counted(headers)
         return data, headers
-
-    def library_request(self, method, url, body, missing_ok):
-        """The library's request, with what http.client raises in it said as
-        a GitHubError, the way symphony-protocol's own fix to its request,
-        not yet vendored here, says it. The request catches urllib's errors
-        and OSError, but http.client's own, for an answer that is not HTTP
-        (BadStatusLine) or one cut short (IncompleteRead), are neither, and
-        urllib passes them on as they are, past every caller that makes a
-        GitHubError one line of the record: the listing of the usage
-        records, the breakdown's reads. One raised as the library read
-        GitHub's words on a refusal is that refusal, with no words."""
-        try:
-            return super().request(method, url, body, missing_ok)
-        except http.client.HTTPException as problem:
-            where = f"{method} {urllib.parse.urlsplit(url).path}"
-            refused = problem.__context__
-            if isinstance(refused, urllib.error.HTTPError):
-                raise GitHubError(f"{where}: HTTP {refused.code}", refused.code, "") from None
-            raise GitHubError(f"{where}: {problem!r}") from None
 
     def counted(self, headers):
         self.calls += 1

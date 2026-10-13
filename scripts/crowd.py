@@ -2250,8 +2250,13 @@ def claim_account_of(text):
 
 
 def claim_branches(ctx):
+    """The claim branches, by the library's rule (claims.number_of): GitHub's
+    first-push lock holds per name, so only claude/N as the claim skill
+    writes it holds issue N, and claude/03 or a name in other digits holds
+    nothing and is not read as a claim."""
+    from sdlc_protocol.claims import number_of
     return [branch["name"] for branch in ctx.gh.pages(f"repos/{ctx.repo}/branches")
-            if re.match(r"^claude/\d+$", branch["name"])]
+            if number_of(branch.get("name") or "") is not None]
 
 
 def audit_claim_pushes(ctx):

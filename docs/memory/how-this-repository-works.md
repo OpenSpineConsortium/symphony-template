@@ -5,7 +5,7 @@ A claude.ai Project belongs to one account, and its memory is private to that ac
 - CLAUDE.md and .claude/rules/: the instructions, read by Claude Code at the start of every session, local or cloud. CLAUDE.md imports docs/project.md, docs/agents/PROTOCOL.md and docs/memory/MEMORY.md with `@` lines, so the goal, the protocol and the memory index load into every session without being asked for.
 - docs/project.md: the goal, the scope, the repositories, the model and effort, the owners.
 - docs/memory/: the shared memory, one fact per file, with the index in MEMORY.md.
-- The board: the file STATE.md on the branch `board`, rewritten by .github/workflows/board.yml from the open issues, the `claude/<issue>` branches, the claim files and the pull requests, and never edited by hand. Read it with `git fetch origin board && git show origin/board:STATE.md`, which the session hook does at the start of every session; docs/agents/STATE.md on the default branch only describes its layout.
+- The board: the file STATE.md on the branch `board`, rewritten by .github/workflows/board.yml from the open issues, the `claude/<issue>` branches, the claim files and the pull requests, and never edited by hand. Read it with `git fetch origin +refs/heads/board:refs/remotes/origin/board && git show origin/board:STATE.md`, which the session hook does at the start of every session; docs/agents/STATE.md on the default branch only describes its layout.
 - docs/agents/PROTOCOL.md: how an issue is claimed (the first push of the branch `claude/<issue>`), worked in the open and finished.
 - docs/agents/claims/: one file per claimed issue while it is claimed; the pull request that finishes the issue deletes it.
 - docs/agents/OWNERSHIP.md: which worker owns which area.

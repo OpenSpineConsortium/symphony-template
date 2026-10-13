@@ -4,8 +4,9 @@ name: Board
 # GitHub knows: the open issues, the claude/<issue> branches and their claim
 # files, the open pull requests with how far each is from the default
 # branch, and the five pull requests merged last. Every Claude session and
-# every account reads it before claiming work (git fetch origin board &&
-# git show origin/board:STATE.md; the session hook prints it).
+# every account reads it before claiming work (git fetch origin
+# +refs/heads/board:refs/remotes/origin/board && git show
+# origin/board:STATE.md; the session hook prints it).
 # tools/board.py renders it from the REST API with GITHUB_TOKEN alone (no
 # other secret is needed) and puts no wall-clock value in it, so the file
 # changes only when the repository did, and only then is it written. The
@@ -18,9 +19,11 @@ name: Board
 # made with GITHUB_TOKEN starts no workflow, so this run cannot start itself
 # again. Before the board is rendered, the same run is the coordinator's
 # code (docs/agents/WORKERS.md): it releases each claim whose branch has
-# gone a day without a commit, with a comment on its issue saying why,
-# whose, what the branch holds and the plan, then takes claimed and the
-# worker's label off; and it tells each piece of open work about other work
+# gone a day without a commit, first taking claimed and the worker's label
+# off, then commenting on its issue why, whose, what the branch holds and
+# the plan, and putting the labels back when the comment fails, so the
+# issue is as it was and the next run starts the release over; and it
+# tells each piece of open work about other work
 # that changes the same files, once per new piece; the board shows those
 # files under Overlaps. The run comments once on a pull request that fell
 # behind the default branch after a push to it, and once on a pull request

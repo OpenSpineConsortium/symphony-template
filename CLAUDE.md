@@ -7,7 +7,7 @@ This repository is a Claude project kept as files: its instructions, its goal, i
 - The goal, the scope and who owns what, loaded into every session by this line: @docs/project.md
 - How work is claimed, done in the open and finished, loaded the same way: @docs/agents/PROTOCOL.md
 - Who works here: every session, routine and worker in GitHub Actions is a worker under a name of its own, labelled worker:<name> (docs/agents/WORKERS.md). A session's name is the GitHub login of the person it works for, unless its environment sets SYMPHONY_WORKER; a routine's or a worker in Actions' is the one its prompt gives.
-- The board: the file STATE.md on the branch `board`, rewritten by the board workflow from the open issues, the claim branches and the pull requests. It lives on another branch, which no import reaches: read it with `git fetch origin board && git show origin/board:STATE.md`; the session hook prints it at the start of every session, and docs/agents/STATE.md on {{DEFAULT_BRANCH}} only describes it.
+- The board: the file STATE.md on the branch `board`, rewritten by the board workflow from the open issues, the claim branches and the pull requests. It lives on another branch, which no import reaches: read it with `git fetch origin +refs/heads/board:refs/remotes/origin/board && git show origin/board:STATE.md`, the form /board uses, since `git fetch origin board` updates no remote-tracking branch in a clone made for one branch, as a cloud session's is; the session hook prints it at the start of every session, and docs/agents/STATE.md on {{DEFAULT_BRANCH}} only describes it.
 
 Before any work: fetch, read the board, check the claim on the issue you mean to take. One issue, one branch `claude/<issue>`, one pull request.
 
