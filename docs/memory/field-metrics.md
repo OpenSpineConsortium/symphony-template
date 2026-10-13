@@ -6,7 +6,9 @@ counts, medians and 90th percentiles in seconds, and two rates, under the
 keys docs/setup/metrics.md lists and no other; tests/test_metrics.py fails
 when a key, a name, a title, a branch or a body from its fixtures reaches
 the file. Off from the file or the variable writes {"schema":
-"sdlc-metrics/1", "sharing": "off"} and calls no API.
+"sdlc-metrics/1", "sharing": "off"} and calls no API; the file is read
+under its name before the rename too, .github/sdlc-metrics, and an off in
+either file wins over an on in the other.
 
 collect also sorts the pull requests that ended in the window into eight
 work settings and four kinds of pairs, by the opener's login and the

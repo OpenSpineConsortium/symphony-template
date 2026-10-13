@@ -50,10 +50,12 @@ each file, how each measure lines up with the benchmark's, and the switch.
   unchanged OLD NEW  exit 0 when two METRICS.json files differ in nothing
            but generated_at, so the workflow writes only when something moved.
 
-The switch: sharing is on unless the file .github/symphony-metrics or the
-repository variable SDLC_METRICS (handed to the workflow's environment)
-says otherwise. Off from either wins, and an off run writes exactly
-{"schema": "sdlc-metrics/1", "sharing": "off"} without a single API call.
+The switch: sharing is on unless the file .github/symphony-metrics (or
+.github/sdlc-metrics, its name before the rename, which a repository set up
+before it carries) or the repository variable SDLC_METRICS (handed to the
+workflow's environment) says otherwise. Off from any of them wins, and an
+off run writes exactly {"schema": "sdlc-metrics/1", "sharing": "off"}
+without a single API call.
 
 Standard library only, like every tool here. GitHub's REST calls go through
 the vendored protocol library's client, the one the board uses, so there is
@@ -279,9 +281,13 @@ def first_word(text):
 
 def sharing(root, environ):
     """'on' or 'off'. The variable turns sharing off with any word but on,
-    and says nothing when empty; the file says on only with the word on
-    first, is on when missing, and is off when it says anything else or
-    cannot be read. Each doubt falls to off, since off shares nothing."""
+    and says nothing when empty; the file, under its name or its old one,
+    says on only with the word on first, says nothing when missing, and is
+    off when it says anything else or cannot be read. Off from any of them
+    wins, and none saying anything is on: a repository set up before the
+    rename may carry both files, and an off in either is the owner's word,
+    which an on in the other never lifts. Each doubt falls to off, since
+    off shares nothing."""
     said = first_word(environ.get(SWITCH_VARIABLE))
     if said and said != ON:
         return OFF
@@ -292,7 +298,8 @@ def sharing(root, environ):
             continue
         except (OSError, UnicodeDecodeError):
             return OFF
-        return ON if first_word(text) == ON else OFF
+        if first_word(text) != ON:
+            return OFF
     return ON
 
 
@@ -2085,7 +2092,8 @@ def push(args, gh, git=None, out=sys.stdout):
 def collect(args, environ, opener=None, sleep=time.sleep):
     if sharing(args.root, environ) == OFF:
         write_json(args.out, OFF_RECORD)
-        print(f"metrics: sharing is off ({SWITCH_FILE} or {SWITCH_VARIABLE}); {args.out} says so and nothing else")
+        print(f"metrics: sharing is off ({SWITCH_FILE}, {OLD_SWITCH_FILE} or {SWITCH_VARIABLE}); {args.out} says so"
+              " and nothing else")
         return 0
     now = parse_time(args.now) if args.now else datetime.now(timezone.utc)
     window = Window.ending(now, args.window_days)

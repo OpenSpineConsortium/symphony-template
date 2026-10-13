@@ -302,10 +302,12 @@ class Switch(unittest.TestCase):
         self.assertEqual(record, {"schema": "sdlc-metrics/1", "sharing": "off"})
         self.assertEqual(list(record), ["schema", "sharing"])
 
-    def test_the_switch_under_its_old_name_still_counts_and_the_new_name_wins(self):
-        """A repository set up before the rename carries .github/sdlc-metrics;
-        it is read when the new file is absent, and the new file decides
-        when both are there."""
+    def test_the_switch_under_its_old_name_still_counts_and_off_in_either_wins(self):
+        """A repository set up before the rename carries .github/sdlc-metrics,
+        and one adopted again since may carry both files: an off in either is
+        the owner's word, which an on in the other never lifts, so the run
+        writes off and calls nothing; only both saying on, or one saying on
+        with the other missing, shares."""
         with tempfile.TemporaryDirectory() as folder:
             switch(folder, "off\n", name="sdlc-metrics")
             code, record, _ = collect(folder, {"GITHUB_TOKEN": "t"}, NoCalls())
@@ -313,7 +315,16 @@ class Switch(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             switch(folder, "off\n", name="sdlc-metrics")
             switch(folder, "on\n")
-            self.assertEqual(metrics.sharing(folder, {}), metrics.ON)
+            self.assertEqual(metrics.sharing(folder, {}), metrics.OFF)
+            code, record, _ = collect(folder, {"GITHUB_TOKEN": "t"}, NoCalls())
+        self.assertEqual((code, record), (0, metrics.OFF_RECORD))
+        for new, old, said in (("off\n", "on\n", metrics.OFF), ("on\n", "maybe\n", metrics.OFF),
+                               ("on\n", "on\n", metrics.ON), (None, "on\n", metrics.ON)):
+            with self.subTest(new=new, old=old), tempfile.TemporaryDirectory() as folder:
+                if new is not None:
+                    switch(folder, new)
+                switch(folder, old, name="sdlc-metrics")
+                self.assertEqual(metrics.sharing(folder, {}), said)
 
     def test_off_in_the_variable_wins_over_on_in_the_file_and_needs_no_token(self):
         with tempfile.TemporaryDirectory() as folder:

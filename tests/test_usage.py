@@ -270,6 +270,15 @@ class Switch(unittest.TestCase):
             (Path(folder) / ".github").mkdir()
             (Path(folder) / ".github" / "sdlc-metrics").write_text("off\n", encoding="ascii")
             self.assertTrue(usage.sharing_off(folder, {}))
+        # Both names at once, as in a repository adopted again since the
+        # rename: an off in either wins, as tools/metrics.py reads them.
+        for new, old in (("on\n", "off\n"), ("off\n", "on\n"), ("on\n", "on\n")):
+            with self.subTest(new=new, old=old), tempfile.TemporaryDirectory() as folder:
+                (Path(folder) / ".github").mkdir()
+                (Path(folder) / usage.SWITCH_FILE).write_text(new, encoding="ascii")
+                (Path(folder) / ".github" / "sdlc-metrics").write_text(old, encoding="ascii")
+                self.assertEqual(usage.sharing_off(folder, {}), "off" in (new.strip(), old.strip()))
+                self.assertEqual(usage.sharing_off(folder, {}), metrics.sharing(folder, {}) == metrics.OFF)
 
 
 class Wiring(unittest.TestCase):
