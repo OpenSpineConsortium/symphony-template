@@ -345,10 +345,15 @@ class OutOfBudget(GitHubError):
 class Unfollowed(urllib.request.HTTPRedirectHandler):
     """Leaves a redirect for the caller, so the address it gives is fetched
     without the token: urllib sends a redirected request every header of
-    the first, Authorization among them, to whatever host it names."""
+    the first, Authorization among them, to whatever host it names. It
+    reads nothing of the redirect, not even its address, which urllib
+    parses before asking whether to follow it and raises ValueError on
+    when it cannot, leaving the answer open: the caller reads it."""
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+    def http_error_302(self, req, fp, code, msg, headers):
         return None
+
+    http_error_301 = http_error_303 = http_error_307 = http_error_308 = http_error_302
 
 
 class Budgeted(GitHub):
@@ -367,7 +372,7 @@ class Budgeted(GitHub):
         if self.remaining is not None and self.remaining <= self.reserve:
             raise OutOfBudget(self.refusal())
         try:
-            data, headers = super().request(method, url, body, missing_ok)
+            data, headers = self.library_request(method, url, body, missing_ok)
         except GitHubError as problem:
             if problem.status == 403 and "api rate limit exceeded" in problem.detail.lower():
                 self.remaining = 0
@@ -379,6 +384,25 @@ class Budgeted(GitHub):
             raise
         self.counted(headers)
         return data, headers
+
+    def library_request(self, method, url, body, missing_ok):
+        """The library's request, with what http.client raises in it said as
+        a GitHubError, the way symphony-protocol's own fix to its request,
+        not yet vendored here, says it. The request catches urllib's errors
+        and OSError, but http.client's own, for an answer that is not HTTP
+        (BadStatusLine) or one cut short (IncompleteRead), are neither, and
+        urllib passes them on as they are, past every caller that makes a
+        GitHubError one line of the record: the listing of the usage
+        records, the breakdown's reads. One raised as the library read
+        GitHub's words on a refusal is that refusal, with no words."""
+        try:
+            return super().request(method, url, body, missing_ok)
+        except http.client.HTTPException as problem:
+            where = f"{method} {urllib.parse.urlsplit(url).path}"
+            refused = problem.__context__
+            if isinstance(refused, urllib.error.HTTPError):
+                raise GitHubError(f"{where}: HTTP {refused.code}", refused.code, "") from None
+            raise GitHubError(f"{where}: {problem!r}") from None
 
     def counted(self, headers):
         self.calls += 1
@@ -424,17 +448,26 @@ class Budgeted(GitHub):
         unread: http.client raises its own IncompleteRead, which is no
         OSError, for one sent in chunks and its BadStatusLine for one that
         is not HTTP, and gives what came of one whose length it was told,
-        read up to a limit, without a word."""
-        if urllib.parse.urlsplit(url).scheme != "https":
-            raise GitHubError("a download address that is not https is not fetched")
-        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        read up to a limit, without a word. The address is fetched only
+        over https and asked, as location asks, without following a
+        redirect, which would take it wherever the storage host said, plain
+        http among the places; and an address urllib cannot read, where it
+        raises ValueError, is a GitHubError too."""
         try:
-            with self.opener.open(request, timeout=TIMEOUT) as answer:
+            if urllib.parse.urlsplit(url).scheme != "https":
+                raise GitHubError("a download address that is not https is not fetched")
+            request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with self.unfollowed.open(request, timeout=TIMEOUT) as answer:
                 data, told = answer.read(limit + 1), header_number(answer.headers, "Content-Length")
+        except urllib.error.HTTPError as problem:
+            problem.close()
+            raise GitHubError(f"download: HTTP {problem.code}") from None
         except OSError as problem:
             raise GitHubError(f"download: {getattr(problem, 'reason', problem)}") from None
         except http.client.HTTPException as problem:
             raise GitHubError(f"download: {problem!r}") from None
+        except ValueError as problem:
+            raise GitHubError(f"download: an address urllib cannot read ({problem})") from None
         if told is not None and len(data) < min(told, limit + 1):
             raise GitHubError(f"download: the answer was cut short, {len(data)} of {told} bytes")
         return data if len(data) <= limit else None
