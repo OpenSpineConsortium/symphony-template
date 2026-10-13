@@ -35,7 +35,7 @@ When the board moves and a routine, a worker's or the coordinator's, no longer a
 
 ## 5. Secret scanning and push protection
 
-Under Code security, turn on secret scanning and push protection. They are the first line: GitHub refuses a push that carries a token it recognises before anything else runs. The repository's own check (tools/check_docs.py, run by scripts/check.sh) looks for the shapes of common secrets in tracked text files as the second line. Neither replaces the rule: no credential, no token and no API key in this repository, ever.
+Under Code security, turn on secret scanning and push protection. A public repository has both free; a private one has them only through the paid add-on GitHub Secret Protection, which an organization on Team or Enterprise Cloud can buy and a personal account cannot (docs/setup/free-or-paid.md), so there the check below is the only line. Where they are on, they are the first line: GitHub refuses a push that carries a token it recognises before anything else runs. The repository's own check (tools/check_docs.py, run by scripts/check.sh) looks for the shapes of common secrets in tracked text files as the second line. Neither replaces the rule: no credential, no token and no API key in this repository, ever.
 
 ## 6. Dependabot
 
