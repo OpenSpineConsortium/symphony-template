@@ -22,7 +22,13 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import usage  # noqa: E402
 
-QUIET = {key: value for key, value in os.environ.items() if not key.startswith("GIT_") and key != "GITHUB_ACTIONS"}
+# The environment the commit tests run in: without git's own variables, which
+# would point the hooks' git at another repository, and without the two the
+# tool reads to decide whether to record at all, GitHub Actions and the
+# metrics switch, which a person may have turned off in their own shell, as
+# usage.py's docstring tells them to; a test that wants either sets it itself.
+QUIET = {key: value for key, value in os.environ.items()
+         if not key.startswith("GIT_") and key not in ("GITHUB_ACTIONS", usage.SWITCH_VARIABLE)}
 
 
 def assistant(message_id, model, usage_fields, at="2026-10-12T10:00:00Z"):
@@ -211,8 +217,11 @@ class AnActionsRun(unittest.TestCase):
             execution = Path(folder) / "claude-execution-output.json"
             execution.write_text(json.dumps(self.MESSAGES), encoding="utf-8")
             out = Path(folder) / "usage" / "record.json"
+            # The switch that counts is the one in the checkout --root names,
+            # here a folder with no switch file, which is on, whatever the
+            # repository running this test has turned its own to.
             argv = ["actions", "--execution-file", str(execution), "--out", str(out), "--workflow", "workers",
-                    "--job", "worker", "--worker", "nightly", "--issue", "12", "--pull", ""]
+                    "--job", "worker", "--worker", "nightly", "--issue", "12", "--pull", "", "--root", folder]
             with mock.patch("sys.stdout", io.StringIO()) as printed:
                 self.assertEqual(usage.main(argv, environ={}), 0)
             self.assertIn("68 tokens", printed.getvalue())
@@ -228,6 +237,12 @@ class AnActionsRun(unittest.TestCase):
             with mock.patch("sys.stdout", io.StringIO()) as printed:
                 self.assertEqual(usage.main(missing, environ={}), 0)
             self.assertIn("no execution file", printed.getvalue())
+            (Path(folder) / ".github").mkdir()
+            (Path(folder) / usage.SWITCH_FILE).write_text("off\n", encoding="ascii")
+            with mock.patch("sys.stdout", io.StringIO()) as printed:
+                self.assertEqual(usage.main(argv, environ={}), 0)
+            self.assertFalse(out.exists(), "the switch of the checkout --root names says off")
+            self.assertIn("switch is off", printed.getvalue())
 
 
 class NeverInTheWay(unittest.TestCase):
