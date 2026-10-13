@@ -10,11 +10,12 @@ Anthropic's rule (code.claude.com/docs/en/claude-projects, read
 What stands on GitHub holds whatever the session runs: the default
 branch's ruleset, the claim lock (GitHub refuses the second push of a
 branch's name) and the required check. /board and the claim skill load in
-every repository and fetch the board with
-`git fetch origin +refs/heads/board:refs/remotes/origin/board`, the form
-CLAUDE.md, docs/agents/PROTOCOL.md and .claude/rules/board.md give too,
-since `git fetch origin board` updates no remote-tracking branch in a
-clone made for one branch, as a cloud session's is.
+every repository and read the board by forms that work in a clone made
+for one branch, as a cloud session's is, where `git fetch origin board`
+alone updates no remote-tracking branch: /board fetches
+`+refs/heads/board:refs/remotes/origin/board`, the form CLAUDE.md,
+docs/agents/PROTOCOL.md and .claude/rules/board.md give too, and the
+claim skill first adds the fetch refspec `+refs/heads/*:refs/remotes/origin/*`.
 
 What does not hold: the push guard, the board printed at session start,
 and the commit-msg hook's Symphony-Usage trailer, so the cost metrics

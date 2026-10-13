@@ -77,7 +77,7 @@ What a session needs, and what it does not: it runs on the claude.ai sign-in of 
 5. **Watch the board.** It is the shared state: `/board` in any session, https://github.com/ORG/NAME/blob/board/STATE.md in the browser, or in a shell:
 
    ```bash
-   git fetch origin board && git show origin/board:STATE.md
+   git fetch origin +refs/heads/board:refs/remotes/origin/board && git show origin/board:STATE.md
    ```
 
    You should see a row per session under Claims, each pull request under Open pull requests with its state (clean, behind, conflicting, blocked or unknown), under Overlaps any file that two of them change, with the order to land them in, and the Queue shrinking. When a merge moves main past an open pull request, the board comments "main moved" on it: send that pull request's session the rebase prompt from [prompts.md](prompts.md), or, once that session has ended, a new session of yours with the same prompt, and it rebases and pushes with `--force-with-lease`, the one forced push the protocol allows. Merge the ready pull requests at https://github.com/ORG/NAME/pulls; each merge closes its issue.
