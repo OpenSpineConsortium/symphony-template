@@ -4,7 +4,9 @@ The template's files are the same at every price. What changes with money
 is which switches GitHub will enforce and how much Claude usage the
 accounts have, so an adopter picks a profile, flips the named settings,
 and spends nothing that does not buy a named feature. Every number below
-was verified against GitHub's and Anthropic's own pages on 2026-10-09;
+was verified against GitHub's and Anthropic's own pages on 2026-10-09,
+and again on 2026-10-13, when docs/setup/free-or-paid.md tabled every
+GitHub feature the template leans on, per plan, from GitHub's docs;
 what could not be verified is marked so. Prices move: when a decision
 hangs on one, read the linked page, not this file.
 
@@ -25,21 +27,26 @@ hangs on one, read the linked page, not this file.
   minute, Windows $0.010, macOS $0.062. The template pins ubuntu runners
   everywhere; keep it that way.
 - Branch protection and rulesets are free on public repositories and
-  need Pro ($4 a month, personal repositories only), Team or Enterprise
-  on private ones. On a Free private repository a ruleset can be written
-  but is not enforced, and the UI does not make that obvious
-  (https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets).
-- Push restrictions on a branch and bypass lists belong to organizations
-  only: a Free organization's public repositories, or every repository
-  on Team and Enterprise Cloud. A personal account never gets them at
-  any price. Push rulesets (blocking by path, size, extension across a
-  fork network) start at Team, private repositories; organization-wide
+  need Pro (personal repositories only), Team or Enterprise on private
+  ones; GitHub's docs give Pro's and Team's price, $4 a month and $4 a
+  user, only from 2020, so every $4 below is that price, unconfirmed
+  since. On a Free private repository a ruleset can be written but is
+  not enforced, as GitHub's settings page shows rather than its docs
+  say, and the UI does not make that obvious (https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets).
+- Classic branch protection's push restrictions and bypass lists belong
+  to organizations only: a Free organization's public repositories, or
+  every repository on Team and Enterprise Cloud. A personal account
+  never gets them at any price; its rulesets, from Pro on a private
+  repository, still restrict updates, creations and deletions. Push
+  rulesets (blocking by path, size, extension across a fork network)
+  start at Team, private repositories; organization-wide
   rulesets reached the Team plan in June 2025
   (https://github.blog/changelog/2025-06-16-organization-rulesets-now-available-for-github-team-plans/).
 - Claude Code is in every paid Claude plan, from Pro up, on the same
   usage pool as the apps: a rolling five-hour window plus a weekly
   limit. Pro is $17 a month billed annually or $20 monthly; Max is $100
-  (5x) or $200 (20x) monthly only and buys usage, never features; Team
+  (5x) or $200 (20x) monthly only and buys usage, higher output limits
+and early access, never a feature this template needs; Team
   is 2 to 150 seats at $20 a seat annually ($25 monthly), premium seats
   $100/$125 with 5x usage, plus SSO and central billing
   (https://claude.com/pricing).
@@ -70,9 +77,9 @@ its keep: enforced protection on a personal private repository, plus
 fallback costs about 120 of them a month (four runs a day, one billed
 minute each); the event triggers carry the real updates.
 
-What this profile cannot have at any price on a personal account: push
-restrictions and bypass lists. The push-guard hook and the protocol
-check stand in for them, honestly but client-side.
+What this profile cannot have at any price on a personal account:
+classic protection's push restrictions and bypass lists. The push-guard
+hook and the protocol check stand in for them, honestly but client-side.
 
 ## Profile 2: team, two to five people, from about $48 a month for two
 
@@ -100,8 +107,10 @@ labels, the coordinator routine, is built for exactly this rung.
 GitHub Enterprise Cloud adds the capacity jump (50,000 included minutes,
 16.7x Team), enterprise-level rulesets above organizations, and internal
 repositories with push rulesets. Claude Enterprise adds the shared,
-administered workspace; its pricing is custom and was not verifiable
-from public pages, so this profile is a direction, not a quote. Two
+administered workspace, priced on 2026-10-13 at $20 a seat a month
+billed annually plus usage at API rates, so its Claude Code is billed
+by use where every other rung runs on a plan's limits; this profile is
+a direction, not a quote. Two
 things stay true at this rung: the repository remains the only shared
 plane that is versioned, reviewed and machine-checked, so the template
 loses none of its point; and what native sharing buys over it is the
@@ -110,9 +119,12 @@ git fetch between a change and every session seeing it.
 
 ## Not verified, decide with the page open
 
-Merge queue plan gating, CODEOWNERS enforcement limits, secret scanning
-and push protection availability per plan, and Claude Enterprise pricing
-and its shared-Project feature set did not survive verification against
-primary pages and are deliberately absent above. The board, the claim
+Since 2026-10-13 docs/setup/free-or-paid.md settles merge queue (an
+organization's public repositories, or private ones on Enterprise
+Cloud), code owners (public, or private from Pro), and secret scanning
+and push protection (free on public repositories, the paid add-on
+GitHub Secret Protection on private ones, Team and up). Still open:
+the current price of GitHub Pro and Team, Enterprise Cloud's price, and
+Claude Enterprise's shared-Project feature set. The board, the claim
 protocol and the required check already give this template a working
 merge discipline without the merge queue.
