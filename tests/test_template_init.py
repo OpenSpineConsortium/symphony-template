@@ -398,10 +398,15 @@ class Labels(unittest.TestCase):
         body = template_init.setup_issue_body("octo/widgets", "main")
         self.assertTrue(body.splitlines()[2].startswith("- [ ] Run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand:"))
         settings = "https://github.com/octo/widgets/settings"
-        for page in (f"{settings}/rules", f"{settings})", f"{settings}/security_analysis", "https://github.com/octo/widgets/labels",
-                     f"{settings}/secrets/actions/new", "https://github.com/octo/widgets/issues/new?template=worker.yml",
-                     template_init.APP_INSTALL):
+        for page in (f"{settings}/rules", f"{settings})", f"{settings}/actions)", f"{settings}/security_analysis",
+                     "https://github.com/octo/widgets/labels", f"{settings}/secrets/actions/new",
+                     "https://github.com/octo/widgets/issues/new?template=worker.yml", template_init.APP_INSTALL):
             self.assertIn(page, body)
+        # The by-hand path names each setting setup-repo.sh turns on, as
+        # the settings pages label it.
+        for setting in ("Automatically delete head branches", "Allow auto-merge",
+                        "Allow GitHub Actions to create and approve pull requests"):
+            self.assertIn(f'"{setting}"', body.splitlines()[2])
         for target in re.findall(r"\]\(([^)]+)\)", body):
             self.assertTrue(target.startswith("https://"), target)
 

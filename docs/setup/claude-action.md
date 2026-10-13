@@ -55,8 +55,13 @@ A worker in Actions is one file under .github/symphony/workers/ that says
 .github/symphony/workers/README.md lists its settings. Add one with the
 "Add a worker" issue form,
 https://github.com/{{REPO}}/issues/new?template=worker.yml, whose
-workflow opens the pull request that adds the file, or add the file by
-hand in a pull request of its own. Once it merges,
+workflow opens the pull request that adds the file where the repository
+lets GitHub Actions open pull requests ("Allow GitHub Actions to create
+and approve pull requests" under Settings, Actions, General, which
+scripts/setup-repo.sh and the front door's Setup App turn on;
+docs/setup/github.md, section 8), and otherwise answers with the link
+that opens it in one press; or add the file by hand in a pull request of
+its own. Once it merges,
 .github/workflows/workers.yml runs every such worker on this token, one
 run per worker, in parallel: every six hours, whenever an issue is
 queued or given to one of them, and again while a worker still has

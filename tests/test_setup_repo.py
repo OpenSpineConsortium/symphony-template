@@ -1,29 +1,52 @@
 """scripts/setup-repo.sh parses, documents every option, reads the labels
-from tools/template_init.py so the list lives in one place, and carries
-every gh call the owner's checklist relies on; docs/setup/ruleset-org.json
-holds the same rules as ruleset-main.json, so the two cannot drift apart;
-and every ruleset the template ships targets the default branch alone, so
-none can stand in the way of a branch the workflows rewrite. gh itself is
-not run here: the script needs a signed-in CLI with admin rights, which no
-test has."""
+from tools/template_init.py so the list lives in one place, carries every
+gh call the owner's checklist relies on, and turns on the setting that
+lets GitHub Actions open pull requests, keeping the token's default
+permissions, or says why it could not and goes on;
+docs/setup/ruleset-org.json holds the same rules as ruleset-main.json, so
+the two cannot drift apart; and every ruleset the template ships targets
+the default branch alone, so none can stand in the way of a branch the
+workflows rewrite. The real gh is not run here: the script needs a
+signed-in CLI with admin rights, which no test has, so a fake gh on PATH
+(tests/fake_gh.py) answers the script's calls and records them."""
 
 import json
+import os
 import re
+import shutil
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import fake_gh  # noqa: E402
+from fake_gh import answer  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "setup-repo.sh"
 MAIN = ROOT / "docs" / "setup" / "ruleset-main.json"
 ORG = ROOT / "docs" / "setup" / "ruleset-org.json"
 # The gh calls the research notes verified against gh 2.89.0 and the REST
-# description, one piece each.
+# description, one piece each; those of the workflow permissions were
+# checked against the same two on 2026-10-13.
 GH_CALLS = (
     "rulesets", "--input", "repo edit", "--delete-branch-on-merge", "--enable-auto-merge", "--add-topic symphony",
     "--enable-secret-scanning", "--enable-secret-scanning-push-protection",
+    "actions/permissions/workflow", "--method PUT", "default_workflow_permissions=",
+    "-F can_approve_pull_request_reviews=true",
     "label create", "variable set", "secret set", "codeowners/errors",
 )
+REPO = "octo/widgets"
+WORKFLOW = f"repos/{REPO}/actions/permissions/workflow"
+SETTING = "workflow permissions: allow GitHub Actions to create and approve pull requests"
+# What the script reads from the tree it runs in, copied to a tree of the
+# test's own whose docs/project.md says crowd mode is off: a crowd
+# repository's own says on, and there the script stops before any write.
+TREE = ("scripts/setup-repo.sh", "tools/template_init.py", "tools/marked_section.py", "docs/setup/ruleset-main.json")
+CROWD_OFF = "# Project\n\n## Crowd mode\n\n- Crowd mode: off. Nobody has run setup.\n"
 
 
 def run(*args):
@@ -62,6 +85,185 @@ class Script(unittest.TestCase):
         for line in calls:
             self.assertNotIn("--body", line)
             self.assertNotIn(" -b ", line)
+
+
+def workflow_answer(permissions, can_approve):
+    """GitHub's answer to the read, in the shape the REST description
+    gives: the token's default permissions beside a JSON boolean."""
+    return answer(200, {"default_workflow_permissions": permissions, "can_approve_pull_request_reviews": can_approve})
+
+
+def fields(call):
+    """The -f and -F pairs of one gh api call, as gh would send them."""
+    args, found = call["args"], {}
+    for flag, pair in zip(args, args[1:]):
+        if flag in ("-f", "-F"):
+            name, _, value = pair.partition("=")
+            found[name] = (flag, value)
+    return found
+
+
+class WorkflowPermissions(unittest.TestCase):
+    """.github/workflows/protocol.yml and add-worker.yml open their pull
+    requests with GITHUB_TOKEN, which GitHub allows only once "Allow GitHub
+    Actions to create and approve pull requests" is on. The script turns it
+    on, sends back the token's default permissions as it read them so
+    nothing else changes, sends nothing when GitHub's answer does not say
+    them, and reports a refusal with where to change it without stopping,
+    since an organization's policy is no reason to leave the labels and the
+    rest undone."""
+
+    def run_script(self, read, write=None, owner_type=None):
+        """The whole script against the fake gh, every other call answered
+        as a fresh repository would: its output and the calls it made.
+        owner_type answers the read of the repository's owner, which the
+        script makes only after a 409; without it that read fails."""
+        folder = tempfile.mkdtemp(prefix="setup-repo-")
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        root = Path(folder) / "tree"
+        for path in TREE:
+            (root / path).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(ROOT / path, root / path)
+        (root / "docs" / "project.md").write_text(CROWD_OFF)
+        routes = {
+            "repo view": [answer(200, f"{REPO}\tmain\tPUBLIC\n")],
+            f"GET repos/{REPO}/actions/variables/CLAUDE_CROWD": [answer(404, {"message": "Not Found"})],
+            f"GET repos/{REPO}/rulesets": [answer(200, "")],
+            f"POST repos/{REPO}/rulesets": [answer(201, "")],
+            "repo edit": [answer(200, "")],
+            f"GET {WORKFLOW}": [read],
+            f"PUT {WORKFLOW}": [write or answer(599, {"message": "not expected"})],
+            "label create": [answer(200, "")],
+            f"GET repos/{REPO}/codeowners/errors": [answer(200, "")],
+            # Read only when a flag is unknown, so it names a gh that old.
+            "--version": [answer(200, "gh version 1.14.0 (2021-08-04)\n")],
+        }
+        if owner_type:
+            routes[f"GET repos/{REPO}"] = [answer(200, f"{owner_type}\n")]
+        env = dict(os.environ, **fake_gh.environment(Path(folder) / "gh", routes))
+        done = subprocess.run(["bash", str(root / "scripts" / "setup-repo.sh"), REPO], cwd=root, env=env,
+                              capture_output=True, text=True)
+        return done, fake_gh.calls(env["FAKE_GH_LOG"])
+
+    def line(self, done):
+        """The one line the step printed."""
+        found = [line for line in done.stdout.splitlines() if line.startswith("workflow permissions:")]
+        self.assertEqual(len(found), 1, done.stdout)
+        return found[0]
+
+    def assert_went_on(self, done, calls):
+        """The run finished, and the labels and the code owners came after
+        the step, so a refusal stopped nothing."""
+        self.assertEqual(done.returncode, 0, done.stderr)
+        keys = [call["key"] for call in calls]
+        step = max(index for index, key in enumerate(keys) if key.endswith(WORKFLOW))
+        self.assertIn("label create", keys[step:])
+        self.assertIn(f"GET repos/{REPO}/codeowners/errors", keys[step:])
+
+    def puts(self, calls):
+        """The calls that wrote the setting."""
+        return [call for call in calls if call["key"] == f"PUT {WORKFLOW}"]
+
+    def test_turns_it_on_and_sends_the_default_permissions_back_as_read(self):
+        # "write" here and "read" in the refusal below: whichever GitHub
+        # reads goes back as it was, a string (-f), beside a JSON true (-F).
+        done, calls = self.run_script(workflow_answer("write", False), answer(204))
+        # The read takes GitHub's own body, unfiltered, which the fake gives
+        # in the REST description's shape; a --jq filter would change what
+        # the real gh prints, and the fake would not show it.
+        self.assertEqual([call["args"] for call in calls if call["key"] == f"GET {WORKFLOW}"], [["api", WORKFLOW]])
+        self.assertEqual([fields(call) for call in self.puts(calls)],
+                         [{"default_workflow_permissions": ("-f", "write"),
+                           "can_approve_pull_request_reviews": ("-F", "true")}])
+        self.assertEqual(self.line(done), f"{SETTING}: on")
+        self.assert_went_on(done, calls)
+
+    def test_leaves_it_alone_when_it_is_on_already(self):
+        done, calls = self.run_script(workflow_answer("read", True))
+        self.assertEqual(self.puts(calls), [])
+        self.assertEqual(self.line(done), f"{SETTING}: on already")
+        self.assert_went_on(done, calls)
+
+    def test_an_organizations_policy_is_reported_with_where_its_owner_changes_it(self):
+        # With --silent gh keeps a refused call's body off standard output
+        # and prints GitHub's answer on standard error: the line carries the
+        # answer, and the body shows nowhere.
+        refused = answer(409, {"message": "Conflict"}, stderr="gh: Conflict (HTTP 409)\n")
+        done, calls = self.run_script(workflow_answer("read", False), refused, owner_type="Organization")
+        self.assertEqual([fields(call) for call in self.puts(calls)],
+                         [{"default_workflow_permissions": ("-f", "read"),
+                           "can_approve_pull_request_reviews": ("-F", "true")}])
+        line = self.line(done)
+        self.assertIn("held off by the policy of octo or its enterprise (gh: Conflict (HTTP 409))", line)
+        self.assertIn("an owner of octo turns it on under https://github.com/organizations/octo/settings/actions", line)
+        self.assertIn("then run this again", line)
+        self.assertNotIn('{"message"', done.stdout)
+        self.assert_went_on(done, calls)
+
+    def test_a_personal_accounts_409_names_the_repositorys_own_page_and_no_organization(self):
+        # A personal account has no organization settings page, so the line
+        # points at the repository's own Actions page instead.
+        refused = answer(409, {"message": "Conflict"}, stderr="gh: Conflict (HTTP 409)\n")
+        done, calls = self.run_script(workflow_answer("read", False), refused, owner_type="User")
+        line = self.line(done)
+        self.assertIn("held off by a policy above this repository (gh: Conflict (HTTP 409))", line)
+        self.assertIn(f"https://github.com/{REPO}/settings/actions", line)
+        self.assertNotIn("/organizations/", line)
+        self.assert_went_on(done, calls)
+
+    def test_a_409_whose_owner_cannot_be_read_names_no_organization_page(self):
+        # The owner's read fails (no route), so the script cannot tell an
+        # organization and names only the page every repository has.
+        refused = answer(409, {"message": "Conflict"}, stderr="gh: Conflict (HTTP 409)\n")
+        done, calls = self.run_script(workflow_answer("read", False), refused)
+        line = self.line(done)
+        self.assertIn(f"https://github.com/{REPO}/settings/actions", line)
+        self.assertNotIn("/organizations/", line)
+        self.assert_went_on(done, calls)
+
+    def test_a_refused_read_is_reported_with_the_repositorys_page_and_nothing_is_written(self):
+        # A login without admin rights cannot read the setting, and without
+        # the default permissions there is nothing safe to send back.
+        refused = answer(403, {"message": "Must have admin rights to Repository."},
+                         stderr="gh: Must have admin rights to Repository. (HTTP 403)\n")
+        done, calls = self.run_script(refused)
+        self.assertEqual(self.puts(calls), [])
+        line = self.line(done)
+        self.assertIn("not changed (gh: Must have admin rights to Repository. (HTTP 403))", line)
+        self.assertIn(f"https://github.com/{REPO}/settings/actions", line)
+        self.assert_went_on(done, calls)
+
+    def test_a_refused_write_that_is_not_the_organizations_is_the_repositorys_to_fix(self):
+        done, calls = self.run_script(workflow_answer("read", False), answer(403))
+        line = self.line(done)
+        self.assertIn("not changed (gh: fake answer (HTTP 403))", line)
+        self.assertIn(f"https://github.com/{REPO}/settings/actions", line)
+        self.assertNotIn("organizations/", line)
+        self.assert_went_on(done, calls)
+
+    def test_an_answer_that_does_not_say_the_permissions_sends_nothing(self):
+        # The PUT sets the token's default permissions too, so a value read
+        # wrong or missing would be written back: no PUT at all instead.
+        for body in ({"can_approve_pull_request_reviews": False},
+                     {"default_workflow_permissions": "admin", "can_approve_pull_request_reviews": False},
+                     {"default_workflow_permissions": "read", "can_approve_pull_request_reviews": "false"}):
+            with self.subTest(body=body):
+                done, calls = self.run_script(answer(200, body), answer(204))
+                self.assertEqual(self.puts(calls), [])
+                line = self.line(done)
+                self.assertIn("not changed (GitHub's answer did not say the token's default permissions, so nothing "
+                              "was sent back)", line)
+                self.assertIn(f"https://github.com/{REPO}/settings/actions", line)
+                self.assert_went_on(done, calls)
+
+    def test_a_gh_too_old_for_the_flags_is_named_as_that_and_not_as_github(self):
+        old = answer(400, stderr="unknown flag: --silent\n\nUsage:  gh api <endpoint> [flags]\n")
+        done, calls = self.run_script(workflow_answer("read", False), old)
+        self.assertEqual(self.line(done), "workflow permissions: this gh (gh version 1.14.0 (2021-08-04)) predates the "
+                         "flag; install gh 2.65 or later (https://github.com/cli/cli/blob/trunk/docs/install_linux.md) "
+                         "and run this again")
+        self.assertEqual(len(self.puts(calls)), 1)
+        self.assert_went_on(done, calls)
 
 
 class EveryShippedRuleset(unittest.TestCase):

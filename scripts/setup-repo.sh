@@ -7,10 +7,10 @@
 # variable, and GitHub lets only a person with admin rights set them.
 # docs/setup/github.md says what each setting is for and
 # docs/setup/owner-checklist.md gathers every step; this script does the
-# GitHub steps through the GitHub CLI, so they are one run instead of six
+# GitHub steps through the GitHub CLI, so they are one run instead of seven
 # settings pages. Run it once on your own computer, from a clone, with gh
-# signed in (gh auth login) as a user with admin rights on the repository.
-# A cloud session cannot run it: gh is installed there, but its GitHub proxy
+# signed in (gh auth login) as a user with admin rights on the repository. A
+# cloud session cannot run it: gh is installed there, but its GitHub proxy
 # refuses gh's GraphQL commands and the session has no admin rights. Running
 # it again does nothing twice: a ruleset that exists is skipped, a toggle
 # that is on stays on, a label is updated in place. In a crowd repository
@@ -39,19 +39,26 @@
 #      neither (a Free organization's private repository has no Secret
 #      Protection) it prints why and carries on, and a gh older than 2.65,
 #      which lacks the two flags, is reported as that and not as the plan;
-#   5. creates or updates the labels, read from LABELS in
+#   5. turns on "Allow GitHub Actions to create and approve pull requests"
+#      unless it is on already, keeping the token's default permissions as
+#      they are: the weekly protocol update and the "Add a worker" form
+#      open their pull requests with GITHUB_TOKEN, and while it is off they
+#      offer an issue or a link instead; where the organization or its
+#      enterprise holds it off, it prints GitHub's answer and where an
+#      owner turns it on, and carries on;
+#   6. creates or updates the labels, read from LABELS in
 #      tools/template_init.py, so the list lives in one place;
-#   6. sets each repository variable given as --var NAME=VALUE; the one
+#   7. sets each repository variable given as --var NAME=VALUE; the one
 #      this repository reads is CLAUDE_ALLOWED_TOOLS (docs/setup/claude-action.md),
 #      since its workers are files, not variables (docs/agents/WORKERS.md);
-#   7. with --token, stores the repository secret CLAUDE_CODE_OAUTH_TOKEN:
+#   8. with --token, stores the repository secret CLAUDE_CODE_OAUTH_TOKEN:
 #      you run `claude setup-token` in another terminal and paste the token
 #      at gh's hidden prompt. The token is never on a command line, never in
 #      a file and never in this script's output: gh reads it without echo
 #      (or from standard input when no terminal is attached), encrypts it on
 #      your machine and sends only the sealed value. Without --token the
 #      step prints the alternative, /install-github-app in Claude Code;
-#   8. reads GitHub's own list of the errors in .github/CODEOWNERS and
+#   9. reads GitHub's own list of the errors in .github/CODEOWNERS and
 #      prints each one, since a line GitHub cannot resolve (an
 #      organization's name, a user or a team without Write) asks nobody for
 #      review and says so nowhere else; it changes nothing, the fix is a
@@ -70,8 +77,9 @@ Usage: bash scripts/setup-repo.sh [OWNER/NAME] [--var NAME=VALUE]... [--token]
 
 Sets up the GitHub side of a repository made from this template: the
 default branch's ruleset, delete-branch-on-merge, auto-merge, secret
-scanning with push protection, the labels, the variables asked for and,
-with --token, the secret CLAUDE_CODE_OAUTH_TOKEN; then prints any line of
+scanning with push protection, the setting that lets GitHub Actions open
+pull requests, the labels, the variables asked for and, with --token, the
+secret CLAUDE_CODE_OAUTH_TOKEN; then prints any line of
 .github/CODEOWNERS GitHub cannot resolve. Needs the GitHub CLI signed in
 (gh auth login) with admin rights on the repository. In crowd mode (the
 variable CLAUDE_CROWD is true, or docs/project.md says crowd mode is on)
@@ -199,7 +207,81 @@ else
   printf 'secret scanning: not available here (%s); a Free organization'"'"'s private repository has no Secret Protection, docs/setup/github.md section 5\n' "$(tr '\n' ' ' <<<"$answer")"
 fi
 
-# 5. The labels, from the one list in tools/template_init.py. --force
+# 5. "Allow GitHub Actions to create and approve pull requests" (Settings,
+# Actions, General, Workflow permissions), off in a new repository unless
+# its organization has it on. .github/workflows/protocol.yml and
+# add-worker.yml open their pull requests with GITHUB_TOKEN, which GitHub
+# refuses while it is off, so they offer an issue or a link instead. The
+# same setting lets a workflow approve a pull request, which counts only
+# where a ruleset or a branch protection rule requires a review, and
+# docs/setup/ruleset-main.json requires none. GitHub sets it together with
+# the token's default permissions, so the PUT sends those back as they
+# were read and nothing else changes; an answer that does not say them as
+# the REST description gives them, "read" or "write" beside a JSON
+# boolean, sends nothing, since a guess could widen the token. An
+# organization, or the enterprise above it, can hold it off for its
+# repositories, and GitHub then answers 409; only an owner there, or in
+# the organization someone with the "Manage organization Actions
+# policies" permission, can change that, so, as in the step above, a
+# refusal is reported with where to change it and the run goes on. gh
+# prints GitHub's answer to a refused call on standard error and the body
+# on standard output, so the answer is read from standard error alone.
+WORKFLOW_SETTING="workflow permissions: allow GitHub Actions to create and approve pull requests"
+# The read's two fields on one line, such as "read false", or exit 1 when
+# the answer does not hold both with those types.
+READ_WORKFLOW_PERMISSIONS='
+import json, sys
+try:
+    answer = json.load(sys.stdin)
+except ValueError:
+    sys.exit(1)
+fields = answer if isinstance(answer, dict) else {}
+permissions = fields.get("default_workflow_permissions")
+can_approve = fields.get("can_approve_pull_request_reviews")
+if permissions not in ("read", "write") or not isinstance(can_approve, bool):
+    sys.exit(1)
+print(permissions, "true" if can_approve else "false")
+'
+workflow_setting_refused() {
+  local answer=${1//$'\n'/ } organization=${REPO%%/*} owner_type
+  if grep -q "unknown flag" <<<"$answer"; then
+    old_gh "workflow permissions"
+  elif grep -q '(HTTP 409)' <<<"$answer"; then
+    # Only an organization has the settings page named below; a personal
+    # account's repository, or one whose owner cannot be read, gets
+    # GitHub's answer and its own page.
+    owner_type=$(gh api "repos/$REPO" --jq .owner.type 2>/dev/null || true)
+    if [ "$owner_type" = Organization ]; then
+      printf '%s: held off by the policy of %s or its enterprise (%s); an owner of %s turns it on under https://github.com/organizations/%s/settings/actions, Workflow permissions, or, where the enterprise sets it, an owner of the enterprise under its Policies, Actions; then run this again\n' \
+        "$WORKFLOW_SETTING" "$organization" "$answer" "$organization" "$organization"
+    else
+      printf '%s: held off by a policy above this repository (%s); turn it on under https://github.com/%s/settings/actions, Workflow permissions, once that page allows it, then run this again\n' \
+        "$WORKFLOW_SETTING" "$answer" "$REPO"
+    fi
+  else
+    printf '%s: not changed (%s); turn it on by hand under https://github.com/%s/settings/actions, Workflow permissions, with admin rights on the repository\n' \
+      "$WORKFLOW_SETTING" "$answer" "$REPO"
+  fi
+}
+refusal=$(mktemp)
+if ! workflow_answer=$(gh api "repos/$REPO/actions/permissions/workflow" 2>"$refusal"); then
+  workflow_setting_refused "$(<"$refusal")"
+elif ! permissions=$(python3 -c "$READ_WORKFLOW_PERMISSIONS" <<<"$workflow_answer"); then
+  workflow_setting_refused "GitHub's answer did not say the token's default permissions, so nothing was sent back"
+else
+  read -r default_permissions can_approve <<<"$permissions"
+  if [ "$can_approve" = true ]; then
+    echo "$WORKFLOW_SETTING: on already"
+  elif gh api --method PUT "repos/$REPO/actions/permissions/workflow" --silent \
+         -f default_workflow_permissions="$default_permissions" -F can_approve_pull_request_reviews=true 2>"$refusal"; then
+    echo "$WORKFLOW_SETTING: on"
+  else
+    workflow_setting_refused "$(<"$refusal")"
+  fi
+fi
+rm -f "$refusal"
+
+# 6. The labels, from the one list in tools/template_init.py. --force
 # updates a label that exists instead of failing on it.
 while IFS=$'\t' read -r label color description; do
   gh label create "$label" --repo "$REPO" --color "$color" --description "$description" --force
@@ -212,7 +294,7 @@ for name, color, description in LABELS:
     print(name, color, description, sep="\t")
 ')
 
-# 6. The variables asked for.
+# 7. The variables asked for.
 if [ ${#VARIABLES[@]} -eq 0 ]; then
   echo "variables: none asked for (--var NAME=VALUE; docs/setup/claude-action.md names them)"
 fi
@@ -221,7 +303,7 @@ for pair in ${VARIABLES[@]+"${VARIABLES[@]}"}; do
   printf 'variable %s: set\n' "${pair%%=*}"
 done
 
-# 7. The secret, from gh's own hidden prompt; nothing is echoed or saved.
+# 8. The secret, from gh's own hidden prompt; nothing is echoed or saved.
 if [ "$TOKEN" = yes ]; then
   echo "In another terminal, run: claude setup-token"
   echo "Approve it in the browser, copy the token it prints, and paste it at the prompt below."
@@ -232,7 +314,7 @@ else
   printf 'secret %s: skipped; run again with --token, or run /install-github-app in Claude Code, which installs the app and stores the secret in one OAuth flow (docs/setup/claude-action.md)\n' "$SECRET"
 fi
 
-# 8. GitHub's reading of .github/CODEOWNERS, after the secret's prompt so
+# 9. GitHub's reading of .github/CODEOWNERS, after the secret's prompt so
 # its lines are the last on the screen. A failed read (no such file on the
 # default branch) is reported, not fatal: everything above is done.
 if errors=$(gh api "repos/$REPO/codeowners/errors" --jq '.errors[] | "  line \(.line): \(.kind): \(.source)"' 2>&1); then

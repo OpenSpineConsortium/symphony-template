@@ -13,7 +13,7 @@ Put your repository for ORG/NAME (ORG is the user or the organization that owns 
 | https://github.com/ORG/NAME/settings/secrets/actions/new | the same, New repository secret | one new secret |
 | https://github.com/ORG/NAME/settings/variables/actions | the same, Variables tab | CLAUDE_ALLOWED_TOOLS, CLAUDE_CROWD, SDLC_APP_ID, SDLC_METRICS; workers are files, not variables (the registry, below) |
 | https://github.com/ORG/NAME/settings/variables/actions/new | the same, New repository variable | one new variable |
-| https://github.com/ORG/NAME/settings/actions | Settings, Actions, General | whether Actions run, and the default token's rights |
+| https://github.com/ORG/NAME/settings/actions | Settings, Actions, General | whether Actions run, the default token's rights, and under Workflow permissions "Allow GitHub Actions to create and approve pull requests", which setup-repo.sh turns on |
 | https://github.com/ORG/NAME/settings/access | Settings, Collaborators & teams | Write for each person who claims issues, once the secrets above are out of the repository ([team.md](team.md), step 1) |
 | https://github.com/ORG/NAME/settings/installations | Settings, GitHub Apps | see that the Claude GitHub App reaches this repository |
 | https://github.com/ORG/NAME/labels | Issues, Labels | the six labels, and `worker:<name>` per worker |
@@ -50,6 +50,7 @@ Making a repository:
 | https://github.com/organizations/ORG/settings/member_privileges | organization Settings, Member privileges | what members may do by default |
 | https://github.com/organizations/ORG/settings/security | organization Settings, Authentication security | require two-factor authentication for everyone |
 | https://github.com/organizations/ORG/settings/rules | organization Settings, Rules | organization rulesets (GitHub Team and up): docs/setup/ruleset-org.json |
+| https://github.com/organizations/ORG/settings/actions | organization Settings, Actions, General | under Workflow permissions, "Allow GitHub Actions to create and approve pull requests", which a new repository inherits and which, held off here, can keep a repository from turning it on |
 | https://github.com/organizations/ORG/settings/secrets/actions | organization Settings, Secrets and variables, Actions | organization secrets, with which repositories see them |
 | https://github.com/organizations/ORG/settings/variables/actions | the same, Variables tab | organization variables |
 | https://github.com/orgs/ORG/teams | the organization's Teams tab | the teams crowd mode makes |
