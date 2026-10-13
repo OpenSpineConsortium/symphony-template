@@ -22,10 +22,19 @@ ROUTINES = ROOT / "docs" / "agents" / "routines"
 P = {"REPO": "{{" + "REPO" + "}}", "DEFAULT_BRANCH": "{{" + "DEFAULT_BRANCH" + "}}"}
 GITHUB = {"REPO": "${{ github.repository }}", "DEFAULT_BRANCH": "${{ env.DEFAULT_BRANCH }}"}
 IN_TEMPLATE = (ROOT / ".template" / "PENDING").is_file()
+CROWD_PAGE = ROOT / "docs" / "setup" / "crowd" / "worker.md"
 # How many characters on either side of a name find it in a page whose
 # other words differ from the workflow's.
 NEAR = 16
 sys.path.insert(0, str(ROOT / "tools"))
+
+import crowd_check  # noqa: E402
+
+# In crowd mode no worker runs in GitHub Actions, since CLAUDE_CROWD keeps
+# workers.yml from starting (tests/test_crowd_check.py), and scripts/crowd.py
+# puts the crowd's worker page in the worker page's place, whose prompt names
+# the worker LOGIN, the contributor's login, where the template's says NAME.
+CROWD = crowd_check.mode_of((ROOT / "docs" / "project.md").read_text(encoding="utf-8")) == "on"
 
 
 def short_prompt(page):
@@ -102,7 +111,18 @@ def prompt_of(workflow, step_id):
     return " ".join(line for line in lines if line)
 
 
+def assert_reads_its_own_file_and_given_issues_first(test, page, name):
+    full = page.read_text(encoding="utf-8").split("```")[-2]
+    test.assertIn(f"worker:{name}", full)
+    test.assertIn(f'"- Worker: {name}"', full)
+    test.assertIn(f".github/symphony/workers/{name}.json", full)
+    test.assertIn('the board\'s "Given to workers" section', full)
+    test.assertLess(full.index("If whoever started this run named an issue, take that one."),
+                    full.index("Given to workers"))
+
+
 class TheWorkerPrompt(unittest.TestCase):
+    @unittest.skipIf(CROWD, "in crowd mode no worker runs in GitHub Actions and the page is the crowd's")
     def test_a_worker_in_actions_gets_the_routines_short_prompt_with_its_name(self):
         routine = short_prompt("worker.md").replace("<name>", "${{ matrix.worker }}")
         sent = prompt_of("workers.yml", "claude")
@@ -112,13 +132,10 @@ class TheWorkerPrompt(unittest.TestCase):
         assert_passes(self, routine.split(" Read it again on every run")[0], sent.split(" This run, ")[0])
 
     def test_the_full_prompt_reads_the_workers_file_and_its_given_issues_first(self):
-        full = (ROUTINES / "worker.md").read_text(encoding="utf-8").split("```")[-2]
-        self.assertIn("worker:NAME", full)
-        self.assertIn('"- Worker: NAME"', full)
-        self.assertIn(".github/symphony/workers/NAME.json", full)
-        self.assertIn('the board\'s "Given to workers" section', full)
-        self.assertLess(full.index("If whoever started this run named an issue, take that one."),
-                        full.index("Given to workers"))
+        assert_reads_its_own_file_and_given_issues_first(self, ROUTINES / "worker.md", "LOGIN" if CROWD else "NAME")
+
+    def test_the_crowds_full_prompt_does_the_same_under_the_contributors_login(self):
+        assert_reads_its_own_file_and_given_issues_first(self, CROWD_PAGE, "LOGIN")
 
     def test_the_workflow_reads_the_registry_and_the_workers_own_settings(self):
         text = (WORKFLOWS / "workers.yml").read_text(encoding="utf-8")

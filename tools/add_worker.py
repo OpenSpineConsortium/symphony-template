@@ -42,6 +42,12 @@ from sdlc_protocol import workers  # noqa: E402
 WORKER_PAGE = ROOT / "docs" / "agents" / "routines" / "worker.md"
 BRANCH_PREFIX = "symphony/worker-"
 NAME_SLOT = "<name>"
+# The crowd's worker page, which scripts/crowd.py puts in the worker page's
+# place in crowd mode, names its worker by the contributor's login and keeps
+# one of two lines for the area, both of which `scripts/crowd.py doctor
+# --worker` fills in; a page whose prompt has this slot and not the name's is
+# that page.
+LOGIN_SLOT = "<login>"
 # The headings GitHub writes for the form's two dropdowns, which no other
 # issue form here asks; an issue that has both is the form's.
 FORM_HEADINGS = ("### Where it runs", "### How its pull requests land")
@@ -79,11 +85,22 @@ def body(name, runs, issue):
             f"Closes #{issue}\n")
 
 
+def first_block(page=WORKER_PAGE):
+    """The worker page's first fenced block, its short prompt as written."""
+    return Path(page).read_text(encoding="utf-8").split("```")[1::2][0].strip("\n")
+
+
 def short_prompt(name, page=WORKER_PAGE):
     """The worker prompt's short form, the first fenced block of the worker
     page, with the worker's name in its slot."""
-    blocks = Path(page).read_text(encoding="utf-8").split("```")[1::2]
-    return blocks[0].strip("\n").replace(NAME_SLOT, name)
+    return first_block(page).replace(NAME_SLOT, name)
+
+
+def is_crowd_page(page=WORKER_PAGE):
+    """Whether the worker page is the crowd's, whose prompt names the worker
+    by the contributor's login."""
+    block = first_block(page)
+    return NAME_SLOT not in block and LOGIN_SLOT in block
 
 
 def next_steps(name, runs, page=WORKER_PAGE):
@@ -92,6 +109,11 @@ def next_steps(name, runs, page=WORKER_PAGE):
                 f"issue is queued or given to it, and again while it has work. It runs on the repository secret "
                 f"CLAUDE_CODE_OAUTH_TOKEN, on that account's plan; docs/setup/claude-action.md says how to set it "
                 f"if it is not there yet. There is nothing to paste.")
+    if runs == "routine" and is_crowd_page(page):
+        return ("Once it merges, make the routine on your own Claude account. In crowd mode a contributor's worker "
+                "works under their GitHub login: run `python3 scripts/crowd.py doctor --worker` in your clone, "
+                "which checks your setup and prints your worker's prompt with your login and your area filled in, "
+                "and make the routine with it as docs/agents/routines/worker.md says.")
     if runs == "routine":
         return (f"Once it merges, make the routine on the Claude account that runs it, with this prompt as it "
                 f"stands, as docs/agents/routines/worker.md says (in that account's Project, with a schedule):\n\n"
