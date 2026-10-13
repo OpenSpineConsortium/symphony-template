@@ -84,6 +84,21 @@ class ReadingATranscript(unittest.TestCase):
         self.assertEqual(usage.parse_trailer("symphony-usage: v1 session=x seconds=no m=1,2\n"), [("x", 0, {})])
         self.assertEqual(usage.parse_trailer("Symphony-Usage: v2 later\n"), [])
 
+    def test_a_count_too_long_or_in_other_digits_is_passed_over_as_unreadable(self):
+        # Anyone who can push a commit writes its message, and int() refuses
+        # a string of more than 4,300 digits with ValueError, which stopped
+        # the metrics run; a count is read as the Actions records' are, a
+        # whole number below 2 ** 53 in ASCII digits.
+        huge = "1" * 4301
+        self.assertEqual(usage.parse_trailer(f"Symphony-Usage: v1 session=x seconds={huge} m={huge},0,0,0,0\n"),
+                         [("x", 0, {})])
+        self.assertEqual(usage.parse_trailer(f"Symphony-Usage: v1 session=x seconds={2 ** 53} m=0,0,0,0,{2 ** 53}\n"),
+                         [("x", 0, {})])
+        self.assertEqual(usage.parse_trailer("Symphony-Usage: v1 session=x seconds=\u0663 m=\u0663,0,0,0,0\n"),
+                         [("x", 0, {})])
+        self.assertEqual(usage.parse_trailer(f"Symphony-Usage: v1 session=x seconds={2 ** 53 - 1} m=0,0,0,0,7\n"),
+                         [("x", 2 ** 53 - 1, {"m": [0, 0, 0, 0, 7]})])
+
     def test_the_trailer_carries_eight_characters_of_the_session_and_nothing_more(self):
         spent = {"models": {"m": [1, 0, 0, 0, 1]}, "seconds": 1}
         self.assertTrue(usage.trailer("session_01AMrLKnvPcvNBSchUXZbDDX", spent).startswith("v1 session=01AMrLKn "))
