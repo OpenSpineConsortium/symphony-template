@@ -10,12 +10,17 @@ last repeated: "METHOD path" for `gh api` (the query is part of the path),
 or the leading words of any other command, such as "pr merge" or
 "--version". The body is printed as it is, after the status line, the
 headers and a blank line when the call asks with --include, as gh prints
-them; a route for a call with --jq gives the body gh would print after the
-filter. The fake exits 1 when the status is 400 or more, as gh does. A call
-with no route answers 599 "fake gh: no route for ...", so an unexpected call
-fails the test that made it. An answer may carry "after", routes that take
-the place of those of the same keys once it is given, so a call that changes
-GitHub, such as a merge, changes what later reads see.
+them, and not at all for a call with --silent, which gh 2.89.0 keeps quiet
+even when the call is refused; a route for a call with --jq gives the body
+gh would print after the filter. The fake exits 1 when the status is 400
+or more, as gh does, and prints a line naming the status on standard
+error, where gh prints GitHub's answer; an answer may carry "stderr" to
+print there instead, for a failure gh reports itself, such as a flag it
+does not know. A call with no route answers 599 "fake gh: no route for
+...", so an unexpected call fails the test that made it. An answer may
+carry "after", routes that take the place of those of the same keys once
+it is given, so a call that changes GitHub, such as a merge, changes what
+later reads see.
 
 A process per call costs tens of milliseconds, which hundreds of calls turn
 into a slow suite, so routed_run() gives a test the same answers without
@@ -87,10 +92,12 @@ def respond(args, stdin, log, routes_file):
     status = chosen.get("status", 200)
     body = chosen.get("body")
     text = body if isinstance(body, str) else ("" if body is None else json.dumps(body))
+    if args[0] == "api" and "--silent" in args:
+        text = ""
     if args[0] == "api" and "--include" in args:
         head = ["HTTP/2.0 %d FAKE" % status] + ["%s: %s" % item for item in (chosen.get("headers") or {}).items()]
         text = "\r\n".join(head) + "\r\n\r\n" + text
-    error = "gh: fake answer (HTTP %d)\n" % status if status >= 400 else ""
+    error = chosen.get("stderr") or ("gh: fake answer (HTTP %d)\n" % status if status >= 400 else "")
     return (1 if status >= 400 else 0), text, error
 
 
@@ -167,9 +174,12 @@ def calls(log_path):
     return found
 
 
-def answer(status=200, body=None, headers=None, after=None):
-    """One answer, for a route's list; after, routes it puts in place."""
+def answer(status=200, body=None, headers=None, after=None, stderr=None):
+    """One answer, for a route's list; after, routes it puts in place;
+    stderr, what gh prints on standard error in place of the fake's line."""
     found = {"status": status, "body": body, "headers": headers or {}}
     if after:
         found["after"] = after
+    if stderr:
+        found["stderr"] = stderr
     return found

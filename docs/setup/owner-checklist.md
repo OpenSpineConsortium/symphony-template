@@ -21,7 +21,12 @@ page that it is set up, which the browser extension reads), turns on
 secret scanning and then push protection
 (and says so and carries on where the plan or the visibility offers
 neither: a Free organization's private repository has no Secret
-Protection), creates or updates the six labels from the one list in
+Protection), turns on "Allow GitHub Actions to create and approve pull
+requests", which the weekly protocol update and the "Add a worker" form
+need to open their pull requests, and leaves the token's default
+permissions as they are (and says so and carries on where the
+organization or its enterprise holds it off, docs/setup/github.md
+section 8), creates or updates the six labels from the one list in
 tools/template_init.py, sets each variable given as `--var NAME=VALUE`,
 and with `--token` stores the secret CLAUDE_CODE_OAUTH_TOKEN from gh's
 hidden prompt, so the token is never on a command line, in a file or on
@@ -38,9 +43,9 @@ terminal and paste the result (or run `/install-github-app` in Claude
 Code instead, which installs the app and stores the secret in one OAuth
 flow, docs/setup/claude-action.md). And anything outside the repository:
 the Claude GitHub App's installation, the organization's rulesets,
-secrets and variables (below), the cloud environment's variable
-(section 2) and the claude.ai Projects (section 5) are pages you open,
-from the links that follow.
+secrets, variables and workflow permissions (below), the cloud
+environment's variable (section 2) and the claude.ai Projects
+(section 5) are pages you open, from the links that follow.
 
 A project worked by volunteers on their own Claude accounts takes another
 command instead, and none of the token, variable or auto-merge steps on this
@@ -62,6 +67,7 @@ Each opens the exact page; the sections below say what to do there.
 - How cloud environments, variables and network access work: https://code.claude.com/docs/en/cloud-environments
 - The repository's rulesets (New ruleset, Import): https://github.com/OpenSpineConsortium/symphony-template/settings/rules
 - The repository's general settings (auto-delete, auto-merge): https://github.com/OpenSpineConsortium/symphony-template/settings
+- The repository's Actions settings (Workflow permissions, which let the workflows open pull requests): https://github.com/OpenSpineConsortium/symphony-template/settings/actions
 - Secret scanning and push protection: https://github.com/OpenSpineConsortium/symphony-template/settings/security_analysis
 - New repository secret: https://github.com/OpenSpineConsortium/symphony-template/settings/secrets/actions/new
 - New repository variable: https://github.com/OpenSpineConsortium/symphony-template/settings/variables/actions/new
@@ -75,7 +81,7 @@ organization can set once for every repository it makes.
 
 ## What an organization can set once for every repository it makes
 
-Three things an organization sets once reach every repository it makes
+Four things an organization sets once reach every repository it makes
 afterwards, copies of this template included, with no step in the new
 repository; each needs the plan named. Checked against GitHub's own
 documentation and REST description on 2026-10-09; where a sentence
@@ -110,6 +116,22 @@ could not be read from a primary source, it says so.
   account's subscription; Claude Code's own documentation suggests an API
   key for a secret shared across repositories, which this project's rule
   of no API billing rules out.
+- **Workflow permissions**, on any plan: "Allow GitHub Actions to create
+  and approve pull requests", under the organization's Settings, Actions,
+  General, Workflow permissions, is inherited by every repository made in
+  the organization afterwards, as GitHub's documentation says of a new
+  repository, so a copy's weekly protocol update and its "Add a worker"
+  form open their pull requests from the start. It also lets workflows
+  approve pull requests in each of those repositories, copies of the
+  template or not, which matters wherever a ruleset or a branch
+  protection rule there requires a review; scripts/crowd.py setup turns
+  it off again in a crowd repository, whose ruleset requires one. An
+  organization that holds it off can keep its repositories from turning
+  it on: GitHub then answers a repository's change with 409, "prevented
+  by the owning organization" in the REST description, which
+  scripts/setup-repo.sh and the Setup App report; an enterprise can hold
+  it off for its organizations under its own Policies, Actions. Checked
+  on 2026-10-13.
 - **Settings as code**, a settings file an app applies, is not a GitHub
   feature but one of two community apps. github/safe-settings keeps every
   repository's settings in one admin repository of the organization and
@@ -122,7 +144,7 @@ could not be read from a primary source, it says so.
   rather than branch protection is unverified. Both need an app
   installation, a new dependency, so by .claude/rules/writing.md it is an
   issue first: "Settings as code", opened by the session that wrote this
-  page. The native equivalents are the two bullets above and, for secret
+  page. The native equivalents are the three bullets above and, for secret
   scanning and push protection, the organization's security
   configurations.
 
@@ -206,11 +228,12 @@ about 42 sessions.
 
 ## 3. The repository's GitHub settings (symphony-template and every copy)
 
-`bash scripts/setup-repo.sh` does 1 to 4 and checks 5 in one run
+`bash scripts/setup-repo.sh` does 1 to 5 and checks 6 in one run
 (above); a repository adopted through the front door with its Setup App
-installed has 1 to 4 done by that run, as its pull request's section
-Settings says. By hand, under Settings of the repository, as
-docs/setup/github.md describes:
+installed has 1 to 5 done by that run (3 only for the whole template),
+except what the plan or the policy of its organization or enterprise
+refuses, as its pull request's section Settings says. By hand, under
+Settings of the repository, as docs/setup/github.md describes:
 
 1. **Rules**: Rules, Rulesets, New ruleset, Import a ruleset, and choose
    docs/setup/ruleset-main.json (protects the default branch, requires the
@@ -220,20 +243,27 @@ docs/setup/github.md describes:
    "lands": "auto-merge", and the coordinator's integrations, land once
    the check is green; with several such workers, optionally untick
    "Require branches to be up to date" in the ruleset.
-3. **Code security**: turn on secret scanning and push protection.
-4. **Labels**: a copy gets them from template-init (todo, claimed,
+3. **Actions**: under Actions, General, Workflow permissions, tick
+   "Allow GitHub Actions to create and approve pull requests", so the
+   weekly protocol update and the "Add a worker" form open their pull
+   requests themselves instead of an issue or a link; where the
+   organization or its enterprise holds it off, only an owner there, or
+   in the organization someone with the "Manage organization Actions
+   policies" permission, can allow it (docs/setup/github.md, section 8).
+4. **Code security**: turn on secret scanning and push protection.
+5. **Labels**: a copy gets them from template-init (todo, claimed,
    in-review, blocker, epic, blocked); a worker's label, worker:<name>,
    is made when the worker first needs it. The template repository itself
    has none; add them by hand only if this repository's own issues should
    be labelled.
-5. **Code owners**: open .github/CODEOWNERS on GitHub and see that no
+6. **Code owners**: open .github/CODEOWNERS on GitHub and see that no
    line is marked as an error. template-init names the owner there, or in
    an organization's copy the person who made it, since GitHub asks a user
    or a team for review and never an organization; a copy made by an app
    still names the organization, so change that line by pull request
    (docs/setup/github.md, section 7).
-6. **Template**: symphony-template is already marked as a template repository.
-7. **Field metrics**: nothing to set. .github/workflows/metrics.yml writes
+7. **Template**: symphony-template is already marked as a template repository.
+8. **Field metrics**: nothing to set. .github/workflows/metrics.yml writes
    the project's aggregates to the branch `metrics` once a day, which
    OpenSpineConsortium's collector reads only where the Symphony App
    is installed; the word off in .github/symphony-metrics, or the repository
