@@ -45,7 +45,7 @@ Split the work below into one Task issue per piece, each with a Goal, an Accepta
 **Rebase after "main moved",** the one forced push the protocol allows:
 
 ```
-The board says main moved on my pull request: git fetch origin, rebase claude/N on origin/main, run bash scripts/check.sh, and push with --force-with-lease.
+The board says main moved on my pull request: push what claude/N holds and note its tip (git rev-parse claude/N), git fetch origin, rebase claude/N on origin/main, run bash scripts/check.sh, and push with git push --force-with-lease=claude/N:<that tip> origin claude/N.
 ```
 
 ## Keep what you learned

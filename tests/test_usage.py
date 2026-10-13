@@ -84,6 +84,32 @@ class ReadingATranscript(unittest.TestCase):
         self.assertEqual(usage.parse_trailer("symphony-usage: v1 session=x seconds=no m=1,2\n"), [("x", 0, {})])
         self.assertEqual(usage.parse_trailer("Symphony-Usage: v2 later\n"), [])
 
+    def test_a_count_too_long_or_in_other_digits_is_passed_over_as_unreadable(self):
+        # Anyone who can push a commit writes its message, and int() refuses
+        # a string of more than 4,300 digits with ValueError, which stopped
+        # the metrics run; a count is read as the Actions records' are, a
+        # whole number below 2 ** 53 in ASCII digits.
+        huge = "1" * 4301
+        self.assertEqual(usage.parse_trailer(f"Symphony-Usage: v1 session=x seconds={huge} m={huge},0,0,0,0\n"),
+                         [("x", 0, {})])
+        self.assertEqual(usage.parse_trailer(f"Symphony-Usage: v1 session=x seconds={2 ** 53} m=0,0,0,0,{2 ** 53}\n"),
+                         [("x", 0, {})])
+        self.assertEqual(usage.parse_trailer("Symphony-Usage: v1 session=x seconds=\u0663 m=\u0663,0,0,0,0\n"),
+                         [("x", 0, {})])
+        self.assertEqual(usage.parse_trailer(f"Symphony-Usage: v1 session=x seconds={2 ** 53 - 1} m=0,0,0,0,7\n"),
+                         [("x", 2 ** 53 - 1, {"m": [0, 0, 0, 0, 7]})])
+
+    def test_a_line_with_a_long_run_of_blanks_is_read_in_one_pass(self):
+        # A value read lazily up to optional blanks before the line's end took
+        # time that grew with the square of a run of blanks inside the line:
+        # a second for 16,000 of them, and the metrics run reads each message
+        # more than once, under a 20-minute limit.
+        message = "Symphony-Usage: v1 session=x" + " " * 100_000 + "m=1,2,3,4,5" + " " * 100_000 + "\n"
+        started = time.monotonic()
+        self.assertEqual(usage.parse_trailer(message), [("x", 0, {"m": [1, 2, 3, 4, 5]})])
+        self.assertLess(time.monotonic() - started, 1.0)
+        self.assertEqual(usage.parse_trailer("Symphony-Usage: v1 \t session=y\t \r\n"), [("y", 0, {})])
+
     def test_the_trailer_carries_eight_characters_of_the_session_and_nothing_more(self):
         spent = {"models": {"m": [1, 0, 0, 0, 1]}, "seconds": 1}
         self.assertTrue(usage.trailer("session_01AMrLKnvPcvNBSchUXZbDDX", spent).startswith("v1 session=01AMrLKn "))

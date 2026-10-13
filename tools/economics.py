@@ -130,25 +130,49 @@ def merge(into, models):
 
 # --- the records ----------------------------------------------------------------
 
+# Every count and number of seconds a record gives is below this: up to it
+# a JSON number is a whole number exactly, and usage.count_in reads a
+# trailer's counts to the same bound.
+NUMBER_LIMIT = 2 ** 53
+
+
+def number(value, whole=True):
+    """Whether a JSON value is a number from 0 up to below NUMBER_LIMIT, a
+    whole one unless whole is False. JSON's true and false are no numbers
+    here, nor the infinity json reads 1e999 as, nor NaN."""
+    kinds = int if whole else (int, float)
+    return isinstance(value, kinds) and not isinstance(value, bool) and 0 <= value < NUMBER_LIMIT
+
+
 def actions_record(data):
     """An Actions run's record as the economics read it, or None when it is
-    not one: its counts by model must be whole numbers, its times numbers,
-    and its words the workflows' own."""
+    not one: its counts by model whole numbers, under a name a model can
+    have (usage.MODEL_KEY), its seconds a number, and its words the
+    workflows' own. Any workflow run of the repository can upload a record,
+    so each part of it is read as anyone's JSON: a part of the wrong kind or
+    past the bound is passed over, and nothing in it is ever raised on."""
     if not isinstance(data, dict) or data.get("v") != 1 or data.get("source") != "actions":
         return None
-    models = {}
-    for model, counts in (data.get("models") or {}).items():
-        if (isinstance(model, str) and isinstance(counts, list) and len(counts) == len(usage.FIELDS)
-                and all(isinstance(c, int) and not isinstance(c, bool) and 0 <= c < 2 ** 53 for c in counts)):
-            models[model] = counts
-    seconds = data.get("seconds")
+    listed = data.get("models") if isinstance(data.get("models"), dict) else {}
+    models = {model: counts for model, counts in listed.items()
+              if isinstance(model, str) and usage.MODEL_KEY.fullmatch(model) and isinstance(counts, list)
+              and len(counts) == len(usage.FIELDS) and all(map(number, counts))}
+    workflow, job, seconds = data.get("workflow"), data.get("job"), data.get("seconds")
     return {
-        "workflow": str(data.get("workflow") or ""), "job": str(data.get("job") or ""),
-        "issue": data.get("issue") if isinstance(data.get("issue"), int) else None,
-        "pull": data.get("pull") if isinstance(data.get("pull"), int) else None,
-        "seconds": float(seconds) if isinstance(seconds, (int, float)) and seconds >= 0 else 0.0,
+        "workflow": workflow if isinstance(workflow, str) else "", "job": job if isinstance(job, str) else "",
+        "issue": data.get("issue") if number(data.get("issue")) else None,
+        "pull": data.get("pull") if number(data.get("pull")) else None,
+        "seconds": float(seconds) if number(seconds, whole=False) else 0.0,
         "models": models,
     }
+
+
+def kept_record(data):
+    """A record in the form the field metrics keep between runs: what
+    actions_record reads of it and nothing more, so no part of a record
+    that is anyone's reaches the cache; None when it is no record."""
+    read = actions_record(data)
+    return None if read is None else {"v": 1, "source": "actions", **read}
 
 
 @dataclass

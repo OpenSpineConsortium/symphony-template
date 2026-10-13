@@ -4,12 +4,12 @@ The claim protocol's rules (the labels, the claim, the board, the coordinator's 
 
 ## Steps
 
-1. **Branch in a fork of symphony-protocol.** Write on symphony-protocol stays its owner's alone, because its Actions hold the App's key (the one-time setup below, step 2) and a writer's pull request runs the workflow that reads it. Everyone else works from a fork: `gh repo fork --clone` makes it, clones it and sets symphony-protocol as `upstream`, the repository the pull request of step 3 opens in. The owner clones symphony-protocol itself with `gh repo clone OpenSpineConsortium/symphony-protocol`.
+1. **Branch in a fork of symphony-protocol.** Write on symphony-protocol stays its owner's alone, because its Actions hold the App's key (the one-time setup below, step 2) and a writer's pull request runs the workflow that reads it. Everyone else works from a fork: `gh repo fork --clone` makes it, clones it and sets symphony-protocol as `upstream`, the repository the pull request of step 3 opens in. The owner clones symphony-protocol itself with `gh repo clone OpenSpineConsortium/symphony-protocol`. Every branch on this page is made with `--no-track` so that it never takes a default branch as its upstream: wherever git's push.default is upstream, a push of a branch with that upstream writes that default branch.
 
    ```bash
    gh repo fork OpenSpineConsortium/symphony-protocol --clone
    cd symphony-protocol
-   git switch -c my-change
+   git switch -c my-change --no-track
    ```
 
 2. **Change the module and its tests, and run the checks.** One test module per module, `tests/test_<module>.py`. A rendered string (the board, the guard's refusals, the gate's answers, the VENDORED record) is part of the interface: change one only on purpose, and say so in the pull request. When a module's imports or ecosystem.json change, rewrite the map. A new release raises `__version__` in sdlc_protocol/__init__.py and `version` in pyproject.toml together, which the tests hold equal. Then run the module's own tests (here the board's), the map and the whole check:
@@ -34,7 +34,7 @@ The claim protocol's rules (the labels, the claim, the board, the coordinator's 
 4. **When a downstream job is red on purpose,** because a consumer pins the old output in a test or calls a function that changed, that consumer goes first: in a clone of it, vendor your branch and answer the change in a pull request of its own, merge that, then re-run this pull request's downstream jobs. From the consumer's clone, with your branch checked out in ../symphony-protocol:
 
    ```bash
-   git switch -c answer-my-change
+   git switch -c answer-my-change --no-track
    python3 ../symphony-protocol/scripts/vendor.py . --consumer OpenSpineConsortium/CONSUMER
    ```
 
@@ -51,7 +51,7 @@ The claim protocol's rules (the labels, the claim, the board, the coordinator's 
    ```bash
    [ -d ../symphony-protocol ] || gh repo clone OpenSpineConsortium/symphony-protocol ../symphony-protocol
    git switch main && git pull
-   git switch -c symphony-protocol-vX.Y.Z
+   git switch -c symphony-protocol-vX.Y.Z --no-track
    git -C ../symphony-protocol fetch --tags && git -C ../symphony-protocol checkout vX.Y.Z
    python3 ../symphony-protocol/scripts/vendor.py . --consumer OpenSpineConsortium/symphony-template
    bash scripts/check.sh

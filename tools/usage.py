@@ -61,9 +61,19 @@ sys.path.insert(0, str(TOOLS))
 
 TRAILER_KEY = "Symphony-Usage"
 TRAILER_VERSION = "v1"
-TRAILER_LINE = re.compile(r"(?im)^[ \t]*symphony-usage:[ \t]*v1[ \t]+(.+?)[ \t]*$")
+# The trailer's line, its value read to the line's end and split on
+# blanks: a lazy value followed by optional blanks before the end of the
+# line would be tried at every blank of a long run of them, and anyone who
+# can push writes a commit's message, which the metrics run reads.
+TRAILER_LINE = re.compile(r"(?im)^[ \t]*symphony-usage:[ \t]*v1[ \t]+(.+)$")
 # The five counts of a model's usage, in the order the trailer writes them.
 FIELDS = ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output")
+# A model's name as a trailer or an Actions run's record may give it:
+# letters, digits, dots, colons, dashes and a tag in brackets such as [1m],
+# at most 81 characters, as the SDK names its models. A record anyone
+# uploads may name anything, and reading a name for the price table
+# (economics.normalized) takes time with the square of a run of brackets.
+MODEL_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,80}")
 # A pause longer than this between two lines of a transcript is time
 # nobody was at work, and is left out of a session's seconds.
 IDLE_GAP = 300
@@ -245,6 +255,14 @@ def trailer(session, spent):
     return " ".join(parts)
 
 
+def count_in(text):
+    """A trailer's count as a whole number, or None when it spells none: ASCII
+    digits below 2 ** 53, the bound the Actions records are read with
+    (economics.actions_record), since anyone who can push writes a commit's
+    message and int() refuses more than 4,300 digits with an error."""
+    return int(text) if re.fullmatch(r"[0-9]{1,16}", text) and int(text) < 2 ** 53 else None
+
+
 def parse_trailer(text):
     """Every Symphony-Usage trailer in a commit message, as (session,
     seconds, {model: counts}); a part that cannot be read is passed over."""
@@ -255,12 +273,12 @@ def parse_trailer(text):
             key, _, value = part.partition("=")
             if key == "session":
                 session = value
-            elif key == "seconds" and value.isdecimal():
-                seconds = int(value)
-            elif re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,80}", key):
-                numbers = value.split(",")
-                if len(numbers) == len(FIELDS) and all(n.isdecimal() for n in numbers):
-                    models[key] = [int(n) for n in numbers]
+            elif key == "seconds" and count_in(value) is not None:
+                seconds = count_in(value)
+            elif MODEL_KEY.fullmatch(key):
+                counts = [count_in(n) for n in value.split(",")]
+                if len(counts) == len(FIELDS) and None not in counts:
+                    models[key] = counts
         found.append((session, seconds, models))
     return found
 

@@ -64,6 +64,7 @@ runs as the maintainer, signed in as themselves.
 """
 
 import argparse
+import http.client
 import io
 import json
 import math
@@ -207,10 +208,11 @@ RESET_HEADER = "X-RateLimit-Reset"
 # What Claude spent in GitHub Actions comes from the record each run
 # uploads as an artifact named with this prefix (tools/usage.py). Each
 # download costs a call of the hour, so a run reads at most USAGE_LIMIT new
-# ones, newest first, and keeps what it read in the file --usage-cache
-# names, which the workflow carries from one run to the next, so the next
-# run reads only what is new; an artifact or a file bigger than
-# USAGE_MAX_BYTES is no record of ours and is left unread.
+# ones, newest first, and keeps what it read of each, the parts
+# economics.kept_record keeps, in the file --usage-cache names, which the
+# workflow carries from one run to the next, so the next run reads only
+# what is new; an artifact or a file bigger than USAGE_MAX_BYTES is no
+# record of ours and is left unread.
 USAGE_PREFIX = "symphony-usage-"
 USAGE_LIMIT = 200
 USAGE_MAX_BYTES = 65536
@@ -325,6 +327,17 @@ def header_number(headers, name):
         return None
 
 
+def refusal_detail(problem):
+    """GitHub's words on a refused call, as error_detail reads them, or ""
+    when the refusal's body was cut short: reading it raises http.client's
+    IncompleteRead, which is no OSError, and a call GitHub refused is a
+    refusal whatever became of its words."""
+    try:
+        return error_detail(problem)
+    except http.client.HTTPException:
+        return ""
+
+
 class OutOfBudget(GitHubError):
     """The hour's requests are down to the board's reserve."""
 
@@ -332,10 +345,15 @@ class OutOfBudget(GitHubError):
 class Unfollowed(urllib.request.HTTPRedirectHandler):
     """Leaves a redirect for the caller, so the address it gives is fetched
     without the token: urllib sends a redirected request every header of
-    the first, Authorization among them, to whatever host it names."""
+    the first, Authorization among them, to whatever host it names. It
+    reads nothing of the redirect, not even its address, which urllib
+    parses before asking whether to follow it and raises ValueError on
+    when it cannot, leaving the answer open: the caller reads it."""
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+    def http_error_302(self, req, fp, code, msg, headers):
         return None
+
+    http_error_301 = http_error_303 = http_error_307 = http_error_308 = http_error_302
 
 
 class Budgeted(GitHub):
@@ -354,7 +372,7 @@ class Budgeted(GitHub):
         if self.remaining is not None and self.remaining <= self.reserve:
             raise OutOfBudget(self.refusal())
         try:
-            data, headers = super().request(method, url, body, missing_ok)
+            data, headers = self.library_request(method, url, body, missing_ok)
         except GitHubError as problem:
             if problem.status == 403 and "api rate limit exceeded" in problem.detail.lower():
                 self.remaining = 0
@@ -367,6 +385,25 @@ class Budgeted(GitHub):
         self.counted(headers)
         return data, headers
 
+    def library_request(self, method, url, body, missing_ok):
+        """The library's request, with what http.client raises in it said as
+        a GitHubError, the way symphony-protocol's own fix to its request,
+        not yet vendored here, says it. The request catches urllib's errors
+        and OSError, but http.client's own, for an answer that is not HTTP
+        (BadStatusLine) or one cut short (IncompleteRead), are neither, and
+        urllib passes them on as they are, past every caller that makes a
+        GitHubError one line of the record: the listing of the usage
+        records, the breakdown's reads. One raised as the library read
+        GitHub's words on a refusal is that refusal, with no words."""
+        try:
+            return super().request(method, url, body, missing_ok)
+        except http.client.HTTPException as problem:
+            where = f"{method} {urllib.parse.urlsplit(url).path}"
+            refused = problem.__context__
+            if isinstance(refused, urllib.error.HTTPError):
+                raise GitHubError(f"{where}: HTTP {refused.code}", refused.code, "") from None
+            raise GitHubError(f"{where}: {problem!r}") from None
+
     def counted(self, headers):
         self.calls += 1
         if (remaining := header_number(headers, REMAINING_HEADER)) is not None:
@@ -376,7 +413,11 @@ class Budgeted(GitHub):
         """Where GitHub sends the download at path, asked without following
         the redirect, since the file is served from another host, which is
         never sent the token; None when GitHub answers with no redirect.
-        One call of the hour, counted like any other."""
+        One call of the hour, counted like any other. It asks around the
+        library's request, so it says each failure as a GitHubError itself,
+        an answer that is not HTTP among them: http.client raises its own
+        exceptions there, which are no OSError, and urllib passes them on
+        as they are."""
         if self.remaining is not None and self.remaining <= self.reserve:
             raise OutOfBudget(self.refusal())
         request = urllib.request.Request(self.url(path), headers=self.headers())
@@ -386,7 +427,7 @@ class Budgeted(GitHub):
         except urllib.error.HTTPError as problem:
             if problem.code not in REDIRECTS:
                 self.calls += 1
-                detail = error_detail(problem)
+                detail = refusal_detail(problem)
                 if problem.code == 403 and "api rate limit exceeded" in detail.lower():
                     self.remaining = 0
                     raise OutOfBudget(f"GitHub refused the call ({detail}); {self.refusal()}") from None
@@ -394,21 +435,41 @@ class Budgeted(GitHub):
             headers, target = problem.headers, problem.headers.get("Location")
         except OSError as problem:
             raise GitHubError(f"GET {path}: {getattr(problem, 'reason', problem)}") from None
+        except http.client.HTTPException as problem:
+            raise GitHubError(f"GET {path}: {problem!r}") from None
         self.counted(headers)
         return target
 
     def download(self, url, limit):
         """The bytes at a storage address a redirect gave, fetched with no
         token at all, or None when they are more than limit; no call of the
-        hour, since the storage host is not GitHub's API."""
-        if urllib.parse.urlsplit(url).scheme != "https":
-            raise GitHubError("a download address that is not https is not fetched")
-        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        hour, since the storage host is not GitHub's API. An answer cut
+        short is a GitHubError, as a refused one is, so the record counts as
+        unread: http.client raises its own IncompleteRead, which is no
+        OSError, for one sent in chunks and its BadStatusLine for one that
+        is not HTTP, and gives what came of one whose length it was told,
+        read up to a limit, without a word. The address is fetched only
+        over https and asked, as location asks, without following a
+        redirect, which would take it wherever the storage host said, plain
+        http among the places; and an address urllib cannot read, where it
+        raises ValueError, is a GitHubError too."""
         try:
-            with self.opener.open(request, timeout=TIMEOUT) as answer:
-                data = answer.read(limit + 1)
+            if urllib.parse.urlsplit(url).scheme != "https":
+                raise GitHubError("a download address that is not https is not fetched")
+            request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with self.unfollowed.open(request, timeout=TIMEOUT) as answer:
+                data, told = answer.read(limit + 1), header_number(answer.headers, "Content-Length")
+        except urllib.error.HTTPError as problem:
+            problem.close()
+            raise GitHubError(f"download: HTTP {problem.code}") from None
         except OSError as problem:
             raise GitHubError(f"download: {getattr(problem, 'reason', problem)}") from None
+        except http.client.HTTPException as problem:
+            raise GitHubError(f"download: {problem!r}") from None
+        except ValueError as problem:
+            raise GitHubError(f"download: an address urllib cannot read ({problem})") from None
+        if told is not None and len(data) < min(told, limit + 1):
+            raise GitHubError(f"download: the answer was cut short, {len(data)} of {told} bytes")
         return data if len(data) <= limit else None
 
     def refusal(self):
@@ -1313,8 +1374,13 @@ def usage_artifacts(api, since):
 
 
 def artifact_record(api, artifact):
-    """The usage record an artifact holds, as uploaded, or None when it
-    holds none that economics.actions_record reads."""
+    """The usage record an artifact holds, in the form the cache keeps
+    (economics.kept_record), or None when it holds none. Any workflow run
+    of the repository can upload an artifact under this name, so its bytes
+    are anyone's, and whatever zipfile, its decompressors and json raise on
+    them is no record of ours: an entry marked encrypted or packed by a
+    method zipfile does not know, a broken stream, JSON nested deeper than
+    the interpreter's stack, among what was seen raised."""
     if (artifact.get("size_in_bytes") or 0) > USAGE_MAX_BYTES:
         return None
     target = api.location(f"/repos/{api.repo}/actions/artifacts/{artifact['id']}/zip")
@@ -1327,22 +1393,27 @@ def artifact_record(api, artifact):
             if len(files) != 1 or files[0].file_size > USAGE_MAX_BYTES:
                 return None
             record = json.loads(archive.read(files[0]).decode("utf-8"))
-    except (zipfile.BadZipFile, ValueError, UnicodeDecodeError):
+    except Exception:
         return None
-    return record if economics.actions_record(record) is not None else None
+    return economics.kept_record(record)
 
 
 def read_usage_cache(path):
     """The records an earlier run kept, by artifact id, each with when its
-    artifact was made; an unreadable file is an empty one."""
+    artifact was made and in the form the cache keeps, which a cache an
+    older run wrote, holding records as they were uploaded, is brought to;
+    an unreadable file is an empty one."""
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8")) if path else None
     except (OSError, ValueError):
         return {}
     entries = data.get("records") if isinstance(data, dict) and data.get("v") == USAGE_CACHE_VERSION else None
-    return {key: entry for key, entry in (entries or {}).items()
-            if isinstance(entry, dict) and parse_time(entry.get("at")) is not None
-            and economics.actions_record(entry.get("record")) is not None}
+    kept = {}
+    for key, entry in (entries if isinstance(entries, dict) else {}).items():
+        record = economics.kept_record(entry.get("record")) if isinstance(entry, dict) else None
+        if record is not None and isinstance(entry.get("at"), str) and parse_time(entry["at"]) is not None:
+            kept[key] = {"at": entry["at"], "record": record}
+    return kept
 
 
 def write_usage_cache(path, kept):

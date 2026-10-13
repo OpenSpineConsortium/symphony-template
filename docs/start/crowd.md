@@ -118,7 +118,7 @@ Crowd mode opens a project to volunteers who each work under their own Claude Pr
    git rm docs/agents/claims/N.md
    git commit -m "Finish #N"
    bash scripts/check.sh
-   git push
+   git push origin claude/N
    gh pr ready claude/N
    gh issue edit N --add-label in-review
    ```
