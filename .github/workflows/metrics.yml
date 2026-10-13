@@ -21,8 +21,10 @@ name: Metrics
 # branch metrics, and only in a repository that installed the Symphony
 # App; nothing here sends anything anywhere.
 # Sharing is on by default, with one switch two ways: the word off in
-# .github/symphony-metrics on the default branch, or the repository variable
-# SDLC_METRICS set to off. Off from either wins, and the run then writes
+# .github/symphony-metrics on the default branch (or in
+# .github/sdlc-metrics, its name before the rename, which a repository set
+# up before it carries), or the repository variable SDLC_METRICS set to
+# off. Off from any of them wins, and the run then writes
 # {"schema": "sdlc-metrics/1", "sharing": "off"} and calls no API.
 #
 # The run is daily at 03:43 UTC, before the collector's read at 04:17, so

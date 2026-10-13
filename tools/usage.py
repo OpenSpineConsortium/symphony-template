@@ -97,8 +97,9 @@ def sharing_off(root=ROOT, environ=None):
     """Whether the metrics switch is off, by the rule tools/metrics.py
     reads it with (its sharing): the variable SDLC_METRICS, in the
     environment, is off with any word but on; the file, the new name or
-    the old, is on only with the word on first, on when missing, and off
-    when it says anything else or cannot be read. A person who wants no
+    the old, is on only with the word on first, says nothing when missing,
+    and is off when it says anything else or cannot be read, an off in
+    either file winning over an on in the other. A person who wants no
     usage of theirs on their commits sets SDLC_METRICS=off in their own
     environment. Not imported from metrics, since this runs before every
     git commit and must stay quick."""
@@ -113,7 +114,8 @@ def sharing_off(root=ROOT, environ=None):
             continue
         except (OSError, UnicodeDecodeError):
             return True
-        return first_word(text) != "on"
+        if first_word(text) != "on":
+            return True
     return False
 
 

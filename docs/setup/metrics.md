@@ -257,7 +257,7 @@ The branch `metrics` is as visible as the repository: in a public repository any
 
 Sharing is on unless one of these says off; off from either wins.
 
-- The file .github/symphony-metrics on the default branch: its first word is `on` or `off`. A missing file means on; any first word but `on`, or a file that cannot be read, means off. Change it by pull request like any file:
+- The file .github/symphony-metrics on the default branch: its first word is `on` or `off`. A missing file means on; any first word but `on`, or a file that cannot be read, means off. A repository set up before the rename to Symphony may carry the same switch as .github/sdlc-metrics, which is read the same way, and off in either file wins: an on in one never lifts an off in the other. Change it by pull request like any file:
 
   ```
   printf 'off\n' > .github/symphony-metrics

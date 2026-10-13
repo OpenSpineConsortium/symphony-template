@@ -1,10 +1,15 @@
 """One prompt for every worker and one for the coordinator, wherever they
 run: a routine pastes the short prompt of docs/agents/routines/worker.md or
 coordinator.md, and .github/workflows/workers.yml and coordinator.yml pass
-the same words, with GitHub's own values where the page has placeholders,
-so a worker in Actions and a routine read the same full prompt and do the
-same thing. The workflows also read the registry the way the library
-reads it, so a worker's file decides its model, turns and rounds."""
+the same words, with GitHub's own values where the page names the
+repository and its default branch, so a worker in Actions and a routine
+read the same full prompt and do the same thing. The page names them with
+placeholders in the template and with the copy's own names once
+tools/template_init.py has filled it, while the workflows, which the fill
+never writes, keep GitHub's values; so the comparison reads what the page
+holds in those places, and holds the template's page to the placeholders.
+The workflows also read the registry the way the library reads it, so a
+worker's file decides its model, turns and rounds."""
 
 import re
 import sys
@@ -15,6 +20,11 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github" / "workflows"
 ROUTINES = ROOT / "docs" / "agents" / "routines"
 P = {"REPO": "{{" + "REPO" + "}}", "DEFAULT_BRANCH": "{{" + "DEFAULT_BRANCH" + "}}"}
+GITHUB = {"REPO": "${{ github.repository }}", "DEFAULT_BRANCH": "${{ env.DEFAULT_BRANCH }}"}
+IN_TEMPLATE = (ROOT / ".template" / "PENDING").is_file()
+# How many characters on either side of a name find it in a page whose
+# other words differ from the workflow's.
+NEAR = 16
 sys.path.insert(0, str(ROOT / "tools"))
 
 
@@ -22,12 +32,61 @@ def short_prompt(page):
     return (ROUTINES / page).read_text(encoding="utf-8").split("```")[1].strip("\n")
 
 
-def in_actions(prompt, name=None):
-    """A page's short prompt as a workflow passes it: the repository and the
-    default branch from GitHub, and the worker's name from the matrix."""
-    text = prompt.replace(P["REPO"], "${{ github.repository }}")
-    text = text.replace(P["DEFAULT_BRANCH"], "${{ env.DEFAULT_BRANCH }}")
-    return text.replace("<name>", name) if name else text
+def names_held(page, sent):
+    """What a page's words hold where the workflow's words have GitHub's own
+    values: one name for the repository and one for its default branch, each
+    the same wherever it stands; None when the words around them differ."""
+    pattern, seen = "", set()
+    for piece in re.split("(" + "|".join(map(re.escape, GITHUB.values())) + ")", sent):
+        key = next((key for key, value in GITHUB.items() if value == piece), None)
+        if key is None:
+            pattern += re.escape(piece)
+        elif key in seen:
+            pattern += f"(?P={key})"
+        else:
+            seen.add(key)
+            pattern += rf"(?P<{key}>\S+?)"
+    found = re.fullmatch(pattern, page)
+    return found.groupdict() if found else None
+
+
+def names_near(page, sent):
+    """For showing words that differ: the name a page holds where the
+    workflow's words first have each of GitHub's values, found by the words
+    on either side, so that a difference elsewhere shows alone; the
+    placeholder where the words beside it differ too. Each is one word, as a
+    name names_held finds is, so words it found differing still differ with
+    these names in place."""
+    names = {}
+    for key, value in GITHUB.items():
+        before, found, after = sent.partition(value)
+        if not found:
+            continue
+        near = re.search(re.escape(before[-NEAR:]) + r"(\S+)" + re.escape(after[:NEAR]), page)
+        names[key] = near.group(1) if near else P[key]
+    return names
+
+
+def as_the_page_holds(sent, names):
+    """The workflow's words with the page's names where GitHub's values stand."""
+    for key, name in names.items():
+        sent = sent.replace(GITHUB[key], name)
+    return sent
+
+
+def assert_passes(test, page, sent):
+    """The workflow passes the page's words: the same words, with GitHub's
+    values where the page names the repository and its default branch,
+    which the template's page names by placeholder. Words that differ are
+    shown with the names the page should hold in those places, the
+    placeholders in the template and in a copy the names found beside them,
+    so that only the words that differ show."""
+    names = names_held(page, sent)
+    shown = names if names is not None else P if IN_TEMPLATE else names_near(page, sent)
+    test.assertEqual(as_the_page_holds(sent, shown), page)
+    if IN_TEMPLATE:
+        test.assertEqual(names, {key: P[key] for key in names},
+                         "the template's page names the repository and its default branch by placeholder")
 
 
 def prompt_of(workflow, step_id):
@@ -45,11 +104,12 @@ def prompt_of(workflow, step_id):
 
 class TheWorkerPrompt(unittest.TestCase):
     def test_a_worker_in_actions_gets_the_routines_short_prompt_with_its_name(self):
-        routine = in_actions(short_prompt("worker.md"), "${{ matrix.worker }}")
+        routine = short_prompt("worker.md").replace("<name>", "${{ matrix.worker }}")
         sent = prompt_of("workers.yml", "claude")
-        keep = routine.split(" Read it again on every run")[0]
-        self.assertTrue(sent.startswith(keep), (sent, keep))
         self.assertIn("This run, ${{ steps.next.outputs.move }} issue #${{ steps.next.outputs.issue }}", sent)
+        # The workflow passes the routine's words up to their last sentence,
+        # and then a sentence of the run's own.
+        assert_passes(self, routine.split(" Read it again on every run")[0], sent.split(" This run, ")[0])
 
     def test_the_full_prompt_reads_the_workers_file_and_its_given_issues_first(self):
         full = (ROUTINES / "worker.md").read_text(encoding="utf-8").split("```")[-2]
@@ -74,7 +134,7 @@ class TheWorkerPrompt(unittest.TestCase):
 
 class TheCoordinatorPrompt(unittest.TestCase):
     def test_the_weekly_run_passes_the_routines_short_prompt(self):
-        self.assertEqual(prompt_of("coordinator.yml", "tidy"), in_actions(short_prompt("coordinator.md")))
+        assert_passes(self, short_prompt("coordinator.md"), prompt_of("coordinator.yml", "tidy"))
 
     def test_the_full_prompt_leaves_releases_and_overlaps_to_the_board(self):
         full = (ROUTINES / "coordinator.md").read_text(encoding="utf-8").split("```")[-2]
