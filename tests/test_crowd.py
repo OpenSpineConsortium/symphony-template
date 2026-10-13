@@ -1606,6 +1606,21 @@ class Audit(unittest.TestCase):
         self.assertEqual(len(warns), 1, run.out)
         self.assertIn("claude/12, claimed by alice, was pushed this week by mallory", warns[0])
 
+    def test_only_the_claim_branch_the_library_writes_is_a_claim(self):
+        # GitHub's first-push lock holds per name, so claude/03 is no claim on
+        # #3 (claims.number_of); a name in other digits, or one int() cannot
+        # read, is not one either, and none of them may be read as a claim.
+        world = merged_world(World())
+        world.claims = {12: ("alice", ["alice", "mallory"])}
+        routes = world.routes()
+        listed = routes[f"GET {API}/branches?per_page=100"][0]["body"]
+        listed += [{"name": name} for name in ("claude/03", "claude/\u0663", "claude/\u00b2", "claude/x", "claude/")]
+        world.routes = lambda: routes
+        run = self.audit(world)
+        warns = [line for line in run.lines if line.startswith("warn  claim pushes")]
+        self.assertEqual(len(warns), 1, run.out)
+        self.assertIn("claude/12, claimed by alice, was pushed this week by mallory", warns[0])
+
     def test_every_failing_check_says_what_fixes_it(self):
         # The guide's step 10: each line comes with the command or the page
         # that fixes it. A check with several lines may say it once, last.

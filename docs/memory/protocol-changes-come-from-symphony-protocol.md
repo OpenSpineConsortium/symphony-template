@@ -18,9 +18,13 @@ symphony-protocol.
 The template itself, OpenSpineConsortium/symphony-template, then receives the
 change with nothing done by hand. symphony-protocol's CI runs the template's own
 check against the change (the job `downstream (symphony-template)`) before it
-merges, and the push to its main starts its workflow Sync, which vendors the
-change into the template and opens, or updates, the pull request from the
-branch `symphony-protocol/sync`, made with the App Symphony's token so the
+merges. A change reaches the consumers only in a release: from 0.4.1 each
+release waits for the owner's approval in symphony-protocol's environment
+release (its release.yml), and its workflow Sync, which follows the Release
+run, weekly and by hand, carries only the newest published release, from
+the commit that raised main to its version, never main's head. Sync
+vendors that release into the template and opens, or updates, the pull
+request from the branch `symphony-protocol/sync`, made with the App Symphony's token so the
 template's CI runs on it, with auto-merge on where the repository allows it;
 the template's check decides. The same sync reaches coordbench,
 symphony-marketplace and symphony-app: symphony-protocol's ecosystem.json lists which
@@ -29,8 +33,9 @@ list, maps all five.
 
 A repository made from the template is not on that list, so no sync pull
 request reaches it. Its own .github/workflows/protocol.yml takes each
-release instead: symphony-protocol tags every version that reaches its main
-by itself (its release.yml), and the copy's workflow, weekly and by hand,
+release instead: symphony-protocol's release.yml tags each version that
+reaches its main once the owner approves its release, and the copy's
+workflow, weekly and by hand,
 vendors the newest tag when it is newer than tools/VENDORED, on the branch
 `symphony-protocol/sync`, and opens the pull request with GITHUB_TOKEN, or
 an issue linking it where GitHub Actions may not open pull requests. A
@@ -38,7 +43,9 @@ push or pull request made with GITHUB_TOKEN starts no workflow, so the run
 starts ci.yml on the branch (its workflow_dispatch) for the required
 check, and arms auto-merge, which lands it once the check is green where
 the repository allows it. tools/protocol_update.py holds what it decides
-and says. By hand it is
+and says. It reads tags, not releases, so a tag pushed by hand reaches the
+copies before any approval (symphony-protocol's README, Releases). By hand
+it is
 `python3 <symphony-protocol>/scripts/vendor.py <this repository> --consumer OpenSpineConsortium/symphony-template`,
 which copies what the template takes, and a pull request; in the template
 the same command needs no `--consumer`, since its remote names it.
@@ -48,6 +55,6 @@ tools/board.py, check_protocol.py, team.py, workers.py and guard_push.py,
 the workflows and the hooks. The owner's one-time setup for the sync is
 docs/setup/owner-checklist.md, section 6.
 
-Source: symphony-protocol 0.4.0, its ecosystem.json and its README's sections
+Source: symphony-protocol 0.4.1, its ecosystem.json, its sync.yml and its README's sections
 "How a change reaches the other repositories", "The owner's one-time setup
 for the sync" and "Releases"; this repository's .github/workflows/protocol.yml.
