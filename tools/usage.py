@@ -68,6 +68,12 @@ TRAILER_VERSION = "v1"
 TRAILER_LINE = re.compile(r"(?im)^[ \t]*symphony-usage:[ \t]*v1[ \t]+(.+)$")
 # The five counts of a model's usage, in the order the trailer writes them.
 FIELDS = ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output")
+# A model's name as a trailer or an Actions run's record may give it:
+# letters, digits, dots, colons, dashes and a tag in brackets such as [1m],
+# at most 81 characters, as the SDK names its models. A record anyone
+# uploads may name anything, and reading a name for the price table
+# (economics.normalized) takes time with the square of a run of brackets.
+MODEL_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,80}")
 # A pause longer than this between two lines of a transcript is time
 # nobody was at work, and is left out of a session's seconds.
 IDLE_GAP = 300
@@ -269,7 +275,7 @@ def parse_trailer(text):
                 session = value
             elif key == "seconds" and count_in(value) is not None:
                 seconds = count_in(value)
-            elif re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,80}", key):
+            elif MODEL_KEY.fullmatch(key):
                 counts = [count_in(n) for n in value.split(",")]
                 if len(counts) == len(FIELDS) and None not in counts:
                     models[key] = counts

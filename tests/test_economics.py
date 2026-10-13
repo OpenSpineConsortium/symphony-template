@@ -75,6 +75,31 @@ class Attribution(unittest.TestCase):
                                          "seconds": -3, "issue": "12"})
         self.assertEqual((kept["models"], kept["seconds"], kept["issue"]), ({"n": [1] * 5}, 0.0, None))
 
+    def test_a_record_is_read_as_anyones_json_and_never_raised_on(self):
+        # Any workflow run can upload a record: each part of the wrong kind,
+        # or past the bound a JSON number holds exactly, is passed over.
+        base = {"v": 1, "source": "actions"}
+        for seconds in (float("inf"), float("nan"), 10 ** 400, 2 ** 53, True, -1, "60"):
+            self.assertEqual(economics.actions_record({**base, "seconds": seconds})["seconds"], 0.0, seconds)
+        self.assertEqual(economics.actions_record({**base, "seconds": 2 ** 53 - 1})["seconds"], float(2 ** 53 - 1))
+        for models in ([1, 2], "m", 5, None):
+            self.assertEqual(economics.actions_record({**base, "models": models})["models"], {}, models)
+        counts = {"m": [1, 0, 0, 0, True], "n": [1, 0, 0, 0, 2 ** 53], "[" * 82: [1] * 5, "-x": [1] * 5,
+                  "claude-opus-4-6[1m]": [1] * 5}
+        self.assertEqual(economics.actions_record({**base, "models": counts})["models"],
+                         {"claude-opus-4-6[1m]": [1] * 5})
+        odd = economics.actions_record({**base, "workflow": ["coordinator"], "job": 5, "issue": True, "pull": 2 ** 60})
+        self.assertEqual((odd["workflow"], odd["job"], odd["issue"], odd["pull"]), ("", "", None, None))
+
+    def test_the_kept_form_of_a_record_is_what_is_read_of_it_and_reads_the_same(self):
+        uploaded = {"v": 1, "source": "actions", "workflow": "coordinator", "job": "plan", "issue": 9, "pull": None,
+                    "seconds": 95, "models": {"m": [1, 2, 3, 4, 5]}, "worker": "", "turns": 12, "deep": [[[]]]}
+        kept = economics.kept_record(uploaded)
+        self.assertEqual(kept, {"v": 1, "source": "actions", "workflow": "coordinator", "job": "plan", "issue": 9,
+                                "pull": None, "seconds": 95.0, "models": {"m": [1, 2, 3, 4, 5]}})
+        self.assertEqual(economics.kept_record(kept), kept)
+        self.assertIsNone(economics.kept_record({"v": 1, "source": "elsewhere"}))
+
 
 class Window(unittest.TestCase):
     def test_the_bill_is_the_windows_trailers_and_runs_and_the_delivery_its_pull_requests(self):

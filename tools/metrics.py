@@ -208,10 +208,11 @@ RESET_HEADER = "X-RateLimit-Reset"
 # What Claude spent in GitHub Actions comes from the record each run
 # uploads as an artifact named with this prefix (tools/usage.py). Each
 # download costs a call of the hour, so a run reads at most USAGE_LIMIT new
-# ones, newest first, and keeps what it read in the file --usage-cache
-# names, which the workflow carries from one run to the next, so the next
-# run reads only what is new; an artifact or a file bigger than
-# USAGE_MAX_BYTES is no record of ours and is left unread.
+# ones, newest first, and keeps what it read of each, the parts
+# economics.kept_record keeps, in the file --usage-cache names, which the
+# workflow carries from one run to the next, so the next run reads only
+# what is new; an artifact or a file bigger than USAGE_MAX_BYTES is no
+# record of ours and is left unread.
 USAGE_PREFIX = "symphony-usage-"
 USAGE_LIMIT = 200
 USAGE_MAX_BYTES = 65536
@@ -1340,8 +1341,13 @@ def usage_artifacts(api, since):
 
 
 def artifact_record(api, artifact):
-    """The usage record an artifact holds, as uploaded, or None when it
-    holds none that economics.actions_record reads."""
+    """The usage record an artifact holds, in the form the cache keeps
+    (economics.kept_record), or None when it holds none. Any workflow run
+    of the repository can upload an artifact under this name, so its bytes
+    are anyone's, and whatever zipfile, its decompressors and json raise on
+    them is no record of ours: an entry marked encrypted or packed by a
+    method zipfile does not know, a broken stream, JSON nested deeper than
+    the interpreter's stack, among what was seen raised."""
     if (artifact.get("size_in_bytes") or 0) > USAGE_MAX_BYTES:
         return None
     target = api.location(f"/repos/{api.repo}/actions/artifacts/{artifact['id']}/zip")
@@ -1354,22 +1360,27 @@ def artifact_record(api, artifact):
             if len(files) != 1 or files[0].file_size > USAGE_MAX_BYTES:
                 return None
             record = json.loads(archive.read(files[0]).decode("utf-8"))
-    except (zipfile.BadZipFile, ValueError, UnicodeDecodeError):
+    except Exception:
         return None
-    return record if economics.actions_record(record) is not None else None
+    return economics.kept_record(record)
 
 
 def read_usage_cache(path):
     """The records an earlier run kept, by artifact id, each with when its
-    artifact was made; an unreadable file is an empty one."""
+    artifact was made and in the form the cache keeps, which a cache an
+    older run wrote, holding records as they were uploaded, is brought to;
+    an unreadable file is an empty one."""
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8")) if path else None
     except (OSError, ValueError):
         return {}
     entries = data.get("records") if isinstance(data, dict) and data.get("v") == USAGE_CACHE_VERSION else None
-    return {key: entry for key, entry in (entries or {}).items()
-            if isinstance(entry, dict) and parse_time(entry.get("at")) is not None
-            and economics.actions_record(entry.get("record")) is not None}
+    kept = {}
+    for key, entry in (entries if isinstance(entries, dict) else {}).items():
+        record = economics.kept_record(entry.get("record")) if isinstance(entry, dict) else None
+        if record is not None and isinstance(entry.get("at"), str) and parse_time(entry["at"]) is not None:
+            kept[key] = {"at": entry["at"], "record": record}
+    return kept
 
 
 def write_usage_cache(path, kept):

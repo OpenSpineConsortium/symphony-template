@@ -17,6 +17,7 @@ import os
 import re
 import shlex
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -845,6 +846,63 @@ class Economics(unittest.TestCase):
                 api.download(f"{STORAGE}/ssh", metrics.USAGE_MAX_BYTES)
             self.assertTrue(str(caught.exception).startswith("download: BadStatusLine("), caught.exception)
 
+    def test_a_record_anyone_uploaded_never_ends_the_run_and_only_what_is_read_is_kept(self):
+        # Any workflow run of the repository can upload an artifact named as
+        # the usage records are, so its bytes are anyone's; each of these
+        # once ended the run with a traceback, and no record was written.
+        # Record 9001 is still read where its JSON is, with what cannot be
+        # read in it passed over, and passed over whole where it is not.
+        sonnet = [900, 25000, 0, 300000, 6400]
+        cases = {
+            "seconds json reads as infinity": (zipped_text(record_text(seconds="1e999")), sonnet),
+            "seconds too large for a float": (zipped_text(record_text(seconds="9" * 401)), sonnet),
+            "models given as a list": (zipped_text(record_text(models="[1, 2]")), None),
+            "a key nested deeper than the interpreter's stack": (
+                zipped_text(record_text(worker="[" * 20000 + "]" * 20000)), "unread"),
+            "a key nested deep enough to stop the cache being written": (
+                zipped_text(record_text(worker="[" * 1500 + "]" * 1500)), sonnet),
+            "a workflow that is no word": (zipped_text(record_text(workflow="[" * 900 + "]" * 900)), sonnet),
+            "an entry marked encrypted": (with_entry_field(zipped_text(record_text()), 6, 8, 1), "unread"),
+            "a compression method zipfile does not know": (
+                with_entry_field(zipped_text(record_text()), 8, 10, 99), "unread"),
+            "a broken deflate stream": (with_broken_stream(zipped_text(record_text(), zipfile.ZIP_DEFLATED)),
+                                        "unread"),
+            "a model named by a run of 60,000 brackets": (
+                zipped_text(record_text(models=json.dumps({"[" * 60000: [1, 0, 0, 0, 1],
+                                                           "claude-sonnet-5-5": sonnet}))), sonnet),
+        }
+        for name, (data, sonnet_read) in cases.items():
+            routes = world_routes()
+            routes["/usage/9001.zip"] = data
+            with self.subTest(name):
+                with tempfile.TemporaryDirectory() as folder:
+                    cache = Path(folder) / "usage.json"
+                    record, _, _ = self.collect(folder, routes=routes, cache=cache)
+                    kept = json.loads(cache.read_text())["records"]
+                economics = record["economics"]
+                self.assertEqual(economics["actions_runs"], 1 if sonnet_read == "unread" else 2)
+                self.assertEqual(economics["actions_runs_unread"], 0)
+                self.assertEqual(economics["tokens_unpriced"], WORLD_ECONOMICS["tokens_unpriced"])
+                spent = sum(sonnet_read) if isinstance(sonnet_read, list) else 0
+                self.assertEqual(economics["tokens_total"], WORLD_ECONOMICS["tokens_total"] - 332300 + spent)
+                self.assertEqual(sorted(kept), ["9002"] if sonnet_read == "unread" else ["9001", "9002"])
+                for entry in kept.values():
+                    self.assertEqual(set(entry["record"]),
+                                     {"v", "source", "workflow", "job", "issue", "pull", "seconds", "models"})
+
+    def test_a_cache_an_older_run_wrote_is_read_in_the_form_the_cache_keeps(self):
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / "usage.json"
+            uploaded = json.loads(record_text(worker='"left over"'))
+            cache.write_text(json.dumps({"v": 1, "records": {
+                "9001": {"at": "2026-10-07T10:28:00Z", "record": uploaded},
+                "9002": {"at": "2026-10-06T08:00:00Z", "record": [1, 2]},
+                "9003": ["not", "an", "entry"]}}))
+            self.assertEqual(sorted(metrics.read_usage_cache(cache)), ["9001"])
+            self.assertNotIn("worker", metrics.read_usage_cache(cache)["9001"]["record"])
+            cache.write_text(json.dumps({"v": 1, "records": [1, 2]}))
+            self.assertEqual(metrics.read_usage_cache(cache), {})
+
     def test_what_is_no_record_of_ours_is_passed_over(self):
         routes = world_routes()
         buffer = io.BytesIO()
@@ -1005,6 +1063,47 @@ def usage_record(workflow, job, models, seconds, issue=None, pull=None):
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("record.json", json.dumps(record))
     return buffer.getvalue()
+
+
+def zipped_text(text, compression=zipfile.ZIP_STORED):
+    """A record's JSON exactly as written, zipped as upload-artifact keeps it."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=compression) as archive:
+        archive.writestr("record.json", text)
+    return buffer.getvalue()
+
+
+def record_text(**raw):
+    """World record 9001's JSON with some fields' values written as raw JSON
+    text, which json.dumps would never write."""
+    record = {"v": 1, "source": "actions", "workflow": "claude", "job": "claude", "worker": "", "issue": None,
+              "pull": 309, "at": "2026-10-06T00:00:00Z", "seconds": 340.5,
+              "models": {"claude-sonnet-5-5": [900, 25000, 0, 300000, 6400]}}
+    text = json.dumps({**record, **{key: f"@{key}@" for key in raw}})
+    for key, value in raw.items():
+        text = text.replace(f'"@{key}@"', value)
+    return text
+
+
+def with_entry_field(data, local_offset, central_offset, value):
+    """A zip with one two-byte field of its entry set to value, in the local
+    header and in the central directory alike: the flags at 6 and 8, the
+    compression method at 8 and 10."""
+    data = bytearray(data)
+    for signature, offset in ((b"PK\x03\x04", local_offset), (b"PK\x01\x02", central_offset)):
+        struct.pack_into("<H", data, data.find(signature) + offset, value)
+    return bytes(data)
+
+
+def with_broken_stream(data):
+    """A deflated zip whose compressed bytes are garbled."""
+    data = bytearray(data)
+    local = data.find(b"PK\x03\x04")
+    name_length, extra_length = struct.unpack_from("<HH", data, local + 26)
+    start = local + 30 + name_length + extra_length
+    for index in range(start, start + 12):
+        data[index] ^= 0xA5
+    return bytes(data)
 
 
 def artifact(number, name, created, expired=False, size=600):
