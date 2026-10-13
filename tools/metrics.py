@@ -64,6 +64,7 @@ runs as the maintainer, signed in as themselves.
 """
 
 import argparse
+import http.client
 import io
 import json
 import math
@@ -325,6 +326,17 @@ def header_number(headers, name):
         return None
 
 
+def refusal_detail(problem):
+    """GitHub's words on a refused call, as error_detail reads them, or ""
+    when the refusal's body was cut short: reading it raises http.client's
+    IncompleteRead, which is no OSError, and a call GitHub refused is a
+    refusal whatever became of its words."""
+    try:
+        return error_detail(problem)
+    except http.client.HTTPException:
+        return ""
+
+
 class OutOfBudget(GitHubError):
     """The hour's requests are down to the board's reserve."""
 
@@ -376,7 +388,11 @@ class Budgeted(GitHub):
         """Where GitHub sends the download at path, asked without following
         the redirect, since the file is served from another host, which is
         never sent the token; None when GitHub answers with no redirect.
-        One call of the hour, counted like any other."""
+        One call of the hour, counted like any other. It asks around the
+        library's request, so it says each failure as a GitHubError itself,
+        an answer that is not HTTP among them: http.client raises its own
+        exceptions there, which are no OSError, and urllib passes them on
+        as they are."""
         if self.remaining is not None and self.remaining <= self.reserve:
             raise OutOfBudget(self.refusal())
         request = urllib.request.Request(self.url(path), headers=self.headers())
@@ -386,7 +402,7 @@ class Budgeted(GitHub):
         except urllib.error.HTTPError as problem:
             if problem.code not in REDIRECTS:
                 self.calls += 1
-                detail = error_detail(problem)
+                detail = refusal_detail(problem)
                 if problem.code == 403 and "api rate limit exceeded" in detail.lower():
                     self.remaining = 0
                     raise OutOfBudget(f"GitHub refused the call ({detail}); {self.refusal()}") from None
@@ -394,21 +410,32 @@ class Budgeted(GitHub):
             headers, target = problem.headers, problem.headers.get("Location")
         except OSError as problem:
             raise GitHubError(f"GET {path}: {getattr(problem, 'reason', problem)}") from None
+        except http.client.HTTPException as problem:
+            raise GitHubError(f"GET {path}: {problem!r}") from None
         self.counted(headers)
         return target
 
     def download(self, url, limit):
         """The bytes at a storage address a redirect gave, fetched with no
         token at all, or None when they are more than limit; no call of the
-        hour, since the storage host is not GitHub's API."""
+        hour, since the storage host is not GitHub's API. An answer cut
+        short is a GitHubError, as a refused one is, so the record counts as
+        unread: http.client raises its own IncompleteRead, which is no
+        OSError, for one sent in chunks and its BadStatusLine for one that
+        is not HTTP, and gives what came of one whose length it was told,
+        read up to a limit, without a word."""
         if urllib.parse.urlsplit(url).scheme != "https":
             raise GitHubError("a download address that is not https is not fetched")
         request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         try:
             with self.opener.open(request, timeout=TIMEOUT) as answer:
-                data = answer.read(limit + 1)
+                data, told = answer.read(limit + 1), header_number(answer.headers, "Content-Length")
         except OSError as problem:
             raise GitHubError(f"download: {getattr(problem, 'reason', problem)}") from None
+        except http.client.HTTPException as problem:
+            raise GitHubError(f"download: {problem!r}") from None
+        if told is not None and len(data) < min(told, limit + 1):
+            raise GitHubError(f"download: the answer was cut short, {len(data)} of {told} bytes")
         return data if len(data) <= limit else None
 
     def refusal(self):

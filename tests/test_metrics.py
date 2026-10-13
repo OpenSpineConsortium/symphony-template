@@ -6,19 +6,25 @@ breakdown is run over a two-person world and over two real histories,
 anonymised, so each rule is held to numbers measured outside this code; no
 login, session link or file name of theirs reaches the file. The workflow's
 write step is run here against local git repositories, so the lease that
-keeps a judge push is tested as it runs, not read."""
+keeps a judge push is tested as it runs, not read, and a socket on this
+machine answers the usage records' downloads cut short, so the run meets
+what http.client itself raises."""
 
+import http.client
 import io
 import json
 import os
 import re
 import shlex
+import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 import urllib.error
 import urllib.parse
+import urllib.request
 import zipfile
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
@@ -276,6 +282,102 @@ class SpentHour:
 class NoCalls:
     def open(self, request, timeout=None):
         raise AssertionError(f"an API call was made: {request.full_url}")
+
+
+# What a socket on this machine answers in the tests of an answer cut
+# short or garbled: a refusal whose body stops before the length it gave, a
+# download sent in chunks that stops inside its first, one that stops
+# before the length it gave, and an answer that is not HTTP at all.
+REFUSAL_CUT_SHORT = (b"HTTP/1.1 502 Bad Gateway\r\nContent-Type: application/json\r\nContent-Length: 96\r\n\r\n"
+                     b'{"message": "Server Err')
+CHUNKS_CUT_SHORT = (b"HTTP/1.1 200 OK\r\nContent-Type: application/zip\r\nTransfer-Encoding: chunked\r\n\r\n"
+                    b"400\r\nPK\x03\x04")
+LENGTH_CUT_SHORT = b"HTTP/1.1 200 OK\r\nContent-Type: application/zip\r\nContent-Length: 600\r\n\r\nPK\x03\x04"
+NOT_HTTP = b"SSH-2.0-OpenSSH_9.6\r\n"
+NOT_FOUND = b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n"
+
+
+class RawSocket:
+    """A socket on this machine that answers each request with the bytes
+    given for its path and then closes the connection, whatever the bytes
+    say. Its opener sends https requests there in plain HTTP, so urllib and
+    http.client read those bytes as they read GitHub's, and an answer cut
+    short or garbled raises what it raises in a real run."""
+
+    def __init__(self, answers):
+        self.answers = answers
+        self.listener = socket.create_server(("127.0.0.1", 0))
+        self.listener.settimeout(0.05)
+        self.closing = threading.Event()
+        self.thread = threading.Thread(target=self.serve, daemon=True)
+        self.thread.start()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.closing.set()
+        self.thread.join(10)
+        self.listener.close()
+        return False
+
+    def serve(self):
+        while not self.closing.is_set():
+            try:
+                connection, _ = self.listener.accept()
+            except TimeoutError:
+                continue
+            with connection:
+                try:
+                    self.answer(connection)
+                except OSError:
+                    pass
+
+    def answer(self, connection):
+        """The bytes for the path the request names, then the end of the
+        answer; what the other side sends after that is read and dropped
+        for a moment, so the close is not a reset that could overtake the
+        bytes, and a client that keeps the connection open holds up the
+        next request no longer than that."""
+        connection.settimeout(10)
+        asked = b""
+        while b"\r\n\r\n" not in asked and (chunk := connection.recv(65536)):
+            asked += chunk
+        words = asked.split(b" ", 2)
+        path = urllib.parse.urlsplit(words[1].decode("ascii")).path if len(words) == 3 else ""
+        connection.sendall(self.answers.get(path, NOT_FOUND))
+        connection.shutdown(socket.SHUT_WR)
+        connection.settimeout(1)
+        while connection.recv(65536):
+            pass
+
+    def opener(self):
+        """urllib's opener as the run builds it, but with https sent here,
+        and with no proxy, which the environment may name for every host."""
+        port = self.listener.getsockname()[1]
+
+        class HereInPlainHTTP(urllib.request.HTTPSHandler):
+            def https_open(self, request):
+                return self.do_open(lambda host, **options: http.client.HTTPConnection("127.0.0.1", port, **options),
+                                    request)
+
+        return urllib.request.build_opener(urllib.request.ProxyHandler({}), metrics.Unfollowed, HereInPlainHTTP)
+
+
+class PartlyOverASocket(FakeGitHub):
+    """The world's GitHub, but for the paths a RawSocket answers, whose
+    requests go to that socket through urllib and http.client."""
+
+    def __init__(self, routes, raw):
+        super().__init__(routes)
+        self.raw, self.real = raw, raw.opener()
+
+    def open(self, request, timeout=None):
+        path = urllib.parse.urlsplit(request.full_url).path
+        if path not in self.raw.answers:
+            return super().open(request, timeout)
+        self.calls.append(path)
+        return self.real.open(request, timeout=timeout)
 
 
 def collect(folder, environ, opener, extra=()):
@@ -614,8 +716,8 @@ class Economics(unittest.TestCase):
     """What the work cost, from the sessions' trailers and the Actions runs'
     records, read after the breakdown and never in its way."""
 
-    def collect(self, folder, routes=None, cache=None):
-        opener = FakeGitHub(routes or world_routes())
+    def collect(self, folder, routes=None, cache=None, opener=None):
+        opener = opener or FakeGitHub(routes or world_routes())
         out = Path(folder) / "METRICS.json"
         extra = ["--usage-cache", str(cache)] if cache else []
         args = metrics.parse_args(["collect", "--repo", REPO, "--out", str(out), "--root", str(folder), "--now", NOW,
@@ -696,6 +798,52 @@ class Economics(unittest.TestCase):
             record = json.loads(out.read_text())
         self.assertEqual((record["economics"]["actions_runs"], record["economics"]["actions_runs_unread"]), (0, 2))
         self.assertEqual(sum(path.endswith("/zip") for path in opener.calls), 1)
+
+    def test_an_answer_cut_short_or_not_http_is_one_record_left_unread_and_the_run_goes_on(self):
+        # Budgeted.location and Budgeted.download ask GitHub and the storage
+        # host with urllib themselves, around the library's request, and
+        # http.client's own errors are no OSError; a download read up to a
+        # limit also stops short of the length it was told without a word.
+        zipped, stored = f"{API}/actions/artifacts/9001/zip", "/usage/9001.zip"
+        for name, path, raw in (("refused, its body cut short", zipped, REFUSAL_CUT_SHORT),
+                                ("asked for its redirect, not HTTP", zipped, NOT_HTTP),
+                                ("downloaded in chunks, cut short", stored, CHUNKS_CUT_SHORT),
+                                ("downloaded, cut short of its length", stored, LENGTH_CUT_SHORT),
+                                ("downloaded, not HTTP", stored, NOT_HTTP)):
+            with self.subTest(name), RawSocket({path: raw}) as here, tempfile.TemporaryDirectory() as folder:
+                opener = PartlyOverASocket(world_routes(), here)
+                record, shown, _ = self.collect(folder, opener=opener)
+                self.assertIn(path, opener.calls)
+                self.assertEqual((record["economics"]["actions_runs"], record["economics"]["actions_runs_unread"]),
+                                 (1, 1))
+                self.assertEqual(record["economics"]["tokens_total"], WORLD_ECONOMICS["tokens_total"] - 332300)
+                self.assertTrue(shown.rstrip("\n").endswith(
+                    "; 1 Actions runs' usage records were left for the next run"), shown)
+
+    def test_location_and_download_say_what_went_wrong_as_the_github_error_the_run_reads(self):
+        refused, garbled = f"{API}/actions/artifacts/9001/zip", f"{API}/actions/artifacts/9002/zip"
+        answers = {refused: REFUSAL_CUT_SHORT, garbled: NOT_HTTP, "/chunks": CHUNKS_CUT_SHORT,
+                   "/length": LENGTH_CUT_SHORT, "/ssh": NOT_HTTP}
+        with RawSocket(answers) as here:
+            api = metrics.Budgeted("t", REPO, opener=here.opener(), sleep=lambda seconds: None)
+            with self.assertRaises(metrics.GitHubError) as caught:
+                api.location(refused)
+            self.assertEqual((str(caught.exception), caught.exception.status, caught.exception.detail),
+                             (f"GET {refused}: HTTP 502", 502, ""))
+            self.assertEqual(api.calls, 1)
+            with self.assertRaises(metrics.GitHubError) as caught:
+                api.location(garbled)
+            self.assertTrue(str(caught.exception).startswith(f"GET {garbled}: BadStatusLine("), caught.exception)
+            self.assertIsNone(caught.exception.status)
+            with self.assertRaises(metrics.GitHubError) as caught:
+                api.download(f"{STORAGE}/chunks", metrics.USAGE_MAX_BYTES)
+            self.assertTrue(str(caught.exception).startswith("download: IncompleteRead("), caught.exception)
+            with self.assertRaises(metrics.GitHubError) as caught:
+                api.download(f"{STORAGE}/length", metrics.USAGE_MAX_BYTES)
+            self.assertEqual(str(caught.exception), "download: the answer was cut short, 4 of 600 bytes")
+            with self.assertRaises(metrics.GitHubError) as caught:
+                api.download(f"{STORAGE}/ssh", metrics.USAGE_MAX_BYTES)
+            self.assertTrue(str(caught.exception).startswith("download: BadStatusLine("), caught.exception)
 
     def test_what_is_no_record_of_ours_is_passed_over(self):
         routes = world_routes()
