@@ -4,14 +4,14 @@ A repository not made from the template takes the protocol in two halves. The sy
 
 ## Steps
 
-1. **Clone the two sources beside your repository, and branch.** symphony-protocol is public; TEMPLATE_OWNER/TEMPLATE_NAME is the template for a member of its enterprise and the public copy for anyone else ([README.md](README.md)), which exists only once the template's owner publishes one; until then, ask the owner for the seven files the `cp` lines below take from it (board.yml, tidy.yml, protocol.yml, board.py, protocol_update.py, check_docs.py and marked_section.py), put them under ../symphony-template at the paths those lines read, and skip the second clone:
+1. **Clone the two sources beside your repository, and branch.** symphony-protocol is public; TEMPLATE_OWNER/TEMPLATE_NAME is the template for a member of its enterprise and the public copy for anyone else ([README.md](README.md)), which exists only once the template's owner publishes one; until then, ask the owner for the seven files the `cp` lines below take from it (board.yml, tidy.yml, protocol.yml, board.py, protocol_update.py, check_docs.py and marked_section.py), put them under ../symphony-template at the paths those lines read, and skip the second clone. The branch is made with `--no-track` so that it never takes the default branch as its upstream, since wherever git's push.default is upstream a push of a branch with that upstream writes the default branch, step 7's push included:
 
    ```bash
    cd ..
    git clone --branch v0.4.0 https://github.com/OpenSpineConsortium/symphony-protocol.git
    gh repo clone TEMPLATE_OWNER/TEMPLATE_NAME symphony-template
    cd NAME
-   git switch -c sdlc-setup
+   git switch -c sdlc-setup --no-track
    ```
 
 2. **The library and the board's workflow.** vendor.py copies the protocol's package where the template keeps it, tools/sdlc_protocol, with its record tools/VENDORED; board.yml renders the board with GitHub's own token on every issue and pull request event, and its run is also the coordinator's, which releases idle claims and tells open work that changes the same files; tidy.yml deletes a closed issue's claim branch; and protocol.yml, with tools/protocol_update.py, brings each later release in by pull request:
