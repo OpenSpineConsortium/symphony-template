@@ -18,7 +18,15 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
 import add_worker  # noqa: E402
+import crowd_check  # noqa: E402
 from sdlc_protocol import workers  # noqa: E402
+
+# In crowd mode scripts/crowd.py puts the crowd's worker page in the worker
+# page's place, so the tests of the template's page hold only outside it, and
+# the crowd's own page, which every copy carries, is tested as it stands.
+CROWD = crowd_check.mode_of((ROOT / "docs" / "project.md").read_text(encoding="utf-8")) == "on"
+CROWD_PAGE = ROOT / "docs" / "setup" / "crowd" / "worker.md"
+IN_CROWD_MODE = "in crowd mode the worker page is the crowd's, tested below as docs/setup/crowd/worker.md"
 
 FORM = ROOT / ".github" / "ISSUE_TEMPLATE" / "worker.yml"
 WORKFLOW = ROOT / ".github" / "workflows" / "add-worker.yml"
@@ -76,6 +84,7 @@ class Deciding(unittest.TestCase):
 
 
 class Answering(unittest.TestCase):
+    @unittest.skipIf(CROWD, IN_CROWD_MODE)
     def test_a_routine_gets_the_short_prompt_with_its_name_filled_in(self):
         text = add_worker.reply("nightly", "routine", "https://github.com/o/r/pull/9", True)
         self.assertTrue(text.startswith("The pull request that adds it: https://github.com/o/r/pull/9."))
@@ -105,6 +114,20 @@ class Answering(unittest.TestCase):
         self.assertIn("- name must be lower case\n- rounds must be a whole number\n", text)
         self.assertNotIn("workers:", text)
 
+    def test_a_routine_in_crowd_mode_is_sent_to_the_crowds_own_prompt(self):
+        """The crowd's prompt names the worker by the contributor's login and
+        keeps one of two area lines, which crowd.py fills in, so the answer
+        sends the contributor there and pastes nothing half filled."""
+        text = add_worker.reply("alice", "routine", "u", True, page=CROWD_PAGE)
+        self.assertIn("python3 scripts/crowd.py doctor --worker", text)
+        self.assertNotIn("```", text)
+        self.assertNotIn(add_worker.LOGIN_SLOT, text)
+
+    def test_the_crowds_page_is_told_from_the_templates_by_its_slot(self):
+        self.assertTrue(add_worker.is_crowd_page(CROWD_PAGE))
+        self.assertEqual(add_worker.is_crowd_page(), CROWD)
+
+    @unittest.skipIf(CROWD, IN_CROWD_MODE)
     def test_the_short_prompt_is_the_worker_pages_first_block(self):
         page = (ROOT / "docs" / "agents" / "routines" / "worker.md").read_text(encoding="utf-8")
         first = page.split("```")[1].strip("\n")

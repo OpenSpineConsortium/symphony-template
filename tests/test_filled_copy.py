@@ -16,13 +16,16 @@ this template" leaves it, and a person's copy on master as the front door's
 whole template makes it with sharing off, with no LICENSE, which the front
 door never copies, and the word off alone in the switch file, as its
 opt-out writes it, and with SDLC_METRICS=off in the environment besides, as
-a person may set it in their shell. Side by side, the two add about the
-time of one copy's check to the template's.
+a person may set it in their shell; and an organization's copy in crowd
+mode, as scripts/crowd.py setup's pull request leaves it once merged, which
+puts the crowd's own pages in place of the template's. Side by side, the
+three add about the time of one copy's check to the template's.
 
 Only the template makes a copy: a copy has no .template/ folder, so its own
 check skips this, which also keeps it from making a copy of itself.
 """
 
+import importlib.util
 import json
 import os
 import shutil
@@ -48,6 +51,8 @@ TAIL = 40
 COPIES = {
     "on": {"repo": "example-org/example", "branch": "main", "owner_type": "Organization", "sharing": "on"},
     "off": {"repo": PERSON + "/example", "branch": "master", "owner_type": "User", "sharing": "off"},
+    "crowd": {"repo": "example-org/crowd", "branch": "main", "owner_type": "Organization", "sharing": "on",
+              "crowd": True},
 }
 
 
@@ -91,12 +96,50 @@ def push_event(repo, branch, owner_type):
             "repository": {"full_name": repo, "default_branch": branch, "owner": {"login": owner, "type": owner_type}}}
 
 
-def make_copy(folder, repo, branch, owner_type, sharing):
+def copy_files(copy):
+    """The copy's tracked files as text, path to text, as crowd.py reads the
+    default branch's."""
+    listed = subprocess.run(["git", "ls-files", "-z"], cwd=copy, env=without_git_variables(os.environ),
+                            capture_output=True, check=True).stdout.decode("utf-8").split("\0")
+    files = {}
+    for rel in filter(None, listed):
+        try:
+            files[rel] = (copy / rel).read_text(encoding="utf-8")
+        except (UnicodeDecodeError, IsADirectoryError):
+            continue
+    return files
+
+
+def into_crowd_mode(copy, repo, branch):
+    """What scripts/crowd.py setup's pull request changes, made offline by its
+    own build_change over the copy's files, the copy's own crowd.py, and
+    committed as its merge would be."""
+    spec = importlib.util.spec_from_file_location("copy_crowd", copy / "scripts" / "crowd.py")
+    crowd = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(copy / "tools"))
+    try:
+        spec.loader.exec_module(crowd)
+        change = crowd.build_change(copy_files(copy), repo, branch, PERSON, [])
+    finally:
+        sys.path.remove(str(copy / "tools"))
+    for rel, text in change.files.items():
+        path = copy / rel
+        if text is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+    git(copy, "add", "-A")
+    git(copy, "commit", "-q", "-m", "Open the repository to volunteers, as scripts/crowd.py setup does")
+
+
+def make_copy(folder, repo, branch, owner_type, sharing, crowd=False):
     """A copy as "Use this template" and its first push's run make it: the
     template's files in one commit on the default branch, then the commit of
     tools/template_init.py's fill; and for sharing off, the commit that
     makes it what the front door's whole template makes with sharing off,
-    which has no LICENSE and says off in the switch file."""
+    which has no LICENSE and says off in the switch file; and for crowd
+    mode, the commit of what crowd.py setup's pull request changes."""
     copy = folder / repo.partition("/")[2]
     copy_template(copy)
     git(copy, "init", "-q")
@@ -113,6 +156,8 @@ def make_copy(folder, repo, branch, owner_type, sharing):
         (copy / "LICENSE").unlink()
         (copy / usage.SWITCH_FILE).write_text("off\n", encoding="ascii")
         git(copy, "commit", "-q", "-am", "Leave out LICENSE and turn sharing off, as the front door does")
+    if crowd:
+        into_crowd_mode(copy, repo, branch)
     return copy
 
 
@@ -170,6 +215,9 @@ class AFilledCopy(unittest.TestCase):
 
     def test_a_persons_copy_on_master_with_sharing_off_passes_its_own_check(self):
         self.assert_passes("off")
+
+    def test_an_organizations_copy_in_crowd_mode_passes_its_own_check(self):
+        self.assert_passes("crowd")
 
 
 if __name__ == "__main__":
