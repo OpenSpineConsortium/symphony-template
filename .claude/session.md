@@ -8,9 +8,9 @@ DESIGN-qa-gate.md, RESEARCH-scale.md), the free-or-paid table
 (free-or-paid.md) and one patch set aside
 (template-crowd-number-of.patch), as files a session reads with the
 Artifact tool; the owner has them too. This file says where things stand.
-Its claims were not rechecked against GitHub before the handoff (the
-owner stopped that check, for the next session to make): the next
-session rechecks them first.
+Its claims were rechecked against GitHub's live state on 2026-10-13 at
+about 15:30 UTC by the Project thread "Recheck the handoff"; what did not
+hold is corrected below and listed under "The recheck".
 
 ## Completed work
 
@@ -60,8 +60,7 @@ session rechecks them first.
 - The release gate is live: each release waits for the owner's click in
   the browser (Review deployments, then Approve and deploy).
 - Nothing of this session's is open on GitHub; the template's session
-  branch claude/magical-shannon-ak167f is level with main after this
-  checkpoint and may be deleted once this session ends.
+  branch claude/magical-shannon-ak167f is already gone, deleted on merge.
 - Six findings of the validation prototype are left, each for the owner's
   decision or a live measurement: F2, F4, F7, F8, F9, F12 (PLAN.md,
   Phase 1, says what each needs).
@@ -82,8 +81,10 @@ For the owner, in order (PLAN.md section 4 has the links):
 5. Submit Symphony for Chrome, then the five CWS_ secrets and CWS_ON_PUSH.
 6. Name the Actions setting in Symphony Setup's description.
 7. Tick "Automatically delete head branches" in symphony-start,
-   symphony-protocol, symphony-marketplace and coordbench, then delete
-   the merged branches left.
+   symphony-protocol, symphony-marketplace, coordbench, symphony-app and
+   the site, then delete the merged branches left, the template's
+   claude/festive-edison-al7xu2 among them (merged in main since
+   2026-10-10).
 8. Beethoven: the beethoven-qa tags v4.0.0 and v5.0.0, Beethoven 20.0.0
    to the store, beethoven-vscode#11 and #12.
 9. spine-program #72.
@@ -91,10 +92,7 @@ For the owner, in order (PLAN.md section 4 has the links):
 
 For the session, in order:
 
-1. Recheck every claim of this file and of HANDOFF.md against GitHub's
-   live state (each pull request merged, each release, version, branch
-   and file named, what is still open), and fix this checkpoint by a
-   pull request where one does not hold.
+1. Done: the recheck (below).
 2. The template's follow-up for 0.4.1, one pull request here:
    docs/agents/PROTOCOL.md's Claim (claude/N exactly, N in one to nine
    ASCII digits with no leading zero; a claim file over 1 MB is read as
@@ -120,7 +118,9 @@ For the session, in order:
 4. docs/memory/the-plan-ladder.md brought up to the free-or-paid table,
    verified 2026-10-13, one pull request.
 5. Phase 1 of PLAN.md: the validation harness in symphony-protocol from
-   validation/DESIGN.md, one pull request per step of its build order.
+   validation/DESIGN.md, one pull request per step of its build order;
+   its first pull request brings DESIGN.md's findings table up to date
+   (see the recheck).
 6. Phase 2, the fresh test, once the owner has deleted the old test
    repositories; then Phases 3 to 11.
 
@@ -128,6 +128,35 @@ Use a workflow for each substantive step, with an adversarial review
 before each pull request, and merge each pull request once its checks are
 green. Never approve, publish or change symphony-protocol's release
 approval without the owner's own words.
+
+## The recheck
+
+Rechecked 2026-10-13 against GitHub: every pull request this file and
+HANDOFF.md name is merged (symphony-protocol#10, #11, #12;
+symphony-template#59 to #65; symphony-marketplace#9 to #13;
+symphony-app#12; coordbench#10; symphony-start#36, #37, #38; site#13,
+#14), each with every check run a success or skipped; v0.4.1 was
+published at 13:39:56 UTC by release.yml's run for #11's merge, which
+waited from 13:16 to 13:39; the plugin is 0.1.10 (0.1.7 at #10, 0.1.9 at
+#11 and #12); privacy statement version 5 is in symphony-start and on the
+site; no pull request of the project's repositories is open; the
+follow-up's files, the patch (it applies to main) and the protocol
+README's two lines are as step 2 and step 3 say. What did not hold, or
+needs a word:
+
+- The template's session branch was already deleted (Current state).
+- Merged branches are left in symphony-app and the site too, not only
+  the four repositories owner step 7 named, and in the template one
+  from 2026-10-10 (owner step 7).
+- symphony-protocol's validation/DESIGN.md, on main, still says the
+  package does not change and lists F1, F2, F3, F5, F6, F10, F11 and F12
+  as "fix in progress on claude/validation-fixes": 0.4.1 fixed six, and
+  F2 and F12 were left with F4, F7, F8 and F9 (session step 5).
+- The site has no CI, so its pull requests' "green on its own checks"
+  means no check ran.
+- Every consumer's VENDORED names 438844f, not v0.4.1's tag commit
+  485d470: vendor.py records the last commit that changed
+  sdlc_protocol/, and the package is the same at both.
 
 ## Decisions
 
