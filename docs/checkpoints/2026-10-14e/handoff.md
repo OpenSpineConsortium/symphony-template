@@ -12,21 +12,21 @@ A pasted copy of this message may arrive cut short, or be only a pointer. The wh
 - Three Symphony threads (the protocol fixes, the deep lane, CooperBench) and a grant thread ran all afternoon and evening in the old account's cloud environment; nothing ran on the owner's computer.
 - symphony-template merged #82 (the 14d handoff) at 14:59 UTC, #83 (the filled-copy test's git runs with no gc or maintenance of its own) at 15:10, #81 (the cut review of coordbench#14) at 15:13, #77 (F4's counterpart: workers.yml deals the workers of one run from one look) at 15:54 and #78 (F14's counterpart) at 16:10. Its main is 8f69c40.
 - symphony-protocol merged #25 (F14) at 16:13 UTC, #26 (F9) at 16:59, #27 (F13) at 18:04, #28 (F15) at 20:57, #29 (F16) at 21:07, #30 (the owner's answers to F15's and F16's questions) at 21:14 and #31 (F17) at 22:01. Its main is c17e34c. The version is still 0.4.1 and the last release is v0.4.1 of 2026-10-13, so F7, F12, F4, F14, F9, F13, F15, F16 and F17 are on main and unreleased.
-- Each adversarial review of a fix turned up the next finding: F15, F16 and F17 (merged), then F18 (symphony-protocol#32) and F19 (a branch with no pull request yet). Part 1 says what each open one is; memory.md says what every fix does.
+- Each adversarial review of a fix turned up the next finding: F15, F16 and F17 (merged), then F18 (symphony-protocol#32) and F19 (symphony-protocol#33). Part 1 says what each open one is; memory.md says what every fix does.
 - coordbench merged #14 at 17:10 UTC, #15 at 17:17 and #16 at 17:25; its main is 5e4860e. #17 came from the review of #14's upload scrub.
 - spine-program: the AIDaS grant revision runs as issue #94 and draft pull request #95, with its own resume file, HANDOFF_2026-10-14e.md, in the grant folder on its branch.
 - The owner's decisions of the day, in memory.md: keep the second review round on each fix (18:59 UTC); the grant keeps the VinDr and FluoroCap results (22:05); the owner has permission to use any and all data (22:16); spine-program's rule 9 stays, so FluoroCap stays out of future training (22:29).
 
-## 1. Where each piece of open work stopped (read from GitHub at about 23:40 UTC)
+## 1. Where each piece of open work stopped (read from GitHub at about 23:50 UTC)
 
 Read each pull request's description first: each thread was told at 23:34 UTC to write its stopping point there.
 
-**symphony-template** (main 8f69c40)
+**symphony-template** (main a137669 at 23:51 UTC, before this handoff merges)
 
-- This handoff's pull request, from branch claude/handoff-2026-10-14e-qv2g34, files only (handoff.md, memory.md and owner-todo.md in this folder). Merge it once its check is green, first of all.
-- #84, draft, the CooperBench thread's checkpoint, https://github.com/OpenSpineConsortium/symphony-template/pull/84, branch claude/project-thread-8d9veg, files only: the findings of coordbench#17's cut round-four review (docs/checkpoints/2026-10-14e/notes/coordbench-review-17-round4.md) and the run's checkpoint brought up to date (docs/checkpoints/2026-10-14/cooperbench-run.md). Merge it once its check is green.
-- #85, draft, the deep lane thread's checkpoint, https://github.com/OpenSpineConsortium/symphony-template/pull/85, files only: docs/checkpoints/2026-10-14e/deep-lane/README.md with the exact steps and scripts to finish symphony-protocol#21. Merge it once its check is green.
-- No other open pull request. Branch claude/festive-edison-al7xu2 is the leftover of 2026-10-10 on the owner's housekeeping list; leave it.
+- #86, this handoff's pull request, https://github.com/OpenSpineConsortium/symphony-template/pull/86, branch claude/handoff-2026-10-14e-qv2g34, files only (handoff.md, memory.md and owner-todo.md in this folder). If it is still open, merge it first, once its check is green.
+- #84, the CooperBench thread's checkpoint, https://github.com/OpenSpineConsortium/symphony-template/pull/84, files only, merged at 23:48 UTC as ae8dbcd: the findings of coordbench#17's cut round-four review (docs/checkpoints/2026-10-14e/notes/coordbench-review-17-round4.md) and the run's checkpoint brought up to date (docs/checkpoints/2026-10-14/cooperbench-run.md).
+- #85, the deep lane thread's checkpoint, https://github.com/OpenSpineConsortium/symphony-template/pull/85, files only, merged at 23:51 UTC as a137669: docs/checkpoints/2026-10-14e/deep-lane/README.md with the exact steps and the scripts to finish symphony-protocol#21.
+- No other open pull request but this handoff's. Branch claude/festive-edison-al7xu2 is the leftover of 2026-10-10 on the owner's housekeeping list; leave it.
 
 **symphony-protocol** (main c17e34c, version 0.4.1)
 
@@ -49,8 +49,8 @@ Read each pull request's description first: each thread was told at 23:34 UTC to
 
 ## 2. The plan, in order (items found today added in their place)
 
-1. The deep lane: symphony-template#85, then symphony-protocol#21's last short run, its figures and its merge.
-2. CooperBench: symphony-template#84; coordbench#17's four findings fixed and reviewed, then #17 merged; the fake run (tag fake-1); the run checkpoint's update; no real run before the owner's steps.
+1. The deep lane: symphony-protocol#21's last short run, its figures and its merge, by the steps in docs/checkpoints/2026-10-14e/deep-lane/README.md.
+2. CooperBench: coordbench#17's four findings (symphony-template#84's notes) fixed and reviewed, then #17 merged; the fake run (tag fake-1); the run checkpoint's update; no real run before the owner's steps.
 3. The protocol fixes, one pull request each, each with an adversarial review and a second review of its answers before it merges: F18 (symphony-protocol#32, with its symphony-template counterpart for shared tasks merged before any release), F19 (#33), F2, F8 (after the canary's C5), then the stuck claim, which raises the version to 0.5.0. A library fix whose rendered strings or pinned tests reach the template gets a template pull request that vendors the branch first (symphony-protocol's README, "A change a consumer must answer"). The owner's decision of 2026-10-13 stands: the library fix on every finding, correctness over cost, no deadlock, no missed work, no orphaned worker.
 3b. The measurement pass, after the stuck-claim merge: the API calls of one board run, the claim-to-first-PR, open-to-merge and first-review medians from a real copy, and retry on 429 and secondary rate limits in the library, each by its own pull request.
 4. Tell the owner 0.5.0 is ready, since only the owner approves a release; then the compiler (docs/checkpoints/2026-10-14b/plans/gh-aw-migration-plan.md, Candidate A, PR 1a to PR 7); CooperBench's real run once the owner's steps are done; the canary's first live run and the harness's step 8 report.
