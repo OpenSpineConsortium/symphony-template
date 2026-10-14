@@ -13,8 +13,9 @@ note on a pull request, is a line of the workflow's log, and the run
 still exits 0, so the board is written to its branch whatever GitHub
 answered; a refused note, idle or "main moved", is posted by a later run,
 since both depend on the state and not on the run's event (from the
-library's release after 0.4.1; before it a refused "main moved" waited
-for the default branch to move again).
+library's change after 0.4.1, which the template vendored ahead of that
+release; before it a refused "main moved" waited for the default branch
+to move again).
 """
 
 import sys

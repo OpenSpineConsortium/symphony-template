@@ -16,13 +16,14 @@ caller patch this module's branches(), which the library's run() would
 not see. Anything the guard cannot read it lets through rather than
 wedging the session; branch protection on GitHub refuses what matters.
 
-Before a lease push onto claude/N the library's guard, from the release
-after 0.4.1, reads whose claim the branch on origin and the branch
-pushed carry, from the claim file docs/agents/claims/N.md, and refuses a
-lease that would take another worker's claim (guard.other_holder, its
-claim_file_reader). main() hands it that reader when the vendored copy
-has one, so the hook gains the fence with the sync that brings that
-release and runs as before until then.
+Before a lease push onto claude/N the library's guard, from its change
+after 0.4.1, which the template vendored ahead of that release, reads
+whose claim the branch on origin and the branch pushed carry, from the
+claim file docs/agents/claims/N.md, and refuses a lease that would take
+another worker's claim (guard.other_holder, its claim_file_reader).
+main() hands it that reader when the vendored copy has one, so an older
+copy's hook gains the fence with the sync that brings that release and
+runs as before until then.
 """
 
 import json
