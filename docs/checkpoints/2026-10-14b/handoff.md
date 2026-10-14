@@ -28,3 +28,9 @@ Pick up Symphony from this checkpoint. The last account ran out of usage, so eve
 
 **Rules**
 One pull request per change, from the thread's own branch. Run bash scripts/check.sh first where the repository has it. Run an adversarial review before each substantive pull request. Merge once green, on my standing permission. Never approve, publish or change a symphony-protocol release or its approval gate without my own words. Never push to or force-push a default branch. No API key and no Claude credential anywhere. If something you need is missing, say exactly what in your first message and stop. Ask me before anything marked mine. Every manual step you give me needs its exact link and what to click.
+
+**Final state, 10:40 UTC**
+- symphony-protocol#21: work pushed, checkpoint at the top of its description. Next: bring main in again, since #24 conflicts in four files; verify the runner review's eight findings; rerun the deep lane at the final head; fill in the docs; merge when green.
+- symphony-protocol#23 (F4): main merged in and the deal tests added, pushed at c70354b, checkpoint at the top of its description. Next: F4's mutation run, the spec and design wording, the review, the template's workers.yml change, then F14 onward.
+- coordbench#12: checkpoint in a comment on #12. The smoke run's three fake pairs ran with no errors, and the review stopped after one of seven reviewers with nine findings. Next: read gradeability survey run 38549172370, fix the findings by a new pull request, fix the pair list and run fake mode over it.
+- SYMPHONY_CLAUDE_ACCOUNTS takes slot numbers separated by commas, for example 1,2,3.
