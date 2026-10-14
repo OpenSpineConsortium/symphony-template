@@ -43,10 +43,10 @@ first job (its own claim, else the task it was given, else the next
 blocker or queued issue in its area), so no two legs of one run race for
 one claim or are dealt one issue from looks at different moments, and an
 idle worker spends no Claude usage; a leg that waited looks again and
-keeps only its worker's own work from that look, and until the vendored
-library carries team deal, each leg asks for itself. The sessions run on
-the secret CLAUDE_CODE_OAUTH_TOKEN; no repository variable switches
-workers on.
+keeps only its worker's own work from that look; in a copy whose
+vendored library has no team deal yet, each leg asks for itself until
+the release after 0.4.1 reaches it. The sessions run on the secret
+CLAUDE_CODE_OAUTH_TOKEN; no repository variable switches workers on.
 
 The coordinator is two things. A step of the board's own run, on
 GITHUB_TOKEN and with no Claude usage, releases a claim idle for 24 hours

@@ -18,11 +18,15 @@ symphony-protocol.
 The template itself, OpenSpineConsortium/symphony-template, then receives the
 change with nothing done by hand. symphony-protocol's CI runs the template's own
 check against the change (the job `downstream (symphony-template)`) before it
-merges. A change reaches the consumers only in a release: from 0.4.1 each
-release waits for the owner's approval in symphony-protocol's environment
-release (its release.yml), and its workflow Sync, which follows the Release
-run, weekly and by hand, carries only the newest published release, from
-the commit that raised main to its version, never main's head. Sync
+merges. A change reaches the consumers in a release, with one exception:
+a change the template's own check must answer, a rendered string its tests
+pin or a function it calls that changes, comes here first, by a pull
+request that vendors the library's branch (symphony-protocol's README, "A
+change a consumer must answer"). From 0.4.1 each release waits for the
+owner's approval in symphony-protocol's environment release (its
+release.yml), and its workflow Sync, which follows the Release run, weekly
+and by hand, carries only the newest published release, from the commit
+that raised main to its version, never main's head. Sync
 vendors that release into the template and opens, or updates, the pull
 request from the branch `symphony-protocol/sync`, made with the App Symphony's token so the
 template's CI runs on it, with auto-merge on where the repository allows it;
@@ -30,6 +34,20 @@ the template's check decides. The same sync reaches coordbench,
 symphony-marketplace and symphony-app: symphony-protocol's ecosystem.json lists which
 repository takes which modules, and its ECOSYSTEM.md, generated from that
 list, maps all five.
+
+So between such a pull request and the release that carries its change,
+the template runs ahead of the newest release, while the first line of
+tools/VENDORED still names that release's version: since
+symphony-template#78 (2026-10-14), symphony-protocol's fixes after 0.4.1
+are here, recorded as 0.4.1 with their commit, and a copy made from the
+template meanwhile starts on them. Sync, weekly and by hand, knows only
+the newest release, so it opens `symphony-protocol/sync` taking the copy
+back to 0.4.1, with auto-merge armed. That pull request is a downgrade:
+close it each time it comes back, and never turn it green, by
+regenerating a fixture or otherwise, until the release that carries the
+fixes, 0.5.0 by the owner's plan, is published and its sync brings the
+copy level again. The fixture of the board's Given to workers heading
+keeps it red meanwhile.
 
 A repository made from the template is not on that list, so no sync pull
 request reaches it. Its own .github/workflows/protocol.yml takes each
