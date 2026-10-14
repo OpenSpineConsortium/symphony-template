@@ -4,7 +4,7 @@ Everything the claude.ai Project "Symphony" held outside GitHub when the owner m
 
 ## Files in this folder
 
-- HANDOFF.md: the prompt for the next session, from the coordinator's handoff card of 01:36 UTC, corrected for coordbench#12's merge at 01:39 and pointed at this folder.
+- HANDOFF.md: the prompt for the next session (item 1 folding #71 and #72 is done: this pull request folded them into .claude/session.md), from the coordinator's handoff card of 01:36 UTC, corrected for coordbench#12's merge at 01:39 and pointed at this folder.
 - coordinator-checkpoint.md: the coordinator's checkpoint of 01:10 UTC, the list the handoff was built from.
 - protocol-fixes.md: the fixes thread's next steps (F4, F14, F9, F13, F2, F8, the stuck claim, then 0.5.0).
 - cooperbench-run.md: where the CooperBench run stands and the owner's steps before a real run.
