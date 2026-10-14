@@ -56,6 +56,27 @@ hold is corrected below and listed under "The recheck".
 
 ## Current state
 
+- Beethoven 20.0.0 (2026-10-13 and 14, the Project thread "Beethoven
+  extension v20 store readiness"): everything a session can do is merged.
+  beethoven-extension #11 (agreement 14, privacy 15, the texts on a public
+  listing), #12 (release/20.0.0, the package's record; SHA-256
+  33294f8b9ea662d9354eef416a05ca1d570918dbcb74cd4b8f73e05f9bbbd790), #13
+  (.github/workflows/release.yml, the organisation's Chrome Web Store
+  release kit on every push to main), #14 (screenshots 2 to 5 captured
+  from the 20.0.0 build, extension/store-assets/raw-20, and the
+  submission kit release/20.0.0/store-kit) and #15 (the kit's commands in
+  a subshell, so it finds the zip); the site's #17 and #18 (the public
+  install card, linking the listing); beethoven-access#6 (deployed). The
+  first release from CI is extension-v20.0.0.102, made 2026-10-14 00:35
+  UTC; its store step says "Not configured" until the owner's secrets
+  exist. The package in the kit is the one built from #11's merge, and
+  nothing in extension/src changed after it. Not yet measured: whether a
+  real upload through the kit succeeds (no secret yet), and whether
+  20.0.0's screens pass the hand test on the real grid. The e2e harness's
+  extension/e2e/lib/words.mjs is behind 20.0.0's welcome texts, and a
+  capture in a Chromium older than the manifest's Chrome 148 needs the
+  two changes raw-20/LIST.txt names, in a copy of the package only.
+
 - Every consumer runs symphony-protocol 0.4.1; the plugin is 0.1.10.
 - The release gate is live: each release waits for the owner's click in
   the browser (Review deployments, then Approve and deploy).
@@ -85,8 +106,20 @@ For the owner, in order (PLAN.md section 4 has the links):
    the site, then delete the merged branches left, the template's
    claude/festive-edison-al7xu2 among them (merged in main since
    2026-10-10).
-8. Beethoven: the beethoven-qa tags v4.0.0 and v5.0.0, Beethoven 20.0.0
-   to the store, beethoven-vscode#11 and #12.
+8. Beethoven: the beethoven-qa tags v4.0.0 and v5.0.0, beethoven-vscode#11
+   and #12, and Beethoven 20.0.0 to the store as a public listing. For the
+   store, in order (the Claude Doc "Beethoven on the Chrome Web Store: the
+   upload and automatic releases",
+   https://claude.ai/code/artifact/faad8276-a633-4b1b-902b-0716790a0f26,
+   has the clicks and the links): the hand test on the grid and the two
+   st1234 curls from WSL; the upload by hand from
+   beethoven-extension's release/20.0.0/store-kit (Visibility Public,
+   Trusted testers empty, Regions United States); a Google Cloud OAuth
+   client with its consent screen published and a refresh token from the
+   OAuth 2.0 Playground; the five CWS_ secrets in beethoven-extension
+   (CWS_ITEM_ID is heoopgbkbkfckhhpbkkcgigohfekjicn) and then the variable
+   CWS_ON_PUSH=upload; one run of "Release the extension" by hand with
+   upload ticked.
 9. spine-program #72.
 10. Questions 6 to 14 of PLAN.md section 3, when their phases start.
 
