@@ -48,6 +48,7 @@ CHECK_TIMEOUT = 900
 STEP_TIMEOUT = 120
 # How many of a failed check's last lines the failure shows.
 TAIL = 40
+QUIET = {"gc.auto": "0", "gc.autoDetach": "false", "maintenance.auto": "false", "maintenance.autoDetach": "false"}
 COPIES = {
     "on": {"repo": "example-org/example", "branch": "main", "owner_type": "Organization", "sharing": "on"},
     "off": {"repo": PERSON + "/example", "branch": "master", "owner_type": "User", "sharing": "off"},
@@ -73,10 +74,15 @@ def run(argv, folder, environ):
 
 def git(folder, *args):
     """git in the copy, as the person who made it, with nobody's own
-    configuration, so no signing setting or hook of theirs takes part."""
+    configuration, so no signing setting or hook of theirs takes part, and
+    with no gc or maintenance of its own: git 2.55 on GitHub's runners starts
+    it, detached, after the copy's first commit, and its packing removed the
+    loose objects' folders while the next add wrote into them, which failed
+    the add at random ("unable to create temporary file")."""
     environ = without_git_variables(os.environ) | {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
+    quiet = [arg for key, value in QUIET.items() for arg in ("-c", f"{key}={value}")]
     run(["git", "-c", f"user.name={PERSON}", "-c", f"user.email={PERSON}@example.invalid",
-         "-c", "commit.gpgsign=false", *args], folder, environ)
+         "-c", "commit.gpgsign=false", *quiet, *args], folder, environ)
 
 
 def copy_template(target):
