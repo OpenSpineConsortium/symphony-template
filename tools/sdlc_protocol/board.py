@@ -75,7 +75,7 @@ OVERLAP_HEADING = ("## Overlaps (files that more than one piece of open work cha
 OVERLAP_COLUMNS = ("File", "Open work, in the order it should land")
 QUEUE_HEADING = "## Queue (open issues labelled todo, unclaimed and given to no worker)"
 ISSUE_COLUMNS = ("Issue", "Title", "Labels")
-GIVEN_HEADING = "## Given to workers (open issues labelled todo that a worker's label names, not yet claimed)"
+GIVEN_HEADING = "## Given to workers (open issues a worker's label names, not yet claimed)"
 GIVEN_COLUMNS = ("Issue", "Title", "Worker")
 BLOCKER_HEADING = "## Blockers (open issues labelled blocker)"
 MERGED_HEADING = f"## Recently merged (the last {RECENT_MERGED})"
@@ -492,19 +492,24 @@ class DueComment(NamedTuple):
 
 
 def comments_due(snapshot, event_name, ref_name, now, idle_after=IDLE_AFTER):
-    """What the board says after this event, as (pull number, marker, text).
-    After a push to the default branch, every pull request behind it or in
-    conflict with it hears so, once per commit of the default branch (the
-    marker carries the short sha); a pull request nobody touched for a day
-    is asked once whether it is parked. Main-moved comments come first,
-    then idle ones, each in the order the snapshot lists the pull requests,
-    as the template's board posted them. A released claim's pull request
-    hears nothing: renaming its branch closes it."""
+    """What the board says after this run, as (pull number, marker, text).
+    Every pull request behind the default branch or in conflict with it
+    hears so, once per commit of the default branch (the marker carries
+    the short sha), in whichever run first finds it so: the word used to
+    be owed only by the run the push to the default branch started, and
+    that run is lost when the workflow's concurrency group replaces it
+    behind a later event's (F12), so the word depends on the state alone,
+    and event_name and ref_name, which the callers still pass, decide
+    nothing. A pull request nobody touched for a day is asked once whether
+    it is parked. Main-moved comments come first, then idle ones, each in
+    the order the snapshot lists the pull requests, as the template's
+    board posted them. A released claim's pull request hears nothing:
+    renaming its branch closes it."""
     snap = as_snapshot(snapshot)
     released = released_branches(snap)
     pulls = [p for p in snap.pulls if p.branch not in released]
     due = []
-    if event_name == "push" and ref_name == snap.default_branch:
+    if snap.sha:
         sha7 = short_sha(snap.sha)
         marker = MAIN_MOVED_MARKER.format(sha=sha7)
         for pull in pulls_behind_main(pulls):
@@ -605,20 +610,22 @@ def issue_rows(snap, label, unclaimed_only):
 
 
 def given_rows(snap):
-    """The open issues labelled todo that a worker's label gives to that
-    worker and that nobody has claimed yet, in number order: the queue
-    leaves them out, since only that worker takes them, and this is where
-    the worker and everyone else see them. An epic is the coordinator's
-    to plan, not a worker's to take, so it is left out with its labels."""
+    """The open issues a worker's label gives to that worker and that
+    nobody has claimed yet, in number order, whatever else they are
+    labelled: the spec says an issue a worker's label names is that
+    worker's alone, left out of the Queue and shown here until the worker
+    claims it, so the queue leaves them out and this is where the worker
+    and everyone else see them. Until F14's fix the rows needed todo and
+    left epics out, so an issue labelled worker:<name> alone was shown
+    nowhere."""
     claimed = claimed_numbers(snap.branches, released_keys(snap))
     rows = []
     for issue in sorted(snap.issues, key=lambda i: i.number):
         names = sorted(issue.labels)
         workers = labels.holder_names(names)
-        if labels.TODO not in names or labels.CLAIMED in names or labels.EPIC in names or not workers:
+        if labels.CLAIMED in names or not workers or issue.number in claimed:
             continue
-        if issue.number not in claimed:
-            rows.append([f"#{issue.number}", issue.title, ", ".join(workers)])
+        rows.append([f"#{issue.number}", issue.title, ", ".join(workers)])
     return rows
 
 
