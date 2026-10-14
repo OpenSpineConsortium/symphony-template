@@ -140,6 +140,12 @@ class TheWorkerPrompt(unittest.TestCase):
     def test_the_workflow_reads_the_registry_and_the_workers_own_settings(self):
         text = (WORKFLOWS / "workers.yml").read_text(encoding="utf-8")
         self.assertIn("python3 tools/workers.py list --runs actions", text)
+        # The first job deals the run from one look and hands each leg its
+        # move; a leg asks for itself only while the vendored library has
+        # no deal (symphony-protocol's F4).
+        self.assertIn('python3 tools/team.py deal --registry "$REGISTRY" --workers "$workers"', text)
+        self.assertIn("deals: ${{ steps.list.outputs.deals }}", text)
+        self.assertIn("DEALS: ${{ needs.registry.outputs.deals }}", text)
         self.assertIn('python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY" --label "worker:$WORKER"', text)
         self.assertIn("for setting in model max_turns rounds; do", text)
         self.assertIn("--max-turns ${{ steps.next.outputs.max_turns }}", text)
