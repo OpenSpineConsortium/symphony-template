@@ -5,20 +5,32 @@ name: Workers
 # (docs/agents/WORKERS.md), one leg per worker, in parallel, on this
 # repository's Claude token. The first job lists them with
 # tools/workers.py on the default branch, and with none registered the run
-# ends there. Each leg first asks tools/team.py what its worker should do,
-# on GITHUB_TOKEN alone: its own claim that needs work, the task it was
-# given, its share of the unclaimed blockers and queued issues whose files
-# fit its area, or nothing. Only the first three start a Claude session, so
-# a worker with nothing to do costs seconds of a runner and no usage, and
-# workers asking at once are dealt different issues rather than race for
-# one. The session runs the worker prompt, docs/agents/routines/worker.md,
+# ends there; then it asks tools/team.py, once for the whole run and on
+# GITHUB_TOKEN alone, what each worker should do: its own claim that needs
+# work, the task it was given, its share of the unclaimed blockers and
+# queued issues whose files fit its area, or nothing. One look deals the
+# run, so two legs are never dealt one issue because one looked while a
+# peer's pull request was clean and the other after the default branch
+# moved past it (symphony-protocol's finding F4); while the vendored
+# library has no deal yet, each leg asks for itself, as before. Only the
+# first three moves start a Claude session, so a worker with nothing to do
+# costs seconds of a runner and no usage; a look that fails stops the run,
+# and the schedule picks it up. A leg that waited for an earlier run of its
+# worker checks its move before its session starts, since the look came
+# before the wait: an issue dealt to it and claimed, closed or given to
+# another worker meanwhile is left alone, and a claim of its own is
+# carried only while it still needs work; an issue queued while every
+# leg waited is dealt by that worker's next round or by the schedule,
+# since the run looks only once. The session runs the worker prompt,
+# docs/agents/routines/worker.md,
 # under the worker's name, the same prompt a routine runs, with the
 # worker's own model and turns; the issue the clerk chose is named in it.
 # After a session, a leg that still has work dispatches itself again
-# (workflow_dispatch, which GITHUB_TOKEN may start), up to the worker's
-# rounds in a row; the six-hourly schedule picks up the rest, and an issue
-# queued (todo, blocker) or given to a worker (worker:<name>) while nobody
-# holds it wakes the workers at once, or only the one it was given to. Such
+# (workflow_dispatch, which GITHUB_TOKEN may start; that run deals again,
+# from a look of its own), up to the worker's rounds in a row; the
+# six-hourly schedule picks up the rest, and an issue queued (todo,
+# blocker) or given to a worker (worker:<name>) while nobody holds it
+# wakes the workers at once, or only the one it was given to. Such
 # a run's actor is the github-actions bot, so the action is told to accept
 # it. Claude runs need the secret CLAUDE_CODE_OAUTH_TOKEN
 # (docs/setup/claude-action.md) and draw on that account's plan. One run
@@ -60,17 +72,23 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      issues: write
+      pull-requests: read
+      checks: read
     outputs:
       workers: ${{ steps.list.outputs.workers }}
+      deals: ${{ steps.list.outputs.deals }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
-      - name: List the workers that run in Actions
+      - name: List the workers that run in Actions and deal them the open work
         id: list
         env:
           ONLY: ${{ inputs.worker }}
           LABEL: ${{ github.event.label.name }}
+          REGISTRY: .github/symphony/workers
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -eu
           case "${LABEL:-}" in worker:*) ONLY="${LABEL#worker:}" ;; esac
@@ -78,6 +96,17 @@ jobs:
           workers=$(python3 -c 'import json, sys; names = json.loads(sys.argv[1]); only = sys.argv[2]; print(json.dumps([n for n in names if not only or n == only]))' "$all" "${ONLY:-}")
           echo "workers in Actions: $all; this run: $workers"
           echo "workers=$workers" >> "$GITHUB_OUTPUT"
+          # One look deals the whole run (symphony-protocol's F4). A copy
+          # whose vendored library is older than the deal command has none,
+          # and then each leg asks for itself, as every leg always did.
+          deals=""
+          if [ "$workers" != "[]" ] && python3 tools/team.py deal --help > /dev/null 2>&1; then
+            deals=$(python3 tools/team.py deal --registry "$REGISTRY" --workers "$workers")
+            echo "dealt from one look: $deals"
+          elif [ "$workers" != "[]" ]; then
+            echo "the vendored protocol library has no deal yet; each leg asks for itself"
+          fi
+          echo "deals=$deals" >> "$GITHUB_OUTPUT"
 
   work:
     needs: registry
@@ -108,14 +137,81 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
-      - name: Read the worker's settings and ask what it should do
+      - name: Read the worker's settings and the move it was dealt
         id: next
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          DEALS: ${{ needs.registry.outputs.deals }}
         run: |
           set -eu
-          answer=$(python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY" --label "worker:$WORKER")
-          echo "$WORKER: $answer"
+          if [ -n "$DEALS" ]; then
+            answer=$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])[sys.argv[2]])' "$DEALS" "$WORKER")
+            echo "$WORKER: $answer, dealt with the run from one look"
+          else
+            answer=$(python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY" --label "worker:$WORKER")
+            echo "$WORKER: $answer, from its own look"
+          fi
+          # The look came before this leg's wait for an earlier run of its
+          # worker, so a move dealt then is checked now: an issue claimed
+          # meanwhile is left with its claimant, one closed, labelled claimed
+          # or blocked, given to another worker or taken out of the queue
+          # is left alone, by the issue's own state read afresh with the
+          # library's label names, and a claim of the worker's own is
+          # carried only while it still needs work. The fresh look
+          # answers that claim first and reads no peer's while it needs work;
+          # once it is finished the look deals the pool, and the leg discards
+          # that answer and takes nothing, since only the run's one look deals.
+          if [ -n "$DEALS" ]; then
+            case "$answer" in
+              "take "*)
+                number=${answer##* }
+                found=0
+                git ls-remote --exit-code --heads origin "refs/heads/claude/$number" > /dev/null || found=$?
+                case "$found" in
+                  0) echo "#$number was claimed while $WORKER waited; nothing this run"; answer=none ;;
+                  2) ;;
+                  *) echo "origin could not be read (git exited $found); the claim lock decides" ;;
+                esac
+                if [ "$answer" != none ]; then
+                  # The issue's own state, read with the library's label names.
+                  # The Python stands at the script's left edge, since Python
+                  # reads indentation and the step's block gives it none.
+                  if gh issue view "$number" --repo "$GITHUB_REPOSITORY" --json state,labels > "$RUNNER_TEMP/dealt-issue.json"; then
+                    standing=$(python3 -c '
+          import json, sys
+          sys.path.insert(0, "tools")
+          from sdlc_protocol import labels
+          issue = json.load(open(sys.argv[1], encoding="utf-8"))
+          names = labels.label_names(issue)
+          holders = labels.holders(issue)
+          if str(issue.get("state", "")).upper() != "OPEN":
+              print("closed")
+          elif labels.CLAIMED in names or labels.BLOCKED in names or labels.EPIC in names:
+              print("labelled " + ", ".join(n for n in names if n in (labels.CLAIMED, labels.BLOCKED, labels.EPIC)))
+          elif holders and holders != {sys.argv[2]}:
+              print("given to " + ", ".join(sorted(holders)))
+          elif not holders and labels.TODO not in names and labels.BLOCKER not in names:
+              print("out of the queue")
+          else:
+              print("free")
+          ' "$RUNNER_TEMP/dealt-issue.json" "$WORKER")
+                    case "$standing" in
+                      free) ;;
+                      *) echo "#$number is $standing since the run looked; nothing this run"; answer=none ;;
+                    esac
+                  else
+                    echo "#$number could not be read from GitHub; the claim lock decides"
+                  fi
+                fi ;;
+              "carry "*)
+                fresh=$(python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY")
+                case "$fresh" in
+                  "carry "*) answer=$fresh ;;
+                  *) echo "$WORKER's claim was finished while it waited (a fresh look says '$fresh'); nothing this run, since only the run's one look deals the pool"; answer=none ;;
+                esac ;;
+            esac
+          fi
           echo "move=${answer%% *}" >> "$GITHUB_OUTPUT"
           echo "issue=${answer##* }" >> "$GITHUB_OUTPUT"
           for setting in model max_turns rounds; do
