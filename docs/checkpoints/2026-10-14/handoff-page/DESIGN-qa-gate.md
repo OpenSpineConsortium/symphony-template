@@ -100,7 +100,7 @@ Five native channels, none needing a dependency. (1) The Security tab, through c
 
 **Adversarial check of the generic QA gate research (2026-10-13)**
 
-Most of the availability, plan, price, preinstalled-tool and native-feature claims hold at the lines cited. 18 need a correction or a qualification (section A). The recommended gate is right on the native side, but it is not the simplest one. Four of its PASS conditions (2, 3, 4 and 5) cannot be checked as written, or can be forged by the PR itself (A6–A9, A19). Section D gives what I would change.
+Most of the availability, plan, price, preinstalled-tool and native-feature claims hold at the lines cited. 18 need a correction or a qualification (section A). The recommended gate is right on the native side, but it is not the simplest one. Four of its PASS conditions (2, 3, 4 and 5) cannot be checked as written, or can be forged by the PR itself (A6-A9, A19). Section D gives what I would change.
 
 **How I checked.** Read only: nothing was written, pushed or posted, and the only API calls were repository-scoped GETs. Sources:
 - github/docs at 602021b0 (2026-10-12), sparse clone at `/tmp/claude-0/-home-user/3dc8ab18-0f0b-58a6-80b3-e06fe3b0d17b/scratchpad/qa-generic/ghdocs-clone/docs`. All `github/docs` paths below are relative to that clone.
@@ -252,7 +252,7 @@ Most of the availability, plan, price, preinstalled-tool and native-feature clai
 
 ## D. Is the recommended gate the simplest generic one?
 
-No. The settings layer is right. But the design carries three required checks, a PR-side lint job, an artifact handoff and an attestation. On the private repositories workers mostly change, Code Security is off, so all of that shrinks to `check` plus a few checks that read the PR as plain text. On top of that, conditions (2), (3) and (4) cannot be checked as written (A6–A8), and (5) can be forged by the PR (A19). What I would change:
+No. The settings layer is right. But the design carries three required checks, a PR-side lint job, an artifact handoff and an attestation. On the private repositories workers mostly change, Code Security is off, so all of that shrinks to `check` plus a few checks that read the PR as plain text. On top of that, conditions (2), (3) and (4) cannot be checked as written (A6-A8), and (5) can be forged by the PR (A19). What I would change:
 
 1. **Two required checks, both pinned to `integration_id` 15368: `check` (unchanged) and `qa`.**
    - Drop the `dependency-review` job.

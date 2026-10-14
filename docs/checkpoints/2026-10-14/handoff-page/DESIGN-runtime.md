@@ -857,7 +857,7 @@ Not yet measured, to settle in the canary before v1.0.0:
 
 
 **Verdict.** Centralizing Symphony is feasible and worth doing. GitHub documents everything the design relies on:
-- `$/` resolves "against the repository of the file it appears in … at the running commit" (gh:content/actions/reference/workflows-and-actions/workflow-syntax.md:741-749).
+- `$/` resolves "against the repository of the file it appears in ... at the running commit" (gh:content/actions/reference/workflows-and-actions/workflow-syntax.md:741-749).
 - The job's workflow identity (`job.workflow_repository`, `job.workflow_sha`) is available (contexts.md:385-388).
 - Workflows can nest ten levels deep, and one file can reach up to 50 reusable workflows (reusing-workflow-configurations.md, Limitations).
 - Dependabot updates reusable-workflow refs (dependabot-version-updates.md:64).
@@ -889,8 +889,8 @@ As drafted, though, the design has four problems:
 
 **2. [high] Nested permissions and the interface are frozen.**
 - The docs say a called workflow's token "can be only downgraded (not elevated)", and that nested workflows can have only "the same or more restrictive" permissions (reusing-workflow-configurations.md).
-- From GitHub's error messages as users report them (not in the docs; measure): the run fails at startup with "The nested job … is requesting …, but is only allowed …". The check runs when the run is created, so jobs whose `if:` is false count too.
-- Then the design's "narrower variant … drops `id-token: write` … v1 accepts both forms" (§3.2) fails on every event, because the dispatcher's workers and coordinator jobs request `id-token: write`.
+- From GitHub's error messages as users report them (not in the docs; measure): the run fails at startup with "The nested job ... is requesting ..., but is only allowed ...". The check runs when the run is created, so jobs whose `if:` is false count too.
+- Then the design's "narrower variant ... drops `id-token: write` ... v1 accepts both forms" (section 3.2) fails on every event, because the dispatcher's workers and coordinator jobs request `id-token: write`.
 - Any v1.x release that widens a central job's permissions stops every copy.
 - The same freeze applies to inputs and secrets: v1 may add optional ones but must never remove one a caller passes.
 - **Fix:**
@@ -903,7 +903,7 @@ As drafted, though, the design has four problems:
 - Every event resolves all eight called workflows. Today a bad queue.yml breaks only crowd queueing.
 - **Fix:**
   - Canaries run every route, with a bake period before `v1` moves.
-  - Write down the rollback. After moving `v1` back, "Re-running all jobs … will use the reusable workflow from the specified reference", while re-running failed jobs reuses the bad commit (gh:data/reusables/actions/partial-reruns-with-reusable.md).
+  - Write down the rollback. After moving `v1` back, "Re-running all jobs ... will use the reusable workflow from the specified reference", while re-running failed jobs reuses the bad commit (gh:data/reusables/actions/partial-reruns-with-reusable.md).
 
 **4. [medium] Two runs named `check` on one head.**
 - Pull requests that GITHUB_TOKEN opens or updates get approval-required `pull_request` runs (actions-do-not-trigger-workflows.md).
@@ -920,7 +920,7 @@ As drafted, though, the design has four problems:
 ## 2. Security: how bad, and how bounded
 
 **6. [high] Every machine follows the moving tag.**
-- session-start resolves the ref fresh (`runtime fresh`, §2.5). So every contributor's machine runs whatever `v1` points at, at their next session, with no change in any copy.
+- session-start resolves the ref fresh (`runtime fresh`, section 2.5). So every contributor's machine runs whatever `v1` points at, at their next session, with no change in any copy.
 - Hooks run "with your full user permissions" (cc:hooks.md:4107). Claude Code's trust is over settings.json, which never changes here.
 - SessionStart stdout is "added as context that Claude can see and act on" (cc:hooks.md:810). A bad release can instruct every session directly, around the reviewed text sync.
 - In crowd mode, this bypasses the code-owner review the crowd ruleset requires on exactly these paths (docs/setup/ruleset-crowd.json:19; scripts/crowd.py:120-125).
@@ -946,8 +946,8 @@ As drafted, though, the design has four problems:
   - It names `SDLC_APP_PRIVATE_KEY` at lines 137, 205 and 288.
   - It names `SDLC_SETUP_APP_PRIVATE_KEY` at lines 473, 495, 512 and 566.
   - It runs template code in the same job at line 713.
-- The design points this job at `v1` and runs `runtime/cli.py fill` there (§3.3).
-- The template's own rule applies: "GitHub hands a job's runner the value of every secret the job names … code that runs on that runner can read it" (/home/user/sdlc-template/.github/workflows/ci.yml:54).
+- The design points this job at `v1` and runs `runtime/cli.py fill` there (section 3.3).
+- The template's own rule applies: "GitHub hands a job's runner the value of every secret the job names ... code that runs on that runner can read it" (/home/user/sdlc-template/.github/workflows/ci.yml:54).
 - SymphonyBoard holds Contents, Pull requests, Issues, Checks and Workflows write on every installation (PRIVACY.md:23-30). That includes workflow files, which the design says a bad release cannot reach.
 - **Fix:**
   - Stage the files in a job that names no secret, from an exact release commit pinned in symphony-start (never `v1`).
@@ -984,7 +984,7 @@ As drafted, though, the design has four problems:
 ## 3. Privacy
 
 **12. [needs the owner's decision] Publishing reverses a recorded decision.**
-- The decision reads: "'Free to use' is not 'free access to the source' … sdlc-start, which holds no file of it" (/home/user/sdlc-template/CLAUDE.md:43).
+- The decision reads: "'Free to use' is not 'free access to the source' ... sdlc-start, which holds no file of it" (/home/user/sdlc-template/CLAUDE.md:43).
 - The owner's message of 2026-10-13 approves centralizing. It does not say to publish.
 - Outside copies can call only public workflows (access table), so the runtime's code must be readable.
 - Much of it already is. Adopted files are MIT-licensed and may sit in public repositories (/home/user/sdlc-start/README.md:49). docs/history (181 KB of research) is copied into every whole-template adoption today (`/tmp/claude-0/-home-user/3dc8ab18-0f0b-58a6-80b3-e06fe3b0d17b/scratchpad/central/sim/newtarget/docs/history`).
@@ -1023,7 +1023,7 @@ As drafted, though, the design has four problems:
 ## 5. Callers, schedules, concurrency and cost
 
 **16. Renames break every copy.**
-- GitHub "does not support redirects for actions or reusable workflows … any workflows using that action with the previous name will fail" (gh:data/reusables/actions/actions-redirects-workflows.md). This is documented, not "nothing has shown".
+- GitHub "does not support redirects for actions or reusable workflows ... any workflows using that action with the previous name will fail" (gh:data/reusables/actions/actions-redirects-workflows.md). This is documented, not "nothing has shown".
 - Repositories here were renamed on 2026-10-11, and an LLC is planned.
 - **Fix:**
   - The organization and repository names become part of v1.
@@ -1037,7 +1037,7 @@ As drafted, though, the design has four problems:
   - Keep the workers on their own cron.
 
 **18. Cost of the six-hourly sync.**
-- Each job is billed at a minimum of one minute: GitHub rounds "each job … up to the nearest whole minute" (gh:content/billing/reference/actions-runner-pricing.md:14).
+- Each job is billed at a minimum of one minute: GitHub rounds "each job ... up to the nearest whole minute" (gh:content/billing/reference/actions-runner-pricing.md:14).
 - That is about 120 minutes a month per private copy, the cost the board's own header warns about (board.yml:70-74).
 - **Fix:** run the sync daily, or inside the board job.
 
@@ -1102,7 +1102,7 @@ As drafted, though, the design has four problems:
 
 ## 8. Statements in the design that are stale or wrong
 
-- **§0 (protocol-only metrics fail at import).** Fixed for new adoptions by symphony-start#37 (ef90b86, merged 2026-10-13 05:18Z). Adoptions made between #57 and #37 keep the broken workflow, which is the drift problem itself. Protocol-only adoptions now also bring economics.py and usage.py.
+- **section 0 (protocol-only metrics fail at import).** Fixed for new adoptions by symphony-start#37 (ef90b86, merged 2026-10-13 05:18Z). Adoptions made between #57 and #37 keep the broken workflow, which is the drift problem itself. Protocol-only adoptions now also bring economics.py and usage.py.
 - **Renames.** Already covered: it is documented, not "nothing has shown" (item 16).
 - **Tags, persistence, "v1 accepts both forms".** "Cloud sessions cannot push a tag" (item 10), "cannot persist" (item 7) and "v1 accepts both forms" (item 2) are corrected above.
 - **"A Claude session in the job can neither move nor commit it."** The default `Bash(python3:*)` (workers.yml:139, claude.yml:68) can rewrite any file on the runner. This is no stronger than today's RUNNER_TEMP copy.
