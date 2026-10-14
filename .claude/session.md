@@ -1,5 +1,13 @@
 # Session checkpoint
 
+Newer than this file: docs/checkpoints/2026-10-14/ holds the checkpoint of
+2026-10-14 01:55 UTC, written when the owner moved to another Claude
+account. Read its HANDOFF.md first; its README.md says what every file
+there is, including copies of the handoff page's files below
+(handoff-page/), the old Project's memory (memory/) and the guides
+(guides/). The rest of this file describes 2026-10-13, with the Beethoven
+and housekeeping checkpoints of symphony-template#71 and #72 folded in.
+
 Written 2026-10-13 at the end of the main account's session
 session_01SEcUB5mdFshEKgiQqdpdK2, for the next session, Fable or any
 other. The handoff page, https://claude.ai/artifact/XQj71up9dbJhwSStCVUe9T, holds the plan (PLAN.md), the
@@ -56,6 +64,27 @@ hold is corrected below and listed under "The recheck".
 
 ## Current state
 
+- Beethoven 20.0.0 (2026-10-13 and 14, the Project thread "Beethoven
+  extension v20 store readiness"): everything a session can do is merged.
+  beethoven-extension #11 (agreement 14, privacy 15, the texts on a public
+  listing), #12 (release/20.0.0, the package's record; SHA-256
+  33294f8b9ea662d9354eef416a05ca1d570918dbcb74cd4b8f73e05f9bbbd790), #13
+  (.github/workflows/release.yml, the organisation's Chrome Web Store
+  release kit on every push to main), #14 (screenshots 2 to 5 captured
+  from the 20.0.0 build, extension/store-assets/raw-20, and the
+  submission kit release/20.0.0/store-kit) and #15 (the kit's commands in
+  a subshell, so it finds the zip); the site's #17 and #18 (the public
+  install card, linking the listing); beethoven-access#6 (deployed). The
+  first release from CI is extension-v20.0.0.102, made 2026-10-14 00:35
+  UTC; its store step says "Not configured" until the owner's secrets
+  exist. The package in the kit is the one built from #11's merge, and
+  nothing in extension/src changed after it. Not yet measured: whether a
+  real upload through the kit succeeds (no secret yet), and whether
+  20.0.0's screens pass the hand test on the real grid. The e2e harness's
+  extension/e2e/lib/words.mjs is behind 20.0.0's welcome texts, and a
+  capture in a Chromium older than the manifest's Chrome 148 needs the
+  two changes raw-20/LIST.txt names, in a copy of the package only.
+
 - Every consumer runs symphony-protocol 0.4.1; the plugin is 0.1.10.
 - The release gate is live: each release waits for the owner's click in
   the browser (Review deployments, then Approve and deploy).
@@ -65,6 +94,38 @@ hold is corrected below and listed under "The recheck".
   decision or a live measurement: F2, F4, F7, F8, F9, F12 (PLAN.md,
   Phase 1, says what each needs).
 
+- Housekeeping rechecked against GitHub on 2026-10-14 at 00:10 UTC by
+  the Project thread "Owner's housekeeping steps": the owner's step list,
+  with every link, is /mnt/project-files/owner/housekeeping-steps.md in
+  the Project's shared folder. All five old test repositories still
+  existed; auto-delete was off in symphony-app, the site, symphony-start,
+  symphony-protocol, symphony-marketplace and coordbench, and on in the
+  template and spine-program; 69 merged branches (each 0 commits ahead)
+  were left across those six and the template. RULESETS_TOKEN is named
+  only by rulesets.yml in beethoven-qa, beethoven-agents and
+  beethoven-base; SDLC_APP_PRIVATE_KEY by symphony-start (adopt.yml,
+  adopt-run.yml), symphony-protocol (ci.yml, sync.yml), symphony-app
+  (collect.yml) and the template's template-init.yml;
+  SDLC_SETUP_APP_PRIVATE_KEY only by symphony-start, SDLC_METRICS_SALT
+  only by symphony-app.
+- The owner asked a session to delete the merged branches (2026-10-14
+  00:19). The cloud proxy refused both routes (the delete-ref call and
+  a deleting push, 403), so the thread asked for a Remote Control
+  session on the owner's Windows machine (deviceName dispatch) to delete
+  them through WSL with the owner's own gh login, keeping symphony-app's
+  data, coordbench's claude/bench-kit-0fxuxy and any running thread's
+  branch. At 01:31 the card still waited for the owner's Allow; nothing
+  was deleted. The next session rechecks each repository's branches.
+- spine-program (2026-10-14): its four workflows (board, tidy, metrics,
+  protocol) run on GITHUB_TOKEN alone and ran green on 2026-10-13; the
+  student aschehr has Write; the Claude GitHub App reaches it;
+  auto-delete is on; the ruleset "Protect the default branch" is active.
+  Still open: Symphony Setup is installed on it (narrow the Setup App's
+  list rather than uninstall, since the canary needs it), and the
+  "Allow GitHub Actions to create and approve pull requests" box, which a
+  session cannot read (protocol.yml falls back to an issue when it is
+  off).
+
 ## Remaining tasks
 
 For the owner, in order (PLAN.md section 4 has the links):
@@ -73,8 +134,11 @@ For the owner, in order (PLAN.md section 4 has the links):
 2. Approve each symphony-protocol release in the browser when GitHub
    emails, or tell a session in the owner's own words to switch the
    approval off for the development phase.
-3. Limit RULESETS_TOKEN and SDLC_APP_PRIVATE_KEY to the repositories that
-   need them.
+3. Limit RULESETS_TOKEN to beethoven-qa, beethoven-agents and
+   beethoven-base, and SDLC_APP_PRIVATE_KEY to symphony-start,
+   symphony-protocol and symphony-app, plus symphony-template if copies
+   made with "Use this template" should keep starting their first Board
+   from template-init.
 4. Delete the old test repositories (sdlc-template-test,
    sdlc-start-test, sdlc-setup-test, Gregory-Schwing-MD-PhD/test-non-org
    and Gregory-Schwing-MD-PhD/test).
@@ -82,12 +146,27 @@ For the owner, in order (PLAN.md section 4 has the links):
 6. Name the Actions setting in Symphony Setup's description.
 7. Tick "Automatically delete head branches" in symphony-start,
    symphony-protocol, symphony-marketplace, coordbench, symphony-app and
-   the site, then delete the merged branches left, the template's
+   the site (still off on 2026-10-14); the merged branches left are
+   being deleted from the owner's machine (Current state), the template's
    claude/festive-edison-al7xu2 among them (merged in main since
    2026-10-10).
-8. Beethoven: the beethoven-qa tags v4.0.0 and v5.0.0, Beethoven 20.0.0
-   to the store, beethoven-vscode#11 and #12.
-9. spine-program #72.
+8. Beethoven: the beethoven-qa tags v4.0.0 and v5.0.0, beethoven-vscode#11
+   and #12, and Beethoven 20.0.0 to the store as a public listing. For the
+   store, in order (docs/checkpoints/2026-10-14/guides/
+   beethoven-store-upload-and-releases.md, a copy of the Claude Doc
+   https://claude.ai/code/artifact/faad8276-a633-4b1b-902b-0716790a0f26,
+   has the clicks and the links): the hand test on the grid and the two
+   st1234 curls from WSL; the upload by hand from
+   beethoven-extension's release/20.0.0/store-kit (Visibility Public,
+   Trusted testers empty, Regions United States); a Google Cloud OAuth
+   client with its consent screen published and a refresh token from the
+   OAuth 2.0 Playground; the five CWS_ secrets in beethoven-extension
+   (CWS_ITEM_ID is heoopgbkbkfckhhpbkkcgigohfekjicn) and then the variable
+   CWS_ON_PUSH=upload; one run of "Release the extension" by hand with
+   upload ticked.
+9. spine-program #72: take spine-program off Symphony Setup's repository
+   list under Configure (keep symphony-protocol-canary on it), check the
+   Actions pull-request box, and try the route once.
 10. Questions 6 to 14 of PLAN.md section 3, when their phases start.
 
 For the session, in order:
