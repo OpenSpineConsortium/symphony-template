@@ -1,6 +1,6 @@
 # Symphony handoff, 2026-10-14 about 23:45 UTC (paste into the new account's Project)
 
-Pick up Symphony from this checkpoint. The owner's weekly usage on the old Claude account was nearly spent at 23:31 UTC on 2026-10-14, and the owner said: checkpoint, push everything and write the handoff, so the work continues exactly where it left off in a new account. At 23:34 UTC every thread was told to commit and push all its work to its own branch, write where it stopped into its pull request's description or its repository's checkpoint notes, reply with its stopping point and stop. Those descriptions and notes are the state to trust: they are newer than this message where they differ, and where one is missing, the branch's last commit is the state. This message is newer than docs/checkpoints/2026-10-14d/handoff.md, docs/checkpoints/2026-10-14c/handoff.md and .claude/session.md; the 14c handoff still holds for where things live (its part 1) and for the compiler plan it points to.
+Pick up Symphony from this checkpoint. The owner's weekly usage on the old Claude account was nearly spent at 23:31 UTC on 2026-10-14, and the owner said: checkpoint, push everything and write the handoff, so the work continues exactly where it left off in a new account. At 23:34 UTC every thread was told to commit and push all its work to its own branch, write where it stopped into its pull request's description or its repository's checkpoint notes, reply with its stopping point and stop; all four replied by 23:46 UTC, and their replies are folded in below. Those descriptions and notes are the state to trust: they are newer than this message where they differ, and where one is missing, the branch's last commit is the state. This message is newer than docs/checkpoints/2026-10-14d/handoff.md, docs/checkpoints/2026-10-14c/handoff.md and .claude/session.md; the 14c handoff still holds for where things live (its part 1) and for the compiler plan it points to.
 
 A pasted copy of this message may arrive cut short, or be only a pointer. The whole of it is docs/checkpoints/2026-10-14e/handoff.md in OpenSpineConsortium/symphony-template. Nothing outside GitHub carries over to the new account: the old Project's memory, threads, shared files and artifacts stay with the old account. So two files beside this one carry what they held:
 
@@ -14,7 +14,7 @@ A pasted copy of this message may arrive cut short, or be only a pointer. The wh
 - symphony-protocol merged #25 (F14) at 16:13 UTC, #26 (F9) at 16:59, #27 (F13) at 18:04, #28 (F15) at 20:57, #29 (F16) at 21:07, #30 (the owner's answers to F15's and F16's questions) at 21:14 and #31 (F17) at 22:01. Its main is c17e34c. The version is still 0.4.1 and the last release is v0.4.1 of 2026-10-13, so F7, F12, F4, F14, F9, F13, F15, F16 and F17 are on main and unreleased.
 - Each adversarial review of a fix turned up the next finding: F15, F16 and F17 (merged), then F18 (symphony-protocol#32) and F19 (a branch with no pull request yet). Part 1 says what each open one is; memory.md says what every fix does.
 - coordbench merged #14 at 17:10 UTC, #15 at 17:17 and #16 at 17:25; its main is 5e4860e. #17 came from the review of #14's upload scrub.
-- spine-program: the AIDaS grant revision runs as issue #94 and draft pull request #95.
+- spine-program: the AIDaS grant revision runs as issue #94 and draft pull request #95, with its own resume file, HANDOFF_2026-10-14e.md, in the grant folder on its branch.
 - The owner's decisions of the day, in memory.md: keep the second review round on each fix (18:59 UTC); the grant keeps the VinDr and FluoroCap results (22:05); the owner has permission to use any and all data (22:16); spine-program's rule 9 stays, so FluoroCap stays out of future training (22:29).
 
 ## 1. Where each piece of open work stopped (read from GitHub at about 23:40 UTC)
@@ -41,8 +41,8 @@ Read each pull request's description first: each thread was told at 23:34 UTC to
 
 **spine-program** (the AIDaS seed grant, due Fri 2026-10-16 at 11:59 p.m. ET)
 
-- #95, draft, https://github.com/OpenSpineConsortium/spine-program/pull/95, branch claude/94 (issue #94), head 9293f1a at 22:39 UTC: the packet rewritten with the missing values looked up on the web (with sources), new figures (the loop, the Beethoven extensions, the network, CT to X-ray, the results), every section fitted to its page limit, the review applied, the owner's data permission recorded; checks green. Stopped in the second review round: the numbers and the references fixed, the writing review still running. Next: fix what the writing review finds, merge #95, build the self-contained LaTeX package for Overleaf (a zip) and the full 10-page PDF. The owner's own items for the grant are owner-todo.md item 1.
-- The two biosketches the owner attached in the old Project at 20:03 UTC (two 5-page PDFs, the PI's and the Co-PI's) are in no repository unless the grant thread committed them, which #95's description says: if not, the owner attaches them again in the new grant thread.
+- #95, draft, https://github.com/OpenSpineConsortium/spine-program/pull/95, branch claude/94 (issue #94), head b1cc79d, pushed at about 23:45 UTC; its board check is green. The grant's own resume file is 01_carm_level_detection/grants/aidas_2027/HANDOFF_2026-10-14e.md on claude/94 (https://github.com/OpenSpineConsortium/spine-program/blob/claude/94/01_carm_level_detection/grants/aidas_2027/HANDOFF_2026-10-14e.md); the new grant thread starts there. Done: the packet rewritten with the missing values looked up on the web (with sources), new figures (the loop, the Beethoven extensions, the network, CT to X-ray, the results), every section fitted to its page limit, the first review applied, the owner's data permission recorded; then the second review's fixes to the numbers, the compliance and the references, and the 8-page draft PDF rebuilt. Stopped: the second review's writing review finished and scores the packet 4 of 5 overall, but none of its edits are applied; they wait as three patches under review/, beside its report. Next: apply those patches without page 4 spilling over (it has about half a line to spare), review the edits, merge #95, then build the self-contained LaTeX package for Overleaf (a zip) and the 10-page PDF.
+- Waiting on the owner for the grant (owner-todo.md item 1): attach the two biosketch PDFs again in the new grant thread, since they were attached in the old Project only; send the allowability e-mail to aidas@wayne.edu, whose text is in the grant's HANDOFF_2026-10-14e.md; fill the eight [DATA NEEDED] items in RECORD.md section 3 (among them tenure-track status, effort and the PI's role); run the disclosure audit and decide what reviewers may see of Figure 3a; submit by Fri 2026-10-16, 11:59 p.m. ET.
 - #89, draft, claude/25, by the student aschehr: not ours to touch.
 
 **symphony-protocol-canary**: still empty; it waits for the owner's adoption (owner-todo.md item 2). Nobody presses Run workflow on canary.yml until a thread says so.
@@ -55,14 +55,14 @@ Read each pull request's description first: each thread was told at 23:34 UTC to
 3b. The measurement pass, after the stuck-claim merge: the API calls of one board run, the claim-to-first-PR, open-to-merge and first-review medians from a real copy, and retry on 429 and secondary rate limits in the library, each by its own pull request.
 4. Tell the owner 0.5.0 is ready, since only the owner approves a release; then the compiler (docs/checkpoints/2026-10-14b/plans/gh-aw-migration-plan.md, Candidate A, PR 1a to PR 7); CooperBench's real run once the owner's steps are done; the canary's first live run and the harness's step 8 report.
 
-Beside these, the grant (spine-program#95) is the owner's own ask, with its own thread whatever the cap, and the most urgent item: it is due Friday.
+Beside these, the grant (spine-program#95, from its HANDOFF_2026-10-14e.md) is the owner's own ask, with its own thread whatever the cap, and the most urgent item: it is due Fri 2026-10-16 at 11:59 p.m. ET.
 
 ## 3. Before the paste: what the new account needs (the owner's clicks)
 
 1. GitHub: signed in to the new Claude account, open https://claude.ai/connect-github, sign in to GitHub as Gregory-Schwing-MD-PhD and press Authorize. The Claude GitHub App is already installed on every repository of OpenSpineConsortium (2026-10-13), so nothing needs installing; if the page asks where to install it anyway, pick OpenSpineConsortium and All repositories.
 2. The Project: open https://claude.ai/code, make a new Project (Projects are on Pro and Max only) named symphony, pick OpenSpineConsortium/symphony-template as its repository, and paste the Rules at the end of this file, verbatim, as its project instructions.
 3. The cloud environment: the default one is enough. Add no environment variable and no secret to it: no Claude token, no API key. COORDBENCH_CLAUDE_TOKEN stays behind on the old account's environment (CooperBench's real run uses organization secrets, owner-todo.md item 3). If a thread later reports a host the network denies, the change is in Project settings, Cloud environment, the gear beside the environment, Network access (https://code.claude.com/docs/en/cloud-environments#network-access).
-4. Then paste the message in part 4 as the first message in the new Project's chat, and allow the repository prompts the threads raise when they attach symphony-protocol, coordbench and spine-program with push access.
+4. Then paste the message at the end of part 4 as the first message in the new Project's chat, and allow the repository prompts the threads raise when they attach symphony-protocol, coordbench and spine-program with push access.
 
 ## 4. How to resume
 
@@ -70,8 +70,19 @@ Beside these, the grant (spine-program#95) is the owner's own ask, with its own 
 - Save memory.md's content as the new Project's memory before starting threads.
 - The fixes stay in the thread on the pasted message: plan item 3, then 3b, then telling the owner 0.5.0 is ready.
 - The deep lane (item 1) and CooperBench (item 2) run as sibling threads; each reads its pull request's description first.
-- The grant gets its own thread at once, regardless of the three-thread cap: it starts from spine-program#95's description and the grant folder, 01_carm_level_detection/grants/aidas_2027/.
+- The grant gets its own thread at once, regardless of the three-thread cap: it starts from the grant's own resume file, 01_carm_level_detection/grants/aidas_2027/HANDOFF_2026-10-14e.md on spine-program's branch claude/94, and #95's description, and the owner attaches the two biosketch PDFs there again.
 - Three Symphony threads at most, the owner told in the project chat as each pull request lands. Each thread attaches the repositories it needs with push access and reads each one's CLAUDE.md first.
+
+The message to paste, whole:
+
+```
+Pick up Symphony where the old account stopped on 2026-10-14 at 23:45 UTC. This message is only a pointer: before anything else, read the whole handoff in OpenSpineConsortium/symphony-template, docs/checkpoints/2026-10-14e/handoff.md (pull request #86; if it is still open, merge it first once its check is green), and the two files beside it: memory.md (the old Project's memory; save it as this Project's memory) and owner-todo.md (my own to-do list). Each open pull request's description says exactly where its thread stopped.
+
+Resume as part 4 of the handoff says: the protocol fixes stay in the thread on this message; the deep lane and CooperBench run as sibling threads; the AIDaS grant gets its own thread now, whatever the three-thread cap, since it is due Friday 2026-10-16 at 11:59 p.m. ET.
+
+Rules
+One pull request per change, from the thread's own branch. Run bash scripts/check.sh first where the repository has it. Run an adversarial review before each substantive pull request. Merge once green, on my standing permission. Never approve, publish or change a symphony-protocol release or its approval gate without my own words. Never push to or force-push a default branch. No API key and no Claude credential anywhere. If something you need is missing, say exactly what in your first message and stop. Ask me before anything marked mine. Every manual step you give me needs its exact link and what to click.
+```
 
 ## Rules
 
