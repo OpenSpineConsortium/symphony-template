@@ -25,17 +25,21 @@ name: Board
 # issue is as it was and the next run starts the release over; and it
 # tells each piece of open work about other work
 # that changes the same files, once per new piece; the board shows those
-# files under Overlaps. The run comments once on a pull request that fell
-# behind the default branch after a push to it, and once on a pull request
-# idle for more than a day; the comments carry HTML markers so a second run
-# posts nothing twice. It renames the branch of a released claim to
+# files under Overlaps. The run comments once per commit of the default
+# branch on a pull request that is behind it or in conflict with it, in
+# whichever run first finds it so, and once on a pull request idle for
+# more than a day; the comments carry HTML markers so a second run posts
+# nothing twice. It renames the branch of a released claim to
 # released/<issue>-<sha> (docs/agents/PROTOCOL.md, Release), in the run
 # that released it, which frees the name for the next claim, keeps the work
 # and closes the branch's pull request, and says so once on the issue;
 # contents: write covers the rename, issues: write the labels, and a call
 # GitHub refuses is only logged, so the board is still written. One run at
-# a time; when events come in a burst GitHub keeps only the newest waiting
-# run, which renders the newest state, so no finished board lags.
+# a time; when events come in a burst, as a merge's four are, the runs
+# wait their turn (queue: max, below) instead of the newest replacing the
+# one waiting, so no event's run is lost; and since no comment depends on
+# the event that started the run, a run that were lost would cost only a
+# delay to the next, at most the schedule's six hours.
 #
 # The checkout is the default branch itself, whatever event started the
 # run, so the board describes that branch's head (git rev-parse HEAD
@@ -86,6 +90,11 @@ permissions:
 concurrency:
   group: board
   cancel-in-progress: false
+  # Up to a hundred runs wait in the group in the order they arrived, in
+  # place of GitHub's default, which cancels the run waiting when another
+  # arrives: a merge fires four events at once, and the push to the default
+  # branch's run was the one often cancelled (symphony-protocol, F12).
+  queue: max
 
 env:
   DEFAULT_BRANCH: ${{ github.event.repository.default_branch || github.ref_name }}
