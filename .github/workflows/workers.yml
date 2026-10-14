@@ -9,19 +9,20 @@ name: Workers
 # GITHUB_TOKEN alone, what each worker should do: its own claim that needs
 # work, the task it was given, its share of the unclaimed blockers and
 # queued issues whose files fit its area, or nothing. One look deals the
-# run, so two legs are never dealt one issue because one looked while a
-# peer's pull request was clean and the other after the default branch
-# moved past it (symphony-protocol's finding F4); while the vendored
-# library has no deal yet, each leg asks for itself, as before. Only the
-# first three moves start a Claude session, so a worker with nothing to do
-# costs seconds of a runner and no usage; a look that fails stops the run,
-# and the schedule picks it up. A leg that waited for an earlier run of its
-# worker checks its move before its session starts, since the look came
-# before the wait: an issue dealt to it and claimed, closed or given to
-# another worker meanwhile is left alone, and a claim of its own is
-# carried only while it still needs work; an issue queued while every
-# leg waited is dealt by that worker's next round or by the schedule,
-# since the run looks only once. The session runs the worker prompt,
+# run, so no two legs of one run are dealt one issue because one looked
+# while a peer's pull request was clean and the other after the default
+# branch moved past it (symphony-protocol's finding F4); while the
+# vendored library has no deal yet, each leg asks for itself, as before.
+# Only the first three moves start a Claude session, so a worker with
+# nothing to do costs seconds of a runner and no usage; a look that fails
+# stops the run, and the schedule picks it up. Since a leg may wait for an
+# earlier run of its worker, and the deal came before that wait, every
+# leg looks again before its session starts, as every leg did before the
+# run dealt, and keeps from that look only its worker's own work, which no
+# leg of the run can be dealt: its own claim that needs work, which comes
+# first, or an issue given to it alone. An issue of the shared queue is
+# taken only as dealt, and only while nobody has claimed, closed, held or
+# given it to another worker since. The session runs the worker prompt,
 # docs/agents/routines/worker.md,
 # under the worker's name, the same prompt a routine runs, with the
 # worker's own model and turns; the issue the clerk chose is named in it.
@@ -145,72 +146,92 @@ jobs:
           DEALS: ${{ needs.registry.outputs.deals }}
         run: |
           set -eu
-          if [ -n "$DEALS" ]; then
-            answer=$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])[sys.argv[2]])' "$DEALS" "$WORKER")
-            echo "$WORKER: $answer, dealt with the run from one look"
-          else
-            answer=$(python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY" --label "worker:$WORKER")
-            echo "$WORKER: $answer, from its own look"
-          fi
-          # The look came before this leg's wait for an earlier run of its
-          # worker, so a move dealt then is checked now: an issue claimed
-          # meanwhile is left with its claimant, one closed, labelled claimed
-          # or blocked, given to another worker or taken out of the queue
-          # is left alone, by the issue's own state read afresh with the
-          # library's label names, and a claim of the worker's own is
-          # carried only while it still needs work. The fresh look
-          # answers that claim first and reads no peer's while it needs work;
-          # once it is finished the look deals the pool, and the leg discards
-          # that answer and takes nothing, since only the run's one look deals.
-          if [ -n "$DEALS" ]; then
-            case "$answer" in
-              "take "*)
-                number=${answer##* }
-                found=0
-                git ls-remote --exit-code --heads origin "refs/heads/claude/$number" > /dev/null || found=$?
-                case "$found" in
-                  0) echo "#$number was claimed while $WORKER waited; nothing this run"; answer=none ;;
-                  2) ;;
-                  *) echo "origin could not be read (git exited $found); the claim lock decides" ;;
-                esac
-                if [ "$answer" != none ]; then
-                  # The issue's own state, read with the library's label names.
-                  # The Python stands at the script's left edge, since Python
-                  # reads indentation and the step's block gives it none.
-                  if gh issue view "$number" --repo "$GITHUB_REPOSITORY" --json state,labels > "$RUNNER_TEMP/dealt-issue.json"; then
-                    standing=$(python3 -c '
+          # The worker's own look, as every leg asked before the run dealt
+          # from one; and the issue's own state, read afresh with the
+          # library's label names: free (queued and nobody's), mine (given
+          # to this worker alone), unread, or why the worker may not take it.
+          # The Python stands at the script's left edge, since Python reads
+          # indentation and the step's block gives it none.
+          look() {
+            python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY" --label "worker:$WORKER"
+          }
+          claimed() {
+            found=0
+            git ls-remote --exit-code --heads origin "refs/heads/claude/$1" > /dev/null || found=$?
+            case "$found" in 0) echo yes ;; 2) echo no ;; *) echo unknown ;; esac
+          }
+          standing() {
+            if ! gh issue view "$1" --repo "$GITHUB_REPOSITORY" --json state,labels > "$RUNNER_TEMP/issue-$1.json"; then
+              echo unread
+              return 0
+            fi
+            python3 -c '
           import json, sys
           sys.path.insert(0, "tools")
           from sdlc_protocol import labels
           issue = json.load(open(sys.argv[1], encoding="utf-8"))
           names = labels.label_names(issue)
           holders = labels.holders(issue)
+          held = [n for n in names if n in (labels.CLAIMED, labels.BLOCKED, labels.EPIC)]
           if str(issue.get("state", "")).upper() != "OPEN":
               print("closed")
-          elif labels.CLAIMED in names or labels.BLOCKED in names or labels.EPIC in names:
-              print("labelled " + ", ".join(n for n in names if n in (labels.CLAIMED, labels.BLOCKED, labels.EPIC)))
-          elif holders and holders != {sys.argv[2]}:
+          elif held:
+              print("labelled " + ", ".join(held))
+          elif holders == {sys.argv[2]}:
+              print("mine")
+          elif holders:
               print("given to " + ", ".join(sorted(holders)))
-          elif not holders and labels.TODO not in names and labels.BLOCKER not in names:
+          elif labels.TODO not in names and labels.BLOCKER not in names:
               print("out of the queue")
           else:
               print("free")
-          ' "$RUNNER_TEMP/dealt-issue.json" "$WORKER")
-                    case "$standing" in
-                      free) ;;
-                      *) echo "#$number is $standing since the run looked; nothing this run"; answer=none ;;
-                    esac
-                  else
-                    echo "#$number could not be read from GitHub; the claim lock decides"
-                  fi
+          ' "$RUNNER_TEMP/issue-$1.json" "$WORKER"
+          }
+          if [ -z "$DEALS" ]; then
+            answer=$(look)
+            echo "$WORKER: $answer, from its own look"
+          else
+            dealt=$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])[sys.argv[2]])' "$DEALS" "$WORKER")
+            echo "$WORKER: $dealt, dealt with the run from one look"
+            # The deal came before this leg's wait for an earlier run of its
+            # worker, so the leg looks again and keeps from that look only
+            # the worker's own work, which no leg of the run can be dealt:
+            # its own claim that needs work, which the clerk answers first,
+            # or an issue given to it alone. An issue of the shared queue is
+            # taken only as dealt, and only while nobody has claimed it,
+            # closed it, held it or given it to another worker since, so two
+            # legs of one run never take one issue.
+            fresh=$(look) || { echo "a fresh look failed; the dealt move stands on its own checks"; fresh=unread; }
+            answer=none
+            case "$fresh" in
+              "carry "*) answer=$fresh ;;
+              "take "*)
+                number=${fresh##* }
+                if [ "$(claimed "$number")" = no ] && [ "$(standing "$number")" = mine ]; then
+                  answer=$fresh
                 fi ;;
-              "carry "*)
-                fresh=$(python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY")
-                case "$fresh" in
-                  "carry "*) answer=$fresh ;;
-                  *) echo "$WORKER's claim was finished while it waited (a fresh look says '$fresh'); nothing this run, since only the run's one look deals the pool"; answer=none ;;
-                esac ;;
             esac
+            if [ "$answer" = none ]; then
+              case "$dealt" in
+                "take "*)
+                  number=${dealt##* }
+                  case "$(claimed "$number")" in
+                    yes) why=claimed ;;
+                    no) why=$(standing "$number") ;;
+                    *) echo "origin could not be read; the claim lock decides"; why=free ;;
+                  esac
+                  case "$why" in
+                    free | mine) answer=$dealt ;;
+                    unread) echo "#$number could not be read from GitHub; the claim lock decides"; answer=$dealt ;;
+                    *) echo "#$number is $why since the run looked; nothing of the queue this run" ;;
+                  esac ;;
+                "carry "*)
+                  if [ "$fresh" = unread ]; then answer=$dealt; fi ;;
+              esac
+            fi
+            if [ "$answer" != "$dealt" ]; then
+              echo "$WORKER: $answer this run, since a fresh look says '$fresh'"
+            fi
           fi
           echo "move=${answer%% *}" >> "$GITHUB_OUTPUT"
           echo "issue=${answer##* }" >> "$GITHUB_OUTPUT"

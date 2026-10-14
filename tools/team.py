@@ -1,6 +1,6 @@
 """The clerk's work, done by code so no Claude usage goes to it: a shim.
 
-The clerk's code (seed, route, next and schema, docs/agents/WORKERS.md)
+The clerk's code (seed, route, next, deal and schema, docs/agents/WORKERS.md)
 lives in the claim protocol's library, OpenSpineConsortium/symphony-protocol,
 vendored here as tools/sdlc_protocol (tools/VENDORED names the version and
 the commit). This file stays because .github/workflows/coordinator.yml,
