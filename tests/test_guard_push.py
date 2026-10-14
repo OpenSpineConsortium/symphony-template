@@ -5,6 +5,7 @@ first fence, branch protection the second, so it fails open."""
 import io
 import json
 import sys
+import types
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -156,6 +157,34 @@ class MainTest(unittest.TestCase):
         self.assertIn("pull requests", message)
         self.assertEqual(self.run_main("git commit -F - <<'EOF'\nClaim #7\n\nThe board first.\nEOF\n"
                                        "git push -u origin claude/7"), (0, ""))
+
+    def test_the_claim_file_reader_is_handed_to_the_library_when_the_vendored_copy_has_one(self):
+        """The fence on a lease onto another worker's claim (the release after
+        symphony-protocol 0.4.1): main() passes the reader the library makes
+        for the clone, and until the vendored copy has one, nothing."""
+        handed = []
+
+        def spy(args, current, default, *reader):
+            handed.append(reader)
+            return None
+        payload = json.dumps({"tool_input": {"command": "git push --force-with-lease origin claude/7"},
+                              "cwd": str(ROOT)})
+        with mock.patch.object(sys, "stdin", io.StringIO(payload)), \
+             mock.patch.object(guard_push, "branches", return_value=("claude/7", "main")), \
+             mock.patch.object(guard_push, "refusal", spy), \
+             mock.patch.object(guard_push.guard, "claim_file_reader", lambda where: ("reader for", where),
+                               create=True):
+            self.assertEqual(guard_push.main(), 0)
+        self.assertEqual(handed, [(("reader for", str(ROOT)),)])
+        handed.clear()
+        with mock.patch.object(sys, "stdin", io.StringIO(payload)), \
+             mock.patch.object(guard_push, "branches", return_value=("claude/7", "main")), \
+             mock.patch.object(guard_push, "refusal", spy):
+            older = types.SimpleNamespace(**{name: value for name, value in vars(guard_push.guard).items()
+                                             if name != "claim_file_reader" and not name.startswith("__")})
+            with mock.patch.object(guard_push, "guard", older):
+                self.assertEqual(guard_push.main(), 0)
+        self.assertEqual(handed, [()])
 
     def test_command_without_push_passes_without_git(self):
         payload = json.dumps({"tool_input": {"command": "git status"}})

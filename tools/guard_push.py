@@ -15,6 +15,14 @@ is the library's guard.run written out here, because the tests and any
 caller patch this module's branches(), which the library's run() would
 not see. Anything the guard cannot read it lets through rather than
 wedging the session; branch protection on GitHub refuses what matters.
+
+Before a lease push onto claude/N the library's guard, from the release
+after 0.4.1, reads whose claim the branch on origin and the branch
+pushed carry, from the claim file docs/agents/claims/N.md, and refuses a
+lease that would take another worker's claim (guard.other_holder, its
+claim_file_reader). main() hands it that reader when the vendored copy
+has one, so the hook gains the fence with the sync that brings that
+release and runs as before until then.
 """
 
 import json
@@ -39,9 +47,12 @@ def main():
               if (args := push_arguments(argv)) is not None]
     if not pushes:
         return guard.PASS
-    current, default = branches(guard.where_to_ask(payload, None))
+    where = guard.where_to_ask(payload, None)
+    current, default = branches(where)
+    reader = getattr(guard, "claim_file_reader", None)
+    with_reader = (reader(where),) if reader else ()
     for args in pushes:
-        reason = refusal(args, current, default)
+        reason = refusal(args, current, default, *with_reader)
         if reason:
             print(reason, file=sys.stderr)
             return guard.REFUSE
