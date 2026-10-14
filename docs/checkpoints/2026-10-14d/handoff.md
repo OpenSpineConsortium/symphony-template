@@ -18,7 +18,7 @@ Read each pull request's "Checkpoint 2026-10-14d" section first; it has the exac
 
 - #77, ready for review, the F4 counterpart, https://github.com/OpenSpineConsortium/symphony-template/pull/77, branch claude/protocol-fixes-xljomq, head b80b6ce, unchanged today; its check was green on b80b6ce against the old main. Not reviewed. Next: run the adversarial review (the lenses planned: the two changed step scripts of .github/workflows/workers.yml run with stubs for every case; the protocol semantics against the library's deal and the re-check's standing rules; GitHub Actions permissions and outputs; the documents and tests; compatibility across the vendored library versions), fold in what stands, update the branch, wait for the check, merge with a merge commit.
 - #78, draft, the F14 counterpart, https://github.com/OpenSpineConsortium/symphony-template/pull/78, branch claude/protocol-fixes-f14-xljomq, head 7e18f2f, stacked on #77, unchanged today. Not reviewed. Next, after #77: update the branch, check, review, mark ready, merge; then symphony-protocol#25's downstream job.
-- This handoff's pull request, from branch claude/awesome-lovelace-7cm439: docs/checkpoints/2026-10-14d/handoff.md, files only. Merge it once its check is green, first of all.
+- #82, this handoff's pull request, from branch claude/awesome-lovelace-7cm439: docs/checkpoints/2026-10-14d/handoff.md, files only. Merge it once its check is green, first of all; then #81, the CooperBench thread's review notes (below), files only too.
 - Branch claude/festive-edison-al7xu2: the old leftover of 2026-10-10, on the owner's housekeeping list.
 
 **symphony-protocol** (main 0b7185c, version 0.4.1, last release v0.4.1 of 2026-10-13)
@@ -30,7 +30,7 @@ Read each pull request's "Checkpoint 2026-10-14d" section first; it has the exac
 
 **coordbench** (main dd9aa2d)
 
-- #14, #15 and #16: the CooperBench thread's. At 14:01 UTC that thread was running the adversarial review of #14 (head 187efd6) and had merged nothing. Its "Checkpoint 2026-10-14d" sections, if written, are the state; else the 2026-10-14c sections are: review #14, fold in, merge; then #15 and #16; then the fake run over the fixed list (tag fake-1); then the checkpoint update in symphony-template; stop short of the real run.
+- #14, #15 and #16: the CooperBench thread's, checkpointed at 14:53 UTC with nothing unpushed. #14, draft, head 187efd6, every check green, unmerged; its description opens with a "Checkpoint 2026-10-14d" section that lists the cut review's findings in groups 1 to 4 (group 1, a pair whose eval.json holds an error is fetched for a rescore that run.py never performs, stood 3 of 3 refuters). #15 (head 0a4f965) and #16 (head 64bcaf5), drafts, green, untouched; #15 conflicts with #14 in PLAN.md only, #16 merges clean. No fake run was dispatched. The review's 21 findings and the two refuter verdicts are kept in symphony-template#81 (branch claude/coordbench-14-review-2026-10-14d, head 1854668, files only: docs/checkpoints/2026-10-14d/notes/coordbench-review-14.md), to merge once its check is green. Next: verify groups 1 to 4, fix the real ones with tests, check.sh, push, merge #14, then #15 and #16, then dispatch the fake run (tag fake-1), then the checkpoint update; stop short of the real run.
 
 **spine-program** and **symphony-protocol-canary**: untouched today; the 2026-10-14c handoff's parts 3, 7 and 8 stand.
 
