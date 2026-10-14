@@ -1,6 +1,6 @@
 # Checkpoints of 2026-10-14
 
-Everything the claude.ai Project "Symphony" held outside GitHub when the owner moved to another Claude account, committed so a session on any account finds it here. The newest state is HANDOFF.md; read it first and paste it as the first message of the next session.
+Everything the claude.ai Project "Symphony" held outside GitHub when the owner moved to another Claude account, committed so a session on any account finds it here. HANDOFF.md is the owner's prompt of 2026-10-14 (01:36 UTC, corrected at 01:55), pasted as the first message of the session that followed; the newest state is .claude/session.md on main, written that day from this handoff rechecked against GitHub, and it says where the handoff's state no longer held.
 
 ## Files in this folder
 
@@ -18,6 +18,6 @@ Everything the claude.ai Project "Symphony" held outside GitHub when the owner m
 - symphony-protocol#21 (harness step 6) and #24 (step 7): their descriptions carry their next steps.
 - symphony-protocol#23: the F4 draft.
 - spine-program#88: the student program's checkpoint, as a comment.
-- symphony-template#71 (Beethoven) and #72 (housekeeping): checkpoint drafts that edit .claude/session.md; the next session folds them in and closes them.
+- symphony-template#71 (Beethoven) and #72 (housekeeping): checkpoint drafts that edited .claude/session.md; #73 folded them in, and GitHub marked them merged at 02:14 UTC.
 
 This repository is internal to its enterprise, so the files are copied as they were, with the student's name and the grid paths; move them to spine-program if this repository is ever made public.
