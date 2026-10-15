@@ -83,9 +83,11 @@ Next: the audit's backfill flags exactly 12 earlier runs (outlines 1655 f6_f7 in
 
 ### 2.4 The taxonomy spec and manual
 
-The owner's ask of 18:04 UTC: a SPEC and a MANUAL placing Symphony and Beethoven in a taxonomy of software (their fit, how they interoperate, the need they close, what is unique; their nativeness to GitHub Actions and its free minutes for public repositories). Both were written and reviewed at 21:24 UTC as artifacts of this account: the spec (https://claude.ai/code/artifact/9ed6238d-6b5e-4a7e-acb5-df360435c19c) and the manual (https://claude.ai/code/artifact/c42e4d26-b238-4834-bb7b-318ae086152c). Findings: only the combination is unique, and unsorry is the closest rival; gh-aw's work queue refuses the subscription token; the review's two protocol findings went to the protocol thread (part 2.1).
+The owner's ask of 18:04 UTC: a SPEC and a MANUAL placing Symphony and Beethoven in a taxonomy of software (their fit, how they interoperate, the need they close, what is unique; their nativeness to GitHub Actions and its free minutes for public repositories). Both were written and reviewed at 21:24 UTC as Claude Docs of this account: the spec (https://claude.ai/code/artifact/9ed6238d-6b5e-4a7e-acb5-df360435c19c, rev 59) and the manual (https://claude.ai/code/artifact/c42e4d26-b238-4834-bb7b-318ae086152c, rev 30). Findings: only the combination is unique, and unsorry is the closest rival; gh-aw's work queue refuses the subscription token; the review's two protocol findings went to the protocol thread (part 2.1).
 
-Open: the owner's 21:58 UTC ask, "I need pdfs with references". At 22:24 UTC four of 15 section groups were cited, each checked by a second reviewer, and a test export of the spec rendered as a 36-page PDF with both drawings. The thread's stopping point is after the PDFs are delivered. Deep research is optional and the owner's: paste the prompt in section 3 of the manual into claude.ai with Research on and bring the report back.
+The thread stopped at 22:42 UTC, after the owner wrote at 22:29 to render the PDFs as they stood and checkpoint at once. Merged: symphony-template#93 (64f0bad), docs/checkpoints/2026-10-15b/taxonomy/: its README (the thread's handoff, with "The exact next step"), spec.pdf (36 pages) and manual.pdf (23 pages) as they stood at 22:30 UTC, Markdown copies spec.md and manual.md, research/ (the 13 notes and the three checks, as .txt) and refs-work/ (the citation work).
+
+Open: the owner's 21:58 UTC ask, "I need pdfs with references". The PDFs carry inline links and the spec's "Sources" list but not yet the numbered reference lists. Citation drafts exist for 13 of 15 section groups, only spec-F's has had its second check, and spec sections 10 and 11 and manual sections 8 and 9 have none. Next, by the README's "The exact next step": draft and check the citations, run refs-work/apply.py for each document, apply its edits and add the reference sections, render both PDFs again. A session on another account cannot edit these Claude Docs; it rebuilds them from spec.md and manual.md. These files describe Beethoven's private repositories, and symphony-template is internal today: removing the folder leaves it in the history, so a public symphony-template would have to be a copy made without it (owner-todo.md, item 9). Deep research is optional and the owner's (owner-todo.md, item 8).
 
 ### 2.5 Finished threads
 
@@ -100,10 +102,10 @@ In this Project's shared folder (/mnt/project-files), which a new account cannot
 - grant/: AIDaS_SEED_2027_overleaf.zip and AIDaS_SEED_2027_submission_draft.pdf (the current build), contacts.tex and biosketches/ (personal data, never committed). The zip and PDF rebuild from spine-program's main with those three private files beside latex/main.tex (`bash make_overleaf_zip.sh <out>`), so a new account needs only the biosketches and the contact lines again. grant/evidence/spine-aim-facts-2026-10-15.md is a copy of the file committed on #107's branch.
 - uploads/hearth/: the IRB form of 2026-10-15 12:45 UTC (personal data; its facts are in spine-program's RECORD.md section 6) and Dr. Han's edited files of 21:42 UTC (folded in by #103).
 - experiments/curse-of-coordination/: the pilot's and the step's reports (also in coordbench's bench/cooperbench/results/ by #19), the harness review, and xblossom/ (the order of later steps, the research on native git and DeLM, off-the-shelf tools, RAG, the screen's results).
-- research/taxonomy/: the 13 research notes, the three verification reports (verify/02-claim-lock.md is the evidence for the two protocol findings), and the citation work under refs-work/.
+- research/taxonomy/: the unfolded originals of what docs/checkpoints/2026-10-15b/taxonomy/ holds folded to ASCII (the research notes, the three checks, of which verify/02-claim-lock.md is the evidence for the two protocol findings, the citation work and the two PDFs).
 - status/readiness-research-2026-10-14.md: also committed, as docs/checkpoints/2026-10-14c/notes/readiness-research-2026-10-14.md.
 
-The two artifacts of part 2.4 belong to this account.
+The two Claude Docs of part 2.4 belong to this account; their Markdown copies are committed beside the taxonomy README.
 
 ## 4. Watch for
 

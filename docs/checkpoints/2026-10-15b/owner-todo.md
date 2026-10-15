@@ -62,4 +62,8 @@ https://github.com/OpenSpineConsortium/symphony-template/blob/main/docs/checkpoi
 
 ### 8. Deep research for the taxonomy
 
-Open the manual (https://claude.ai/code/artifact/c42e4d26-b238-4834-bb7b-318ae086152c, an artifact of this account), copy the prompt in its section 3, paste it into a new chat at https://claude.ai with Research turned on, and bring the report back to the taxonomy thread.
+Open the manual (https://claude.ai/code/artifact/c42e4d26-b238-4834-bb7b-318ae086152c, a Claude Doc of this account; from another account, its copy https://github.com/OpenSpineConsortium/symphony-template/blob/main/docs/checkpoints/2026-10-15b/taxonomy/manual.md), copy the prompt in its section 3, paste it into a new chat at https://claude.ai with Research turned on, and bring the report back to the taxonomy thread.
+
+### 9. Before symphony-template is ever made public
+
+docs/checkpoints/2026-10-15b/taxonomy/ describes Beethoven's private repositories. The repository is internal today. Removing the folder by pull request still leaves it in the repository's history, so before you ever make the repository public, publish a copy made without that history rather than switching this one's visibility.
