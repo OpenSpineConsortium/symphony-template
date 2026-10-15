@@ -58,6 +58,7 @@ One pull request per change, from the thread's own branch. Run bash scripts/chec
 - The owner's ask (2026-10-15 05:19 UTC): replicate CooperBench's curse of coordination, then remove it with Symphony's protocol (the sdlc arm); latency, tokens and cost.
 - Route: one cloud session drives bench agents as Sonnet subagents of Workflow lanes, with no Claude token anywhere; sdlc pinned to symphony-protocol c7f0d84 (a newer pin is the owner's choice). About 34 runs per five-hour window at four lanes; a two-agent run reads 1.9 to 7.6 million tokens in 3 to 14 minutes. Disk about 40 GB: build large images alone, keep 2 GB free.
 - Each bench agent re-reads an inherited prompt of about 80,000 tokens on every call (74 to 76% of its input), so absolute tokens and dollars are inflated for every arm alike; for figures that go into a grant, standalone agents in GitHub Actions, as CooperBench runs them.
+- Every run writes an audit.json (coordbench#21); a run the harness spoiled (a full disk, a lost or doubled agent) is rerun and left out of every figure. The step of 8 pairs' first figures counted 11 such runs, so they are regenerated after the reruns; the notes are in coordbench's bench/cooperbench/results/curse-of-coordination-notes/.
 - When results exist for the grant: one-line setup, k of n with Wilson intervals, sdlc against coop with ranges, ASCII, source paths.
 
 ## Product state (evidence: docs/checkpoints/2026-10-14c/notes/readiness-research-2026-10-14.md)

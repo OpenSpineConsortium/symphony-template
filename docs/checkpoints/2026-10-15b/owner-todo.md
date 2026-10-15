@@ -33,7 +33,7 @@ Your decision: which accounts, and how many. Use accounts nobody uses by hand, s
 
 ### 4. The coordination experiment: each step up is yours
 
-The experiment thread runs no bench work beyond what you chose. Your choice of 18:36 on 2026-10-15 was the full run: the 12 runs the harness spoiled again, then the 32 remaining pairs under the five arms in four strata batches, xblossom left out (your 19:36 choice). The next thread names each batch's pair count and the usage windows it takes before it starts; answer it in that thread.
+The experiment thread runs no bench work beyond what you chose. Your choice of 18:36 on 2026-10-15 was the full run: the remaining pairs under the five arms, batch by batch, xblossom left out (your 19:36 choice). Before it, the 12 runs the harness spoiled run again, since the step of 8 pairs' figures count 11 of them. The next thread names each batch's pair count and the usage windows it takes before it starts; answer it in that thread.
 
 ### 5. The canary repository
 
