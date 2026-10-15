@@ -13,7 +13,9 @@ named after its job, never after a login: a worker carries on every claim
 made under its name, so two under one name would take each other's
 claims. An issue a worker's label names is that worker's alone: the board
 leaves it out of the Queue and lists it under "Given to workers" until it
-is claimed. A worker's label is made when it is first needed (by the claim
+is claimed; one that several workers' labels name is given to each of
+them, and the first of them to claim it holds it (symphony-protocol's
+F18). A worker's label is made when it is first needed (by the claim
 skill, the worker prompt, or the clerk when the coordinator gives a task),
 so a copy makes six labels up front: todo, claimed, in-review, blocker,
 epic and blocked.
@@ -39,11 +41,13 @@ docs/agents/routines/worker.md, which differs only in the name.
 issue is queued or given to one, and again while it has work, up to its
 rounds. Before any Claude session, tools/team.py deals the open work on
 GITHUB_TOKEN, once for the run from one look at the repository in its
-first job (its own claim, else the task it was given, else the next
-blocker or queued issue in its area), so no two legs of one run race for
-one claim or are dealt one issue from looks at different moments, and an
-idle worker spends no Claude usage; a leg that waited looks again and
-keeps only its worker's own work from that look; in a copy whose
+first job (its own claim, else the task it was given, a task shared by
+several workers going to the first of them with nothing else to do, else
+the next blocker or queued issue in its area), so no two legs of one run
+race for one claim or are dealt one issue from looks at different
+moments, and an idle worker spends no Claude usage; a leg that waited
+looks again and keeps only its worker's own work from that look, taking a
+queued or shared issue only as dealt; in a copy whose
 vendored library has no team deal yet, each leg asks for itself until
 the release after 0.4.1 reaches it. The sessions run on the secret
 CLAUDE_CODE_OAUTH_TOKEN; no repository variable switches workers on.

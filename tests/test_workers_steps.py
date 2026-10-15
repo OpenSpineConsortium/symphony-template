@@ -5,10 +5,10 @@ GitHub. The registry's step deals the run from one look when the vendored
 library has `team deal`, and leaves the deal empty when it has not; the
 leg's step takes the move it was dealt, looks again since it may have
 waited for an earlier run of its worker, and keeps from that look only its
-worker's own work, while an issue of the shared queue is taken only as
-dealt and only while nobody has claimed, closed, held or given it away
-since. A string in the workflow says nothing of what its script does, so
-these run it.
+worker's own work, while an issue of the shared queue, or one the labels
+give to several workers, is taken only as dealt and only while nobody has
+claimed, closed, held or given it away since. A string in the workflow
+says nothing of what its script does, so these run it.
 
 The stand-ins: tools/team.py answers `next` and `deal` as the test says and
 logs each call; git answers `ls-remote` for the claim branches the test
@@ -238,6 +238,7 @@ class TheLeg(unittest.TestCase):
             "labelled claimed": ({5: queued("claimed")}, ()),
             "labelled blocked": ({5: queued("blocked")}, ()),
             "given to w2": ({5: given("w2", "todo")}, ()),
+            "given to w2, w3": ({5: given("w2", "worker:w3")}, ()),
             "out of the queue": ({5: {"labels": []}}, ()),
         }
         for why, (issues, claimed) in cases.items():
@@ -245,6 +246,24 @@ class TheLeg(unittest.TestCase):
                 move, said = self.leg("take 5", "none", issues, claimed)
                 self.assertEqual(move, "none")
                 self.assertIn(f"#5 is {why} since the run looked", said)
+
+    def test_a_dealt_task_the_labels_give_to_several_workers_is_taken(self):
+        """A task given to this worker and to others is each of theirs, and
+        the run's deal says which of them takes it (symphony-protocol's
+        F18): the leg takes it as dealt, with or without todo and under
+        the older label spellings, whatever its own fresh look says of the
+        queue. Until this, standing() called such an issue given to
+        others, so the worker it was dealt to idled on every run."""
+        issues = {5: given("w1", "worker:w2"), 6: given("w1", "worker:w2", "todo"),
+                  7: {"labels": ["account:w1", "agent:w2"]}, 8: given("w2", "worker:w1", "worker:w3")}
+        for number in issues:
+            with self.subTest(number=number):
+                move, said = self.leg(f"take {number}", "none", issues)
+                self.assertEqual(move, f"take {number}")
+                self.assertNotIn("since the run looked", said)
+        self.assertEqual(self.leg("take 5", "take 5", issues)[0], "take 5")
+        self.assertEqual(self.leg("take 5", "take 6", issues)[0], "take 5")
+        self.assertEqual(self.leg("take 5", "none", issues, (5,))[0], "none")
 
     def test_the_worker_s_own_claim_that_needs_work_comes_first(self):
         """The clerk answers a claim of the worker's own first; one made by
@@ -261,8 +280,9 @@ class TheLeg(unittest.TestCase):
         self.assertEqual(self.leg("none", "take 8", issues)[0], "take 8")
 
     def test_a_take_of_the_shared_queue_from_the_fresh_look_is_never_kept(self):
-        """Only the run's one look deals the queue (F4): a leg that kept its
-        own look's take of a queued issue could take one a peer was dealt."""
+        """Only the run's one look deals the queue (F4), and a task given to
+        several workers with it (F18): a leg that kept its own look's take
+        of a queued or shared issue could take one a peer was dealt."""
         issues = {7: queued(), 8: given("w1", "claimed"), 9: given("w1"), 10: given("w1", "worker:w2")}
         for fresh, claimed in (("take 7", ()), ("take 8", ()), ("take 9", (9,)), ("take 10", ())):
             with self.subTest(fresh=fresh):

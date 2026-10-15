@@ -20,9 +20,11 @@ name: Workers
 # leg looks again before its session starts, as every leg did before the
 # run dealt, and keeps from that look only its worker's own work, which no
 # leg of the run can be dealt: its own claim that needs work, which comes
-# first, or an issue given to it alone. An issue of the shared queue is
+# first, or an issue given to it alone. An issue of the shared queue, or
+# one the labels give to several workers, which the deal gives to the
+# first of them with nothing else to do (symphony-protocol's F18), is
 # taken only as dealt, and only while nobody has claimed, closed, held or
-# given it to another worker since. The session runs the worker prompt,
+# given it away since. The session runs the worker prompt,
 # docs/agents/routines/worker.md,
 # under the worker's name, the same prompt a routine runs, with the
 # worker's own model and turns; the issue the clerk chose is named in it.
@@ -149,9 +151,11 @@ jobs:
           # The worker's own look, as every leg asked before the run dealt
           # from one; and the issue's own state, read afresh with the
           # library's label names: free (queued and nobody's), mine (given
-          # to this worker alone), unread, or why the worker may not take it.
-          # The Python stands at the script's left edge, since Python reads
-          # indentation and the step's block gives it none.
+          # to this worker alone), shared (given to this worker and to
+          # others, so the run's deal says which of them takes it), unread,
+          # or why the worker may not take it. The Python stands at the
+          # script's left edge, since Python reads indentation and the
+          # step's block gives it none.
           look() {
             python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY" --label "worker:$WORKER"
           }
@@ -179,6 +183,8 @@ jobs:
               print("labelled " + ", ".join(held))
           elif holders == {sys.argv[2]}:
               print("mine")
+          elif sys.argv[2] in holders:
+              print("shared")
           elif holders:
               print("given to " + ", ".join(sorted(holders)))
           elif labels.TODO not in names and labels.BLOCKER not in names:
@@ -197,10 +203,13 @@ jobs:
             # worker, so the leg looks again and keeps from that look only
             # the worker's own work, which no leg of the run can be dealt:
             # its own claim that needs work, which the clerk answers first,
-            # or an issue given to it alone. An issue of the shared queue is
-            # taken only as dealt, and only while nobody has claimed it,
-            # closed it, held it or given it to another worker since, so two
-            # legs of one run never take one issue.
+            # or an issue given to it alone. An issue of the shared queue,
+            # or one given to this worker and to others, which the deal
+            # gives to the first of them with nothing else to do, is taken
+            # only as dealt, and only while nobody has claimed it, closed
+            # it, held it or given it away since, so two legs of one run
+            # never take one issue: a fresh look's take of such an issue
+            # is never kept, since it may disagree with a peer's deal.
             fresh=$(look) || { echo "a fresh look failed; the dealt move stands on its own checks"; fresh=unread; }
             answer=none
             case "$fresh" in
@@ -221,7 +230,7 @@ jobs:
                     *) echo "origin could not be read; the claim lock decides"; why=free ;;
                   esac
                   case "$why" in
-                    free | mine) answer=$dealt ;;
+                    free | mine | shared) answer=$dealt ;;
                     unread) echo "#$number could not be read from GitHub; the claim lock decides"; answer=$dealt ;;
                     *) echo "#$number is $why since the run looked; nothing of the queue this run" ;;
                   esac ;;
