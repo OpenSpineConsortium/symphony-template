@@ -22,9 +22,14 @@ name: Workers
 # leg of the run can be dealt: its own claim that needs work, which comes
 # first, or an issue given to it alone. An issue of the shared queue, or
 # one the labels give to several workers, which the deal gives to the
-# first of them with nothing else to do (symphony-protocol's F18), is
-# taken only as dealt, and only while nobody has claimed, closed, held or
-# given it away since. The session runs the worker prompt,
+# first of them in the registry's order with nothing else to do once the
+# vendored library carries symphony-protocol's F18 (before that, to
+# nobody), is taken only as dealt, and only while nobody has claimed,
+# closed, held or given it away since. A run that a label event starts
+# while another run's legs still wait may deal such an issue, or one of
+# the queue, again from its later look; the claim lock settles that at
+# the cost of one session, as it always did. The session runs the worker
+# prompt,
 # docs/agents/routines/worker.md,
 # under the worker's name, the same prompt a routine runs, with the
 # worker's own model and turns; the issue the clerk chose is named in it.
@@ -33,7 +38,9 @@ name: Workers
 # from a look of its own), up to the worker's rounds in a row; the
 # six-hourly schedule picks up the rest, and an issue queued (todo,
 # blocker) or given to a worker (worker:<name>) while nobody holds it
-# wakes the workers at once, or only the one it was given to. Such
+# wakes the workers at once, or only the one it was given to; given to
+# several workers, it wakes every worker, since the deal, over the whole
+# registry, may give it to one the new label does not name. Such
 # a run's actor is the github-actions bot, so the action is told to accept
 # it. Claude runs need the secret CLAUDE_CODE_OAUTH_TOKEN
 # (docs/setup/claude-action.md) and draw on that account's plan. One run
@@ -90,11 +97,21 @@ jobs:
         env:
           ONLY: ${{ inputs.worker }}
           LABEL: ${{ github.event.label.name }}
+          ISSUE_LABELS: ${{ toJSON(github.event.issue.labels.*.name) }}
           REGISTRY: .github/symphony/workers
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          case "${LABEL:-}" in worker:*) ONLY="${LABEL#worker:}" ;; esac
+          # A worker's label wakes that worker alone, unless the issue's
+          # labels now name several workers: the deal, over the whole
+          # registry, may give such an issue to one the new label does not
+          # name (symphony-protocol's F18), so every worker runs and the
+          # one the deal picks is in the run; an idle leg costs seconds.
+          case "${LABEL:-}" in
+            worker:*)
+              named=$(python3 -c 'import json, sys; sys.path.insert(0, "tools"); from sdlc_protocol import labels; print(len(labels.holder_names(json.loads(sys.argv[1]) or [])))' "${ISSUE_LABELS:-null}")
+              if [ "$named" = 1 ]; then ONLY="${LABEL#worker:}"; fi ;;
+          esac
           all=$(python3 tools/workers.py list --runs actions)
           workers=$(python3 -c 'import json, sys; names = json.loads(sys.argv[1]); only = sys.argv[2]; print(json.dumps([n for n in names if not only or n == only]))' "$all" "${ONLY:-}")
           echo "workers in Actions: $all; this run: $workers"
@@ -205,7 +222,8 @@ jobs:
             # its own claim that needs work, which the clerk answers first,
             # or an issue given to it alone. An issue of the shared queue,
             # or one given to this worker and to others, which the deal
-            # gives to the first of them with nothing else to do, is taken
+            # gives to the first of them with nothing else to do (F18, once
+            # the vendored library carries it), is taken
             # only as dealt, and only while nobody has claimed it, closed
             # it, held it or given it away since, so two legs of one run
             # never take one issue: a fresh look's take of such an issue

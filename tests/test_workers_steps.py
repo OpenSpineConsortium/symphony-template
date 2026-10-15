@@ -194,8 +194,21 @@ class TheDeal(unittest.TestCase):
         self.assertNotEqual(done.returncode, 0)
 
     def test_a_worker_label_runs_that_worker_alone(self):
-        found, _ = self.run_step({"deal --help": 0, "deal": '{"w2":"take 4"}'}, LABEL="worker:w2")
+        found, _ = self.run_step({"deal --help": 0, "deal": '{"w2":"take 4"}'}, LABEL="worker:w2",
+                                 ISSUE_LABELS='["todo", "worker:w2"]')
         self.assertEqual(json.loads(found["workers"]), ["w2"])
+
+    def test_a_worker_label_on_an_issue_given_to_several_workers_runs_every_worker(self):
+        """The deal is over the whole registry, so an issue the labels give
+        to several workers may go to one the new label does not name
+        (symphony-protocol's F18); a run of the labelled worker alone would
+        leave the task to the schedule. Labels the event does not give, as
+        when the step runs outside an issue event, narrow nothing."""
+        for issue_labels in ('["worker:w1", "worker:w2"]', '["todo", "agent:w1", "worker:w2"]', "null", "[]"):
+            with self.subTest(issue_labels=issue_labels):
+                found, _ = self.run_step({"deal --help": 0, "deal": '{"w1":"take 4","w2":"none"}'},
+                                         LABEL="worker:w2", ISSUE_LABELS=issue_labels)
+                self.assertEqual(json.loads(found["workers"]), list(WORKERS))
 
 
 class TheLeg(unittest.TestCase):
@@ -294,6 +307,27 @@ class TheLeg(unittest.TestCase):
         move, said = self.leg("take 5", "none", {5: queued()}, FAKE_ORIGIN_DOWN="1")
         self.assertEqual(move, "take 5")
         self.assertIn("the claim lock decides", said)
+
+    def test_a_dealt_task_given_to_the_worker_alone_is_taken_as_dealt(self):
+        """The dealt path's own acceptance of an issue given to this worker
+        alone: the fresh look keeps such a take first, so this shows only
+        when the fresh look fails or answers something else."""
+        issues = {5: given("w1"), 6: given("w1", "todo")}
+        self.assertEqual(self.leg("take 5", 1, issues)[0], "take 5")
+        self.assertEqual(self.leg("take 6", "none", issues)[0], "take 6")
+        self.assertEqual(self.leg("take 5", 1, issues, (5,))[0], "none")
+
+    def test_standing_names_each_state_by_its_word(self):
+        """The leg's checks read standing()'s word, which the log shows
+        only on a refusal; each word is held here on its own."""
+        issues = {1: queued(), 2: given("w1"), 3: given("w1", "worker:w2"), 4: given("w2", "worker:w3"),
+                  5: {"labels": ["account:w1", "agent:w2"]}, 6: given("w1", "claimed", "worker:w2")}
+        words = {1: "free", 2: "mine", 3: "shared", 4: "given to w2, w3", 5: "shared", 6: "labelled claimed"}
+        for number, word in words.items():
+            with self.subTest(number=number):
+                done = self.checkout.run(LEG + f"\nstanding {number}\n", {"next": "none"}, issues)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                self.assertEqual(done.stdout.rstrip().splitlines()[-1], word)
 
     def test_a_fresh_look_that_fails_leaves_the_dealt_move_to_its_own_checks(self):
         move, said = self.leg("take 5", 1, {5: queued()})

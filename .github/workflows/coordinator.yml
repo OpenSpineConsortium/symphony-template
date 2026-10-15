@@ -269,9 +269,17 @@ jobs:
             echo "#$TASK is still blocked; it waits for the owner of the repository"
             exit 0
           fi
-          worker=$(printf '%s\n' "$labels" | sed -n 's/^\(worker\|agent\|account\)://p' | head -n 1)
+          named=$(printf '%s\n' "$labels" | sed -n 's/^\(worker\|agent\|account\)://p' | sort -u)
+          worker=$(printf '%s\n' "$named" | head -n 1)
           in_actions=$(python3 tools/workers.py --dir "$REGISTRY" list --runs actions)
-          if [ -n "$worker" ] && printf '%s' "$in_actions" | python3 -c 'import json, sys; sys.exit(sys.argv[1] not in json.load(sys.stdin))' "$worker"; then
+          # A task the labels of several workers give goes to the first of
+          # them with nothing else to do, dealt over the whole registry
+          # (symphony-protocol's F18), so every worker runs and the deal
+          # picks, rather than the one worker the first label names.
+          if [ "$(printf '%s\n' "$named" | grep -c .)" -gt 1 ] && [ "$in_actions" != "[]" ]; then
+            gh workflow run workers.yml --repo "$GITHUB_REPOSITORY"
+            echo "#$TASK is given to several workers; every worker in Actions runs and the deal picks"
+          elif [ -n "$worker" ] && printf '%s' "$in_actions" | python3 -c 'import json, sys; sys.exit(sys.argv[1] not in json.load(sys.stdin))' "$worker"; then
             gh workflow run workers.yml --repo "$GITHUB_REPOSITORY" -f worker="$worker"
             echo "$worker started again for #$TASK"
           else
