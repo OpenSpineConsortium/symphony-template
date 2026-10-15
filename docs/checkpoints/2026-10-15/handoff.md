@@ -1,33 +1,131 @@
-# Symphony handoff, 2026-10-15 about 04:00 UTC
+# Symphony handoff, 2026-10-15 about 04:10 UTC
 
-Pick up from here. This file is newer than docs/checkpoints/2026-10-14e/handoff.md, whose memory.md and owner-todo.md still hold (the old Project's memory and the owner's own to-do list). The owner's credits were nearly spent at about 03:55 UTC and the owner asked for everything pushed and a handoff. Every branch below is pushed; no work lives only in a container.
+This replaces docs/checkpoints/2026-10-14e/handoff.md as the place to
+start. That file still holds for where things live, the owner's rules,
+memory.md (the Project's memory) and owner-todo.md (the owner's own
+steps). This one says where each of the four threads stopped, read
+from GitHub at about 04:05 UTC on 2026-10-15, and how to resume each.
 
-## What this thread did (the protocol fixes thread, session_01GjBoZqAYEbXyTjnFTtg294)
+The Fable usage limit was reached on 2026-10-15 at about 03:55 UTC;
+start the new threads on another model (Opus) until it resets.
 
-- Started the three sibling threads at 01:10 UTC: the deep lane (session_01TxkNJhWGA7PvoJMHT3TC9t), CooperBench (session_0172Vev3K7caKhKxkffG7oqo) and the AIDaS grant (session_01W41DgnF8diKs6v4mKxRoUA). The first two stopped at once on a permission prompt to attach a repository and did no work; the grant thread worked (see below).
-- F18's template counterpart, symphony-template#87 (https://github.com/OpenSpineConsortium/symphony-template/pull/87): workers in Actions take a task the labels give to several workers, the prompts read whose a claim is from the claim file, Announce takes the other workers' labels off, a worker label on an issue several workers hold wakes every worker. Two adversarial review rounds answered (its description lists both). Ready; if it is still open, its check was running at 03:55 UTC on head 7d1a532: merge it with a merge commit once the check is green.
-- The plugin's copy of the claim skill, symphony-marketplace#15: merged at 03:54 UTC as 5f6be11 (plugin version 0.1.11).
-- F18 in the library, symphony-protocol#32 (https://github.com/OpenSpineConsortium/symphony-protocol/pull/32), branch claude/owner-decisions-f18, head 002c1cb, still a draft: every finding of its first review is answered and pushed, CI green on 002c1cb (check, mutants 78 of 78, consumers, four downstream jobs, CodeQL), parity suite 30 OK with a template clone that has its history. Its description says what each answer is.
+## 1. Where each thread stopped
 
-Decision: when a worker claims a task the labels of several workers gave, its Announce takes the other workers' labels off, so from the claim on the labels name the holder alone, as the claim file does; the claim file still decides whose a claim is where a label disagrees (spec/PROTOCOL.md on #32's branch, Labels and Announce).
+### Deep lane (symphony-protocol#21): done
 
-## Where each open item stopped, and the next steps in order
+Merged at 02:19 UTC on 2026-10-15. Nothing is left on it. Its
+follow-ups (a deep space for F15, F16 and F17; the weekly deep job on
+main) are listed in #21's description and need no thread now.
 
-1. **symphony-template#87**: merge once its check is green on 7d1a532 (merge commit, the expected head sha copied from git).
-2. **symphony-protocol#32 (F18)**: its second adversarial review, of the answers in 002c1cb, was started twice and stopped twice (a container restart, then the owner's credit limit), with no result kept. Next: run that second review (three lenses: the answers against the first round's eight findings and the counts in DESIGN.md, README.md, GUARANTEES.md and F18.json; whether the second commit's tests bite under mutation; the Announce change's consequences across the oracle, the policies, the restructured F18 trace and F19's branch), answer what it finds, then a template pull request that vendors #32's final head (`python3 <symphony-protocol>/scripts/vendor.py <template> --consumer OpenSpineConsortium/symphony-template`), merged before #32; then mark #32 ready and merge it with a merge commit. The template's prose already hedges "once the vendored library carries F18", so the vendoring pull request drops those hedges.
-3. **symphony-protocol#33 (F19)**: unchanged since the 14e handoff: after #32 merges, merge main into its branch (claude/owner-decisions-f19, never a rebase), fix the four tests failing on purpose, write the planned tests and documents, review twice, merge. Its description lists each step. Note for it: #32 restructured validation/traces/F18.json and validation/replay.py (an announce step takes a second argument, the labels to take off), which F19's branch also touches.
-4. Then F2, F8 (after the canary's C5, owner-todo.md item 2), the stuck claim (0.5.0), the measurement pass, as the 14e handoff's part 2 says.
-5. **The deep lane (symphony-protocol#21)** and **CooperBench (coordbench#17)**: not started this session. Their sessions are stopped at a repository-attach prompt; a new account starts them afresh from the 14e handoff's part 1 and docs/checkpoints/2026-10-14e/deep-lane/README.md and notes/coordbench-review-17-round4.md.
-6. **The grant (spine-program#95, due Fri 2026-10-16 11:59 p.m. ET)**: its thread reported at 01:27 UTC that the 8-page draft is revised and checked and the 10-page submission PDF waits on the owner: the two biosketch PDFs (biosketch_han.pdf and biosketch_schwiebert.pdf) and each investigator's office, phone and e-mail (or fill the \tbd contact fields in Overleaf's contacts.tex). Read #95 and its branch claude/94 for the exact state; the thread's own resume file is 01_carm_level_detection/grants/aidas_2027/HANDOFF_2026-10-14e.md there.
+### AIDaS grant (spine-program#95): packet merged, submission left
 
-## The owner's clicks
+#95 merged at 01:25 UTC on 2026-10-15 (head 75b5672). The resume file
+is 01_carm_level_detection/grants/aidas_2027/HANDOFF_2026-10-14e.md on
+spine-program's main. Due Friday 2026-10-16 at 11:59 p.m. ET.
 
-- Grant: attach the two biosketch PDFs and the contact lines in the grant thread, or a new one, and the other items of owner-todo.md item 1 (the allowability e-mail to aidas@wayne.edu, the eight [DATA NEEDED] items, the disclosure audit, the submission).
-- A safety-net check-in of this thread is scheduled for 04:42 UTC (trigger trig_018mpw2s3Fj4mkLPgnj1jFSL); it costs a little usage when it fires. To stop it, open https://claude.ai/code/routines and delete "Re-check #87, #15 and #32 (2)".
-- Everything else in docs/checkpoints/2026-10-14e/owner-todo.md stands.
+Left, all outside git:
+- Build the Overleaf zip and the 10-page submission PDF. They need the
+  two biosketch PDFs and the filled contacts, which are never
+  committed, so the owner attaches the biosketches again in the new
+  grant thread.
+- The owner's own items (owner-todo.md item 1 and the resume file):
+  send the allowability e-mail to aidas@wayne.edu (its text is in the
+  resume file), fill the [DATA NEEDED] items in RECORD.md section 3,
+  run the disclosure audit, decide what reviewers may see of Figure 3a,
+  and submit.
 
-## Lessons from this session
+spine-program#89 (claude/25) is the student aschehr's: not ours.
 
-- A container restart kills running workflows and background checks; a review workflow's journal survives under ~/.claude/projects and its finished agents' results can be read from it, but a resume needs the script at a readable path, so copy the script into the scratchpad when it is launched.
-- A sibling session started with create_session stops at its first add_repo prompt until the owner allows it; say so to the owner at once with the session's link.
-- The stop hook wants commits authored as Claude <noreply@anthropic.com>: set user.name and user.email in each clone before the first commit.
+### CooperBench (coordbench#17): fix pushed, one review round left
+
+https://github.com/OpenSpineConsortium/coordbench/pull/17, draft on
+purpose, branch claude/coordbench-scrub-layers-8d9veg, head e3dc418.
+e3dc418 fixes every finding of round four's review, the blocker
+included, each with a test that fails on 21f5382. Three review rounds
+of those fixes ran and were answered. The fourth stopped on the usage
+limit with no report. `bash scripts/check.sh` passes locally on
+Python 3.12 (1114 tests); CI on e3dc418 had not been read.
+
+Next, in order:
+1. Merge symphony-template#89 (this handoff and the CooperBench notes)
+   once its check is green.
+2. Read CI on coordbench e3dc418.
+3. Run the fourth review round again on e3dc418: break zip_covers_tar
+   and zip_extent, past_unread_blocks, and the stopped-short rule in
+   layers_through, with mutants of those lines. Fix what it finds,
+   each with a test.
+4. Run `bash scripts/check.sh` with Python 3.12 first on PATH, mark #17
+   ready, and merge it with a merge commit, the expected head sha
+   copied from git. Check main's tree after.
+5. Dispatch the fake run: Actions > Bench > Run workflow on main, mode
+   fake, pairs @bench/cooperbench/pairs.txt, tag fake-1, survey_tag
+   survey-1. Read its report in the report job's log.
+6. Update docs/checkpoints/2026-10-14/cooperbench-run.md here by pull
+   request.
+7. Stop. The real run waits on the owner's steps (owner-todo.md item 3).
+
+Notes: docs/checkpoints/2026-10-14e/notes/coordbench-review-17-round5.md.
+
+### Protocol fixes (symphony-protocol#32, #33; symphony-template#87)
+
+- symphony-template#87, ready, branch claude/symphony-handoff-2026-10-14-yo9pzb,
+  head dc7aa11: the template's half of F18 (workers in Actions take a
+  task several workers' labels give). Two review rounds answered;
+  check.sh green at 7d1a532. It is behind main: bring main in by the
+  update-branch call, wait for its check, merge. It must merge before
+  any release that carries F18.
+- symphony-protocol#32 (F18), draft, branch claude/owner-decisions-f18,
+  head 002c1cb: fix, lane, 78 of 78 mutants caught, check.sh green.
+  Left: the second adversarial review of its answers (it was to run
+  once #87's review was done); then a template pull request that
+  vendors the final head; then ready and merge with a merge commit.
+- symphony-protocol#33 (F19), draft, branch claude/owner-decisions-f19,
+  head b580243, work in progress, built on F18's first commit. Four
+  tests fail on purpose; #33's description lists the steps. After #32
+  merges: merge main into the branch, fix the four tests, write the
+  tests and documents, check.sh, review and second round, ready, merge.
+- Then F2, F8 (waits on the canary's C5, owner-todo.md item 2), then
+  the stuck claim, which raises the version to 0.5.0. Then the
+  measurement pass, then telling the owner 0.5.0 is ready. Only the
+  owner approves a release.
+
+### Watch for
+
+- The weekly sync (Mondays 06:17 UTC, next 2026-10-19) opens a
+  symphony-template pull request "Vendor symphony-protocol 0.4.1". It is
+  a downgrade; the owner closes it.
+
+## 2. How to resume (the owner)
+
+1. Open https://claude.ai/code and the symphony Project. If the session
+   picker offers a model, pick Opus.
+2. Start three threads, one per line below, each by pasting its message
+   as the first message. The deep lane needs no thread.
+3. Allow the repository prompts each thread raises when it attaches
+   coordbench, symphony-protocol or spine-program with push access.
+4. In the grant thread, attach the two biosketch PDFs again.
+
+Grant thread:
+
+```
+Resume the AIDaS grant. Read docs/checkpoints/2026-10-15/handoff.md in OpenSpineConsortium/symphony-template, part 1 "AIDaS grant", then the resume file 01_carm_level_detection/grants/aidas_2027/HANDOFF_2026-10-14e.md on OpenSpineConsortium/spine-program's main (#95 is merged). Build the Overleaf zip and the 10-page submission PDF; I attach the two biosketches here. Never commit the biosketches or the contacts. Due Friday 2026-10-16 11:59 p.m. ET. Tell me exactly what is left for me, with links.
+```
+
+CooperBench thread:
+
+```
+Resume CooperBench. Read docs/checkpoints/2026-10-15/handoff.md in OpenSpineConsortium/symphony-template, part 1 "CooperBench", and do its numbered steps in order, starting by merging symphony-template#89 once green. Attach OpenSpineConsortium/coordbench with push access and read its CLAUDE.md and #17's description first. Leak tests plant only the stand-in PLANTED in ordinary files, never /proc/self/environ or an environment file. No real run, and no Claude credential anywhere.
+```
+
+Protocol thread:
+
+```
+Resume the protocol fixes. Read docs/checkpoints/2026-10-15/handoff.md in OpenSpineConsortium/symphony-template, part 1 "Protocol fixes", then symphony-template#87 and symphony-protocol#32 and #33's descriptions. First merge #87 (bring main in, wait for green). Then finish #32, then #33, then F2, F8 and the stuck claim, one pull request each, each with an adversarial review and a second round. Attach symphony-protocol with push access. Never approve or publish a release.
+```
+
+Every thread follows the Rules below and tells the owner in one line as
+each pull request lands.
+
+## Rules
+
+One pull request per change, from the thread's own branch. Run bash scripts/check.sh first where the repository has it. Run an adversarial review before each substantive pull request. Merge once green, on my standing permission. Never approve, publish or change a symphony-protocol release or its approval gate without my own words. Never push to or force-push a default branch. No API key and no Claude credential anywhere. If something you need is missing, say exactly what in your first message and stop. Ask me before anything marked mine. Every manual step you give me needs its exact link and what to click.
