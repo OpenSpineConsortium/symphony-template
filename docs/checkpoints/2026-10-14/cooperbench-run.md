@@ -1,12 +1,13 @@
-# CooperBench run with Symphony workers: checkpoint, 2026-10-15 03:15 UTC
+# CooperBench run with Symphony workers: checkpoint, 2026-10-15 10:40 UTC
 
 Thread: "CooperBench" of the symphony project, carrying item 2 of the
-2026-10-14d handoff, stopped when the owner's weekly usage ran out. The
-owner asked (2026-10-13 23:04) to start CooperBench benchmarking with the
-workers automatically, working, and reporting every statistic needed to
-compare against the CooperBench paper and its follow-ups. The run lives in
-OpenSpineConsortium/coordbench's own GitHub Actions. coordbench's main is
-5e4860e.
+2026-10-15 handoff (docs/checkpoints/2026-10-15/handoff.md), which
+continued the 2026-10-14d handoff's item after the owner's weekly usage ran
+out. The owner asked (2026-10-13 23:04) to start CooperBench benchmarking
+with the workers automatically, working, and reporting every statistic
+needed to compare against the CooperBench paper and its follow-ups. The run
+lives in OpenSpineConsortium/coordbench's own GitHub Actions. coordbench's
+main is 5028999.
 
 ## Landed (merged, CI green)
 
@@ -26,50 +27,41 @@ OpenSpineConsortium/coordbench's own GitHub Actions. coordbench's main is
 - coordbench#16 (merge 5e4860e): the protocol's own counts (claims, pull
   requests, merge attempts, merges, conflicts, time to first merge) beside
   the emergent rates in the report, the gap METRICS.md named.
+- coordbench#17 (merge 5028999): the read-back before upload opens every
+  layer of a pair's files by its bytes, so a token packed or committed under
+  any name is caught, and refuses what it cannot open
+  (bench/cooperbench/README.md says what it opens and what it leaves). Six
+  commits, each after an adversarial review of the one before; the sixth,
+  5bf26be, is the fourth review round of the fifth commit run again, as the
+  handoff asked: six findings, each reproduced by its own verifier and fixed
+  with a test that fails on the commit before
+  (docs/checkpoints/2026-10-15/notes/coordbench-review-17-round6.md; rounds
+  four and five are under docs/checkpoints/2026-10-14e/notes/). `bash
+  scripts/check.sh` passes on Python 3.12 (1115 tests).
 
-## In flight: coordbench#17, the read-back before upload
+## The fake run (fake-1)
 
-https://github.com/OpenSpineConsortium/coordbench/pull/17, draft, branch
-claude/coordbench-scrub-layers-8d9veg, head e3dc418 (2026-10-15 about
-03:10 UTC). It makes the check that runs before a pair's files are
-uploaded to a public artifact open every layer by its bytes, so a token
-packed or committed under any name is caught. It must merge before any
-real run publishes artifacts.
-
-Five rounds of fixes now. e3dc418 answers round four's review: the
-blocker (a zip -s first part ending with a stored zip read as that zip),
-the struct.error traceback, the zip64 split's last part, the zipapp read
-as a tar, the unverified ustar-at-257 zipapp and the two nits. Those
-fixes were reviewed in three more rounds before the push, each round's
-findings fixed with a test (docs/checkpoints/2026-10-14e/notes/
-coordbench-review-17-round5.md). `bash scripts/check.sh` passes locally
-on Python 3.12 (1114 tests). A fourth review round, on the third round's
-answers, was still running when the owner's credits ran low; its report
-was lost.
-
-Next on #17, in order: read CI on e3dc418; run the fourth review round
-again on e3dc418 (break zip_covers_tar and zip_extent, past_unread_blocks
-and the stopped-short rule in layers_through, with mutants of those
-lines) and fix what it finds with a test; `bash scripts/check.sh` with
-Python 3.12 first on PATH; mark ready; merge with a merge commit, the
-expected head sha copied from git; check main's tree after. #17's
-description has a "Checkpoint 2026-10-15" section and covers all five
-rounds.
+bench.yml dispatched on main in fake mode (mode fake, pairs
+@bench/cooperbench/pairs.txt, arms solo,coop,coop-git,team,sdlc, tag
+fake-1, survey_tag survey-1), run 38718383737:
+https://github.com/OpenSpineConsortium/coordbench/actions/runs/38718383737.
+No usage was spent. Every one of the 250 runs, 50 pairs under each of the
+five arms, finished and was scored: the Pass rates table shows 50 pairs and
+0 in the Errors column for every arm, every pair fail, as a fake agent
+writes no patch, and the Runs table one pair per run at 0.4 to 2.8 minutes
+of wall time; 255 jobs, all green, 17 minutes from dispatch to report
+(10:10 to 10:27 UTC). The read-back ran over every pair's files for the
+stand-in and refused none, since a refusal fails the run's job. The report
+is the artifact report-fake-1-38718383737 of that run and the report job's
+log; the per-pair table of 50 rows ends it.
 
 ## Then, in order
 
-1. Dispatch bench.yml on main in fake mode (Actions > Bench > Run
-   workflow: mode fake, pairs @bench/cooperbench/pairs.txt, arms left at
-   solo,coop,coop-git,team,sdlc, tag fake-1;
-   https://github.com/OpenSpineConsortium/coordbench/actions/workflows/bench.yml).
-   No usage is spent. Expect every pair Submitted and 0 in the Errors
-   column of its report's Pass rates table.
-2. Update this file with the fake run's result.
-3. The owner's steps below, then a real dispatch on
-   pallets_click_task/2068 first (the pilot), approved on its run's page
-   (Review deployments, tick bench, Approve and deploy), its report read;
-   then the full list, @bench/cooperbench/pairs.txt. No real run before
-   the owner's steps.
+1. The owner's steps below.
+2. A real dispatch on pallets_click_task/2068 first (the pilot), approved
+   on its run's page (Review deployments, tick bench, Approve and deploy), its
+   report read; then the full list, @bench/cooperbench/pairs.txt. No real run
+   before the owner's steps.
 
 ## What the read-back does not open (bench/cooperbench/README.md)
 
