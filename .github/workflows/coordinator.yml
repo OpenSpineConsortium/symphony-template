@@ -274,11 +274,14 @@ jobs:
           in_actions=$(python3 tools/workers.py --dir "$REGISTRY" list --runs actions)
           # A task the labels of several workers give goes to the first of
           # them with nothing else to do, dealt over the whole registry
-          # (symphony-protocol's F18), so every worker runs and the deal
-          # picks, rather than the one worker the first label names.
-          if [ "$(printf '%s\n' "$named" | grep -c .)" -gt 1 ] && [ "$in_actions" != "[]" ]; then
+          # (symphony-protocol's F18, once the vendored library carries it;
+          # before that the run deals it to nobody and the schedule tries
+          # again), so every worker runs and the deal picks, rather than
+          # the one worker the first label names; when none of them runs
+          # in Actions the run would deal it to nobody, so nothing starts.
+          if [ "$(printf '%s\n' "$named" | grep -c .)" -gt 1 ] && printf '%s' "$in_actions" | python3 -c 'import json, sys; sys.exit(not set(json.load(sys.stdin)) & set(sys.argv[1].split()))' "$named"; then
             gh workflow run workers.yml --repo "$GITHUB_REPOSITORY"
-            echo "#$TASK is given to several workers; every worker in Actions runs and the deal picks"
+            echo "#$TASK is given to several workers; every worker in Actions runs and the deal picks once the vendored library carries F18"
           elif [ -n "$worker" ] && printf '%s' "$in_actions" | python3 -c 'import json, sys; sys.exit(sys.argv[1] not in json.load(sys.stdin))' "$worker"; then
             gh workflow run workers.yml --repo "$GITHUB_REPOSITORY" -f worker="$worker"
             echo "$worker started again for #$TASK"

@@ -1,7 +1,8 @@
 """The two steps of .github/workflows/workers.yml that choose each leg's
-move, run as the workflow runs them: their own scripts under bash, in a
-folder laid out like the checkout, with stand-ins for what they ask of
-GitHub. The registry's step deals the run from one look when the vendored
+move, and the step of .github/workflows/coordinator.yml that starts a
+task's worker again, run as the workflows run them: their own scripts
+under bash, in a folder laid out like the checkout, with stand-ins for
+what they ask of GitHub. The registry's step deals the run from one look when the vendored
 library has `team deal`, and leaves the deal empty when it has not; the
 leg's step takes the move it was dealt, looks again since it may have
 waited for an earlier run of its worker, and keeps from that look only its
@@ -13,9 +14,10 @@ says nothing of what its script does, so these run it.
 The stand-ins: tools/team.py answers `next` and `deal` as the test says and
 logs each call; git answers `ls-remote` for the claim branches the test
 names, exiting 2 for one that is not there, as git does; gh answers
-`issue view` from the issues the test gives, in gh's JSON shape, and fails
-for any other issue. The library's own labels module and the registry's
-real tools/workers.py are used as they are.
+`issue view` from the issues the test gives, in gh's JSON shape or, with
+`--jq '.labels[].name'`, as the label names, fails for any other issue,
+and logs each `workflow run`. The library's own labels module and the
+registry's real tools/workers.py are used as they are.
 """
 
 import json
@@ -30,6 +32,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "workers.yml"
+COORDINATOR = ROOT / ".github" / "workflows" / "coordinator.yml"
 REGISTRY = ".github/symphony/workers"
 REPO = "example-org/example"
 WORKERS = ("w1", "w2")
@@ -60,20 +63,27 @@ exit 1
 GH = """
 import json, os, sys
 args = sys.argv[1:]
+if args[:2] == ["workflow", "run"]:
+    with open(os.environ["FAKE_GH_LOG"], "a", encoding="utf-8") as log:
+        log.write(json.dumps(args[2:]) + "\\n")
+    sys.exit(0)
 issues = json.loads(os.environ["FAKE_ISSUES"])
 if args[:2] != ["issue", "view"] or args[2] not in issues:
     sys.stderr.write("fake gh: no answer for %s\\n" % " ".join(args))
     sys.exit(1)
 issue = issues[args[2]]
+if "--jq" in args and args[args.index("--jq") + 1] == ".labels[].name":
+    print("\\n".join(issue.get("labels", [])))
+    sys.exit(0)
 print(json.dumps({"state": issue.get("state", "OPEN"),
                   "labels": [{"id": "L" + name, "name": name, "description": "", "color": "ededed"}
                              for name in issue.get("labels", [])]}))
 """
 
 
-def step_script(name):
+def step_script(name, workflow=WORKFLOW):
     """The script of the step with this name, as the runner hands it to bash."""
-    lines = WORKFLOW.read_text(encoding="utf-8").splitlines()
+    lines = workflow.read_text(encoding="utf-8").splitlines()
     start = lines.index(f"      - name: {name}")
     end = next((i for i in range(start + 1, len(lines))
                 if lines[i].startswith("      - ") or (lines[i].strip() and not lines[i].startswith(" " * 8))),
@@ -85,6 +95,7 @@ def step_script(name):
 
 LEG = step_script("Read the worker's settings and the move it was dealt")
 REGISTRY_STEP = step_script("List the workers that run in Actions and deal them the open work")
+UNBLOCK = step_script("Start the task's worker again", COORDINATOR)
 
 
 def queued(*more):
@@ -121,14 +132,16 @@ class Checkout:
         self.temp.mkdir()
         self.output = self.temp / "output"
         self.team_log = self.temp / "team.log"
+        self.gh_log = self.temp / "gh.log"
 
     def run(self, script, team, issues=None, claimed=(), **env):
         self.output.write_text("")
+        self.gh_log.unlink(missing_ok=True)
         environ = {
             "PATH": f"{self.bin}{os.pathsep}{Path(sys.executable).parent}{os.pathsep}/usr/bin:/bin",
             "HOME": str(self.temp), "RUNNER_TEMP": str(self.temp), "GITHUB_OUTPUT": str(self.output),
             "GITHUB_REPOSITORY": REPO, "REGISTRY": REGISTRY, "WORKER": "w1", "DEALS": "",
-            "FAKE_TEAM": json.dumps(team), "FAKE_TEAM_LOG": str(self.team_log),
+            "FAKE_TEAM": json.dumps(team), "FAKE_TEAM_LOG": str(self.team_log), "FAKE_GH_LOG": str(self.gh_log),
             "FAKE_ISSUES": json.dumps({str(n): i for n, i in (issues or {}).items()}),
             "FAKE_CLAIMED": " ".join(str(n) for n in claimed), **env,
         }
@@ -150,15 +163,68 @@ class Checkout:
             return []
         return [json.loads(line) for line in self.team_log.read_text().splitlines()]
 
+    def workflow_runs(self):
+        """What `gh workflow run` was asked for, each call's arguments."""
+        if not self.gh_log.exists():
+            return []
+        return [json.loads(line) for line in self.gh_log.read_text().splitlines()]
+
 
 class TheScripts(unittest.TestCase):
     def test_both_scripts_parse_and_the_python_in_the_leg_compiles(self):
-        for script in (LEG, REGISTRY_STEP):
+        for script in (LEG, REGISTRY_STEP, UNBLOCK):
             done = subprocess.run(["bash", "-n"], input=script, capture_output=True, text=True, timeout=30)
             self.assertEqual(done.returncode, 0, done.stderr)
         python = LEG.split("python3 -c '\nimport json, sys\n", 1)[1].split("\n' ", 1)[0]
         compile("import json, sys\n" + python, "the leg's standing", "exec")
-        self.assertNotIn("${{", LEG + REGISTRY_STEP)
+        self.assertNotIn("${{", LEG + REGISTRY_STEP + UNBLOCK)
+
+
+class TheUnblock(unittest.TestCase):
+    """The coordinator's step that starts a task's worker again once the
+    task is settled: one worker named and in Actions is started alone;
+    several named, one of them at least in Actions, start every worker,
+    since the deal over the whole registry picks which of them takes it
+    (symphony-protocol's F18); none of them in Actions, nobody named, or
+    the task still blocked start nothing."""
+
+    def setUp(self):
+        self.folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.folder, True)
+        self.checkout = Checkout(self.folder)
+
+    def unblock(self, labels):
+        done = self.checkout.run(UNBLOCK, {}, {5: {"labels": labels}}, TASK="5")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return self.checkout.workflow_runs(), done.stdout
+
+    def test_one_worker_in_actions_is_started_alone(self):
+        for labels in (["todo", "worker:w1"], ["agent:w1", "worker:w1", "todo"]):
+            with self.subTest(labels=labels):
+                runs, said = self.unblock(labels)
+                self.assertEqual(runs, [["workers.yml", "--repo", REPO, "-f", "worker=w1"]])
+                self.assertIn("w1 started again for #5", said)
+
+    def test_several_workers_one_of_them_in_actions_start_every_worker(self):
+        for labels in (["todo", "worker:w1", "worker:w2"], ["todo", "worker:alice", "worker:w1"],
+                       ["account:w2", "worker:alice"]):
+            with self.subTest(labels=labels):
+                runs, said = self.unblock(labels)
+                self.assertEqual(runs, [["workers.yml", "--repo", REPO]])
+                self.assertIn("given to several workers", said)
+
+    def test_workers_outside_actions_and_a_blocked_task_start_nothing(self):
+        cases = {
+            "two workers outside Actions": (["todo", "worker:alice", "worker:bob"], "does not run in Actions"),
+            "one worker outside Actions": (["todo", "worker:alice"], "does not run in Actions"),
+            "nobody named": (["todo"], "(none named) does not run in Actions"),
+            "still blocked": (["blocked", "worker:w1", "worker:w2"], "still blocked"),
+        }
+        for why, (labels, word) in cases.items():
+            with self.subTest(why=why):
+                runs, said = self.unblock(labels)
+                self.assertEqual(runs, [])
+                self.assertIn(word, said)
 
 
 class TheDeal(unittest.TestCase):
@@ -194,9 +260,13 @@ class TheDeal(unittest.TestCase):
         self.assertNotEqual(done.returncode, 0)
 
     def test_a_worker_label_runs_that_worker_alone(self):
-        found, _ = self.run_step({"deal --help": 0, "deal": '{"w2":"take 4"}'}, LABEL="worker:w2",
-                                 ISSUE_LABELS='["todo", "worker:w2"]')
-        self.assertEqual(json.loads(found["workers"]), ["w2"])
+        """One worker under two spellings is one holder (labels.holder_names
+        counts a name once), so the run still narrows to it."""
+        for issue_labels in ('["todo", "worker:w2"]', '["agent:w2", "worker:w2"]', '["account:w2", "agent:w2", "worker:w2"]'):
+            with self.subTest(issue_labels=issue_labels):
+                found, _ = self.run_step({"deal --help": 0, "deal": '{"w2":"take 4"}'}, LABEL="worker:w2",
+                                         ISSUE_LABELS=issue_labels)
+                self.assertEqual(json.loads(found["workers"]), ["w2"])
 
     def test_a_worker_label_on_an_issue_given_to_several_workers_runs_every_worker(self):
         """The deal is over the whole registry, so an issue the labels give

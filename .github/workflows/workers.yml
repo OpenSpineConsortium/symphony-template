@@ -28,9 +28,8 @@ name: Workers
 # closed, held or given it away since. A run that a label event starts
 # while another run's legs still wait may deal such an issue, or one of
 # the queue, again from its later look; the claim lock settles that at
-# the cost of one session, as it always did. The session runs the worker
-# prompt,
-# docs/agents/routines/worker.md,
+# the cost of one session, as it always did. The session runs the
+# worker prompt, docs/agents/routines/worker.md,
 # under the worker's name, the same prompt a routine runs, with the
 # worker's own model and turns; the issue the clerk chose is named in it.
 # After a session, a leg that still has work dispatches itself again
