@@ -1,4 +1,4 @@
-# CooperBench run with Symphony workers: checkpoint, 2026-10-14 23:40 UTC
+# CooperBench run with Symphony workers: checkpoint, 2026-10-15 03:15 UTC
 
 Thread: "CooperBench" of the symphony project, carrying item 2 of the
 2026-10-14d handoff, stopped when the owner's weekly usage ran out. The
@@ -30,33 +30,31 @@ OpenSpineConsortium/coordbench's own GitHub Actions. coordbench's main is
 ## In flight: coordbench#17, the read-back before upload
 
 https://github.com/OpenSpineConsortium/coordbench/pull/17, draft, branch
-claude/coordbench-scrub-layers-8d9veg, head 21f5382, every check green
-(check, CodeQL, the smoke bench run). It makes the check that runs before
-a pair's files are uploaded to a public artifact (`run.py scrub`, then
-`unscrubbed`) open every layer by its bytes, gzip, xz, lzma, bzip2, tar,
-zip, ar, git loose objects, packs and bundles, up to eight deep under one
-budget, so a token packed or committed under any name is caught. It must
-merge before any real run publishes artifacts.
+claude/coordbench-scrub-layers-8d9veg, head e3dc418 (2026-10-15 about
+03:10 UTC). It makes the check that runs before a pair's files are
+uploaded to a public artifact open every layer by its bytes, so a token
+packed or committed under any name is caught. It must merge before any
+real run publishes artifacts.
 
-Four rounds of fixes, each after an adversarial review: 7 findings, then
-22, then 13 gaps and a dozen unpinned tests, then 28 (commit 21f5382's
-message lists them). The fourth round's own review was stopped part way:
-docs/checkpoints/2026-10-14e/notes/coordbench-review-17-round4.md holds
-what it found. It found a verified blocker, a regression of 21f5382: a
-zip -s first part that ends with a stored zip is read as that inner zip
-and passes with the token inside, which 0d3279b refused. Three verified
-should-fix findings: a tar header shorter than 512 bytes ends the scrub
-in a traceback (struct.error from is_broken_tar), a zip64 split archive's
-last part is never opened, and is_broken_tar takes a zipapp for a tar so
-its members are not read. One should-fix finding is unverified (a file
-with ustar at byte 257 that is not a tar is no longer refused). The claims
-and tests lens did not finish.
+Five rounds of fixes now. e3dc418 answers round four's review: the
+blocker (a zip -s first part ending with a stored zip read as that zip),
+the struct.error traceback, the zip64 split's last part, the zipapp read
+as a tar, the unverified ustar-at-257 zipapp and the two nits. Those
+fixes were reviewed in three more rounds before the push, each round's
+findings fixed with a test (docs/checkpoints/2026-10-14e/notes/
+coordbench-review-17-round5.md). `bash scripts/check.sh` passes locally
+on Python 3.12 (1114 tests). A fourth review round, on the third round's
+answers, was still running when the owner's credits ran low; its report
+was lost.
 
-Next on #17, in order: fix each finding with a test that fails on 21f5382;
-`bash scripts/check.sh` with Python 3.12 first on PATH; an adversarial
-review of the fixes; rewrite #17's description to cover all four rounds
-(it describes the first two); mark it ready and merge it with a merge
-commit once green, the expected head sha copied from git.
+Next on #17, in order: read CI on e3dc418; run the fourth review round
+again on e3dc418 (break zip_covers_tar and zip_extent, past_unread_blocks
+and the stopped-short rule in layers_through, with mutants of those
+lines) and fix what it finds with a test; `bash scripts/check.sh` with
+Python 3.12 first on PATH; mark ready; merge with a merge commit, the
+expected head sha copied from git; check main's tree after. #17's
+description has a "Checkpoint 2026-10-15" section and covers all five
+rounds.
 
 ## Then, in order
 
