@@ -20,10 +20,16 @@ name: Workers
 # leg looks again before its session starts, as every leg did before the
 # run dealt, and keeps from that look only its worker's own work, which no
 # leg of the run can be dealt: its own claim that needs work, which comes
-# first, or an issue given to it alone. An issue of the shared queue is
-# taken only as dealt, and only while nobody has claimed, closed, held or
-# given it to another worker since. The session runs the worker prompt,
-# docs/agents/routines/worker.md,
+# first, or an issue given to it alone. An issue of the shared queue, or
+# one the labels give to several workers, which the deal gives to the
+# first of them in the registry's order with nothing else to do once the
+# vendored library carries symphony-protocol's F18 (before that, to
+# nobody), is taken only as dealt, and only while nobody has claimed,
+# closed, held or given it away since. A run that a label event starts
+# while another run's legs still wait may deal such an issue, or one of
+# the queue, again from its later look; the claim lock settles that at
+# the cost of one session, as it always did. The session runs the
+# worker prompt, docs/agents/routines/worker.md,
 # under the worker's name, the same prompt a routine runs, with the
 # worker's own model and turns; the issue the clerk chose is named in it.
 # After a session, a leg that still has work dispatches itself again
@@ -31,7 +37,9 @@ name: Workers
 # from a look of its own), up to the worker's rounds in a row; the
 # six-hourly schedule picks up the rest, and an issue queued (todo,
 # blocker) or given to a worker (worker:<name>) while nobody holds it
-# wakes the workers at once, or only the one it was given to. Such
+# wakes the workers at once, or only the one it was given to; given to
+# several workers, it wakes every worker, since the deal, over the whole
+# registry, may give it to one the new label does not name. Such
 # a run's actor is the github-actions bot, so the action is told to accept
 # it. Claude runs need the secret CLAUDE_CODE_OAUTH_TOKEN
 # (docs/setup/claude-action.md) and draw on that account's plan. One run
@@ -88,11 +96,21 @@ jobs:
         env:
           ONLY: ${{ inputs.worker }}
           LABEL: ${{ github.event.label.name }}
+          ISSUE_LABELS: ${{ toJSON(github.event.issue.labels.*.name) }}
           REGISTRY: .github/symphony/workers
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          case "${LABEL:-}" in worker:*) ONLY="${LABEL#worker:}" ;; esac
+          # A worker's label wakes that worker alone, unless the issue's
+          # labels now name several workers: the deal, over the whole
+          # registry, may give such an issue to one the new label does not
+          # name (symphony-protocol's F18), so every worker runs and the
+          # one the deal picks is in the run; an idle leg costs seconds.
+          case "${LABEL:-}" in
+            worker:*)
+              named=$(python3 -c 'import json, sys; sys.path.insert(0, "tools"); from sdlc_protocol import labels; print(len(labels.holder_names(json.loads(sys.argv[1]) or [])))' "${ISSUE_LABELS:-null}")
+              if [ "$named" = 1 ]; then ONLY="${LABEL#worker:}"; fi ;;
+          esac
           all=$(python3 tools/workers.py list --runs actions)
           workers=$(python3 -c 'import json, sys; names = json.loads(sys.argv[1]); only = sys.argv[2]; print(json.dumps([n for n in names if not only or n == only]))' "$all" "${ONLY:-}")
           echo "workers in Actions: $all; this run: $workers"
@@ -149,9 +167,11 @@ jobs:
           # The worker's own look, as every leg asked before the run dealt
           # from one; and the issue's own state, read afresh with the
           # library's label names: free (queued and nobody's), mine (given
-          # to this worker alone), unread, or why the worker may not take it.
-          # The Python stands at the script's left edge, since Python reads
-          # indentation and the step's block gives it none.
+          # to this worker alone), shared (given to this worker and to
+          # others, so the run's deal says which of them takes it), unread,
+          # or why the worker may not take it. The Python stands at the
+          # script's left edge, since Python reads indentation and the
+          # step's block gives it none.
           look() {
             python3 tools/team.py next --agent "$WORKER" --registry "$REGISTRY" --label "worker:$WORKER"
           }
@@ -179,6 +199,8 @@ jobs:
               print("labelled " + ", ".join(held))
           elif holders == {sys.argv[2]}:
               print("mine")
+          elif sys.argv[2] in holders:
+              print("shared")
           elif holders:
               print("given to " + ", ".join(sorted(holders)))
           elif labels.TODO not in names and labels.BLOCKER not in names:
@@ -197,10 +219,14 @@ jobs:
             # worker, so the leg looks again and keeps from that look only
             # the worker's own work, which no leg of the run can be dealt:
             # its own claim that needs work, which the clerk answers first,
-            # or an issue given to it alone. An issue of the shared queue is
-            # taken only as dealt, and only while nobody has claimed it,
-            # closed it, held it or given it to another worker since, so two
-            # legs of one run never take one issue.
+            # or an issue given to it alone. An issue of the shared queue,
+            # or one given to this worker and to others, which the deal
+            # gives to the first of them with nothing else to do (F18, once
+            # the vendored library carries it), is taken
+            # only as dealt, and only while nobody has claimed it, closed
+            # it, held it or given it away since, so two legs of one run
+            # never take one issue: a fresh look's take of such an issue
+            # is never kept, since it may disagree with a peer's deal.
             fresh=$(look) || { echo "a fresh look failed; the dealt move stands on its own checks"; fresh=unread; }
             answer=none
             case "$fresh" in
@@ -221,7 +247,7 @@ jobs:
                     *) echo "origin could not be read; the claim lock decides"; why=free ;;
                   esac
                   case "$why" in
-                    free | mine) answer=$dealt ;;
+                    free | mine | shared) answer=$dealt ;;
                     unread) echo "#$number could not be read from GitHub; the claim lock decides"; answer=$dealt ;;
                     *) echo "#$number is $why since the run looked; nothing of the queue this run" ;;
                   esac ;;
