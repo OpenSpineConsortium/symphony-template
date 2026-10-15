@@ -1,0 +1,116 @@
+# Symphony handoff, 2026-10-15b (paste the block in part 0 as the next session's first message)
+
+At 22:20 UTC on 2026-10-15 the owner asked every thread, and the project chat, to "identify a good point to push merge and handoff". Each of the four working threads named its stopping point, merged what was ready there, wrote a section titled "Checkpoint 2026-10-15b" at the top of each of its open pull requests' descriptions (a comment where there is none), unsubscribed from its pull requests and stopped. Those sections are the state to trust: they are newer than this file where they differ, and where one is missing, the branch's last commit is the state.
+
+This file replaces docs/checkpoints/2026-10-15/handoff.md as the place to start. Two files beside it carry what lives outside GitHub: memory.md, the Project's memory at the handoff (save it as the next Project's memory if the next session is on another account or in a new Project), and owner-todo.md, the owner's own steps with every link and what to click, which replaces docs/checkpoints/2026-10-14e/owner-todo.md for everything it lists.
+
+## 0. The first message to paste
+
+Paste this whole block as the first message in the next Project's chat. If it arrives cut short, the whole of this file is docs/checkpoints/2026-10-15b/handoff.md in OpenSpineConsortium/symphony-template.
+
+```
+Pick up Symphony where the last session stopped on 2026-10-15 at about 23:00 UTC. This message is a pointer: before anything else, read docs/checkpoints/2026-10-15b/handoff.md in OpenSpineConsortium/symphony-template, and the two files beside it: memory.md (the last Project's memory; save it as this Project's memory if it is not already there) and owner-todo.md (my own steps). Each open pull request's description begins with a "Checkpoint 2026-10-15b" section saying exactly where its thread stopped; it is newer than the handoff where they differ.
+
+Start one thread per item below, each reading its part of the handoff (part 2) first and attaching the repositories it needs with push access:
+1. The AIDaS grant in spine-program (draft #107), due Friday 2026-10-16 at 11:59 p.m. ET. Its own thread at once, whatever the cap.
+2. The protocol fixes in symphony-protocol toward 0.5.0: the stuck claim (it raises the version to 0.5.0), then the two findings from the taxonomy review, then the measurement pass, then tell me 0.5.0 is ready. Never the release or its approval gate.
+3. The curse-of-coordination experiment in coordbench: from coordbench #21 and the handoff's part 2; no bench run beyond what I already chose without my word and number.
+4. The taxonomy spec and manual: whatever its checkpoint says is left.
+
+Rules
+One pull request per change, from the thread's own branch. Run bash scripts/check.sh first where the repository has it. Run an adversarial review before each substantive pull request. Merge once green, on my standing permission. Never approve, publish or change a symphony-protocol release or its approval gate without my own words. Never push to or force-push a default branch. No API key and no Claude credential anywhere. If something you need is missing, say exactly what in your first message and stop. Ask me before anything marked mine. Every manual step you give me needs its exact link and what to click.
+```
+
+## 1. Before the paste
+
+### Continuing in the same Project (symphony, on the same account)
+
+Nothing to set up: the Project memory, the shared folder and the artifacts stay. Paste part 0 in the project chat. The account's weekly usage limit was reached at 14:14 UTC on 2026-10-15 and resets on 2026-10-22 at 02:00 UTC; the threads have run on claude-opus-5-5 since about 15:13 UTC, the default model for new threads since 17:47 UTC.
+
+### Moving to another account or a new Project
+
+Nothing outside GitHub carries over: this Project's memory, threads, shared folder (/mnt/project-files), artifacts and connectors stay with this account. Part 3 lists what lives only there and what to do about each before you switch. Then:
+
+1. GitHub: signed in to the new Claude account, open https://claude.ai/connect-github, sign in to GitHub as Gregory-Schwing-MD-PhD and press Authorize. The Claude GitHub App is already installed on every repository of OpenSpineConsortium (2026-10-13); if the page asks where to install it anyway, pick OpenSpineConsortium and All repositories.
+2. The Project: open https://claude.ai/code, make a new Project named symphony, pick OpenSpineConsortium/symphony-template as its repository, and set:
+   - Topic, exactly: Finish Symphony, OpenSpineConsortium's coordination product for Claude Code agents, from where the 2026-10-15b handoff left it: land the open pull requests, finish the protocol fixes, ect
+   - Project instructions, exactly (the Rules, verbatim, as this Project has them): Rules One pull request per change, from the thread's own branch. Run bash scripts/check.sh first where the repository has it. Run an adversarial review before each substantive pull request. Merge once green, on my standing permission. Never approve, publish or change a symphony-protocol release or its approval gate without my own words. Never push to or force-push a default branch. No API key and no Claude credential anywhere. If something you need is missing, say exactly what in your first message and stop. Ask me before anything marked mine. Every manual step you give me needs its exact link and what to click.
+3. The cloud environment: the default one is enough. Add no environment variable and no secret: no Claude token, no API key.
+4. Connectors: the grant thread sent e-mail from your Gmail on 2026-10-15 at your request. If the new grant thread should do that again, connect Gmail in the new account (Settings, Connectors, at https://claude.ai/settings/connectors).
+5. Paste part 0. Allow the repository prompts the threads raise when they attach symphony-protocol, coordbench and spine-program with push access. In the grant thread, attach the two biosketch PDFs and the cover's contact lines again (owner-todo.md, item 1).
+
+## 2. Where each thread stopped
+
+Read from the threads' final replies and from GitHub; the times are UTC on 2026-10-15.
+
+### 2.1 Protocol fixes toward 0.5.0 (symphony-protocol)
+
+Merged on 2026-10-15: symphony-template#87 (F18's template counterpart, 04:27, 7be1f1f) and #90 (the template vendors the library at 53e232f, F18, 09:51, 875563a); symphony-protocol#32 (F18, 0536cc3), #33 (F19, 1a79df9) and #34 (F2, a3a5b4d). The library's version is still 0.4.1 and the last release is v0.4.1 of 2026-10-13, so every fix since (F7, F12, F4, F14, F9, F13, F15 to F19, F2) is on main and unreleased. The owner ran the canary's check C5 at 16:18 UTC: 3 of 3 passed.
+
+F8, symphony-protocol#35 (https://github.com/OpenSpineConsortium/symphony-protocol/pull/35, branch claude/owner-decisions-f8): a claim is idle by when GitHub received the push of its head, not by its committer date. At 22:24 UTC its head a6465a5 passed check.sh (1,432 tests), 109 of 109 mutants and the deep lane locally; CI was running, and a third adversarial review had found one test gap and nothing wrong in the library. The thread's stopping point is right after #35 merges.
+
+Next, in order (the owner's decision of 2026-10-13 stands: the library fix on every finding, correctness over cost, no deadlock, no missed work, no orphaned worker):
+
+1. The stuck claim: a claim stuck by a lost reply is re-read on the next run. Its pull request raises the version to 0.5.0.
+2. The two findings the taxonomy thread's review passed on at 21:25 UTC (evidence in part 3): the push guard reads claim files from the hook's working directory and ignores the clone a `git -C <dir>` push names; and a reopened issue keeps the labels claimed and in-review, so no worker is dealt it (tidy.yml runs only when an issue closes). Reproduce each on main; each that holds gets a finding entry and its own library-fix pull request, after the stuck claim and before 0.5.0 is called ready. Drop one that does not reproduce.
+3. The measurement pass (the owner's choice of 2026-10-14 11:24 UTC): the API calls of one board run, the claim-to-first-PR, open-to-merge and first-review medians from a real copy, and retry on 429 and secondary rate limits in the library, each by its own pull request.
+4. The template's follow-up: a symphony-template pull request that vendors the library's final head, since the template carries 53e232f (F18) and not F19, F2, F8 or what follows.
+5. Tell the owner 0.5.0 is ready. Only the owner approves a release (owner-todo.md, item 6). Then the compiler (docs/checkpoints/2026-10-14b/plans/gh-aw-migration-plan.md, Candidate A, PR 1a to PR 7) and the harness's step 8 report.
+
+### 2.2 The AIDaS grant (spine-program), due Friday 2026-10-16 at 11:59 p.m. ET
+
+Merged on 2026-10-15: spine-program#97 (the Overleaf zip as a script), #99 (the Elsevier literature element; the IRB protocol named as pending, at the owner's 12:45 UTC "make the grant better!"), #101 (Aim 1 rewritten on the owner's 17:04 UTC correction: Claude Code iterating the scientific method inside Beethoven's frameworks, beethoven-qa and Symphony), #103 (Dr. Han's four edits word for word, at the owner's 21:42 UTC instruction to change nothing else and run no adversarial check) and #105 (two stray words trimmed and "a tenure-track" fixed, back to 10 pages). Main holds every change to the packet; the zip and the 10-page PDF in the Project's shared folder were rebuilt after #105.
+
+Open: draft #107 (https://github.com/OpenSpineConsortium/spine-program/pull/107, branch claude/106), the owner's 21:56 UTC ask: do not limit the spine aim to the 802 CT scans; show the whole corpus in spine-program, the progress on the C-arm problem, the data mining, and the real hospital use of AI against wrong-level surgery and its never events and legal costs. At 22:24 UTC it held only its claim; the thread was gathering spine-program's evidence (two of six readers done) and stops once that finishes, with the cited facts saved and its checkpoint at the top of #107. Next: rewrite the spine aim and the significance from those facts within 10 pages, fact-check every number against its file, merge, rebuild the zip and the PDF. One finding to keep: the repository's verified evidence does not support "billions a year" in legal costs; the figure it supports is $1.3 billion in US malpractice payments for all surgical never events over 1990 to 2010.
+
+Holds and defaults that stand:
+- The packet changes only as the owner asks; no review runs on an edit the owner said to apply as written.
+- No coordination-experiment data goes into the grant until the owner has run the full suite and tried the xblossom arm (the owner, 18:01 UTC). The experiment's own cutoff for grant data was Friday 2026-10-16 at 12:00 p.m. ET.
+- An office silent by 3 p.m. ET on Friday gets "estimate, quote requested" in the budget.
+- Two calls wait for the owner in the thread: the Claude seats (budget line C1 buys Team seats, while Beethoven's decision D1 asks for a plan in each trainee's own name: amend D1, or switch C1 to Pro plans with a new amount) and CLAIM (beethoven-research only names the checklist as coming, so the packet says it "plans" CLAIM; back to "holds" if the owner points to the checklist).
+- The e-mails asking Dr. Han and Loren Schwiebert for their details were sent from the owner's Gmail at 19:35 UTC at the owner's request; do not resend. Their answers arrive in the owner's inbox and the owner pastes them into the thread.
+- Never commit contacts.tex, the biosketches or the IRB form: they hold personal data (spine-program's CLAUDE.md rule 12).
+
+### 2.3 The curse of coordination (coordbench)
+
+The owner's ask of 05:19 UTC: replicate CooperBench's curse of coordination, then remove it with Symphony's protocol, measuring latency, tokens and cost; don't use all the owner's tokens; the owner chooses each step up. Merged on 2026-10-15: coordbench#17 (the upload scrub, 5028999), #18 (the pilot's code, 7eb1fd9), #19 (the step of 8 pairs, 40 runs, fe2e245) and #20 (the xblossom arm, 76706ac). Results: on 8 pairs every two-agent arm passed 6 of 8 and solo 5 of 8, so no curse showed and nothing is significant; the sdlc arm was the slowest, with about a third of its agent time blocked waiting. The xblossom screen (12 runs) passed 4 of 4 like team but used 26% more tokens and 21% more dollars, so the owner chose at 19:36 UTC to leave it out of the full run. Every bench agent on this route re-reads an inherited prompt of about 80,000 tokens, so absolute tokens and dollars are inflated for every arm alike; arm comparisons hold.
+
+Open: draft coordbench#21 (https://github.com/OpenSpineConsortium/coordbench/pull/21, branch claude/curse-of-coordination-cittw7), the harness fixes: every finished run is audited, and a run the harness spoiled (a full disk, a lost agent) is marked for a rerun and left out of every figure. Two review rounds were answered and CI was green; at 22:21 UTC a last review had found one blocking bug (the summary rebuilt too early) and smaller ones, being fixed. The thread's stopping point is right after #21 merges.
+
+Next: the audit's backfill flags exactly 12 earlier runs (outlines 1655 f6_f7 in all five arms among them: run outlines alone on one lane, since it filled the disk at scoring); rerun those, then the 32 remaining pairs under the five arms in four strata batches, the full run the owner chose at 18:36 UTC. The owner chooses each step up; say the pair count and the expected usage windows before each batch. The disk allowance is about 40 GB: build the large images alone and keep 2 GB free while runs are in flight. Files: /mnt/project-files/experiments/curse-of-coordination/ (xblossom/trial-order.md has the order of the later steps).
+
+### 2.4 The taxonomy spec and manual
+
+The owner's ask of 18:04 UTC: a SPEC and a MANUAL placing Symphony and Beethoven in a taxonomy of software (their fit, how they interoperate, the need they close, what is unique; their nativeness to GitHub Actions and its free minutes for public repositories). Both were written and reviewed at 21:24 UTC as artifacts of this account: the spec (https://claude.ai/code/artifact/9ed6238d-6b5e-4a7e-acb5-df360435c19c) and the manual (https://claude.ai/code/artifact/c42e4d26-b238-4834-bb7b-318ae086152c). Findings: only the combination is unique, and unsorry is the closest rival; gh-aw's work queue refuses the subscription token; the review's two protocol findings went to the protocol thread (part 2.1).
+
+Open: the owner's 21:58 UTC ask, "I need pdfs with references". At 22:24 UTC four of 15 section groups were cited, each checked by a second reviewer, and a test export of the spec rendered as a 36-page PDF with both drawings. The thread's stopping point is after the PDFs are delivered. Deep research is optional and the owner's: paste the prompt in section 3 of the manual into claude.ai with Research on and bring the report back.
+
+### 2.5 Finished threads
+
+- CooperBench in Actions: done. coordbench#17 merged, the fake run (250 pair runs, five arms) clean, symphony-template#91 recorded it (15d3f22). The real run waits on the owner's steps (owner-todo.md, item 3).
+- The deep lane, symphony-protocol#21: merged at 02:38 UTC as c7f0d84 (docs/checkpoints/2026-10-15/deep-lane.md).
+- The 2026-10-14 threads are finished and must not be reused.
+
+## 3. What lives outside GitHub
+
+In this Project's shared folder (/mnt/project-files), which a new account cannot read:
+
+- grant/: AIDaS_SEED_2027_overleaf.zip and AIDaS_SEED_2027_submission_draft.pdf (the current build), contacts.tex and biosketches/ (personal data, never committed). The zip and PDF rebuild from spine-program's main with those three private files beside latex/main.tex (`bash make_overleaf_zip.sh <out>`), so a new account needs only the biosketches and the contact lines again.
+- uploads/hearth/: the IRB form of 2026-10-15 12:45 UTC (personal data; its facts are in spine-program's RECORD.md section 6) and Dr. Han's edited files of 21:42 UTC (folded in by #103).
+- experiments/curse-of-coordination/: the pilot's and the step's reports (also in coordbench's bench/cooperbench/results/ by #19), the harness review, and xblossom/ (the order of later steps, the research on native git and DeLM, off-the-shelf tools, RAG, the screen's results).
+- research/taxonomy/: the 13 research notes, the three verification reports (verify/02-claim-lock.md is the evidence for the two protocol findings), and the citation work under refs-work/.
+- status/readiness-research-2026-10-14.md: also committed, as docs/checkpoints/2026-10-14c/notes/readiness-research-2026-10-14.md.
+
+The two artifacts of part 2.4 belong to this account.
+
+## 4. Watch for
+
+- Until symphony-protocol 0.5.0 is published, its weekly sync (Mondays 06:17 UTC, next 2026-10-19) opens a symphony-template pull request "Vendor symphony-protocol 0.4.1". It is a downgrade that would undo every fix since; its check stays red. The owner closes it (owner-todo.md, item 5); no session fixes its check.
+- A thread paused on a usage limit is not stuck; it resumes at the reset. Do not nudge or restart it.
+- A thread's container can restart: only pushed work survives. Commit and push before any long step.
+- More than one account has pushed to the same branches before: read a pull request's commits before touching its branch.
+- When the owner says to push and checkpoint everything: every thread pushes, writes a "Checkpoint <date>" section at the top of each open pull request's description (a comment where there is none), replies with where it stopped and stops; one thread writes the handoff under docs/checkpoints/ by pull request.
+
+## Rules
+
+One pull request per change, from the thread's own branch. Run bash scripts/check.sh first where the repository has it. Run an adversarial review before each substantive pull request. Merge once green, on my standing permission. Never approve, publish or change a symphony-protocol release or its approval gate without my own words. Never push to or force-push a default branch. No API key and no Claude credential anywhere. If something you need is missing, say exactly what in your first message and stop. Ask me before anything marked mine. Every manual step you give me needs its exact link and what to click.
