@@ -10,6 +10,7 @@ Three rules hold in every programme, taken from OpenSpineConsortium/coordbench, 
 
 Programmes:
 
+- [beyond-cooperation](beyond-cooperation/README.md): what one agent spends, context, tool calls, reading and time, and how to spend less, measured with tools/profile.py, with MAST's failure taxonomy as the outcome side.
 - [flowbench](flowbench/README.md): the workflow as a plug-in, on SWE-bench Verified: whether Symphony's flow (an issue claimed by its branch, a draft pull request, a review by three lenses, an answer to every finding) resolves as many issues as the owner's map-reduce script and as one agent alone, and at what cost in tokens and time; the design, the pre-registered plan, the parity with SWE-bench row by row and a tested scaffold that scores through SWE-bench's own harness in the published images, rehearsed end to end; no agent has run on the owner's tokens yet, and the pilot waits for the owner's word.
 
 ## Notes
