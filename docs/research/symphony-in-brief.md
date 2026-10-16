@@ -1,6 +1,6 @@
 # Symphony in brief
 
-Source: the Claude Doc "Symphony in brief" (https://claude.ai/code/artifact/4259cf7d-5c04-422b-a774-ea1ca5af5196), written on 2026-10-14 in the thread "Symphony tl;dr and related work" of the owner's claude.ai Project (20:51 to 21:44 UTC) and fact-checked in the same thread, which changed no guarantee's status; exported to Markdown on 2026-10-16 for this folder, the words unchanged. Every link is pinned to the commits its Sources section names, so its numbers are those of the evening of 2026-10-14 (symphony-protocol at b5f098d, after F15 and F16): where the doc "Symphony versus competitors" of 2026-10-16, listed in this folder's README, says otherwise, the newer doc stands. The doc's one figure does not export; a bracketed note stands where it was.
+Source: the Claude Doc "Symphony in brief" (https://claude.ai/code/artifact/4259cf7d-5c04-422b-a774-ea1ca5af5196), written on 2026-10-14 in the thread "Symphony tl;dr and related work" of the owner's claude.ai Project (20:51 to 21:44 UTC) and fact-checked in the same thread, which changed no guarantee's status; exported to Markdown on 2026-10-16 for this folder, the words unchanged. Every link is pinned to the commits its Sources section names, so its numbers are those of the evening of 2026-10-14 (symphony-protocol at b5f098d, after F15 and F16): where the doc "Symphony versus competitors" of 2026-10-16 (symphony-versus-competitors.md in this folder) says otherwise, the newer doc stands. The doc's one figure does not export; a bracketed note stands where it was.
 
 ## TL;DR
 

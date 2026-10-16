@@ -20,6 +20,7 @@ A note is one finished piece of research, a study, a comparison, a deep-research
 
 - [Symphony in brief](symphony-in-brief.md): the tl;dr of 2026-10-14, how Symphony works, what it guarantees and does not, and where it sits against CooperBench and other agent coding work; its numbers are those of that evening.
 - [Native git plus DeLM for agents that reuse verified results](git-and-delm-for-verified-results.md): the deep research of 2026-10-15 on git notes keyed by tree, compare-and-swap refs and merge-tree as the primitives for parallel agents that reuse verified results, DeLM's check receipt as the key worth taking, a proposed coordbench arm, and why a run with no stored credential rules out DeLM's harness and coordbench's drivers as they stand.
+- [Symphony versus competitors](symphony-versus-competitors.md): the comparison of 2026-10-16, built on the taxonomy spec and manual and exported from its Claude Doc, with its placement figure (symphony-versus-competitors-figure.svg): who Symphony is compared with, two head-to-head tables, seven claims where it is better by design, each graded, nine places where it is not or not yet, what not to claim, and a paragraph for each audience.
 
 ## Research kept elsewhere in this repository
 
@@ -42,6 +43,6 @@ Written before this folder existed and left where its links point:
 
 A Claude Doc or an artifact belongs to one account and is read by link; what a session could export is above.
 
-- "Symphony versus competitors" (https://claude.ai/code/artifact/a1cb9900-9020-49ec-8d96-6781a0d3a523), a Claude Doc of 2026-10-16 built on the taxonomy spec and manual; it supersedes "Symphony in brief" where the two differ, and its own thread is committing a copy here.
+- "Symphony versus competitors" (https://claude.ai/code/artifact/a1cb9900-9020-49ec-8d96-6781a0d3a523), a Claude Doc of 2026-10-16 built on the taxonomy spec and manual; it supersedes "Symphony in brief" where the two differ, and its copy is the note above.
 - The taxonomy spec (https://claude.ai/code/artifact/9ed6238d-6b5e-4a7e-acb5-df360435c19c) and manual (https://claude.ai/code/artifact/c42e4d26-b238-4834-bb7b-318ae086152c), Claude Docs of the other account; their Markdown copies are under docs/checkpoints/2026-10-15b/taxonomy/.
 - The handoff page of 2026-10-14 (https://claude.ai/artifact/XQj71up9dbJhwSStCVUe9T); its files are under docs/checkpoints/2026-10-14/handoff-page/.
