@@ -21,7 +21,10 @@ tokens the totals, with their part given in the record's helpers block,
 while the context, the time and the prompts are the session's own. The
 Agent SDK's execution file of a run in Actions, one JSON array of the
 same messages, is read too, though its messages carry no timestamps, so
-its time measures are empty and it has no session token. Each API call is
+its time measures are empty and it has no session token; its helpers'
+messages are in the same array, each marked with the tool call that
+started its helper (parent_tool_use_id), and are read as the helpers'
+transcripts are. Each API call is
 counted once by its message id: a message written as several lines, one
 per block, carries its usage on each, the input and cache counts the same
 on every line and the output count as far as the message had got when
@@ -47,11 +50,27 @@ transcript, the same tool with the same input: MAST's step repetition
 (arXiv:2503.13657) read by code, and an upper bound on waste, since a
 git status after a change is a repeat and no waste.
 
+The same counts ride on a session's commits, as a second line beside the
+Symphony-Usage trailer, written by the same hooks of tools/usage.py: the
+profile since the session's last commit,
+
+    Symphony-Profile: v1 session=6e4cb20b calls=42 failed=3 repeated=1 reads=12 rereads=4 read_bytes=58210 reread_bytes=9120 peak=181234 compactions=0 drops=0 tool_seconds=95
+
+each count the rise of the record's own since that commit, the calls and
+the reads with the helpers' in them, the compactions, the drops and the
+seconds in tools the session's own, and peak the largest context of the
+session's own calls made since; the session is the usage line's, so the
+two lines pair up. It carries counts alone, no tool's name, since an MCP
+server names its tools, so it stands on a public commit as the usage line
+does, and the metrics switch that stops the one stops the other. Nothing
+sums it yet; the research programme's step 2 is to, with parse_trailer.
+
 Standard library only, like every tool here; the shell commands are split
 by the vendored protocol library's reader, the one the push guard uses.
 """
 
 import argparse
+import functools
 import json
 import posixpath
 import re
@@ -112,22 +131,63 @@ BY_TOOL_KEYS = ("calls", "failed", "repeated", "input_bytes", "result_bytes", "s
 SECONDS_KEYS = ("span", "active", "in_tools", "outside_tools", "thinking")
 HELPERS_KEYS = ("transcripts", "calls", "seconds_in_tool", "output_tokens")
 READS_KEYS = ("calls", "files_named", "files", "rereads", "partial", "bytes", "reread_bytes")
+# The line a commit carries, read to its end and split on blanks, as
+# usage.py reads its own, since anyone who can push writes a commit's
+# message: a lazy value before optional blanks would be tried at every
+# blank of a long run of them.
+TRAILER_KEY = "Symphony-Profile"
+TRAILER_VERSION = "v1"
+TRAILER_LINE = re.compile(r"(?im)^[ \t]*symphony-profile:[ \t]*v1[ \t]+(.+)$")
+TRAILER_FIELDS = ("calls", "failed", "repeated", "reads", "rereads", "read_bytes", "reread_bytes", "peak",
+                  "compactions", "drops", "tool_seconds")
+SUMS = tuple(field for field in TRAILER_FIELDS if field != "peak")
+# The session as the line writes it, at most usage.session_token's eight characters.
+TRAILER_SESSION = re.compile(r"[A-Za-z0-9-]{1,8}")
+# A blank line, which ends a paragraph of a commit's message.
+PARAGRAPH_BREAK = re.compile(r"\n[ \t\r]*\n")
 
 
 # --- reading the transcript -----------------------------------------------------
 
 def entries_of(path):
-    """A transcript's entries: one JSON object a line, as Claude Code
-    writes a session's, or one JSON array, as the Agent SDK writes a run's
-    execution file in Actions."""
-    entries = list(usage.transcript_lines(path))
-    if entries:
-        return entries
+    """A transcript's entries: one JSON array, as the Agent SDK writes a
+    run's execution file in Actions, which claude-code-action writes over
+    many lines, or one JSON object a line, as Claude Code writes a
+    session's. The array is read whole first, since a line of it can be a
+    whole object by itself, an empty one, and read as a line it would be
+    taken for the file's one entry."""
+    if opens_an_array(path):
+        try:
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = None
+        if isinstance(data, list):
+            return [e for e in data if isinstance(e, dict)]
+    return list(usage.transcript_lines(path))
+
+
+def opens_an_array(path):
     try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
-    return [e for e in data if isinstance(e, dict)] if isinstance(data, list) else []
+        with open(path, encoding="utf-8", errors="replace") as stream:
+            return stream.read(4096).lstrip()[:1] == "["
+    except OSError:
+        return False
+
+
+def threads_of(entries):
+    """A transcript's entries parted by whose they are: the session's own,
+    and each helper's, in the order each helper first speaks, where the
+    entries name the tool call that started their helper, as an execution
+    file's do (parent_tool_use_id); a session's transcript keeps its
+    helpers in files of their own and names none."""
+    own, helpers = [], {}
+    for entry in entries:
+        parent = entry.get("parent_tool_use_id")
+        if parent:
+            helpers.setdefault(str(parent), []).append(entry)
+        else:
+            own.append(entry)
+    return own, list(helpers.values())
 
 
 def blocks(message):
@@ -260,7 +320,11 @@ def heredoc_opener(line):
     read as the shell reads it, after the guard's plain_shell has dropped a
     comment: a << inside quotes, in a <<< here-string or in arithmetic,
     $(( )) or (( )), opens nothing, so a quoted << is told from the
-    operator wherever its quotes begin."""
+    operator wherever its quotes begin. A line with no << opens nothing
+    and is not read, since reading a long one a character at a time is
+    most of what a here-document costs a profile."""
+    if "<<" not in line:
+        return None
     text, quote, arithmetic, i = guard.plain_shell(line), None, 0, 0
     while i < len(text):
         ch = text[i]
@@ -315,8 +379,13 @@ def without_heredocs(command):
     return "\n".join(kept)
 
 
+@functools.lru_cache(maxsize=256)
 def commands_of(command):
-    return guard.simple_commands(without_heredocs(command))
+    """The simple commands of a shell command, its here-documents left
+    out: read once for the three readers of each call (what it is for,
+    what it reads, and whether it reads part of a file), since splitting a
+    long command is most of what profiling a session costs."""
+    return tuple(tuple(argv) for argv in guard.simple_commands(without_heredocs(command)))
 
 
 def is_write(program, arguments):
@@ -422,16 +491,25 @@ def union(intervals):
     return merged
 
 
-def overlap(a, b, intervals):
-    return sum(max(0.0, min(b, end) - max(a, start)) for start, end in intervals)
-
-
 def active_outside(times, intervals):
     """The active seconds, each gap between consecutive lines of at most
-    IDLE_GAP, less the part of each a tool was running."""
-    times = sorted(times)
-    gaps = [(a, b) for a, b in zip(times, times[1:]) if b - a <= usage.IDLE_GAP]
-    return sum((b - a) - overlap(a, b, intervals) for a, b in gaps)
+    IDLE_GAP, less the part of each a tool was running. The lines and the
+    merged intervals are walked once, side by side, as both are in order:
+    a long session has thousands of each, and the hook reads it before
+    every commit."""
+    times, merged = sorted(times), union(intervals)
+    total, first = 0.0, 0
+    for a, b in zip(times, times[1:]):
+        if b - a > usage.IDLE_GAP:
+            continue
+        while first < len(merged) and merged[first][1] <= a:
+            first += 1
+        covered, later = 0.0, first
+        while later < len(merged) and merged[later][0] < b:
+            covered += max(0.0, min(b, merged[later][1]) - max(a, merged[later][0]))
+            later += 1
+        total += (b - a) - covered
+    return total
 
 
 # --- the profile -------------------------------------------------------------------
@@ -452,6 +530,7 @@ class Profile:
         self.files = set()
         self.per_path = Counter()
         self.context = {}
+        self.sizes = []
         self.seconds = dict.fromkeys(SECONDS_KEYS, 0)
         self.prompts = 0
         self.attachments = 0
@@ -534,6 +613,7 @@ class Profile:
         is an error line, not a call."""
         measured = [c for c in calls if c["counts"] and context_of(c["counts"]) > 0]
         sizes = [context_of(c["counts"]) for c in measured]
+        self.sizes = sizes
         cached = sum(c["counts"][3] for c in measured)
         self.context = {"calls": len(sizes), "first": sizes[0] if sizes else 0, "peak": max(sizes, default=0),
                         "last": sizes[-1] if sizes else 0, "mean": round(sum(sizes) / len(sizes)) if sizes else 0,
@@ -600,14 +680,104 @@ def stamp(moment):
 
 def profile(transcript, helpers=True):
     """The record of one session: its transcript and, by default, its
-    helpers' beside it."""
+    helpers', those its transcript holds and those in files beside it."""
     built = Profile()
-    built.add_transcript(entries_of(transcript), main=True)
+    own, held = threads_of(entries_of(transcript))
+    built.add_transcript(own, main=True)
     if helpers:
+        for entries in held:
+            built.add_transcript(entries, main=False)
         for helper in usage.helper_transcripts(transcript):
             built.add_transcript(entries_of(helper), main=False)
     stem = Path(transcript).stem
     return built.record(usage.session_token(stem) if SESSION_STEM.fullmatch(stem) else None), built
+
+
+# --- the trailer --------------------------------------------------------------------
+
+def session_counts(transcript):
+    """A session's counts so far, as its commits' trailers add them up: the
+    sums, from the record with its helpers', and the context of each of the
+    session's own calls in order, from which the peak since a commit is
+    taken."""
+    record, built = profile(transcript)
+    calls, reads, context = record["calls"], record["reads"], record["context"]
+    sums = {"calls": calls["total"], "failed": calls["failed"], "repeated": calls["repeated"],
+            "reads": reads["files_named"], "rereads": reads["rereads"], "read_bytes": reads["bytes"],
+            "reread_bytes": reads["reread_bytes"], "compactions": context.get("compactions", 0),
+            "drops": context.get("drops", 0), "tool_seconds": record["seconds"]["in_tools"]}
+    return {"sums": sums, "sizes": list(built.sizes)}
+
+
+def kept(now):
+    """What is kept of a session's counts once they are on a commit: the
+    sums, and how many of its calls the peak has looked at."""
+    return {"sums": dict(now["sums"]), "api_calls": len(now["sizes"])}
+
+
+def known(before):
+    """Whether counts kept at a commit can be counted from: as kept() keeps
+    them, every sum and the count of calls a whole number, none below
+    nothing; or empty, as kept after a session's first commit whose
+    profile was not read, from which the next line counts everything.
+    Anything else, a file damaged or written by another version, could
+    make a line claim calls an earlier line carried."""
+    if before == {}:
+        return True
+    sums, calls = before.get("sums"), before.get("api_calls")
+    return (isinstance(sums, dict) and all(is_count(sums.get(key)) for key in SUMS) and is_count(calls))
+
+
+def is_count(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def since(now, before):
+    """The profile since the counts kept() kept at the session's last
+    commit, or since its start when before is empty: each sum's rise, and
+    the largest context of the calls made since."""
+    earlier = before.get("sums") or {}
+    spent = {key: max(0, int(now["sums"].get(key) or 0) - int(earlier.get(key) or 0)) for key in SUMS}
+    spent["peak"] = max(now["sizes"][int(before.get("api_calls") or 0):], default=0)
+    return spent
+
+
+def trailer(session, spent):
+    """The trailer's value for the profile since a commit, its session as
+    the usage line gives it."""
+    counts = [f"{key}={int(spent[key])}" for key in TRAILER_FIELDS]
+    return " ".join([TRAILER_VERSION, f"session={usage.session_token(session)}", *counts])
+
+
+def parse_trailer(text):
+    """Every Symphony-Profile trailer in a commit message, as (session,
+    {field: count}): read in the message's last paragraph alone, where git
+    and the hook put a commit's trailers, so that a line quoted in the
+    body counts for nothing. So it is read from the commits the hook
+    wrote, a pull request's own, and never from a squash commit, which
+    moves each commit's trailers into its body. A part that cannot be read
+    is passed over: a count past usage.count_in's bound, as the usage
+    line's are, a session of more than the token's eight characters or of
+    others, and a key said again, of which the first counts."""
+    found = []
+    for match in TRAILER_LINE.finditer(trailer_block(text)):
+        session, counts, said = "", {}, set()
+        for part in match.group(1).split():
+            key, _, value = part.partition("=")
+            if key in said:
+                continue
+            said.add(key)
+            if key == "session":
+                session = value if TRAILER_SESSION.fullmatch(value) else ""
+            elif key in TRAILER_FIELDS and usage.count_in(value) is not None:
+                counts[key] = usage.count_in(value)
+        found.append((session, counts))
+    return found
+
+
+def trailer_block(text):
+    """A commit message's last paragraph."""
+    return PARAGRAPH_BREAK.split((text or "").strip())[-1]
 
 
 # --- the report ---------------------------------------------------------------------
