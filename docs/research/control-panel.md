@@ -288,7 +288,7 @@ Follow-ups).
   starting the workers, the two-press merge with Cancel, a repository without the topic and its
   preselected install link, the cost page's measured rows and calculator, Forget the token, and a
   refused token. It passes against the built pages of 2026-10-16.
-- The sign-in as the first way in: a second Playwright file of 111 checks, against a mocked
+- The sign-in as the first way in: a second Playwright file of 112 checks, against a mocked
   api.github.com, a mocked authorize page of GitHub's and a mocked service, with the script's
   two constants patched in. It covers the gate unconfigured on both pages (the button first and
   unpressable, the line saying why, the token box open) and configured (pressable, the token
@@ -331,9 +331,11 @@ Follow-ups).
   another tab's token after this tab's own paste, a browser with no AbortSignal.timeout, Forget
   with a classic and a fine-grained token pasted, a slow answer and a slow failure on the cost
   page, the late answer of Forget's revoke after a paste, both ways, a token another tab kept
-  while the page names nobody, and the page's own renewal while it names nobody. Seventy-nine
-  mutants, one per fix, each fail the check meant for it against the fifth round's script, and
-  the panel's earlier checks and the 13 checks of hostile input pass with the change.
+  while the page names nobody, and the page's own renewal while it names nobody; and, from the
+  rerun of the earlier rounds' mutants, a tab-only sign-in running out mid-load beside a kept one
+  in its last minute. Seventy-nine mutants, one per fix, each fail the check meant for it against
+  the fifth round's script, and the panel's earlier checks and the 13 checks of hostile input
+  pass with the change.
 - Adversarial reviews, as the handoff requires before a substantive pull request: one of the
   pages, one of the service and the privacy statement, and five of the sign-in as the first way
   in; what each found and what was done:
@@ -485,7 +487,12 @@ Follow-ups).
     deploy. Of three older points it raised, the revoke-failure words now say the listed
     repositories stay and the cost page shows only the latest choice of repository's answer;
     Merge staying armed after "The sign-in changed" is by design. The reviewer's reproductions
-    pass on the fixed page, configured and unconfigured, 28 of 28.
+    pass on the fixed page, configured and unconfigured, 28 of 28. Running every earlier round's
+    mutant again against the fixed page found one that the fourth round's fix had left uncaught:
+    with the page's first look at whether this tab's sign-in ended taken out, a tab whose
+    sign-in ended still sent nothing to GitHub, since a second look, added in the fourth round,
+    stops the call, but it renewed the sign-in its other tabs keep when that one was in its last
+    minute; a new check of that catches it, and the page needed no change.
   - The reviewer's own probe script, 13 checks written against the pages before the rewrite
     (repository switching mid-load, a failed read said in words, the 300-issue cut, the merge
     button on a draft and on a failed check, a hostile board, an escaped pipe, the fallback
