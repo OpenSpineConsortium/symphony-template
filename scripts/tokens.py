@@ -632,7 +632,10 @@ def check_scopes(gh, target):
         return
     done = gh.run(["auth", "status"])
     scopes = re.search(r"Token scopes: (.*)", (done.stdout or "") + (done.stderr or ""))
-    if scopes and "admin:org" not in scopes.group(1):
+    # gh quotes each scope of an OAuth token; a token of another kind (a
+    # fine-grained token in GH_TOKEN) lists none, and gh says itself what
+    # such a token lacks when a call is refused.
+    if scopes and "'" in scopes.group(1) and "admin:org" not in scopes.group(1):
         raise TokensError("gh's token lacks the admin:org scope an organization's secrets need: run gh auth refresh -h github.com -s admin:org, "
                           "approve it in the browser, then run this again")
 

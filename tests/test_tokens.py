@@ -222,6 +222,13 @@ class TheMask(unittest.TestCase):
 
     FRAME = ("\x1b[?25lYour OAuth token (valid for 1 year):\n\n\x1b[1m" + TOKEN + "\x1b[22m\n\n"
              "Store this token securely.\n\nUse this token by setting: export CLAUDE_CODE_OAUTH_TOKEN=" + TOKEN + "\n\x1b[?25h")
+    # Claude Code 2.1's own renderer places each word by its column and
+    # ends a line with \r\r\n, as a run of the real claude setup-token
+    # behind the wizard's terminal showed on 2026-10-16; a token is one
+    # word, so it comes between a column code and a line end.
+    PLACED = ("\x1b[2GYour\x1b[7GOAuth\x1b[13Gtoken\x1b[19G(valid\x1b[26Gfor\x1b[30G1\x1b[32Gyear):\r\r\n\r\r\n"
+              "\x1b[2G\x1b[1m" + TOKEN + "\x1b[22m\r\r\n\r\r\n\x1b[2GStore\x1b[8Gthis\x1b[13Gtoken\x1b[19Gsecurely.\r\r\n"
+              "\x1b[2GUse\x1b[6Gthis\x1b[11Gtoken\x1b[17Gby\x1b[20Gsetting:\x1b[29Gexport\x1b[36GCLAUDE_CODE_OAUTH_TOKEN=" + TOKEN + "\r\r\n")
 
     def masked(self, text, size):
         masker = tokens.Masker()
@@ -230,16 +237,17 @@ class TheMask(unittest.TestCase):
         return out, masker.tokens
 
     def test_the_token_never_reaches_the_screen_at_any_chunk_size(self):
-        for size in list(range(1, 48)) + [64, 100, 1000]:
-            out, found = self.masked(self.FRAME, size)
-            self.assertEqual(found, [TOKEN], size)
-            self.assertNotIn(TOKEN, out, size)
-            self.assertFalse(has_token(out), size)
-            self.assertEqual(out.count(tokens.MASK), 2, size)
-            # Everything else is on the screen as claude printed it; where
-            # the token came one character at a time, its first "s" was
-            # on the screen before the mask took the rest.
-            self.assertEqual(re.sub("s?" + re.escape(tokens.MASK), TOKEN, out), self.FRAME, size)
+        for frame in (self.FRAME, self.PLACED):
+            for size in list(range(1, 48)) + [64, 100, 1000]:
+                out, found = self.masked(frame, size)
+                self.assertEqual(found, [TOKEN], size)
+                self.assertNotIn(TOKEN, out, size)
+                self.assertFalse(has_token(out), size)
+                self.assertEqual(out.count(tokens.MASK), 2, size)
+                # Everything else is on the screen as claude printed it;
+                # where the token came one character at a time, its first
+                # "s" was on the screen before the mask took the rest.
+                self.assertEqual(re.sub("s?" + re.escape(tokens.MASK), TOKEN, out), frame, size)
 
     def test_two_different_tokens_are_both_kept(self):
         out, found = self.masked("a " + TOKEN + " b " + OTHER + " c", 7)
