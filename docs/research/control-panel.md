@@ -298,8 +298,9 @@ Checks Read-only, Contents Read and write, Issues Read and write, Pull requests 
 
 ## Follow-ups
 
-- tools/economics.py: Sonnet 5.5's cache-read price 0.20 to 0.10 and PRICES_AS_OF to the date
-  read, in a pull request of its own once #95 has merged.
+- tools/economics.py: Sonnet 5.5's cache-read price 0.20 to 0.10 and PRICES_AS_OF to 2026-10-16,
+  the day the page was read again (its footnote: cache hits on Opus 5.5 and Sonnet 5.5 are 0.05
+  times the input price, Sonnet 5's 0.1 times), in the pull request after #95; done.
 - The constants pull request on the site, once the owner gives the Worker's address and the
   Client ID.
 - The Playwright test lives outside the repositories; the site has no test runner, and adding
