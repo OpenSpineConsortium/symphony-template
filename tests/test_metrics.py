@@ -893,20 +893,37 @@ class Economics(unittest.TestCase):
                 self.assertEqual(sorted(kept), ["9002"] if sonnet_read == "unread" else ["9001", "9002"])
                 for entry in kept.values():
                     self.assertEqual(set(entry["record"]),
-                                     {"v", "source", "workflow", "job", "issue", "pull", "seconds", "models"})
+                                     {"v", "source", "workflow", "job", "issue", "pull", "seconds", "models",
+                                      "profile"})
 
     def test_a_cache_an_older_run_wrote_is_read_in_the_form_the_cache_keeps(self):
         with tempfile.TemporaryDirectory() as folder:
             cache = Path(folder) / "usage.json"
             uploaded = json.loads(record_text(worker='"left over"'))
-            cache.write_text(json.dumps({"v": 1, "records": {
+            cache.write_text(json.dumps({"v": metrics.USAGE_CACHE_VERSION, "records": {
                 "9001": {"at": "2026-10-07T10:28:00Z", "record": uploaded},
                 "9002": {"at": "2026-10-06T08:00:00Z", "record": [1, 2]},
                 "9003": ["not", "an", "entry"]}}))
             self.assertEqual(sorted(metrics.read_usage_cache(cache)), ["9001"])
             self.assertNotIn("worker", metrics.read_usage_cache(cache)["9001"]["record"])
-            cache.write_text(json.dumps({"v": 1, "records": [1, 2]}))
+            self.assertEqual(metrics.read_usage_cache(cache)["9001"]["record"]["profile"], RUN_9001_PROFILE)
+            cache.write_text(json.dumps({"v": metrics.USAGE_CACHE_VERSION, "records": [1, 2]}))
             self.assertEqual(metrics.read_usage_cache(cache), {})
+
+    def test_a_cache_kept_before_the_profile_is_read_again_from_the_artifacts(self):
+        # Version 1 kept no run's profile, so its records are downloaded
+        # again rather than read without one.
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / "usage.json"
+            older = {"9001": {"at": "2026-10-07T10:28:00Z", "record": json.loads(record_text(profile="null"))},
+                     "9002": {"at": "2026-10-06T08:00:00Z", "record": json.loads(record_text())}}
+            cache.write_text(json.dumps({"v": 1, "records": older}))
+            self.assertEqual(metrics.read_usage_cache(cache), {})
+            _, _, opener = self.collect(folder, cache=cache)
+            kept = json.loads(cache.read_text())
+        self.assertEqual(sum(path.endswith("/zip") for path in opener.calls), 2)
+        self.assertEqual((kept["v"], kept["records"]["9001"]["record"]["profile"]),
+                         (metrics.USAGE_CACHE_VERSION, RUN_9001_PROFILE))
 
     def test_a_listing_or_a_breakdown_read_cut_short_or_not_http_is_one_line_of_the_record(self):
         # The library's request lets http.client's own errors through, which
@@ -1015,6 +1032,78 @@ class Economics(unittest.TestCase):
                  metrics.PullFacts({"number": 2, "title": "Revert the thing", "merged_at": "2026-10-02T00:00:00Z"}),
                  metrics.PullFacts({"number": 3, "title": 'Revert "Old"', "merged_at": "2026-08-02T00:00:00Z"})]
         self.assertEqual(metrics.reverts(facts, window), 1)
+
+
+def collect_profile(folder, routes=None, environ=None, remaining=None):
+    """collect with --profile-out over the world: METRICS.json, PROFILE.json
+    and what the run printed."""
+    out, profile_out = Path(folder) / "METRICS.json", Path(folder) / "PROFILE.json"
+    args = metrics.parse_args(["collect", "--repo", REPO, "--out", str(out), "--root", str(folder), "--now", NOW,
+                               "--profile-out", str(profile_out)])
+    opener = FakeGitHub(routes or world_routes(), remaining=remaining)
+    with redirect_stdout(io.StringIO()) as shown:
+        code = metrics.collect(args, {"GITHUB_TOKEN": "t"} if environ is None else environ, opener=opener,
+                               sleep=lambda seconds: None)
+    return code, json.loads(out.read_text()), profile_out.read_text(), shown.getvalue()
+
+
+class ProfileSums(unittest.TestCase):
+    """PROFILE.json: the Symphony-Profile lines on the pull requests'
+    commits and the runs' profiles, summed beside the breakdown and under
+    the same switch, into a file of the repository's own that the collector
+    does not read."""
+
+    def test_the_world_sums_to_what_its_lines_and_runs_say(self):
+        with tempfile.TemporaryDirectory() as folder:
+            code, record, text, shown = collect_profile(folder)
+        found = json.loads(text)
+        self.assertEqual(code, 0)
+        self.assertEqual(found, WORLD_PROFILE)
+        self.assertEqual(tuple(found), metrics.PROFILE_KEYS)
+        self.assertEqual(tuple(found["by_setting"]), metrics.SETTINGS)
+        for row in [*found["by_setting"].values(), found["coordination"]["alone"], found["coordination"]["parallel"]]:
+            self.assertEqual(tuple(row), metrics.profile.GROUP_KEYS)
+        self.assertEqual(tuple(found["coordination"]["ratios"]), metrics.profile.RATIO_KEYS)
+        self.assertEqual((record["economics"], record["coordination"]), (WORLD_ECONOMICS, WORLD_COORDINATION))
+        self.assertIn(f"METRICS.json and {Path(folder) / 'PROFILE.json'} written over 30 days", shown)
+        self.assertEqual(sum(row["profiled"] for row in found["by_setting"].values()),
+                         found["coordination"]["parallel"]["profiled"])
+
+    def test_nothing_of_the_repository_reaches_the_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            _, _, text, _ = collect_profile(folder)
+        for secret in ("secret", "a1a1a1a1", "b1b1b1b1", A1, B1, TOKEN, "claude/", REPO, LINK):
+            self.assertNotIn(secret, text)
+        self.assertNotIn("mcp", text)
+
+    def test_sharing_off_writes_off_alone_and_calls_nothing(self):
+        with tempfile.TemporaryDirectory() as folder:
+            switch(folder, "off\n")
+            out, profile_out = Path(folder) / "METRICS.json", Path(folder) / "PROFILE.json"
+            args = metrics.parse_args(["collect", "--repo", REPO, "--out", str(out), "--root", folder, "--now", NOW,
+                                       "--profile-out", str(profile_out)])
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(metrics.collect(args, {"GITHUB_TOKEN": "t"}, opener=NoCalls()), 0)
+            self.assertEqual(json.loads(profile_out.read_text()), {"schema": "symphony-profile-sums/1",
+                                                                   "sharing": "off"})
+
+    def test_the_sums_are_left_out_with_the_breakdown(self):
+        routes = world_routes()
+        del routes[f"{API}/pulls/314/commits"]
+        with tempfile.TemporaryDirectory() as folder:
+            code, record, text, _ = collect_profile(folder, routes=routes)
+        self.assertEqual(code, 0)
+        self.assertNotIn("economics", record)
+        self.assertEqual(json.loads(text), {"schema": "symphony-profile-sums/1", "generated_at": NOW,
+                                            "window_days": 30, "sharing": "on"})
+        self.assertEqual(tuple(json.loads(text)), metrics.PROFILE_KEYS[:4])
+
+    def test_without_its_option_no_profile_is_written(self):
+        with tempfile.TemporaryDirectory() as folder:
+            code, record, _, shown, _, _ = collect_world(folder)
+            self.assertEqual(sorted(path.name for path in Path(folder).iterdir()), ["METRICS.json"])
+        self.assertEqual(code, 0)
+        self.assertNotIn("PROFILE", shown)
 
 
 class ProtocolVersion(unittest.TestCase):
@@ -1129,19 +1218,37 @@ def commit_sha(number, index):
     return f"{number:04d}{index:02d}e" + "f" * 33
 
 
-def trailer(session, usage=""):
+def trailer(session, usage="", profile=""):
     """A cloud session's trailers, with a Symphony-Usage line when usage
-    gives its value."""
+    gives its value and a Symphony-Profile line after it when profile
+    does, as the hook writes them."""
     lines = f"Work.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nClaude-Session: {LINK}{session}"
-    return lines + (f"\nSymphony-Usage: v1 {usage}" if usage else "")
+    lines += f"\nSymphony-Usage: v1 {usage}" if usage else ""
+    return lines + (f"\nSymphony-Profile: v1 {profile}" if profile else "")
 
 
-def usage_record(workflow, job, models, seconds, issue=None, pull=None):
+def profiled(session, *counts):
+    """A Symphony-Profile line's value: the session and each count in
+    tools/profile.py's TRAILER_FIELDS order (calls, failed, repeated, reads,
+    rereads, read_bytes, reread_bytes, peak, compactions, drops,
+    tool_seconds)."""
+    fields = zip(metrics.profile.TRAILER_FIELDS, counts, strict=True)
+    return f"session={session} " + " ".join(f"{key}={value}" for key, value in fields)
+
+
+def run_profile(*counts):
+    """A run's profile block, its counts in the same order."""
+    return dict(zip(metrics.profile.TRAILER_FIELDS, counts, strict=True))
+
+
+def usage_record(workflow, job, models, seconds, issue=None, pull=None, profile=None):
     """The record a run in Actions uploads (tools/usage.py), zipped as
-    upload-artifact keeps it."""
+    upload-artifact keeps it, with its profile block when profile gives it."""
     record = {"v": 1, "source": "actions", "workflow": workflow, "job": job, "worker": "", "issue": issue,
               "pull": pull, "at": "2026-10-06T00:00:00Z", "seconds": seconds, "api_seconds": seconds,
               "turns": 12, "reported_usd": 0.0, "error": False, "models": models}
+    if profile is not None:
+        record["profile"] = profile
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("record.json", json.dumps(record))
@@ -1161,7 +1268,7 @@ def record_text(**raw):
     text, which json.dumps would never write."""
     record = {"v": 1, "source": "actions", "workflow": "claude", "job": "claude", "worker": "", "issue": None,
               "pull": 309, "at": "2026-10-06T00:00:00Z", "seconds": 340.5,
-              "models": {"claude-sonnet-5-5": [900, 25000, 0, 300000, 6400]}}
+              "models": {"claude-sonnet-5-5": [900, 25000, 0, 300000, 6400]}, "profile": RUN_9001_PROFILE}
     text = json.dumps({**record, **{key: f"@{key}@" for key in raw}})
     for key, value in raw.items():
         text = text.replace(f'"@{key}@"', value)
@@ -1259,35 +1366,47 @@ WORLD_PULLS = [
 # The usage the sessions' commits carry (tools/usage.py), in the trailer's
 # order: uncached input, cache writes kept five minutes and an hour, cache
 # reads, output. 313's commit was made before the window, so it is on no
-# bill of the window, though it counts for 313, which ended in it.
+# bill of the window, though it counts for 313, which ended in it. The
+# profile lines after them (tools/profile.py) are summed the same way into
+# PROFILE.json, and 312's, open, into none of it.
 WORLD_COMMITS = {
     301: [world_commit(301, 1, "2026-10-01T09:00:00Z", trailer(
-              A1, "session=a1a1a1a1 seconds=2400 claude-opus-5-5=2100,61000,0,880000,18500")),
+              A1, "session=a1a1a1a1 seconds=2400 claude-opus-5-5=2100,61000,0,880000,18500",
+              profiled("a1a1a1a1", 40, 2, 1, 12, 3, 60000, 9000, 150000, 0, 0, 300))),
           world_commit(301, 2, "2026-10-01T12:00:00Z", trailer(
-              A1, "session=a1a1a1a1 seconds=1500 claude-opus-5-5=900,22000,0,540000,9800")),
+              A1, "session=a1a1a1a1 seconds=1500 claude-opus-5-5=900,22000,0,540000,9800",
+              profiled("a1a1a1a1", 25, 1, 0, 8, 2, 30000, 4000, 180000, 1, 1, 200))),
           world_commit(301, 3, "2026-10-01T12:30:00Z", trailer(B1))],
-    302: [world_commit(302, 1, "2026-10-01T10:30:00Z"), world_commit(302, 2, "2026-10-01T13:00:00Z")],
+    # A profile line whose session is no token's: its counts are summed,
+    # and it names no session.
+    302: [world_commit(302, 1, "2026-10-01T10:30:00Z"), world_commit(302, 2, "2026-10-01T13:00:00Z", (
+              "Work.\n\nSymphony-Profile: v1 " + profiled("toolongtoken", 12, 1, 0, 4, 1, 10000, 1000, 100000, 0, 0, 60)))],
     303: [world_commit(303, 1, "2026-10-01T15:00:00Z", trailer(B1))],
     304: [world_commit(304, 1, "2026-10-03T09:50:00Z", trailer(
-              B1, "session=b1b1b1b1 seconds=1200 claude-sonnet-5-5=1500,30000,0,420000,7600")),
+              B1, "session=b1b1b1b1 seconds=1200 claude-sonnet-5-5=1500,30000,0,420000,7600",
+              profiled("b1b1b1b1", 30, 0, 2, 10, 4, 40000, 12000, 120000, 0, 0, 150))),
           world_commit(304, 2, "2026-10-03T10:56:00Z", trailer(B1))],
     305: [world_commit(305, 1, "2026-10-03T10:55:00Z")],
     306: [world_commit(306, 1, "2026-10-05T09:00:00Z")],
     307: [world_commit(307, 1, "2026-10-05T11:00:00Z", trailer(
               A1, "session=a1a1a1a1 seconds=900 claude-haiku-5-5=300,4000,0,30000,900 "
-                  "claude-opus-5-5=700,18000,0,260000,5200"))],
+                  "claude-opus-5-5=700,18000,0,260000,5200",
+              profiled("a1a1a1a1", 20, 1, 0, 6, 1, 20000, 2000, 90000, 0, 0, 100)))],
     # The Sept 20 commit is more than seven days before the opening.
     308: [world_commit(308, 1, "2026-09-20T09:00:00Z", trailer(B1)),
           world_commit(308, 2, "2026-10-07T09:00:00Z", trailer(
-              B1, "session=b1b1b1b1 seconds=1600 claude-sonnet-5-5=1800,35000,0,610000,11200"))],
+              B1, "session=b1b1b1b1 seconds=1600 claude-sonnet-5-5=1800,35000,0,610000,11200",
+              profiled("b1b1b1b1", 50, 4, 3, 15, 6, 70000, 20000, 200000, 0, 0, 400)))],
     309: [world_commit(309, 1, "2026-10-07T10:05:00Z")],
     310: [world_commit(310, 1, "2026-10-02T00:00:00Z")],
     311: [world_commit(311, 1, "2026-10-09T09:00:00Z", trailer(A2)),
           world_commit(311, 2, "2026-10-09T09:30:00Z", f"Local work.\n\nSymphony-Session: {TOKEN}")],
     312: [world_commit(312, 1, "2026-10-09T11:00:00Z", trailer(
-              B1, "session=b1b1b1b1 seconds=600 claude-sonnet-5-5=400,9000,0,120000,2100"))],
+              B1, "session=b1b1b1b1 seconds=600 claude-sonnet-5-5=400,9000,0,120000,2100",
+              profiled("b1b1b1b1", 10, 0, 0, 3, 0, 8000, 0, 60000, 0, 0, 50)))],
     313: [world_commit(313, 1, "2026-09-05T09:00:00Z", trailer(
-              A1, "session=a1a1a1a1 seconds=3000 claude-opus-5-5=2500,70000,0,1000000,20000"))],
+              A1, "session=a1a1a1a1 seconds=3000 claude-opus-5-5=2500,70000,0,1000000,20000",
+              profiled("a1a1a1a1", 35, 2, 1, 11, 2, 50000, 6000, 160000, 1, 0, 250)))],
     314: [world_commit(314, 1, "2026-09-01T09:00:00Z", trailer(A2))],
     315: [world_commit(315, 1, "2026-07-01T09:00:00Z", trailer(A2))],
     319: [world_commit(319, 1, "2026-10-05T12:30:00Z")],
@@ -1326,6 +1445,7 @@ WORLD_COMMENTS = [
 # The Actions runs' usage records, newest first as GitHub lists them: the
 # @claude run that made 309, the coordinator's plan of an epic, which names
 # no pull request, an artifact of another workflow, and an expired record.
+# The two records carry the runs' profiles, 9002's on the parallel side.
 STORAGE = "https://storage.example"
 WORLD_ARTIFACTS = {"total_count": 4, "artifacts": [
     artifact(9003, "build-output", "2026-10-08T00:00:00Z"),
@@ -1333,9 +1453,13 @@ WORLD_ARTIFACTS = {"total_count": 4, "artifacts": [
     artifact(9002, "symphony-usage-70-1-plan", "2026-10-06T08:00:00Z"),
     artifact(9000, "symphony-usage-60-1-claude", "2026-09-30T08:00:00Z", expired=True),
 ]}
+RUN_9001_PROFILE = run_profile(18, 0, 0, 5, 1, 15000, 3000, 80000, 0, 0, 0)
+RUN_9002_PROFILE = run_profile(6, 0, 0, 2, 0, 5000, 0, 40000, 0, 0, 0)
 WORLD_RECORDS = {
-    9001: usage_record("claude", "claude", {"claude-sonnet-5-5": [900, 25000, 0, 300000, 6400]}, 340.5, pull=309),
-    9002: usage_record("coordinator", "plan", {"claude-opus-5-5": [600, 15000, 0, 90000, 3500]}, 95.0, issue=900),
+    9001: usage_record("claude", "claude", {"claude-sonnet-5-5": [900, 25000, 0, 300000, 6400]}, 340.5, pull=309,
+                       profile=RUN_9001_PROFILE),
+    9002: usage_record("coordinator", "plan", {"claude-opus-5-5": [600, 15000, 0, 90000, 3500]}, 95.0, issue=900,
+                       profile=RUN_9002_PROFILE),
 }
 
 
@@ -1404,6 +1528,40 @@ WORLD_COORDINATION = {
                  "active_seconds": 6383400},
     "ratios": {"tokens_per_merge": None, "usd_per_merge": None, "latency": None, "throughput": None,
                "first_check_pass": None, "commits_per_merge": None, "failures_per_pull_request": None},
+}
+
+
+def profile_row(*values):
+    return row_of(metrics.profile.GROUP_KEYS, *values)
+
+
+# The world's PROFILE.json, as docs/setup/metrics.md shows it: the profile
+# lines of the pull requests that ended in the window, two of 301's among
+# them, 313's from before the window and 302's, whose session is no
+# token's, each in its setting as the breakdown sorts it, with 9001's
+# profile on 309; on the parallel side, where every one of them is, the
+# coordinator's plan too (9002). The median peak is of 301's 180000, 302's
+# 100000, 304's 120000, 307's 90000, 308's 200000, 309's 80000 and 313's
+# 160000.
+NOTHING_PROFILED = (0,) * 10
+WORLD_PROFILE = {
+    "schema": "symphony-profile-sums/1", "generated_at": NOW, "window_days": 30, "sharing": "on", "sessions": 2,
+    "actions_runs": 2,
+    "by_setting": {
+        "solo": profile_row(1, 1, 1, 1, 50, 4, 3, 15, 6, 70000, 20000, 0, 0, 400, 200000),
+        "one_session": profile_row(2, 2, 1, 1, 30, 0, 2, 10, 4, 40000, 12000, 0, 0, 150, 120000),
+        "one_person_sessions": profile_row(3, 3, 2, 2, 100, 5, 2, 31, 7, 140000, 19000, 2, 1, 750, 170000),
+        "several_people": profile_row(1, 0, 0, 0, *NOTHING_PROFILED, None),
+        "several_people_and_sessions": profile_row(1, 1, 1, 1, 12, 1, 0, 4, 1, 10000, 1000, 0, 0, 60, 100000),
+        "undetermined": profile_row(2, 2, 1, 1, 20, 1, 0, 6, 1, 20000, 2000, 0, 0, 100, 90000),
+        "workflow_agents": profile_row(1, 1, 1, 1, 18, 0, 0, 5, 1, 15000, 3000, 0, 0, 0, 80000),
+        "automation": profile_row(1, 1, 0, 0, *NOTHING_PROFILED, None),
+    },
+    "coordination": {
+        "alone": profile_row(0, 0, 0, 0, *NOTHING_PROFILED, None),
+        "parallel": profile_row(11, 10, 7, 7, 236, 11, 7, 73, 20, 300000, 57000, 2, 1, 1460, 120000),
+        "ratios": {"calls_per_merge": None, "reads_per_merge": None, "rereads_per_merge": None, "peak": None},
+    },
 }
 # The world's breakdown, as docs/setup/metrics.md shows it: every setting's
 # row in SETTING_KEYS order and every relation's in PAIR_KEYS order.
@@ -2655,15 +2813,17 @@ class JudgePush(unittest.TestCase):
             commit = metrics.push_judge(path, partial(run_in, clone))
         return clone, commit, path
 
-    def test_it_lands_as_a_fast_forward_that_keeps_metrics_json(self):
+    def test_it_lands_as_a_fast_forward_that_keeps_metrics_json_and_profile_json(self):
         with tempfile.TemporaryDirectory() as folder:
-            origin, seeded = seeded_origin(folder, {"METRICS.json": '{"schema": "sdlc-metrics/1"}\n'})
+            origin, seeded = seeded_origin(folder, {"METRICS.json": '{"schema": "sdlc-metrics/1"}\n',
+                                                    "PROFILE.json": '{"schema": "symphony-profile-sums/1"}\n'})
             before = tree_of(origin, seeded)
             clone, commit, path = self.push(folder, origin)
             self.assertEqual(git(origin, "rev-parse", "metrics"), commit)
             self.assertEqual(git(origin, "rev-parse", "metrics^"), seeded)
             after = tree_of(origin, "metrics")
-            self.assertEqual(after["METRICS.json"], before["METRICS.json"])
+            self.assertEqual((after["METRICS.json"], after["PROFILE.json"]),
+                             (before["METRICS.json"], before["PROFILE.json"]))
             self.assertEqual(git(origin, "show", "metrics:JUDGE.json") + "\n", path.read_text())
             self.assertRegex(git(origin, "log", "-1", "--format=%s", "metrics"),
                              r"^Judge counts as of \d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ \[skip ci\]$")
@@ -2722,10 +2882,13 @@ def run_block(lines):
     return "\n".join(line[10:] for line in lines[start + 1:]) + "\n"
 
 
-WRITE_STEP = "Write METRICS.json to the branch metrics when it changed"
+WRITE_STEP = "Write METRICS.json and PROFILE.json to the branch metrics when they changed"
 OLD = dict(EXPECTED, schema="sdlc-metrics/1", generated_at="2026-10-09T04:43:00Z")
 NEW_TIME = dict(OLD, generated_at="2026-10-10T04:43:00Z")
 MOVED = dict(NEW_TIME, counts=dict(EXPECTED["counts"], merged=2))
+SUMS_OLD = dict(WORLD_PROFILE, generated_at="2026-10-09T04:43:00Z")
+SUMS_NEW_TIME = dict(SUMS_OLD, generated_at="2026-10-10T04:43:00Z")
+SUMS_MOVED = dict(SUMS_NEW_TIME, sessions=3)
 RACE_GIT = """#!/bin/bash
 # The first push of the run is preceded by a judge's, as if it landed
 # between the run's fetch and its own push.
@@ -2740,20 +2903,29 @@ exec "$REAL_GIT" "$@"
 class WriteStep(unittest.TestCase):
     """The step's own script, run against a bare origin."""
 
-    def step(self, folder, origin, record, extra_env=None):
+    def step(self, folder, origin, record, extra_env=None, sums=None):
+        """The step after a collect that wrote record as METRICS.json and,
+        where sums is given, sums as PROFILE.json."""
         work = clone_of(folder, origin, "work")
         (work / "tools").symlink_to(ROOT / "tools")
         temp = Path(folder) / "runner"
         temp.mkdir()
         (temp / "METRICS.json").write_text(json.dumps(record, indent=2) + "\n")
+        if sums is not None:
+            (temp / "PROFILE.json").write_text(json.dumps(sums, indent=2) + "\n")
         env = {**os.environ, **GIT_ENV, "RUNNER_TEMP": str(temp), **(extra_env or {})}
         return subprocess.run(["bash", "-e", "-c", run_block(step_lines(WRITE_STEP))], cwd=work, env=env,
                               capture_output=True, text=True)
 
-    def run_step(self, folder, origin, record, extra_env=None):
-        done = self.step(folder, origin, record, extra_env)
+    def run_step(self, folder, origin, record, extra_env=None, sums=None):
+        done = self.step(folder, origin, record, extra_env, sums)
         self.assertEqual(done.returncode, 0, done.stderr)
         return done.stdout
+
+    def origin_with_sums(self, folder):
+        return seeded_origin(folder, {"METRICS.json": json.dumps(OLD, indent=2) + "\n",
+                                      "PROFILE.json": json.dumps(SUMS_OLD, indent=2) + "\n",
+                                      "JUDGE.json": '{"n": 1}\n'})
 
     def origin_with_judge(self, folder):
         return seeded_origin(folder, {"METRICS.json": json.dumps(OLD, indent=2) + "\n", "JUDGE.json": '{"n": 1}\n'})
@@ -2797,6 +2969,43 @@ class WriteStep(unittest.TestCase):
             self.assertIn("Rename it", done.stdout)
             self.assertNotIn("moved during this run", done.stdout)
             self.assertEqual(git(origin, "rev-parse", "metrics"), seeded)
+
+    def test_the_profile_goes_beside_metrics_json_and_a_first_one_is_a_change(self):
+        with tempfile.TemporaryDirectory() as folder:
+            origin, seeded = self.origin_with_judge(folder)
+            judge_blob = tree_of(origin, seeded)["JUDGE.json"]
+            said = self.run_step(folder, origin, NEW_TIME, sums=SUMS_NEW_TIME)
+            self.assertIn("metrics written as", said)
+            self.assertEqual(sorted(tree_of(origin, "metrics")), ["JUDGE.json", "METRICS.json", "PROFILE.json"])
+            self.assertEqual(tree_of(origin, "metrics")["JUDGE.json"], judge_blob)
+            self.assertEqual(json.loads(git(origin, "show", "metrics:PROFILE.json")), SUMS_NEW_TIME)
+
+    def test_both_files_unchanged_apart_from_their_time_write_nothing(self):
+        with tempfile.TemporaryDirectory() as folder:
+            origin, seeded = self.origin_with_sums(folder)
+            said = self.run_step(folder, origin, NEW_TIME, sums=SUMS_NEW_TIME)
+            self.assertIn("metrics unchanged", said)
+            self.assertEqual(git(origin, "rev-parse", "metrics"), seeded)
+
+    def test_a_moved_profile_alone_is_a_change(self):
+        with tempfile.TemporaryDirectory() as folder:
+            origin, _ = self.origin_with_sums(folder)
+            said = self.run_step(folder, origin, NEW_TIME, sums=SUMS_MOVED)
+            self.assertIn("metrics written as", said)
+            self.assertEqual(json.loads(git(origin, "show", "metrics:PROFILE.json")), SUMS_MOVED)
+            self.assertEqual(json.loads(git(origin, "show", "metrics:METRICS.json")), NEW_TIME)
+            self.assertEqual(git(origin, "show", "metrics:JUDGE.json"), '{"n": 1}')
+
+    def test_a_run_that_wrote_no_profile_keeps_the_branchs(self):
+        with tempfile.TemporaryDirectory() as folder:
+            origin, seeded = self.origin_with_sums(folder)
+            sums_blob = tree_of(origin, seeded)["PROFILE.json"]
+            self.assertIn("metrics unchanged", self.run_step(folder, origin, NEW_TIME))
+        with tempfile.TemporaryDirectory() as folder:
+            origin, seeded = self.origin_with_sums(folder)
+            said = self.run_step(folder, origin, MOVED)
+            self.assertIn("metrics written as", said)
+            self.assertEqual(tree_of(origin, "metrics")["PROFILE.json"], sums_blob)
 
     def test_a_judge_push_landing_meanwhile_is_kept(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -2862,6 +3071,11 @@ class Workflow(unittest.TestCase):
         self.assertNotIn("anthropics/claude-code-action", self.TEXT)
         self.assertIn("In crowd mode", self.TEXT.split("\non:", 1)[0])
 
+    def test_the_profile_collect_writes_is_the_one_the_write_step_puts_on_the_branch(self):
+        collect_step = " ".join(line.strip() for line in step_lines("Collect the aggregates"))
+        self.assertIn('--profile-out "$RUNNER_TEMP/PROFILE.json"', collect_step)
+        self.assertIn('profile="$RUNNER_TEMP/PROFILE.json"', run_block(step_lines(WRITE_STEP)))
+
     def test_its_one_forced_push_is_leased_to_the_commit_it_read(self):
         script = run_block(step_lines(WRITE_STEP))
         self.assertIn('--force-with-lease="refs/heads/metrics:$previous"', script)
@@ -2922,6 +3136,20 @@ class Page(unittest.TestCase):
         self.assertEqual((sample["economics"], sample["coordination"]), (WORLD_ECONOMICS, WORLD_COORDINATION))
         self.assertEqual((sample["counts"], sample["durations_seconds"], sample["rates"]),
                          (WORLD_COUNTS, WORLD_DURATIONS, WORLD_RATES))
+
+    def test_the_profile_sample_is_what_collect_writes_for_the_two_person_world(self):
+        sample = next(s for s in self.samples() if s["schema"] == metrics.PROFILE_SCHEMA)
+        self.assertEqual(sample, WORLD_PROFILE)
+        self.assertEqual(tuple(sample), metrics.PROFILE_KEYS)
+        self.assertEqual(tuple(sample["by_setting"]), metrics.SETTINGS)
+        for row in [*sample["by_setting"].values(), sample["coordination"]["alone"],
+                    sample["coordination"]["parallel"]]:
+            self.assertEqual(tuple(row), metrics.profile.GROUP_KEYS)
+        self.assertEqual(tuple(sample["coordination"]), ("alone", "parallel", "ratios"))
+        self.assertEqual(tuple(sample["coordination"]["ratios"]), metrics.profile.RATIO_KEYS)
+        self.assertIn(f"`{json.dumps(metrics.PROFILE_OFF)}`", self.TEXT)
+        for key in (*metrics.profile.GROUP_KEYS, *metrics.profile.RATIO_KEYS, *metrics.PROFILE_KEYS[4:6]):
+            self.assertIn(key, self.TEXT.split("## The profile's sums", 1)[1].split("\n## ", 1)[0], key)
 
     def test_it_names_the_switch_both_ways_and_never_an_api_key_for_the_judge(self):
         for needed in (metrics.SWITCH_FILE, "SDLC_METRICS", "python3 tools/metrics.py judge --dry-run",

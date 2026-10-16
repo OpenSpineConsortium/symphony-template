@@ -15,12 +15,14 @@ import tempfile
 import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
+import economics  # noqa: E402
 import usage  # noqa: E402
 
 profile = usage.profiler()
@@ -507,6 +509,156 @@ class TheTrailer(ATranscriptOnDisk):
         for session in ("a" * 9, "a;b", "٣", ""):
             self.assertEqual(profile.parse_trailer(f"Symphony-Profile: v1 session={session} calls=1\n"),
                              [("", {"calls": 1})], session)
+
+
+def mixed_tool_entries():
+    """A call of four tools: two from MCP servers, one an Agent SDK program
+    defined for itself, and the shell."""
+    return [
+        *assistant("m1", used(100, 900, 0, 50), [
+            tool_use("t1", "mcp__github__get_file_contents", path="secret/a.py"),
+            tool_use("t2", "mcp__private-crm__lookup", customer="x"),
+            tool_use("t3", "lookup_customer", id=1),
+            tool_use("t4", "Bash", command="ls"),
+        ], 10),
+        result("t1", "a" * 40, 12), result("t2", "b" * 60, 13, error=True), result("t3", "c" * 10, 14),
+        result("t4", "d", 15),
+        *assistant("m2", used(0, 100, 1000, 10), [{"type": "text", "text": "Done."}], 20),
+    ]
+
+
+class ToolNames(ATranscriptOnDisk):
+    """The record names the harness's own tools and folds every other: each
+    MCP tool into one row, since a server's name can say what a session
+    was connected to, and any other into another."""
+
+    def test_every_mcp_tool_is_one_row_and_any_other_tool_another(self):
+        record, built = self.profiled(mixed_tool_entries())
+        by_tool = record["calls"]["by_tool"]
+        self.assertEqual(sorted(by_tool), ["Bash", profile.MCP_TOOLS, profile.OTHER_TOOLS])
+        mcp = by_tool[profile.MCP_TOOLS]
+        self.assertEqual((mcp["calls"], mcp["failed"], mcp["result_bytes"]), (2, 1, 100))
+        self.assertEqual((by_tool["other"]["calls"], by_tool["other"]["result_bytes"]), (1, 10))
+        self.assertEqual(sum(row["calls"] for row in by_tool.values()), record["calls"]["total"])
+        text = json.dumps(record)
+        for name in ("github", "private-crm", "lookup", "mcp__"):
+            self.assertNotIn(name, text)
+        self.assertEqual(len(built.by_tool), 4, "the names stay in memory for the screen")
+
+    def test_the_harness_list_holds_names_alone(self):
+        self.assertIn("Bash", profile.HARNESS_TOOLS)
+        for name in profile.HARNESS_TOOLS:
+            self.assertRegex(name, r"^[A-Z][A-Za-z]+$", "a harness tool is a word, never a server's name")
+        self.assertEqual(profile.tool_kind("Read"), "Read")
+        self.assertEqual(profile.tool_kind("mcp__x__y"), profile.MCP_TOOLS)
+        self.assertEqual(profile.tool_kind("read"), profile.OTHER_TOOLS)
+
+    def test_the_tools_by_name_are_printed_and_never_written(self):
+        write_lines(self.transcript, [
+            *mixed_tool_entries()[:-1],
+            *assistant("m2", used(0, 100, 1000, 10), [tool_use("t5", "mcp__private-crm__lookup", customer="y")], 20),
+            result("t5", "e", 21),
+            *assistant("m3", used(0, 100, 1100, 10), [{"type": "text", "text": "Done."}], 30),
+        ])
+        out = self.folder / "profile.json"
+        printed = io.StringIO()
+        with redirect_stdout(printed):
+            self.assertEqual(profile.main([str(self.transcript), "--json", str(out), "--tools", "3"]), 0)
+        self.assertIn("Tools called most often, by name (not in the record):\n    2  mcp__private-crm__lookup\n"
+                      "    1  Bash\n    1  lookup_customer\n", printed.getvalue())
+        self.assertNotIn("mcp__", out.read_text())
+
+
+def profile_line(session, **counts):
+    return f"Symphony-Profile: v1 session={session} " + " ".join(f"{key}={value}" for key, value in counts.items())
+
+
+def commit_of(*lines, body="Work"):
+    return {"sha": "x", "commit": {"message": f"{body}\n\nCo-Authored-By: x\n" + "\n".join(lines) + "\n"}}
+
+
+def counted(calls, peak, **rest):
+    """A run's profile as its record carries it: every count nothing but
+    calls, peak and those given."""
+    return {**dict.fromkeys(profile.TRAILER_FIELDS, 0), "calls": calls, "peak": peak, **rest}
+
+
+def run_record(profiled, workflow="claude", issue=None, pull=None):
+    return {"workflow": workflow, "issue": issue, "pull": pull, "profile": profiled}
+
+
+class SumsOverPullRequests(unittest.TestCase):
+    """What tools/metrics.py writes into PROFILE.json: each pull request's
+    lines and runs summed, then per work setting and on the two sides the
+    coordination block compares, with the same pull requests on each side
+    as economics.coordination puts there."""
+
+    NOW = datetime(2026, 10, 9, tzinfo=timezone.utc)
+
+    def test_a_pull_requests_profile_is_its_commits_lines_and_the_runs_that_name_it(self):
+        work = economics.Work(40, claim=12, commits=[
+            commit_of(profile_line("aaaa", calls=10, reads=3, peak=500)),
+            commit_of(profile_line("aaaa", calls=5, reads=1, peak=900), profile_line("bbbb", calls=2, peak=100)),
+            {"sha": "x", "commit": {"message": "Quoted:\nSymphony-Profile: v1 session=x calls=99\n\nNo trailer."}},
+            commit_of(profile_line("cccc")), commit_of(body="plain")])
+        records = [run_record(counted(7, 300), pull=40), run_record(counted(1, 2000), issue=12),
+                   run_record(counted(100, 9), issue=99), run_record(None, pull=40)]
+        self.assertEqual(profile.pull_profile(work, records),
+                         {**dict.fromkeys(profile.SUMS, 0), "calls": 25, "reads": 4, "peak": 2000})
+        self.assertEqual(profile.commit_lines(work.commits[1]), [("aaaa", {"calls": 5, "reads": 1, "peak": 900}),
+                                                                 ("bbbb", {"calls": 2, "peak": 100})])
+        self.assertEqual(profile.commit_lines(work.commits[3]), [], "a line with no count is no profile")
+        self.assertIsNone(profile.pull_profile(economics.Work(41, commits=work.commits[2:]), records))
+
+    def works(self):
+        """economics' own two sides: 1 and 2 alone, 3 to 5 at work together,
+        and the automation's 6 beside them all, which counts on no side."""
+        def work(number, start, end, merged=True, kind="person"):
+            begun = self.NOW + timedelta(hours=start)
+            finished = self.NOW + timedelta(hours=end)
+            return economics.Work(number, kind=kind, start=begun, end=finished,
+                                  merged=finished if merged else None, opened=begun)
+        return [work(1, 0, 10), work(2, 20, 30), work(3, 40, 44), work(4, 41, 45, kind="workflow_agents"),
+                work(5, 42, 46, merged=False), work(6, 0, 50, kind="automation")]
+
+    PROFILES = {1: counted(40, 1000, reads=10, rereads=4), 2: None, 3: counted(10, 3000, reads=4, rereads=1),
+                4: counted(6, 500, reads=2), 5: counted(4, 2000, reads=2, rereads=1), 6: counted(100, 9)}
+    OVERHEAD = [run_record(counted(4, 50), workflow="coordinator", issue=77),
+                run_record(counted(500, 50), workflow="coordinator", pull=3),
+                run_record(counted(600, 50), workflow="workers", issue=78)]
+
+    def test_each_side_sums_its_profiled_pull_requests_and_the_parallel_one_the_coordinators_runs(self):
+        found = profile.coordination(self.works()[::-1], self.PROFILES, self.NOW + timedelta(hours=100),
+                                     window_records=self.OVERHEAD)
+        alone, parallel = found["alone"], found["parallel"]
+        self.assertEqual(tuple(alone), profile.GROUP_KEYS)
+        self.assertEqual(tuple(found["ratios"]), profile.RATIO_KEYS)
+        self.assertEqual([alone[k] for k in ("pull_requests", "merged", "profiled", "profiled_merged")], [2, 2, 1, 1])
+        self.assertEqual([alone[k] for k in ("calls", "reads", "rereads", "peak_median")], [40, 10, 4, 1000])
+        self.assertEqual([parallel[k] for k in ("pull_requests", "merged", "profiled", "profiled_merged")],
+                         [3, 2, 3, 2])
+        # 3, 4 and 5, the unmerged 5 among them, and the plan that names none.
+        self.assertEqual([parallel[k] for k in ("calls", "reads", "rereads", "peak_median")], [24, 8, 2, 2000])
+
+    def test_each_ratio_is_over_one_where_parallel_did_better(self):
+        ratios = profile.coordination(self.works(), self.PROFILES, self.NOW + timedelta(hours=100),
+                                      window_records=self.OVERHEAD)["ratios"]
+        # Per profiled merge: one alone, two in parallel.
+        self.assertEqual(ratios, {"calls_per_merge": round(40 / (24 / 2), 4), "reads_per_merge": 2.5,
+                                  "rereads_per_merge": 4.0, "peak": 0.5})
+
+    def test_a_side_with_nothing_profiled_gives_no_ratio(self):
+        found = profile.coordination(self.works(), {}, self.NOW + timedelta(hours=100))
+        self.assertTrue(all(value is None for value in found["ratios"].values()))
+        self.assertEqual((found["alone"]["profiled"], found["alone"]["peak_median"], found["alone"]["calls"]),
+                         (0, None, 0))
+
+    def test_a_setting_sums_whatever_kind_its_pull_requests_are_and_its_median_peak_rounds_half_up(self):
+        works = self.works()
+        profiles = {6: counted(3, 10), 1: counted(1, 1), 2: counted(1, 2), 3: counted(1, 3)}
+        row = profile.group([works[5], works[0], works[1], works[2]], profiles)
+        self.assertEqual(row, {**dict.fromkeys(profile.GROUP_KEYS, 0), "pull_requests": 4, "merged": 4, "profiled": 4,
+                               "profiled_merged": 4, "calls": 6, "peak_median": 3})
 
 
 class WhatATextIsWorth(unittest.TestCase):
