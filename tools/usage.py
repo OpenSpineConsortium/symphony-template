@@ -23,7 +23,13 @@ metrics workflow can read it with GITHUB_TOKEN alone:
   needs no API, which a cloud session or a routine does not have, and the
   metrics workflow reads it from the pull request's commits. What a
   session spends after its last commit is not on any commit, and so not
-  counted.
+  counted. The same two hooks add a second line, Symphony-Profile, the
+  session's profile since its last commit by tools/profile.py, whose
+  docstring gives it: counts of calls, reads, the context and seconds in
+  tools, for the research programme in docs/research/beyond-cooperation/.
+  It never stands in the usage line's way: a profile that cannot be read,
+  or a last commit whose profile is not known, leaves that one commit
+  without it.
 
   A run in GitHub Actions: a worker's, the coordinator's or @claude's.
   After claude-code-action the workflow runs `python3 tools/usage.py
@@ -33,18 +39,23 @@ metrics workflow can read it with GITHUB_TOKEN alone:
   metrics workflow lists and reads those artifacts. The workflow runs a
   copy of this file made before Claude starts, with --root naming the
   checkout, since the run may leave the checkout on a branch older than
-  this file. Inside Actions the hook and the trailer record nothing, so a
-  run is never counted twice.
+  this file; profile.py, economics.py and the protocol library are copied
+  beside it where the checkout has them, and the record then carries the
+  run's profile too, the counts of a commit's Symphony-Profile line over
+  the whole run. Inside Actions the hook and the trailer record nothing,
+  so a run is never counted twice.
 
 Nothing is recorded while the metrics switch is off (the word off in
 .github/symphony-metrics, or SDLC_METRICS=off in the environment). No
 word of the conversation is kept: token counts by model, seconds, turns,
-the first eight characters of the session's id, and, for a run in
-Actions, which job ran and for which worker, issue and pull request. A
+the profile's counts, the first eight characters of the session's id,
+and, for a run in Actions, which job ran and for which worker, issue and
+pull request. A
 hook never stops the session or the commit: whatever it cannot read, it
 leaves alone, and it always exits 0.
 """
 
+import importlib.util
 import json
 import os
 import re
@@ -86,9 +97,9 @@ SWITCH_VARIABLE = "SDLC_METRICS"
 HOOK_MARKER = "symphony-usage"
 SYNTHETIC = "<synthetic>"
 COMMIT_MSG_HOOK = """#!/bin/sh
-# symphony-usage: adds the Claude Code session's usage since its last
-# commit to this commit as a Symphony-Usage trailer (tools/usage.py). It
-# never stops a commit.
+# symphony-usage: adds the Claude Code session's usage and profile since
+# its last commit to this commit as the Symphony-Usage and Symphony-Profile
+# trailers (tools/usage.py). It never stops a commit.
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 [ -f "$root/tools/usage.py" ] || exit 0
 python3 "$root/tools/usage.py" trailer "$1" >/dev/null 2>&1 || true
@@ -343,12 +354,14 @@ def run_hook(payload, environ=None):
     if sharing_off(root, environ):
         return
     usage = session_usage(transcript)
-    write_json(state_dir(cwd) / "pending.json", {"session": str(session), "at": time.time(), **usage})
+    write_json(state_dir(cwd) / "pending.json",
+               {"session": str(session), "at": time.time(), **usage, "profile": profile_so_far(transcript)})
 
 
 def run_trailer(message_file, cwd=None, environ=None, now=None):
-    """The commit-msg hook's step: add to the commit the usage the hook left
-    since the session's last commit, and remember it as written."""
+    """The commit-msg hook's step: add to the commit the usage and the
+    profile the hook left since the session's last commit, and remember
+    them as written."""
     if in_actions(environ):
         return
     folder = state_dir(cwd)
@@ -361,16 +374,83 @@ def run_trailer(message_file, cwd=None, environ=None, now=None):
     if not session:
         return
     written = folder / f"{session}.json"
-    spent = since(pending, read_json(written) or {})
-    write_json(written, {"models": pending.get("models") or {}, "seconds": pending.get("seconds") or 0})
+    before = read_json(written) or {}
+    spent = since(pending, before)
+    profiled, profile_kept = profile_line(session, pending.get("profile"), before)
+    state = {"models": pending.get("models") or {}, "seconds": pending.get("seconds") or 0}
+    if profile_kept:
+        state["profile"] = profile_kept
+    write_json(written, state)
     if not spent["models"]:
         return
-    value = trailer(session, spent)
+    lines = [f"{TRAILER_KEY}: {trailer(session, spent)}"]
+    if profiled:
+        lines.append(profiled)
+    add_trailers(message_file, lines, cwd)
+
+
+def add_trailers(message_file, lines, cwd=None):
+    """Add the trailer lines to the commit's message by git's own rules for
+    a trailer block, or at its end where git cannot."""
     try:
-        git("interpret-trailers", "--in-place", "--trailer", f"{TRAILER_KEY}: {value}", str(message_file), cwd=cwd)
+        git("interpret-trailers", "--in-place", *[arg for line in lines for arg in ("--trailer", line)],
+            str(message_file), cwd=cwd)
     except OSError:
         with open(message_file, "a", encoding="utf-8") as stream:
-            stream.write(f"\n{TRAILER_KEY}: {value}\n")
+            stream.write("\n" + "".join(f"{line}\n" for line in lines))
+
+
+# --- the profile beside the usage -------------------------------------------------
+
+def profiler():
+    """tools/profile.py, which reads a session's profile for its line,
+    loaded by its path beside this file, since the standard library has a
+    module of the same name; loaded only for a commit, so that this file
+    alone still records a run in Actions, from the copy each workflow makes
+    of it."""
+    spec = importlib.util.spec_from_file_location("symphony_profile", TOOLS / "profile.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def profile_so_far(transcript):
+    """The session's profile counts so far, or None when they cannot be read."""
+    try:
+        return profiler().session_counts(transcript)
+    except Exception:
+        return None
+
+
+def run_profile(execution_file):
+    """A run's profile, the same counts as a commit's line over the whole
+    execution file, or None when they cannot be read, as where the workflow
+    copied this file without profile.py; the file has no clock, so its
+    seconds in tools are nothing."""
+    try:
+        profile = profiler()
+        return profile.since(profile.session_counts(execution_file), {})
+    except Exception:
+        return None
+
+
+def profile_line(session, now, before):
+    """The Symphony-Profile line for the profile since the session's last
+    commit, and what is kept of the counts for the next, each None when it
+    cannot be told: no profile read now, or a last commit recorded without
+    one, by a hook older than the line or one that could not read it, whose
+    counts this line would claim for itself."""
+    if not isinstance(now, dict):
+        return None, None
+    try:
+        profile = profiler()
+        kept = profile.kept(now)
+        if before and not isinstance(before.get("profile"), dict):
+            return None, kept
+        spent = profile.since(now, before.get("profile") or {})
+        return f"{profile.TRAILER_KEY}: {profile.trailer(session, spent)}", kept
+    except Exception:
+        return None, None
 
 
 def hooks_dir(cwd=None):
@@ -507,6 +587,9 @@ def run_actions(argv, environ=None):
         return 0
     record = actions_record(messages, args.job, args.workflow, args.worker,
                             number_or_none(args.issue), number_or_none(args.pull))
+    profiled = run_profile(args.execution_file)
+    if profiled is not None:
+        record["profile"] = profiled
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(record, indent=2) + "\n", encoding="ascii")

@@ -1,8 +1,9 @@
 """tools/usage.py: a session's usage read from its transcript and its
 helpers', written on each commit as one trailer line by way of a real git
-repository's commit-msg hook, and a run in Actions read from the action's
-execution file; the switch turns both off, and inside Actions a session
-records nothing, so no run counts twice."""
+repository's commit-msg hook, with the session's profile on a second line
+where tools/profile.py is beside it, and a run in Actions read from the
+action's execution file; the switch turns both off, and inside Actions a
+session records nothing, so no run counts twice."""
 
 import io
 import json
@@ -20,6 +21,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
+import profile  # noqa: E402
 import usage  # noqa: E402
 
 # The environment the commit tests run in: without git's own variables, which
@@ -47,6 +49,20 @@ def used(inp=0, write=0, read=0, out=0, hour=None):
 def write_lines(path, entries):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(json.dumps(e) + "\n" for e in entries) + "not json\n", encoding="utf-8")
+
+
+def asking(message_id, usage_fields, at, *tools):
+    """An assistant line that asks for tools, each a (name, input) pair whose
+    call's id is the message's and its place."""
+    entry = assistant(message_id, "claude-opus-5-5", usage_fields, at)
+    entry["message"]["content"] = [{"type": "tool_use", "id": f"{message_id}-{index}", "name": name, "input": given}
+                                   for index, (name, given) in enumerate(tools)]
+    return entry
+
+
+def answer(tool_id, text, at, error=False):
+    block = {"type": "tool_result", "tool_use_id": tool_id, "content": text, "is_error": error}
+    return {"type": "user", "timestamp": at, "message": {"role": "user", "content": [block]}}
 
 
 class ReadingATranscript(unittest.TestCase):
@@ -117,8 +133,10 @@ class ReadingATranscript(unittest.TestCase):
         self.assertTrue(usage.trailer("a b;c$d", spent).startswith("v1 session=abcd "))
 
 
-class Commits(unittest.TestCase):
-    """The hook and the commit-msg hook in a real repository."""
+class ARepository(unittest.TestCase):
+    """A real repository whose commit-msg hook runs the tools copied into it."""
+
+    COPIED = ("usage.py",)
 
     def setUp(self):
         environment = mock.patch.dict(os.environ, QUIET, clear=True)
@@ -128,7 +146,7 @@ class Commits(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.folder, True)
         self.repo = self.folder / "repo"
         (self.repo / "tools").mkdir(parents=True)
-        for name in ("usage.py",):
+        for name in self.COPIED:
             shutil.copy(ROOT / "tools" / name, self.repo / "tools" / name)
         shutil.copytree(ROOT / "tools" / "sdlc_protocol", self.repo / "tools" / "sdlc_protocol")
         self.git("init", "-q")
@@ -150,6 +168,12 @@ class Commits(unittest.TestCase):
         self.git("add", name)
         self.git("commit", "-q", "-m", f"Add {name}\n\nCo-Authored-By: someone")
         return self.git("log", "-1", "--format=%B")
+
+
+class Commits(ARepository):
+    """The hook and the commit-msg hook in a real repository, here one whose
+    tools hold usage.py alone, as a copy may that has no profile.py, so the
+    usage line stands by itself."""
 
     def test_each_commit_carries_what_the_session_spent_since_the_last(self):
         self.assertIn("commit-msg hook in place", usage.install(cwd=self.repo))
@@ -214,6 +238,72 @@ class Commits(unittest.TestCase):
             self.assertEqual(usage.main(["hook"], stdin=io.StringIO(text)), 0)
 
 
+class ProfiledCommits(ARepository):
+    """With tools/profile.py beside usage.py, as in every copy of the
+    template, each commit carries the session's profile since its last
+    commit too, on a line of its own after the usage line."""
+
+    COPIED = ("usage.py", "profile.py", "economics.py")
+    SESSION = "6e4cb20b-affa-5339"
+    # A call that reads a file and runs a failing command, its context 4,010
+    # tokens; then a compaction, and a call of 1,200 that reads the file again.
+    FIRST = [asking("m1", used(10, 4000, 0, 5), "2026-10-12T10:00:00Z",
+                    ("Read", {"file_path": "/r/a.py"}), ("Bash", {"command": "ls"})),
+             answer("m1-0", "x" * 300, "2026-10-12T10:00:02Z"),
+             answer("m1-1", "boom", "2026-10-12T10:00:03Z", error=True)]
+    SECOND = [{"type": "system", "subtype": "compact_boundary", "timestamp": "2026-10-12T10:00:04Z"},
+              asking("m2", used(1200, 0, 0, 7), "2026-10-12T10:00:05Z", ("Read", {"file_path": "/r/a.py"})),
+              answer("m2-0", "y" * 50, "2026-10-12T10:00:06Z")]
+
+    def setUp(self):
+        super().setUp()
+        usage.install(cwd=self.repo)
+
+    def test_each_commit_carries_the_profile_since_the_last(self):
+        write_lines(self.transcript, self.FIRST)
+        self.hook(session=self.SESSION)
+        first = self.commit("a.txt")
+        usage_line, profile_line = first.rstrip().split("\n")[-2:]
+        self.assertTrue(usage_line.startswith("Symphony-Usage: v1 session=6e4cb20b "), first)
+        self.assertTrue(profile_line.startswith("Symphony-Profile: v1 session=6e4cb20b "), first)
+        self.assertEqual(profile.parse_trailer(first), [("6e4cb20b", {
+            "calls": 2, "failed": 1, "repeated": 0, "reads": 1, "rereads": 0, "read_bytes": 300, "reread_bytes": 0,
+            "peak": 4010, "compactions": 0, "drops": 0, "tool_seconds": 3})])
+        write_lines(self.transcript, self.FIRST + self.SECOND)
+        self.hook(session=self.SESSION)
+        second = self.commit("b.txt")
+        self.assertEqual(usage.parse_trailer(second)[0][2], {"claude-opus-5-5": [1200, 0, 0, 0, 7]})
+        # The peak is the second call's, not the session's; the Read repeats
+        # the first one's and reads a.py again.
+        self.assertEqual(profile.parse_trailer(second), [("6e4cb20b", {
+            "calls": 1, "failed": 0, "repeated": 1, "reads": 1, "rereads": 1, "read_bytes": 50, "reread_bytes": 50,
+            "peak": 1200, "compactions": 1, "drops": 1, "tool_seconds": 1})])
+
+    def test_a_last_commit_recorded_without_a_profile_leaves_one_commit_without_it(self):
+        """A hook older than the profile line kept the usage of the session's
+        last commit and no profile: the counts since that commit cannot be
+        told, so the next commit carries the usage line alone, and the one
+        after it the profile since."""
+        state = usage.state_dir(self.repo) / f"{self.SESSION}.json"
+        state.write_text(json.dumps({"models": {"claude-opus-5-5": [1, 0, 0, 0, 1]}, "seconds": 0}))
+        write_lines(self.transcript, self.FIRST)
+        self.hook(session=self.SESSION)
+        first = self.commit("a.txt")
+        self.assertEqual(usage.parse_trailer(first)[0][2], {"claude-opus-5-5": [9, 4000, 0, 0, 4]})
+        self.assertEqual(profile.parse_trailer(first), [])
+        write_lines(self.transcript, self.FIRST + self.SECOND)
+        self.hook(session=self.SESSION)
+        self.assertEqual(profile.parse_trailer(self.commit("b.txt"))[0][1]["calls"], 1)
+
+    def test_a_profile_the_hook_cannot_read_leaves_the_usage_line_alone(self):
+        write_lines(self.transcript, self.FIRST)
+        with mock.patch.object(usage, "profiler", side_effect=OSError("no profile.py")):
+            self.hook(session=self.SESSION)
+        first = self.commit("a.txt")
+        self.assertEqual(usage.parse_trailer(first)[0][2], {"claude-opus-5-5": [10, 4000, 0, 0, 5]})
+        self.assertEqual(profile.parse_trailer(first), [])
+
+
 class AnActionsRun(unittest.TestCase):
     MESSAGES = [
         {"type": "system", "subtype": "init", "model": "claude-sonnet-5-5"},
@@ -232,6 +322,46 @@ class AnActionsRun(unittest.TestCase):
             "pull": 40, "at": "2026-10-12T10:00:00Z", "seconds": 61.2, "api_seconds": 50.0, "turns": 7,
             "reported_usd": 0.42, "error": False,
             "models": {"claude-sonnet-5-5": [5, 10, 0, 20, 30], "claude-haiku-5-5": [1, 0, 0, 0, 2]}})
+
+    # A run that read a file: an execution file has no clock, so its seconds
+    # in tools are nothing; its larger context is the second call's, 36.
+    READING = [
+        {"type": "system", "subtype": "init", "model": "claude-sonnet-5-5"},
+        {"type": "assistant", "message": {"id": "a1", "model": "claude-sonnet-5-5", "usage": used(5, 10, 20, 30),
+                                          "content": [{"type": "tool_use", "id": "t1", "name": "Read",
+                                                       "input": {"file_path": "/w/a.py"}}]}},
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1",
+                                                                  "content": "abc"}]}},
+        {"type": "assistant", "message": {"id": "a2", "model": "claude-sonnet-5-5", "usage": used(1, 0, 35, 4),
+                                          "content": [{"type": "text", "text": "Done."}]}},
+        {"type": "result", "subtype": "success", "is_error": False, "duration_ms": 1000, "num_turns": 2},
+    ]
+    READ = {"calls": 1, "failed": 0, "repeated": 0, "reads": 1, "rereads": 0, "read_bytes": 3, "reread_bytes": 0,
+            "peak": 36, "compactions": 0, "drops": 0, "tool_seconds": 0}
+
+    def recorded_by_a_copy(self, names):
+        """The record a copy of the named tools writes, as each workflow runs
+        one, made in the runner's temporary folder before Claude starts."""
+        with tempfile.TemporaryDirectory() as folder:
+            for name in names:
+                source = ROOT / "tools" / name
+                (shutil.copytree if source.is_dir() else shutil.copy)(source, Path(folder) / name)
+            execution = Path(folder) / "execution.json"
+            execution.write_text(json.dumps(self.READING), encoding="utf-8")
+            out = Path(folder) / "record.json"
+            done = subprocess.run([sys.executable, str(Path(folder) / "usage.py"), "actions", "--execution-file",
+                                   str(execution), "--out", str(out), "--workflow", "workers", "--job", "worker",
+                                   "--root", folder], capture_output=True, text=True, timeout=60, env=QUIET)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            return json.loads(out.read_text())
+
+    def test_a_copy_with_the_profiler_records_the_runs_profile_and_one_without_it_the_rest(self):
+        record = self.recorded_by_a_copy(("usage.py", "profile.py", "economics.py", "sdlc_protocol"))
+        self.assertEqual(record["profile"], self.READ)
+        alone = self.recorded_by_a_copy(("usage.py",))
+        self.assertNotIn("profile", alone)
+        self.assertEqual(alone["models"], record["models"])
+        self.assertEqual(record["models"], {"claude-sonnet-5-5": [6, 10, 0, 55, 34]})
 
     def test_without_a_result_the_messages_are_summed_and_the_run_marked(self):
         record = usage.actions_record(self.MESSAGES[:2], "plan", "coordinator")
@@ -325,6 +455,8 @@ class Wiring(unittest.TestCase):
                 step_id = re.search(r"\n        id: (\S+)", step)
                 self.assertIsNotNone(step_id, f"{path.name}: a Claude step with no id")
                 self.assertIn('cp tools/usage.py "$RUNNER_TEMP/usage.py"', steps[index - 1], path.name)
+                self.assertIn('cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true',
+                              steps[index - 1], path.name)
                 record, kept = steps[index + 1], steps[index + 2]
                 self.assertIn(f"steps.{step_id.group(1)}.outputs.execution_file", record, path.name)
                 self.assertIn('python3 "$RUNNER_TEMP/usage.py" actions --root "$GITHUB_WORKSPACE"', record, path.name)

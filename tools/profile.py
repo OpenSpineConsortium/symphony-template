@@ -47,6 +47,20 @@ transcript, the same tool with the same input: MAST's step repetition
 (arXiv:2503.13657) read by code, and an upper bound on waste, since a
 git status after a change is a repeat and no waste.
 
+The same counts ride on every commit a session makes, as a second line
+beside the Symphony-Usage trailer, written by the same hooks of
+tools/usage.py: the profile since the session's last commit,
+
+    Symphony-Profile: v1 session=6e4cb20b calls=42 failed=3 repeated=1 reads=12 rereads=4 read_bytes=58210 reread_bytes=9120 peak=181234 compactions=0 drops=0 tool_seconds=95
+
+each count the rise of the record's own since that commit, with the
+helpers' calls and reads in it, but peak, the largest context of the
+session's own calls made since; the session is the usage line's, so the
+two lines pair up. It carries counts alone, no tool's name, since an MCP
+server names its tools, so it stands on a public commit as the usage line
+does, and the metrics switch that stops the one stops the other. Nothing
+sums it yet: the research programme's step 2 does, with parse_trailer.
+
 Standard library only, like every tool here; the shell commands are split
 by the vendored protocol library's reader, the one the push guard uses.
 """
@@ -112,6 +126,16 @@ BY_TOOL_KEYS = ("calls", "failed", "repeated", "input_bytes", "result_bytes", "s
 SECONDS_KEYS = ("span", "active", "in_tools", "outside_tools", "thinking")
 HELPERS_KEYS = ("transcripts", "calls", "seconds_in_tool", "output_tokens")
 READS_KEYS = ("calls", "files_named", "files", "rereads", "partial", "bytes", "reread_bytes")
+# The line a commit carries, read to its end and split on blanks, as
+# usage.py reads its own, since anyone who can push writes a commit's
+# message: a lazy value before optional blanks would be tried at every
+# blank of a long run of them.
+TRAILER_KEY = "Symphony-Profile"
+TRAILER_VERSION = "v1"
+TRAILER_LINE = re.compile(r"(?im)^[ \t]*symphony-profile:[ \t]*v1[ \t]+(.+)$")
+TRAILER_FIELDS = ("calls", "failed", "repeated", "reads", "rereads", "read_bytes", "reread_bytes", "peak",
+                  "compactions", "drops", "tool_seconds")
+SUMS = tuple(field for field in TRAILER_FIELDS if field != "peak")
 
 
 # --- reading the transcript -----------------------------------------------------
@@ -452,6 +476,7 @@ class Profile:
         self.files = set()
         self.per_path = Counter()
         self.context = {}
+        self.sizes = []
         self.seconds = dict.fromkeys(SECONDS_KEYS, 0)
         self.prompts = 0
         self.attachments = 0
@@ -534,6 +559,7 @@ class Profile:
         is an error line, not a call."""
         measured = [c for c in calls if c["counts"] and context_of(c["counts"]) > 0]
         sizes = [context_of(c["counts"]) for c in measured]
+        self.sizes = sizes
         cached = sum(c["counts"][3] for c in measured)
         self.context = {"calls": len(sizes), "first": sizes[0] if sizes else 0, "peak": max(sizes, default=0),
                         "last": sizes[-1] if sizes else 0, "mean": round(sum(sizes) / len(sizes)) if sizes else 0,
@@ -608,6 +634,62 @@ def profile(transcript, helpers=True):
             built.add_transcript(entries_of(helper), main=False)
     stem = Path(transcript).stem
     return built.record(usage.session_token(stem) if SESSION_STEM.fullmatch(stem) else None), built
+
+
+# --- the trailer --------------------------------------------------------------------
+
+def session_counts(transcript):
+    """A session's counts so far, as its commits' trailers add them up: the
+    sums, from the record with its helpers', and the context of each of the
+    session's own calls in order, from which the peak since a commit is
+    taken."""
+    record, built = profile(transcript)
+    calls, reads, context = record["calls"], record["reads"], record["context"]
+    sums = {"calls": calls["total"], "failed": calls["failed"], "repeated": calls["repeated"],
+            "reads": reads["files_named"], "rereads": reads["rereads"], "read_bytes": reads["bytes"],
+            "reread_bytes": reads["reread_bytes"], "compactions": context.get("compactions", 0),
+            "drops": context.get("drops", 0), "tool_seconds": record["seconds"]["in_tools"]}
+    return {"sums": sums, "sizes": list(built.sizes)}
+
+
+def kept(now):
+    """What is kept of a session's counts once they are on a commit: the
+    sums, and how many of its calls the peak has looked at."""
+    return {"sums": dict(now["sums"]), "api_calls": len(now["sizes"])}
+
+
+def since(now, before):
+    """The profile since the counts kept() kept at the session's last
+    commit, or since its start when before is empty: each sum's rise, and
+    the largest context of the calls made since."""
+    earlier = before.get("sums") or {}
+    spent = {key: max(0, int(now["sums"].get(key) or 0) - int(earlier.get(key) or 0)) for key in SUMS}
+    spent["peak"] = max(now["sizes"][int(before.get("api_calls") or 0):], default=0)
+    return spent
+
+
+def trailer(session, spent):
+    """The trailer's value for the profile since a commit, its session as
+    the usage line gives it."""
+    counts = [f"{key}={int(spent[key])}" for key in TRAILER_FIELDS]
+    return " ".join([TRAILER_VERSION, f"session={usage.session_token(session)}", *counts])
+
+
+def parse_trailer(text):
+    """Every Symphony-Profile trailer in a commit message, as (session,
+    {field: count}); a part that cannot be read is passed over, and a count
+    is read by usage.count_in's bound, as the usage line's are."""
+    found = []
+    for match in TRAILER_LINE.finditer(text or ""):
+        session, counts = "", {}
+        for part in match.group(1).split():
+            key, _, value = part.partition("=")
+            if key == "session":
+                session = value
+            elif key in TRAILER_FIELDS and usage.count_in(value) is not None:
+                counts[key] = usage.count_in(value)
+        found.append((session, counts))
+    return found
 
 
 # --- the report ---------------------------------------------------------------------

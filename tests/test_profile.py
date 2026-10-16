@@ -1,13 +1,15 @@
 """tools/profile.py: a session's profile from its transcript, each API call
 counted once, each tool call with its answer, the files read and read
 again, the context's growth shared out to the tools, the time in tools
-and outside them; and a record that carries counts alone."""
+and outside them; a record that carries counts alone; and the line a
+commit carries, the counts since the session's last commit."""
 
 import io
 import json
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -338,6 +340,86 @@ class HelpersAndCompactions(ATranscriptOnDisk):
         self.assertEqual(record["context"]["calls"], 3)
         self.assertEqual((record["context"]["last"], record["context"]["growth"]), (2350, 1280))
         self.assertEqual(record["models"], {"claude-opus-5-5": [100, 2250, 0, 3250, 100]})
+
+
+class TheTrailer(ATranscriptOnDisk):
+    """The line each commit of a session carries beside its usage line, the
+    profile since the session's last commit, as tools/usage.py's hooks
+    write it from these functions."""
+
+    def counts(self, entries):
+        write_lines(self.transcript, entries)
+        return profile.session_counts(self.transcript)
+
+    def test_a_sessions_counts_are_the_records_sums_and_its_calls_contexts(self):
+        now = self.counts(session_entries())
+        self.assertEqual(now["sums"], {"calls": 4, "failed": 1, "repeated": 0, "reads": 5, "rereads": 2,
+                                       "read_bytes": 1004, "reread_bytes": 4, "compactions": 0, "drops": 0,
+                                       "tool_seconds": 11})
+        self.assertEqual(now["sizes"], [1000, 2250, 2350])
+        self.assertEqual(profile.since(now, {}), {**now["sums"], "peak": 2350},
+                         "a session's first commit carries everything so far")
+        self.assertEqual(profile.kept(now), {"sums": now["sums"], "api_calls": 3})
+
+    def test_each_count_is_its_rise_since_the_last_commit(self):
+        entries = session_entries()
+        # The first commit came after the first call's two tools answered.
+        before = profile.kept(self.counts(entries[:6]))
+        self.assertEqual(before["api_calls"], 1)
+        spent = profile.since(self.counts(entries), before)
+        # The second call's two tools: the failing command, whose sed read b.py
+        # again, and the search; their union of time is 20 to 26 s.
+        self.assertEqual(spent, {"calls": 2, "failed": 1, "repeated": 0, "reads": 1, "rereads": 1, "read_bytes": 4,
+                                 "reread_bytes": 4, "peak": 2350, "compactions": 0, "drops": 0, "tool_seconds": 6})
+
+    def test_the_peak_is_of_the_calls_since_the_last_commit_alone(self):
+        """A session's peak before a compaction is no commit's after it."""
+        entries = [
+            *assistant("m1", used(0, 5000, 0, 100), [tool_use("t1", "Bash", command="ls")], 10),
+            result("t1", "x" * 10, 12),
+            {"type": "system", "subtype": "compact_boundary", "timestamp": at(13)},
+            *assistant("m2", used(1200, 0, 0, 10), [tool_use("t2", "Bash", command="ls")], 15),
+            result("t2", "y", 16),
+        ]
+        before = profile.kept(self.counts(entries[:2]))
+        spent = profile.since(self.counts(entries), before)
+        self.assertEqual((spent["peak"], spent["compactions"], spent["drops"]), (1200, 1, 1))
+        self.assertEqual((spent["calls"], spent["repeated"]), (1, 1), "the second ls repeats the first")
+        self.assertEqual(profile.since(self.counts(entries), {})["peak"], 5000)
+
+    def test_a_count_never_falls_below_nothing(self):
+        """Counts kept from a longer transcript than the one read now, a file
+        replaced under the session, give nothing rather than less."""
+        now = self.counts(session_entries()[:6])
+        before = {"sums": dict.fromkeys(profile.SUMS, 10 ** 6), "api_calls": 99}
+        self.assertEqual(profile.since(now, before), dict.fromkeys(profile.TRAILER_FIELDS, 0))
+
+    def test_the_trailer_round_trips_and_carries_counts_alone(self):
+        spent = profile.since(self.counts(session_entries()), {})
+        value = profile.trailer("abcdef12-3456-7890", spent)
+        self.assertEqual(value, "v1 session=abcdef12 calls=4 failed=1 repeated=0 reads=5 rereads=2 read_bytes=1004 "
+                                "reread_bytes=4 peak=2350 compactions=0 drops=0 tool_seconds=11")
+        message = (f"Do it\n\nWhy.\n\nCo-Authored-By: x\nSymphony-Usage: v1 session=abcdef12 seconds=31 m=1,2,3,4,5\n"
+                   f"Symphony-Profile: {value}\n")
+        self.assertEqual(profile.parse_trailer(message), [("abcdef12", spent)])
+        for secret in ("a.py", "b.py", "cat", "Read", "Bash", CWD):
+            self.assertNotIn(secret, value)
+        self.assertEqual(profile.parse_trailer("Symphony-Profile: v2 calls=1\n"), [])
+        self.assertEqual(profile.parse_trailer("Symphony-Usage: v1 session=x seconds=1 m=1,2,3,4,5\n"), [])
+
+    def test_a_count_that_cannot_be_read_is_passed_over(self):
+        # Anyone who can push writes a commit's message, and int() refuses a
+        # string of more than 4,300 digits with ValueError; a count is read as
+        # the usage line's are, a whole number below 2 ** 53 in ASCII digits.
+        huge = "1" * 4301
+        line = f"symphony-profile: v1 session=x calls={huge} failed={2 ** 53} reads=٣ paths=3 peak=7 drops\n"
+        self.assertEqual(profile.parse_trailer(line), [("x", {"peak": 7})])
+
+    def test_a_line_with_a_long_run_of_blanks_is_read_in_one_pass(self):
+        message = "Symphony-Profile: v1 session=x" + " " * 100_000 + "calls=3" + " " * 100_000 + "\n"
+        started = time.monotonic()
+        self.assertEqual(profile.parse_trailer(message), [("x", {"calls": 3})])
+        self.assertLess(time.monotonic() - started, 1.0)
 
 
 class WhatATextIsWorth(unittest.TestCase):
