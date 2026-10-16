@@ -29,6 +29,7 @@ For the maintainer of the template itself: mark the repository as a template (Se
 | Shared memory | `docs/memory/` | the index imported by CLAUDE.md, a fact's file read when its line says it matters; the Project's own memory stays blank |
 | The board | the branch `board`, file `STATE.md`; `docs/agents/STATE.md` on {{DEFAULT_BRANCH}} describes it | fetched and printed by the session hook, since no import reaches another branch |
 | Claims | the branch `claude/<issue>` and `docs/agents/claims/` | read in the clone |
+| Research | `docs/research/` | read in the clone when its README's line says it matters; the rule .claude/rules/research.md, loaded with the instructions, sends what a session finds out there |
 | History | `docs/history/` (later) | |
 | Skills | `.claude/skills/` | read by Claude Code |
 | Checks | `scripts/check.sh` | |
