@@ -47,21 +47,27 @@ python3 scripts/tokens.py
    that slot is for, and waits for Enter. The sign-in page that follows
    names the account it approves: if the browser is signed in to another
    of your accounts, sign out there first, or open the link claude prints
-   in a private window and sign in as the right one.
-5. It runs `claude setup-token` behind a pseudo-terminal of its own: the
-   browser opens, or the link is printed for you to open, you approve the
-   access, and if the page shows a code you paste it at claude's prompt,
-   all as if you had run the command yourself. The token claude prints
-   is taken out of the output before it reaches your screen and shown as
+   in a private window and sign in as the right one. While
+   CLAUDE_CODE_OAUTH_TOKEN is not set, it asks whether the same token
+   should be stored under that name too, the one the workflows run on.
+5. It settles everything that could fail after the sign-in before it:
+   that each repository named is one your login can see, and the
+   visibility and the list each secret will be written with; a token
+   minted and then not stored would be a year's token lost with the
+   process. Then it runs `claude setup-token` behind a pseudo-terminal of
+   its own: the browser opens, or the link is printed for you to open,
+   you approve the access, and if the page shows a code you paste it at
+   claude's prompt, all as if you had run the command yourself. The
+   token claude prints is taken out of the output before it reaches your
+   screen and shown as
    `sk-ant-oat**-**************** (kept by the wizard, not shown)`.
 6. It hands the token to `gh secret set` on a pipe. gh encrypts it on your
    machine with the organization's or the repository's public key and
    sends only the sealed value; the token is never on a command line, in
    a file, in a log or in the wizard's output.
-7. It reads GitHub's listing back and confirms the secret is there, by
-   name and date, sets the label and the list of slots, and asks whether
-   the same token should also be CLAUDE_CODE_OAUTH_TOKEN, the one the
-   workflows run on, when that is not set yet; then whether there is
+7. It stores the label, reads GitHub's listing back and confirms the
+   secret is there, by name and date, and keeps the list of slots equal
+   to the slots whose secret exists; then it asks whether there is
    another account.
 
 The same, one step at a time, without questions:
@@ -92,14 +98,18 @@ run for a repository in crowd mode, which holds no Claude token
 
 ## Where it runs
 
-Linux, macOS and WSL have the pseudo-terminal the sign-in runs behind. In
-WSL, claude opens the link through xdg-open where that exists and prints
-it otherwise; open it in the Windows browser. A Windows shell has no
+Linux, macOS and WSL have the pseudo-terminal the sign-in runs behind;
+claude opens the browser where it can and prints the link otherwise, and
+in WSL the link is opened in the Windows browser. A Windows shell has no
 pseudo-terminal, and a machine may have gh but not claude: there, run
 `claude setup-token` wherever claude is and give the wizard the token with
-`--paste`, at a hidden prompt that echoes nothing, as gh's own prompt
-would; the wizard takes the paste path by itself when it cannot run
-claude.
+`add --paste` or `main --paste`, at a hidden prompt that echoes nothing,
+as gh's own prompt would; the wizard takes the paste path by itself when
+it cannot run claude, and refuses a paste in a window that cannot hide it
+(Git Bash's own window is one: run it there through winpty, or from cmd,
+PowerShell or Windows Terminal). A token that claude wrapped over two
+lines, or a piece of one, is refused rather than stored, and the wizard
+says so.
 
 ## By hand, where the wizard cannot run
 
@@ -132,6 +142,8 @@ token in place, with the slot's label and list kept. `remove N` deletes
 the slot's secret and its label and takes it off the list; delete
 CLAUDE_CODE_OAUTH_TOKEN on its page to turn @claude, the workers in
 Actions and the coordinator workflow off (docs/setup/claude-action.md).
-An account's token can also be revoked from that account's side, at
-claude.ai under Settings; the secret then stays listed until it is
-replaced or removed, and a run on it fails.
+Deleting or replacing a secret takes the old token out of Actions and
+does not revoke it: it stays good until a year after it was made, and
+the Claude Code documentation names no page that revokes a setup-token
+token on its own (docs/research/token-wizard.md, open items), one more
+reason the wizard keeps every token off every screen.

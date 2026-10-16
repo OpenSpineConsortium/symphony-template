@@ -125,9 +125,11 @@ wizard runs on the owner's own computer.
   util-linux's script(1) was considered and dropped: it copies the
   session to the terminal itself, so the token would show, and macOS's
   differs in syntax.
-- gh's hidden prompt stays as the fallback (--paste), for a Windows
-  shell, which has no pseudo-terminal, and for a machine with gh but no
-  claude; a pasted export line is accepted and an API key refused.
+- gh's hidden prompt stays as the fallback (`add --paste`, `main
+  --paste`), for a Windows shell, which has no pseudo-terminal, and for a
+  machine with gh but no claude; a pasted export line is accepted and an
+  API key refused, and a window where Python's getpass cannot hide the
+  input (it warns so and would echo) is refused.
 - The names are the consumers' names, unchanged: CLAUDE_CODE_OAUTH_TOKEN
   and SYMPHONY_CLAUDE_1 to 8 with SYMPHONY_CLAUDE_ACCOUNTS. One new
   convention, optional: SYMPHONY_CLAUDE_<slot>_LABEL, a variable holding
@@ -153,15 +155,83 @@ wizard runs on the owner's own computer.
 - tests/test_tokens.py: the masker at every chunk size, in Ink's form and
   in the 2.1 renderer's placed-words form; the mint with a fake claude
   behind the real pseudo-terminal (the fake reports it saw a terminal of
-  400 columns and the code typed); the store through the fake gh, in the
-  process and as a command, with the token on gh's standard input and on
-  no command line; the paste path; the API-key refusal; the crowd
-  refusals; status, remove, the place options before and after the
-  command, the origin's reading, the scope check, and that neither the
-  script nor the test file holds a secret's shape.
+  400 columns, no COLUMNS from the shell, and the code typed); the store
+  through the fake gh, in the process and as a command, with the token
+  on gh's standard input, once, and on no call's command line; the paste
+  path; the API-key refusal; the crowd refusals; status, remove, the
+  place options before and after the command and the pairings refused
+  before any call, the origin's reading, the scope check, and that
+  neither the script nor the test file holds a secret's shape.
 - `bash scripts/check.sh` passes, the filled copies included: a crowd
   copy runs these tests with its own mode line saying on, so the tests
   read a project file of their own.
+
+## The adversarial review (2026-10-16) and what changed for it
+
+A reviewer with the diff, gh 2.89.0's source and Claude Code's
+documentation, and probes of its own, found no path by which a token of
+the known shape reaches the screen, a command line, a file, a log, an
+error message, gh's arguments or a child's environment, and twelve
+things to fix, none of them must-fix. All twelve are fixed on the branch:
+
+- The masker gave up holding a tail longer than 400 characters and
+  printed it raw, token included, where claude's output ran on with no
+  break after the token (a contrived output, but the one invariant).
+  Now a run that reaches the chunk's end is held only while it is short
+  enough to be a token still arriving; a longer one is masked as it is
+  and refused afterwards by its length, so it is never shown and never
+  stored.
+- `gh auth status` fails when any account of any host gh knows is stale,
+  and lists the hosts in its config's order, so a working github.com
+  login beside an old one read as "not signed in", and the scopes read
+  could be another host's; and "admin:org" was matched as a substring,
+  which admin:org_hook satisfies. Now the wizard asks `gh auth status
+  --hostname github.com --active` once (an older gh without --active is
+  asked for the host alone), and reads the quoted scopes exactly.
+- The reads that could fail (the list an existing secret reaches, which
+  needs admin:org on that path; a repository name the login cannot see)
+  ran after the token was minted, so a failure there lost a year's token
+  with the process, with no way to revoke it. Now every repository named
+  is read and every secret's and variable's scope is settled before the
+  sign-in, and the writes take what was settled.
+- The only defence against a token wrapped over two lines was the
+  400-column window; a library that reads COLUMNS from the environment
+  would wrap at the shell's width, and the first piece would be stored
+  as the token with the rest printed in the clear. Now the child's
+  environment carries no COLUMNS or LINES; a run of a token's characters
+  that begins the line after a masked token is taken for the rest of a
+  cut token and the mint refused, saying the screen may show part of it;
+  and a captured token shorter than 60 characters is refused as a piece.
+  Whether Claude Code's renderer honours the window it is given is still
+  only inferred (open items).
+- The page said a token can be revoked at claude.ai under Settings,
+  which nothing verified; it now says what the documentation says, that
+  deleting the secret does not revoke the token, and names no page.
+- `--org X --repos a,b --visibility all` was accepted and the repositories
+  silently dropped; it is refused, as gh refuses it.
+- The pairings of options that cannot go together were found after a
+  `gh auth status` round trip, with exit 1; they are found before any
+  call, with exit 2, as the docstring promised.
+- The terminal was restored with TCSADRAIN, which keeps keys typed between
+  claude's end and the restore for the wizard's next question, and the
+  modes claude turns on (bracketed paste, focus and mouse events, its
+  keyboard protocol) were left on after a claude killed mid-screen. Now
+  TCSAFLUSH, and a reset sequence written after claude ends.
+- claude installed by Claude Code's own installer lives at
+  ~/.claude/local/claude behind a shell alias, invisible to PATH; the
+  wizard looks there too.
+- Only the oat shape was masked, so another key claude might echo (an API
+  key from the environment) would reach the screen; every sk-ant- shape
+  is masked now and only the oat kind kept.
+- Tests added: `main`, an existing secret keeping its visibility, the
+  hold limit, the cut token, the other shape, the status read's flags
+  and the fallback, admin:org_hook, the usage errors as a process, and
+  the whole add run asserting the token is on no call's command line and
+  on gh's standard input once.
+- The page's step 7 described an order the wizard does not follow, named
+  a bare `--paste` that the parser has only on `add` and `main`, and the
+  wizard printed the sign-in note twice; all three fixed, and the Git
+  Bash window named.
 
 ## Open items
 
@@ -173,10 +243,17 @@ wizard runs on the owner's own computer.
 - Nothing warns a year later: `status` says "renew soon" and "renew now",
   and only when run. A scheduled workflow could list the secrets' dates
   on GITHUB_TOKEN and open an issue; not built.
-- Revoking a token from the account's side was not verified against a
-  page of claude.ai; the page says only that a revoked token's secret
-  stays listed until replaced.
+- No page of claude.ai or of Claude Code's documentation that revokes a
+  setup-token token on its own is known: the documentation says the
+  command saves the token nowhere, and that /logout removes and revokes
+  the credential a sign-in wrote. The page says deleting the secret does
+  not revoke the token.
 - The real sign-in through the wizard has not been run end to end, since
   no session may hold a credential: the owner's first run is the test,
   and a token claude prints in a form the masker does not know would
-  reach the screen as claude prints it, which the page says.
+  reach the screen as claude prints it, which the page says. Whether the
+  renderer wraps at the 400-column window the wizard gives it is
+  inferred from Node reading the terminal's size; the cut-token refusal
+  and the length floor stand behind that inference. Python's getpass
+  under Git Bash's own window (mintty) is known to hang or echo; the page
+  says to use winpty or another terminal there, unverified here.

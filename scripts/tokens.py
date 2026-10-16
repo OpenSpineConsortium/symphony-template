@@ -34,14 +34,16 @@ a personal one its own level. A secret that exists keeps its visibility and
 its list, and the list grows by what --repos names; nothing is taken off a
 list here. Needs the GitHub CLI signed in (gh auth login) as an admin of the
 organization, or of the repository, and Claude Code (claude) on this
-machine; --paste takes the token from a hidden prompt instead, for a machine
-without claude, or a Windows shell, which has no pseudo-terminal. A label is
+machine; `add --paste` and `main --paste` take the token from a hidden
+prompt instead, for a machine without claude, or a Windows shell, which has
+no pseudo-terminal. A label is
 a word of your own so that status can say which account a slot is; it is
 stored as the variable SYMPHONY_CLAUDE_<slot>_LABEL, which anyone who reads
 the repository's workflows can see, so never an e-mail address. Refuses to
 run for a repository in crowd mode, which holds no Claude token
-(docs/setup/crowdsourcing.md). Exit 0 when done, 1 on a refusal, 2 on a
-usage error made before any call.
+(docs/setup/crowdsourcing.md). Everything that can fail is tried before
+the sign-in, since a token minted and not stored is lost with the process.
+Exit 0 when done, 1 on a refusal, 2 on a usage error made before any call.
 """
 
 import argparse
@@ -76,22 +78,40 @@ VISIBILITIES = ("selected", "all", "private")
 # Rows and columns of the terminal claude gets: wide, so it never wraps the
 # token over two lines, where no pattern would find it.
 TERMINAL_SIZE = (50, 400)
-# A held-back tail longer than this is a run of letters, not a token's start.
+# A held-back tail longer than this is a run of letters, not a token's start;
+# a captured run longer than it went on past where a token ends.
 HOLD_LIMIT = 400
+# A token claude prints is far longer than this; a captured one shorter is
+# a piece of one, cut by a terminal narrower than the one claude was given.
+TOKEN_SHORTEST = 60
 # The shapes are assembled from pieces so that this file never looks like a
 # secret to tools/check_docs.py, whose own shapes are built the same way.
-TOKEN_HEAD = "sk-" + "ant-" + "oat"
-API_KEY_HEAD = "sk-" + "ant-" + "api"
+# Anything of Anthropic's key shape is kept off the screen; only the
+# subscription token's kind is kept.
+SECRET_HEAD = "sk-" + "ant-"
+TOKEN_HEAD = SECRET_HEAD + "oat"
+API_KEY_HEAD = SECRET_HEAD + "api"
+SECRET_SHAPE = re.compile(re.escape(SECRET_HEAD) + r"[A-Za-z0-9_-]{20,}")
 TOKEN_SHAPE = re.compile(re.escape(TOKEN_HEAD) + r"[0-9]{2}-[A-Za-z0-9_-]{20,}")
 # A tail of what claude printed that may be the start of a token whose rest
 # is still to come: two characters or more of the head, or the head itself
 # with whatever followed it so far.
 TOKEN_START = re.compile(
-    "(?:" + "|".join(re.escape(TOKEN_HEAD[:n]) for n in range(2, len(TOKEN_HEAD) + 1))
-    + "|" + re.escape(TOKEN_HEAD) + r"[0-9]{0,2}-?[A-Za-z0-9_-]*)$"
+    "(?:" + "|".join(re.escape(SECRET_HEAD[:n]) for n in range(2, len(SECRET_HEAD) + 1))
+    + "|" + re.escape(SECRET_HEAD) + r"[A-Za-z0-9_-]*)$"
 )
-# What the screen shows in a token's place; it matches no secret's shape.
+# What the screen shows in a token's place; neither matches a secret's shape.
 MASK = TOKEN_HEAD + "**-" + "*" * 16 + " (kept by the wizard, not shown)"
+OTHER_MASK = SECRET_HEAD + "****" + " (not a token from claude setup-token; not shown)"
+# The rest of a token cut over two lines: a run of a token's characters
+# that begins the line after the masked part, past line ends and cursor
+# codes; shorter runs are words. A cursor code cut by the chunk's end is
+# waited for.
+CONTINUATION = re.compile(r"^(?:\r|\n|\x1b\[[0-9;?]*[A-Za-z])*([A-Za-z0-9_-]*)")
+CONTINUATION_RUN = 20
+PARTIAL_CODE = re.compile(r"\x1b(?:\[[0-9;?]*)?")
+# What claude turns on in the terminal and may leave on when it is killed.
+TERMINAL_RESET = "\x1b[?2004l\x1b[?1004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2026l\x1b[<u\x1b[?25h\x1b[0m"
 LABEL_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$")
 REPO_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
 FULL_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$")
@@ -101,6 +121,10 @@ ORIGIN = re.compile(r"github\.com[:/]([A-Za-z0-9][A-Za-z0-9-]*)/([A-Za-z0-9._-]+
 class TokensError(Exception):
     """Something the wizard could not do, or refuses to do; the message says
     what to do instead, and never holds a token."""
+
+
+class UsageError(TokensError):
+    """Options that cannot go together, found before gh is asked anything."""
 
 
 # The GitHub CLI.
@@ -203,26 +227,35 @@ def origin_repository(root=ROOT):
     return (match.group(1), match.group(2)) if match else None
 
 
+def check_options(args, root=ROOT):
+    """The place the options name, as far as it is known without gh:
+    (repos, visibility, origin), or why the options cannot go together."""
+    repos = parse_repos(args.repos)
+    visibility = args.visibility or "selected"
+    if args.repo and (repos or args.visibility):
+        raise UsageError("--repo puts the secrets on one repository: --repos and --visibility are for --org")
+    if repos and visibility != "selected":
+        raise UsageError(f"--repos names the repositories that see a selected secret, and --visibility {visibility} "
+                         "makes every repository see it: drop one")
+    origin = None if args.repo else origin_repository(root)
+    if args.org and not repos and visibility == "selected":
+        if origin and origin[0].lower() == args.org.lower():
+            repos = [origin[1]]
+        else:
+            raise UsageError("--org needs the repositories that see the secrets: --repos NAME,NAME (or --visibility all)")
+    if not args.org and not args.repo and not origin:
+        raise UsageError("this clone has no GitHub origin: say where the secrets go with --org ORG --repos NAME or --repo OWNER/NAME")
+    return repos, visibility, origin
+
+
 def target_from(args, gh, root=ROOT):
     """The level and the place the options name, or the origin's."""
-    repos = parse_repos(args.repos)
+    repos, visibility, origin = check_options(args, root)
     if args.repo:
-        if repos or args.visibility:
-            raise TokensError("--repo puts the secrets on one repository: --repos and --visibility are for --org")
         owner, name = args.repo.split("/")
         return Target("repo", owner, name=name)
-    visibility = args.visibility or "selected"
     if args.org:
-        if not repos and visibility == "selected":
-            origin = origin_repository(root)
-            if origin and origin[0].lower() == args.org.lower():
-                repos = [origin[1]]
-            else:
-                raise TokensError("--org needs the repositories that see the secrets: --repos NAME,NAME (or --visibility all)")
         return Target("org", args.org, repos, visibility)
-    origin = origin_repository(root)
-    if not origin:
-        raise TokensError("this clone has no GitHub origin: say where the secrets go with --org ORG --repos NAME or --repo OWNER/NAME")
     owner, name = origin
     kind = gh.must(["api", f"users/{owner}", "--jq", ".type"]).strip()
     if kind == "Organization":
@@ -236,7 +269,7 @@ def parse_repos(text):
     repos = [part.strip() for part in (text or "").replace(" ", ",").split(",") if part.strip()]
     for repo in repos:
         if not REPO_NAME.match(repo):
-            raise TokensError(f"--repos takes repository names without their owner, not {repo}")
+            raise UsageError(f"--repos takes repository names without their owner, not {repo}")
     return repos
 
 
@@ -254,21 +287,27 @@ class Masker:
         self.shown = ""
         self.held = ""
         self.tokens = []
+        # What followed the last mask, while it may be a cut token's rest.
+        self.after = None
+        self.cut_over_lines = False
 
     def feed(self, chunk, final=False):
         """The text to put on the screen for this chunk. A token that runs
         to the chunk's end may go on in the next one, so it is held back
-        whole, as a start is, until the text after it shows where it ends."""
+        whole, as a start is, until the text after it shows where it ends;
+        one that has run on past any token's length is masked as it is,
+        since it is never shown, and refused later by its length."""
         text = self.shown + self.held + chunk
         shown = len(self.shown)
         pieces, position = [], shown
-        for match in TOKEN_SHAPE.finditer(text):
-            if match.end() == len(text) and not final:
+        for match in SECRET_SHAPE.finditer(text):
+            if match.end() == len(text) and not final and len(match.group(0)) <= HOLD_LIMIT:
                 break
-            if match.group(0) not in self.tokens:
-                self.tokens.append(match.group(0))
+            found = match.group(0)
+            if TOKEN_SHAPE.fullmatch(found) and found not in self.tokens:
+                self.tokens.append(found)
             pieces.append(text[position:max(match.start(), shown)])
-            pieces.append(MASK)
+            pieces.append(MASK if TOKEN_SHAPE.fullmatch(found) else OTHER_MASK)
             position = max(match.end(), shown)
         cut = len(text)
         if not final:
@@ -276,10 +315,31 @@ class Masker:
             if start and len(start.group(0)) <= HOLD_LIMIT:
                 cut = max(start.start(), position)
         self.held = text[cut:]
-        emit = "".join(pieces) + text[position:cut]
+        pieces.append(text[position:cut])
+        self.watch(pieces)
+        emit = "".join(pieces)
         if emit:
             self.shown = (self.shown + emit)[-12:]
         return emit
+
+    def watch(self, pieces):
+        """A run of a token's characters that begins the line after a
+        masked token is the rest of one cut over two lines by a terminal
+        narrower than the one claude was given: the piece kept is then no
+        token, and the rest is already on the screen, so it is noted here
+        and the run refused."""
+        for piece in pieces:
+            if piece in (MASK, OTHER_MASK):
+                self.after = ""
+            elif self.after is not None and piece:
+                self.after += piece
+                run = CONTINUATION.match(self.after)
+                rest = self.after[run.end():]
+                if len(run.group(1)) >= CONTINUATION_RUN:
+                    self.cut_over_lines = True
+                    self.after = None
+                elif (rest and not PARTIAL_CODE.fullmatch(rest)) or len(self.after) > HOLD_LIMIT:
+                    self.after = None
 
 
 def pty_available():
@@ -320,7 +380,7 @@ def mint(stdin_fd=None, write=None, command=SETUP_TOKEN):
     """Run claude setup-token behind a pseudo-terminal: the sign-in goes
     through to the browser and the keyboard, everything claude prints
     reaches the screen but the token, and the tokens seen come back with
-    claude's exit status."""
+    claude's exit status and whether one was cut over two lines."""
     import fcntl
     import pty
     import termios
@@ -333,6 +393,12 @@ def mint(stdin_fd=None, write=None, command=SETUP_TOKEN):
             sys.stdout.flush()
     pid, master = pty.fork()
     if pid == 0:
+        # The width claude wraps at is the terminal's, set here before it
+        # starts; a COLUMNS or LINES inherited from the shell would tell a
+        # library another width, and a token wrapped over two lines is
+        # one no pattern finds whole.
+        for name in ("COLUMNS", "LINES"):
+            os.environ.pop(name, None)
         fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", *TERMINAL_SIZE, 0, 0))
         try:
             os.execvp(command[0], list(command))
@@ -350,22 +416,33 @@ def mint(stdin_fd=None, write=None, command=SETUP_TOKEN):
         raise
     finally:
         if saved is not None:
-            termios.tcsetattr(stdin_fd, termios.TCSADRAIN, saved)
+            # Keys typed after claude ended are dropped, not fed to the
+            # wizard's next question.
+            termios.tcsetattr(stdin_fd, termios.TCSAFLUSH, saved)
         os.close(master)
         write(masker.feed(decoder.decode(b"", final=True), final=True))
+        if saved is not None:
+            # The modes claude turns on (bracketed paste, focus and mouse
+            # events, its keyboard protocol) are turned off again, since a
+            # claude killed mid-screen leaves them on.
+            write(TERMINAL_RESET)
         write("\n")
         _, status = os.waitpid(pid, 0)
-    return masker.tokens, status
+    return masker.tokens, status, masker.cut_over_lines
 
 
 def minted_token(**options):
     """One token from claude setup-token, or why there is none."""
     try:
-        tokens, status = mint(**options)
+        tokens, status, cut = mint(**options)
     except KeyboardInterrupt:
         raise TokensError("stopped; nothing was stored") from None
+    if cut:
+        raise TokensError("claude's output went on with a run of a token's characters on the line after the token, as a token "
+                          "cut over two lines by a narrow terminal does: nothing was stored, and the screen may show part of "
+                          "it; run claude setup-token yourself in a wide window and use --paste")
     if len(tokens) == 1:
-        return tokens[0]
+        return whole_token(tokens[0])
     if tokens:
         raise TokensError("claude printed more than one token, so none was stored; run it again")
     code = os.waitstatus_to_exitcode(status) if hasattr(os, "waitstatus_to_exitcode") else status
@@ -375,9 +452,35 @@ def minted_token(**options):
                       "in a form this wizard does not know; run it again, or run claude setup-token yourself and use --paste")
 
 
+def whole_token(token):
+    """A token of a token's length: a shorter one is a piece cut by a
+    terminal, a longer one a run that went on past where a token ends."""
+    if len(token) < TOKEN_SHORTEST:
+        raise TokensError(f"the token seen is {len(token)} characters, shorter than any claude setup-token prints, so it was "
+                          "cut: nothing was stored; run claude setup-token yourself in a wide window and use --paste")
+    if len(token) > HOLD_LIMIT:
+        raise TokensError("what claude printed ran on past a token's length with no break, so no token could be told apart "
+                          "from it: nothing was stored; run claude setup-token yourself and use --paste")
+    return token
+
+
+def hidden_input(prompt):
+    """getpass, or a refusal where it could not hide the input: it warns
+    so and would echo, in a window that is no console."""
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", getpass.GetPassWarning)
+        try:
+            return getpass.getpass(prompt)
+        except getpass.GetPassWarning:
+            raise TokensError("this window cannot hide what you type, so nothing was pasted: run the wizard from a terminal "
+                              "(cmd, PowerShell or Windows Terminal; in Git Bash, through winpty), or let it run claude "
+                              "setup-token itself") from None
+
+
 def pasted_token(ask=None):
     """The token from a hidden prompt, as gh's own prompt would take it."""
-    ask = ask or getpass.getpass
+    ask = ask or hidden_input
     return check_token((ask("Paste the token claude setup-token printed, then Enter (nothing is shown): ") or "").strip())
 
 
@@ -391,7 +494,17 @@ def check_token(text):
     found = TOKEN_SHAPE.findall(text)
     if len(set(found)) != 1:
         raise TokensError(f"that is not a token from claude setup-token (one begins with {TOKEN_HEAD}); nothing was stored")
-    return found[0]
+    return whole_token(found[0])
+
+
+def claude_command():
+    """Where claude is: on PATH, or where Claude Code's own installer puts
+    it behind a shell alias, which PATH does not show."""
+    found = shutil.which(SETUP_TOKEN[0])
+    if found:
+        return found
+    local = Path.home() / ".claude" / "local" / "claude"
+    return str(local) if local.is_file() and os.access(local, os.X_OK) else None
 
 
 def get_token(args, write=None, stdin_fd=None, ask=None):
@@ -402,11 +515,12 @@ def get_token(args, write=None, stdin_fd=None, ask=None):
     if not pty_available():
         print("This shell has no pseudo-terminal, so the token is pasted: run claude setup-token in another window first.")
         return pasted_token(ask)
-    if shutil.which(SETUP_TOKEN[0]) is None:
+    claude = claude_command()
+    if claude is None:
         print("claude is not on this machine's PATH, so the token is pasted: run claude setup-token where it is, then paste it here.")
         return pasted_token(ask)
     print("Starting claude setup-token. Approve the sign-in in your browser; the token stays out of sight.")
-    return minted_token(write=write, stdin_fd=stdin_fd)
+    return minted_token(write=write, stdin_fd=stdin_fd, command=(claude,) + SETUP_TOKEN[1:])
 
 
 # What is there.
@@ -549,16 +663,18 @@ def scope_args(state, kind, name):
     return ["--visibility", "selected", "--repos", ",".join(repos)]
 
 
-def store_secret(state, name, token):
+def store_secret(state, name, token, scope):
     """The value goes to gh on its standard input, where gh reads it without
-    echo or a command line; the arguments carry the name and the place."""
-    args = ["secret", "set", name] + state.target.flags + scope_args(state, "secrets", name)
+    echo or a command line; the arguments carry the name and the place, the
+    scope found before the token was."""
+    args = ["secret", "set", name] + state.target.flags + scope
     state.gh.must(args, stdin=token)
     print(f"  {name}: stored")
 
 
-def set_variable(state, name, value):
-    args = ["variable", "set", name] + state.target.flags + scope_args(state, "variables", name) + ["--body", value]
+def set_variable(state, name, value, scope=None):
+    scope = scope_args(state, "variables", name) if scope is None else scope
+    args = ["variable", "set", name] + state.target.flags + scope + ["--body", value]
     state.gh.must(args)
     print(f"  {name}: {value}")
 
@@ -588,7 +704,7 @@ def verify(state, names):
     return fresh
 
 
-def update_accounts(state):
+def update_accounts(state, scope=None):
     """The variable names every slot whose secret exists, as the bench reads
     it, and is written only when that changed."""
     wanted = ",".join(str(slot) for slot in state.slots_set())
@@ -600,11 +716,12 @@ def update_accounts(state):
         if have is not None:
             delete_variable(state, ACCOUNTS_VARIABLE)
         return
-    set_variable(state, ACCOUNTS_VARIABLE, wanted)
+    set_variable(state, ACCOUNTS_VARIABLE, wanted, scope)
 
 
 def refuse_crowd(gh, target, project=None):
-    """A crowd repository holds no Claude token (docs/setup/crowdsourcing.md):
+    """Each repository named is one this login can see, and none holds a
+    Claude token for being in crowd mode (docs/setup/crowdsourcing.md):
     this clone's mode line and each repository's variable say so."""
     try:
         text = (PROJECT if project is None else project).read_text(encoding="utf-8")
@@ -613,29 +730,43 @@ def refuse_crowd(gh, target, project=None):
     if CROWD_ON.search(text):
         raise TokensError("crowd mode is on in this clone's docs/project.md: a crowd repository holds no Claude token, so nothing was stored")
     for full in target.repositories():
+        found, _ = gh.read(["api", f"repos/{full}", "--jq", ".full_name"])
+        if not found:
+            raise TokensError(f"GitHub lists no repository {full} for this login: check the name, or --repos")
         found, value = gh.read(["api", f"repos/{full}/actions/variables/{CROWD_VARIABLE}", "--jq", ".value"])
         if found and value.strip().lower() == "true":
             raise TokensError(f"{full} is in crowd mode (its variable {CROWD_VARIABLE} is true): it holds no Claude token, so nothing was stored")
 
 
+def auth_status(gh):
+    """gh auth status for the active github.com account alone: the plain
+    command fails on a stale account of any host it knows, and lists that
+    host first; a gh too old for --active takes the host alone."""
+    done = gh.run(["auth", "status", "--hostname", "github.com", "--active"])
+    if done.returncode != 0 and "unknown flag" in (done.stderr or ""):
+        done = gh.run(["auth", "status", "--hostname", "github.com"])
+    return done
+
+
 def check_signed_in(gh):
-    done = gh.run(["auth", "status"])
+    """What gh says of the github.com account, once it says one is signed in."""
+    done = auth_status(gh)
     if done.returncode != 0:
-        raise TokensError("gh is not signed in: run gh auth login (https://cli.github.com/manual/gh_auth_login), then run this again")
+        raise TokensError("gh is not signed in to github.com: run gh auth login (https://cli.github.com/manual/gh_auth_login), then run this again")
+    return (done.stdout or "") + (done.stderr or "")
 
 
-def check_scopes(gh, target):
+def check_scopes(status, target):
     """An organization's secrets need gh's token to carry admin:org, which
     gh auth login does not grant by default; better found here than after
-    a sign-in."""
+    a sign-in. gh quotes each scope of an OAuth token; a token of another
+    kind (a fine-grained token in GH_TOKEN) lists none, and gh says itself
+    what such a token lacks when a call is refused."""
     if target.level != "org":
         return
-    done = gh.run(["auth", "status"])
-    scopes = re.search(r"Token scopes: (.*)", (done.stdout or "") + (done.stderr or ""))
-    # gh quotes each scope of an OAuth token; a token of another kind (a
-    # fine-grained token in GH_TOKEN) lists none, and gh says itself what
-    # such a token lacks when a call is refused.
-    if scopes and "'" in scopes.group(1) and "admin:org" not in scopes.group(1):
+    line = re.search(r"Token scopes: (.*)", status)
+    scopes = re.findall(r"'([^']+)'", line.group(1)) if line else []
+    if scopes and "admin:org" not in scopes:
         raise TokensError("gh's token lacks the admin:org scope an organization's secrets need: run gh auth refresh -h github.com -s admin:org, "
                           "approve it in the browser, then run this again")
 
@@ -660,35 +791,43 @@ def sign_in_note(slot):
     print("  The page that opens names the account it will approve; approve it there and the token is stored.")
 
 
-def add(gh, target, slot=None, label="", also_main=False, paste=False, write=None, stdin_fd=None, ask=None):
+def add(gh, target, slot=None, label="", also_main=False, paste=False, write=None, stdin_fd=None, ask=None, noted=False):
+    """One account into a slot. Every read and every scope is settled before
+    the sign-in: a token minted and then not stored is a year's token lost
+    with the process, so what can fail fails first."""
     refuse_crowd(gh, target)
     check_label(label)
     state = State(gh, target)
     slot = slot or first_free(state)
     name = slot_secret(slot)
+    names = [name] + ([MAIN_SECRET] if also_main else [])
+    scopes = {each: scope_args(state, "secrets", each) for each in names}
+    label_scope = scope_args(state, "variables", slot_label(slot)) if label else None
+    accounts_scope = scope_args(state, "variables", ACCOUNTS_VARIABLE)
     if name in state.secrets:
         print(f"Slot {slot} is set ({age_line(state.secrets[name])}); the new token replaces it.")
-    sign_in_note(slot)
+    if not noted:
+        sign_in_note(slot)
     token = get_token(argparse.Namespace(paste=paste), write=write, stdin_fd=stdin_fd, ask=ask)
-    store_secret(state, name, token)
-    if also_main:
-        store_secret(state, MAIN_SECRET, token)
+    for each in names:
+        store_secret(state, each, token, scopes[each])
     token = None
     if label:
-        set_variable(state, slot_label(slot), label)
-    state = verify(state, [name] + ([MAIN_SECRET] if also_main else []))
-    update_accounts(state)
+        set_variable(state, slot_label(slot), label, label_scope)
+    state = verify(state, names)
+    update_accounts(state, accounts_scope)
     return state
 
 
 def main_token(gh, target, paste=False, write=None, stdin_fd=None, ask=None):
     refuse_crowd(gh, target)
     state = State(gh, target)
+    scope = scope_args(state, "secrets", MAIN_SECRET)
     if MAIN_SECRET in state.secrets:
         print(f"{MAIN_SECRET} is set ({age_line(state.secrets[MAIN_SECRET])}); the new token replaces it.")
     print(f"{MAIN_SECRET}: in your browser, sign in to claude.ai as the account whose plan @claude, the workers in Actions and the coordinator workflow should draw on.")
     token = get_token(argparse.Namespace(paste=paste), write=write, stdin_fd=stdin_fd, ask=ask)
-    store_secret(state, MAIN_SECRET, token)
+    store_secret(state, MAIN_SECRET, token, scope)
     token = None
     return verify(state, [MAIN_SECRET])
 
@@ -743,7 +882,7 @@ def wizard(gh, target, ask=input, write=None, stdin_fd=None):
         ask("Press Enter once the browser is signed in to that account ")
         also_main = MAIN_SECRET not in state.secrets and yes(
             ask(f"Store the same token as {MAIN_SECRET} too, the one @claude, the workers in Actions and the coordinator workflow run on? [y/N] "), False)
-        state = add(gh, target, slot, label, also_main, write=write, stdin_fd=stdin_fd)
+        state = add(gh, target, slot, label, also_main, write=write, stdin_fd=stdin_fd, noted=True)
         if not yes(ask("Another account? [y/N] "), False):
             break
     print_status(state)
@@ -788,11 +927,15 @@ def main(argv=None):
         parser.error("--repo takes OWNER/NAME")
     if args.repo and args.org:
         parser.error("--org or --repo, not both")
+    try:
+        check_options(args)
+    except UsageError as error:
+        parser.error(str(error))
     gh = Gh()
     try:
-        check_signed_in(gh)
+        status = check_signed_in(gh)
         target = target_from(args, gh)
-        check_scopes(gh, target)
+        check_scopes(status, target)
         if args.command == "status":
             print_status(State(gh, target))
         elif args.command == "add":

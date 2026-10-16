@@ -7,6 +7,7 @@ fake gh on PATH, or in the process (tests/fake_gh.py), answers the calls
 and records them, and a fake claude prints the sign-in's screens with a
 token built here from pieces, so this file never holds one."""
 
+import getpass
 import io
 import json
 import os
@@ -67,7 +68,7 @@ w("\\x1b[?25h")
 sys.stdout.flush()
 columns = os.get_terminal_size(1).columns if sys.stdout.isatty() else None
 with open(os.environ["FAKE_CLAUDE_REPORT"], "w") as handle:
-    json.dump({{"code": code, "columns": columns, "tty": sys.stdout.isatty()}}, handle)
+    json.dump({{"code": code, "columns": columns, "tty": sys.stdout.isatty(), "env_columns": os.environ.get("COLUMNS")}}, handle)
 '''
 
 
@@ -140,6 +141,8 @@ class World:
         routes = {
             "auth status": [answer(200, status)],
             f"GET users/{ORG}": [answer(200, "Organization\n")],
+            f"GET repos/{ORG}/{REPO}": [answer(200, f"{ORG}/{REPO}\n")],
+            f"GET repos/{ORG}/other": [answer(200, f"{ORG}/other\n")],
             f"GET repos/{ORG}/{REPO}/actions/variables/{tokens.CROWD_VARIABLE}": [
                 answer(404, {"message": "Not Found"}) if crowd is None else answer(200, crowd + "\n")],
             f"GET repos/{ORG}/other/actions/variables/{tokens.CROWD_VARIABLE}": [answer(404, {"message": "Not Found"})],
@@ -236,11 +239,17 @@ class TheMask(unittest.TestCase):
         out += masker.feed("", final=True)
         return out, masker.tokens
 
+    def masker_fed(self, text, size):
+        masker = tokens.Masker()
+        out = "".join(masker.feed(text[i:i + size]) for i in range(0, len(text), size))
+        out += masker.feed("", final=True)
+        return masker, out
+
     def test_the_token_never_reaches_the_screen_at_any_chunk_size(self):
         for frame in (self.FRAME, self.PLACED):
             for size in list(range(1, 48)) + [64, 100, 1000]:
-                out, found = self.masked(frame, size)
-                self.assertEqual(found, [TOKEN], size)
+                masker, out = self.masker_fed(frame, size)
+                self.assertEqual(masker.tokens, [TOKEN], size)
                 self.assertNotIn(TOKEN, out, size)
                 self.assertFalse(has_token(out), size)
                 self.assertEqual(out.count(tokens.MASK), 2, size)
@@ -248,6 +257,57 @@ class TheMask(unittest.TestCase):
                 # where the token came one character at a time, its first
                 # "s" was on the screen before the mask took the rest.
                 self.assertEqual(re.sub("s?" + re.escape(tokens.MASK), TOKEN, out), frame, size)
+                # The words after the token are words, not a cut token's rest.
+                self.assertFalse(masker.cut_over_lines, size)
+
+    def test_a_run_past_the_hold_limit_is_masked_and_then_refused(self):
+        # A token with no break after it for longer than any token: never
+        # shown, and what was kept is too long to be one.
+        text = "x " + TOKEN + "Q" * (tokens.HOLD_LIMIT + 40) + "\n"
+        for size in (1, 100, 5000):
+            masker, out = self.masker_fed(text, size)
+            self.assertNotIn(TOKEN, out, size)
+            self.assertFalse(has_token(out), size)
+            self.assertEqual(len(masker.tokens), 1, size)
+            self.assertGreater(len(masker.tokens[0]), tokens.HOLD_LIMIT, size)
+            with self.assertRaises(tokens.TokensError) as caught:
+                tokens.whole_token(masker.tokens[0])
+            self.assertIn("ran on", str(caught.exception))
+
+    def test_another_key_s_shape_is_masked_and_not_kept(self):
+        text = "key " + API_KEY + " and token " + TOKEN + "\n"
+        for size in (1, 7, 1000):
+            masker, out = self.masker_fed(text, size)
+            self.assertNotIn(API_KEY, out, size)
+            self.assertNotIn(TOKEN, out, size)
+            self.assertIn(tokens.OTHER_MASK, out, size)
+            self.assertEqual(masker.tokens, [TOKEN], size)
+
+    def test_a_token_cut_over_two_lines_is_noticed(self):
+        # A terminal narrower than claude's would end the line inside the
+        # token: the first piece is masked and kept, the rest comes as the
+        # next line's first word, which no shape finds, so the run after
+        # the mask is the sign.
+        cut = TOKEN[:50] + "\r\n" + TOKEN[50:] + "\r\nStore this token securely.\n"
+        for size in (1, 3, 30, 1000):
+            masker, out = self.masker_fed(cut, size)
+            self.assertTrue(masker.cut_over_lines, size)
+            self.assertEqual(masker.tokens, [TOKEN[:50]], size)
+            self.assertFalse(has_token(out), size)
+        # A line of words after the token, with cursor codes between, is none.
+        for after in ("\r\r\n\x1b[2GStore\x1b[8Gthis", "\n\n" + "-" * 10 + " done", "\x1b[22m\r\n"):
+            masker, out = self.masker_fed("\x1b[1m" + TOKEN + after, 1)
+            self.assertFalse(masker.cut_over_lines, repr(after))
+            self.assertEqual(masker.tokens, [TOKEN])
+
+    def test_a_token_of_another_length_is_refused(self):
+        with self.assertRaises(tokens.TokensError) as caught:
+            tokens.whole_token(TOKEN[:tokens.TOKEN_SHORTEST - 1])
+        self.assertIn("shorter", str(caught.exception))
+        self.assertNotIn(TOKEN[:20], str(caught.exception))
+        self.assertEqual(tokens.whole_token(TOKEN), TOKEN)
+        with self.assertRaises(tokens.TokensError):
+            tokens.check_token(TOKEN[:tokens.TOKEN_SHORTEST - 1])
 
     def test_two_different_tokens_are_both_kept(self):
         out, found = self.masked("a " + TOKEN + " b " + OTHER + " c", 7)
@@ -268,9 +328,10 @@ class TheMask(unittest.TestCase):
         self.assertEqual(masker.feed("", final=True), "sk-")
 
     def test_the_mask_is_no_secret_shape(self):
-        for name, pattern in check_docs.SECRET_PATTERNS:
-            self.assertIsNone(pattern.search(tokens.MASK), name)
-        self.assertIsNone(tokens.TOKEN_SHAPE.search(tokens.MASK))
+        for mask in (tokens.MASK, tokens.OTHER_MASK):
+            for name, pattern in check_docs.SECRET_PATTERNS:
+                self.assertIsNone(pattern.search(mask), name)
+            self.assertIsNone(tokens.SECRET_SHAPE.search(mask))
 
 
 class TheMint(unittest.TestCase):
@@ -284,17 +345,19 @@ class TheMint(unittest.TestCase):
         report = str(Path(folder) / "report.json")
         collector = Collector()
         reader = code_pipe()
-        with patch.dict(os.environ, {"FAKE_CLAUDE_REPORT": report}):
+        with patch.dict(os.environ, {"FAKE_CLAUDE_REPORT": report, "COLUMNS": "80", "LINES": "24"}):
             try:
-                found, status = tokens.mint(stdin_fd=reader, write=collector, command=(str(bin_dir / "claude"), "setup-token"))
+                found, status, cut = tokens.mint(stdin_fd=reader, write=collector, command=(str(bin_dir / "claude"), "setup-token"))
             finally:
                 os.close(reader)
         self.assertEqual(found, [TOKEN])
         self.assertEqual(status, 0)
+        self.assertFalse(cut)
         seen = read_json(report)
         self.assertEqual(seen["code"], "thecode")
         self.assertTrue(seen["tty"])
         self.assertEqual(seen["columns"], tokens.TERMINAL_SIZE[1])
+        self.assertIsNone(seen["env_columns"], "the shell's COLUMNS would tell claude another width")
         self.assertNotIn(TOKEN, collector.text)
         self.assertFalse(has_token(collector.text))
         self.assertIn("Paste code here if prompted", collector.text)
@@ -318,6 +381,36 @@ class TheMint(unittest.TestCase):
         self.assertIn("exit 3", str(caught.exception))
         self.assertIn("--paste", str(caught.exception))
 
+    def test_a_token_claude_wrapped_is_refused_not_stored(self):
+        folder = tempfile.mkdtemp(prefix="tokens-mint-")
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        bin_dir = Path(folder) / "bin"
+        bin_dir.mkdir()
+        claude = bin_dir / "claude"
+        claude.write_text(f"#!{sys.executable} -IS\nimport sys\nsys.stdout.write('Your token:\\n' + {TOKEN[:50]!r} + '\\r\\n' + {TOKEN[50:]!r} + '\\r\\n')\n")
+        claude.chmod(0o755)
+        collector = Collector()
+        reader = code_pipe("")
+        try:
+            with self.assertRaises(tokens.TokensError) as caught:
+                tokens.minted_token(stdin_fd=reader, write=collector, command=(str(claude), "setup-token"))
+        finally:
+            os.close(reader)
+        self.assertIn("cut over two lines", str(caught.exception))
+        self.assertNotIn(TOKEN[:50], collector.text)
+        self.assertNotIn(TOKEN[:50], str(caught.exception))
+
+    def test_claude_is_found_where_its_own_installer_puts_it(self):
+        folder = tempfile.mkdtemp(prefix="tokens-home-")
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        with patch.dict(os.environ, {"PATH": folder, "HOME": folder}):
+            self.assertIsNone(tokens.claude_command())
+            local = Path(folder) / ".claude" / "local" / "claude"
+            local.parent.mkdir(parents=True)
+            local.write_text("#!/bin/sh\n")
+            local.chmod(0o755)
+            self.assertEqual(tokens.claude_command(), str(local))
+
     def test_a_claude_that_is_not_there_is_named(self):
         collector = Collector()
         reader = code_pipe("")
@@ -339,6 +432,20 @@ class ThePaste(unittest.TestCase):
         with self.assertRaises(tokens.TokensError) as caught:
             tokens.check_token(API_KEY)
         self.assertIn("API key", str(caught.exception))
+
+    def test_a_window_that_cannot_hide_the_input_is_refused(self):
+        import warnings
+
+        def echoing(prompt):
+            warnings.warn("Can not control echo on the terminal.", getpass.GetPassWarning, stacklevel=2)
+            return TOKEN
+
+        with patch.object(tokens.getpass, "getpass", echoing):
+            with self.assertRaises(tokens.TokensError) as caught:
+                tokens.hidden_input("Paste: ")
+        self.assertIn("cannot hide", str(caught.exception))
+        with patch.object(tokens.getpass, "getpass", lambda prompt: "  " + TOKEN + "\n"):
+            self.assertEqual(tokens.pasted_token(), TOKEN)
 
     def test_anything_else_is_refused(self):
         for text in ("", "hello", "ghp_" + "x" * 40, TOKEN + " " + OTHER):
@@ -411,6 +518,55 @@ class Adding(unittest.TestCase):
         with self.assertRaises(tokens.TokensError) as caught:
             world.run_in_process(self, tokens.add, tokens.Gh(), target(), None, "", False, False)
         self.assertIn("does not list", str(caught.exception))
+
+    def test_what_can_fail_fails_before_the_sign_in(self):
+        # The list an existing secret reaches cannot be read (no admin:org
+        # on that path): the sign-in is not spent on it.
+        world = World(self, secrets=[secret(tokens.slot_secret(1))])
+        routes = read_json(world.routes_file)
+        routes[f"GET orgs/{ORG}/actions/secrets/{tokens.slot_secret(1)}/repositories"] = [
+            answer(403, {"message": "Resource not accessible by integration"})]
+        fake_gh.write_routes(world.routes_file, routes)
+        with self.assertRaises(tokens.TokensError) as caught:
+            world.run_in_process(self, tokens.add, tokens.Gh(), target(), 1, "", False, False)
+        self.assertIn("403", str(caught.exception))
+        self.assertIsNone(world.report, "claude did not run")
+        self.assertEqual(find(world.calls(), "secret set"), [])
+        # A repository the login cannot see is named before it too.
+        world = World(self)
+        with self.assertRaises(tokens.TokensError) as caught:
+            world.run_in_process(self, tokens.add, tokens.Gh(), target(repos=("nothere",)), None, "", False, False)
+        self.assertIn("nothere", str(caught.exception))
+        self.assertIsNone(world.report, "claude did not run")
+
+    def test_the_main_secret_alone(self):
+        world = World(self, secrets=[secret(tokens.MAIN_SECRET, OLD, "all", 0)])
+        world.expect_store(tokens.MAIN_SECRET)
+        state, printed, calls = world.run_in_process(self, tokens.main_token, tokens.Gh(), target(), False)
+        stores = find(calls, "secret set")
+        self.assertEqual(len(stores), 1)
+        self.assertEqual(stores[0]["stdin"], TOKEN)
+        # An existing secret keeps its visibility, whatever the target says.
+        self.assertEqual(stores[0]["args"], ["secret", "set", tokens.MAIN_SECRET, "--org", ORG, "--visibility", "all"])
+        self.assertIn("replaces it", printed)
+        self.assertIn("GitHub lists it", printed)
+        self.assertFalse(has_token(printed))
+        self.assertEqual(find(calls, "variable set"), [])
+        self.assertEqual(world.report["code"], "thecode")
+
+    def test_an_existing_visibility_is_kept(self):
+        world = World(self, secrets=[secret("A", OLD, "all", 0), secret("B", OLD, "private", 0), secret("C", OLD, "selected", 1)])
+        run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+        routes = read_json(world.routes_file)
+        routes[f"GET orgs/{ORG}/actions/secrets/C/repositories"] = [answer(200, "zeta\nalpha\n")]
+        fake_gh.write_routes(world.routes_file, routes)
+        with patch.object(tokens.subprocess, "run", run):
+            state = tokens.State(tokens.Gh(), target())
+            self.assertEqual(tokens.scope_args(state, "secrets", "A"), ["--visibility", "all"])
+            self.assertEqual(tokens.scope_args(state, "secrets", "B"), ["--visibility", "private"])
+            self.assertEqual(tokens.scope_args(state, "secrets", "C"), ["--visibility", "selected", "--repos", "alpha,widgets,zeta"])
+            self.assertEqual(tokens.scope_args(state, "secrets", "D"), ["--visibility", "selected", "--repos", REPO])
+            self.assertEqual(tokens.scope_args(tokens.State(tokens.Gh(), target(visibility="all")), "secrets", "D"), ["--visibility", "all"])
 
     def test_a_label_is_a_word_not_an_address(self):
         world = World(self)
@@ -550,14 +706,56 @@ class ThePlace(unittest.TestCase):
         place = tokens.target_from(self.parse("--org", "elsewhere", "--visibility", "all"), tokens.Gh(), root=Path(tempfile.gettempdir()))
         self.assertEqual(place.describe(), "the organization elsewhere, seen by every repository")
 
+    def test_options_that_cannot_go_together_are_usage_errors(self):
+        here = Path(tempfile.gettempdir())
+        for argv in (("--repo", "o/n", "--repos", "a"), ("--repo", "o/n", "--visibility", "all"),
+                     ("--org", "x", "--repos", "a,b", "--visibility", "all"), ("--org", "x",), ("--repos", "a/b",)):
+            with self.assertRaises(tokens.UsageError, msg=argv):
+                tokens.check_options(self.parse(*argv), root=here)
+        with self.assertRaises(tokens.UsageError):
+            tokens.check_options(self.parse(), root=here)
+        self.assertEqual(tokens.check_options(self.parse("--org", "x", "--repos", "a,b"), root=here), (["a", "b"], "selected", None))
+        self.assertEqual(tokens.check_options(self.parse("--repo", "o/n"), root=here), ([], "selected", None))
+        # As a process, before gh is asked anything: exit 2 with no fake gh on PATH.
+        done = subprocess.run([sys.executable, str(SCRIPT), "--org", "x", "--repos", "a", "--visibility", "all", "status"],
+                              capture_output=True, text=True, cwd=ROOT, env={"PATH": "/nonexistent"})
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn("drop one", done.stderr)
+
     def test_the_organization_needs_the_scope_before_any_sign_in(self):
-        world = World(self, scopes="  Token scopes: 'gist', 'read:org', 'repo', 'workflow'\n")
+        short = SIGNED_IN.replace(SCOPES_LINE, "  Token scopes: 'gist', 'read:org', 'repo', 'workflow'\n")
+        with self.assertRaises(tokens.TokensError) as caught:
+            tokens.check_scopes(short, target())
+        self.assertIn("admin:org", str(caught.exception))
+        tokens.check_scopes(short, tokens.Target("repo", ORG, name=REPO))
+        # The scope is read whole: admin:org_hook is not admin:org.
+        with self.assertRaises(tokens.TokensError):
+            tokens.check_scopes(SIGNED_IN.replace(SCOPES_LINE, "  Token scopes: 'admin:org_hook', 'repo'\n"), target())
+        tokens.check_scopes(SIGNED_IN, target())
+        # A token of another kind lists no scopes; gh says what it lacks when a call is refused.
+        tokens.check_scopes(SIGNED_IN.replace(SCOPES_LINE, "  Token scopes: none\n"), target())
+
+    def test_the_status_read_is_the_active_account_on_github_com(self):
+        # The plain gh auth status fails on any stale account of any host
+        # it knows, so the wizard asks for the one account it uses.
+        world = World(self)
         run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
         with patch.object(tokens.subprocess, "run", run):
-            with self.assertRaises(tokens.TokensError) as caught:
-                tokens.check_scopes(tokens.Gh(), target())
-            tokens.check_scopes(tokens.Gh(), tokens.Target("repo", ORG, name=REPO))
-        self.assertIn("admin:org", str(caught.exception))
+            status = tokens.check_signed_in(tokens.Gh())
+        self.assertIn(SCOPES_LINE, status)
+        self.assertEqual(find(world.calls(), "auth status")[0]["args"], ["auth", "status", "--hostname", "github.com", "--active"])
+        # A gh too old for --active is asked for the host alone.
+        world = World(self)
+        routes = read_json(world.routes_file)
+        routes["auth status"] = [answer(1, "", stderr="unknown flag: --active\n"), answer(200, SIGNED_IN)]
+        routes["auth status"][0]["status"] = 400
+        fake_gh.write_routes(world.routes_file, routes)
+        run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+        with patch.object(tokens.subprocess, "run", run):
+            status = tokens.check_signed_in(tokens.Gh())
+        self.assertIn(SCOPES_LINE, status)
+        self.assertEqual([call["args"] for call in find(world.calls(), "auth status")],
+                         [["auth", "status", "--hostname", "github.com", "--active"], ["auth", "status", "--hostname", "github.com"]])
 
     def test_not_signed_in_is_said_first(self):
         world = World(self)
@@ -581,7 +779,7 @@ class TheWizard(unittest.TestCase):
         stores = find(calls, "secret set")
         self.assertEqual([call["args"][2] for call in stores], [tokens.slot_secret(1), tokens.MAIN_SECRET])
         self.assertEqual(find(calls, "variable set", tokens.slot_label(1))[0]["args"][-2:], ["--body", "greg"])
-        self.assertIn("sign in to claude.ai as the account this slot is for", printed)
+        self.assertEqual(printed.count("sign in to claude.ai as the account this slot is for"), 1)
         self.assertFalse(has_token(printed))
 
     def test_the_slot_question(self):
@@ -625,6 +823,13 @@ class TheScript(unittest.TestCase):
         self.assertEqual(store["args"][2], tokens.slot_secret(2))
         self.assertEqual(find(calls, "variable set", tokens.ACCOUNTS_VARIABLE)[0]["args"][-2:], ["--body", "1,2"])
         self.assertEqual(read_json(report)["code"], "thecode")
+        # The token went to gh on standard input, once, and on no call's
+        # command line.
+        self.assertEqual([call["key"] for call in calls if call["stdin"] == TOKEN], ["secret set"])
+        for call in calls:
+            self.assertFalse(any(TOKEN in arg or has_token(arg) for arg in call["args"]), call["args"])
+            self.assertFalse(call["stdin"] and call["key"] != "secret set" and has_token(call["stdin"]), call["args"])
+        self.assertFalse({"--body", "-b"} & set(store["args"]))
 
     def test_help_and_usage_errors(self):
         done = subprocess.run([sys.executable, str(SCRIPT), "--help"], capture_output=True, text=True, cwd=ROOT)
