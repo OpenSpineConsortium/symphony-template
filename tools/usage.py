@@ -70,6 +70,7 @@ import stat
 import subprocess
 import sys
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -105,8 +106,23 @@ PENDING_FRESH = 600
 DELIMITER_REACH = 1024
 # git's scissors line, below which a commit made with -v or commit.verbose
 # carries its diff in the editor's template and where git cuts the message:
-# the comment string, then 24 dashes, >8 and 24 dashes.
-SCISSORS = re.compile(r"(?m)^\S{1,16} -{24} >8 -{24}$")
+# the comment string, then 24 dashes, >8 and 24 dashes, and LF alone.
+SCISSORS = re.compile(r"(?m)^(\S{1,16}) -{24} >8 -{24}\n")
+# The shell's reserved words that may come before a command, which the
+# guard's reading leaves at the head of the command's words.
+RESERVED_WORDS = ("{", "!", "if", "then", "else", "elif", "do", "while", "until", "time")
+# git commit's options as its option parser reads them, for the hook's
+# reading of a command's words (commit_options): the short ones that take a
+# value, the rest of their word or else the next word; the short flags; and
+# the long ones, which may be shortened to any prefix that names one alone,
+# with those of them that take a value.
+SHORT_VALUED, SHORT_FLAGS = "mFcCt", "qvsaeinopz"
+LONG_VALUED = ("file", "author", "date", "message", "reedit-message", "reuse-message", "fixup", "squash", "trailer",
+               "template", "cleanup", "pathspec-from-file")
+LONG_OPTIONS = LONG_VALUED + ("quiet", "verbose", "reset-author", "signoff", "edit", "status", "gpg-sign", "all",
+                              "include", "interactive", "patch", "only", "no-verify", "dry-run", "short", "branch",
+                              "ahead-behind", "porcelain", "long", "null", "amend", "no-post-rewrite",
+                              "untracked-files", "pathspec-file-nul", "allow-empty", "allow-empty-message")
 SWITCH_FILES = (".github/symphony-metrics", ".github/sdlc-metrics")
 SWITCH_FILE = SWITCH_FILES[0]
 SWITCH_VARIABLE = "SDLC_METRICS"
@@ -381,48 +397,85 @@ def without_heredocs(command):
 
 @dataclass(slots=True)
 class Frame:
-    """What the reading of a command holds open at one depth of $( ): the
-    quote, how deep in arithmetic it is, how many ( it has open, and the
-    here-documents opened at this depth, each a delimiter and whether its
-    body's leading tabs go (<<-), whose bodies wait for a newline."""
+    """What the reading of a command holds open at one depth of $( ), <( )
+    or >( ): the quote, how deep in arithmetic it is, how many ( it has
+    open, and the here-documents opened at this depth, each a delimiter and
+    whether its body's leading tabs go (<<-), whose bodies wait for a
+    newline."""
     quote: str | None = None
     arithmetic: int = 0
     parens: int = 0
-    waiting: list = field(default_factory=list)
+    waiting: deque = field(default_factory=deque)
 
 
 def heredoc_bodies(text):
     """Where the bodies of a command's here-documents lie, each span from
     the newline after the operators to the end of the last delimiter. The
-    command is read whole, as bash reads it: a << in quotes, in a <<<
-    here-string, in arithmetic, $(( )) or (( )), or in a comment opens
-    nothing, on a line a string carries on from an earlier one too; each $(
-    reads quotes and operators anew, inside double quotes too, where Claude
-    Code writes its commit messages; and the bodies of the here-documents a
-    $( opens follow the first newline inside it, or, where it closes on the
-    line that opens them, the newline after it."""
+    command is read whole, as bash 5.2 reads it: a << in quotes, in a <<<
+    here-string, in arithmetic, $(( )), $[ ] or (( )), or in a comment opens
+    nothing, on a line a string carries on from an earlier one too; each
+    $(, <( and >( reads quotes and operators anew, $( inside double quotes
+    too, where Claude Code writes its commit messages, and the bodies of
+    the here-documents opened in it follow the first newline inside it;
+    those of one that closes on the line that opens them follow the very
+    next newline, wherever it falls, before any other's. A backquoted
+    command is read by itself, its here-documents ending with it."""
     from sdlc_protocol import guard
-    frames, i, word_start = [Frame()], 0, True
+    frames, handed, i, word_start = [Frame()], deque(), 0, True
     while i < len(text):
         frame, ch = frames[-1], text[i]
+        if handed and (newline := newline_at(text, i, frame.quote)) is not None:
+            end = past_bodies(text, newline + 1, handed, len(frames) > 1)
+            yield newline, end
+            i, word_start = end, True
+            continue
         if ch == "\\" and frame.quote != "'":
             # An escaped character is part of a word; a backslash-newline is
             # the line continuation the shell takes out, word and all.
             word_start = word_start and text.startswith("\n", i + 1)
             i += 2
             continue
-        if frame.quote:
+        if ch == "\n" and frame.waiting and not frame.quote:
+            end = past_bodies(text, i + 1, frame.waiting, len(frames) > 1)
+            yield i, end
+            i, word_start = end, True
+            continue
+        if ch == "`" and frame.quote != "'":
+            close = backquote_end(text, i)
+            inner = text[i + 1:close]
+            if "<<" in inner:
+                yield from ((i + 1 + start, i + 1 + end) for start, end in heredoc_bodies(inner))
+            step = min(close + 1, len(text)) - i
+        elif frame.quote:
             step = inside_quotes(text, i, frames)
         elif ch == "#" and word_start:
             step = line_end(text, i) - i
-        elif ch == "\n" and frame.waiting:
-            end, frame.waiting = past_bodies(text, i + 1, frame.waiting, len(frames) > 1)
-            yield i, end
-            step = end - i
         else:
-            step = outside_quotes(text, i, frames)
+            step = outside_quotes(text, i, frames, handed)
         word_start = text[i + step - 1] in guard.WORD_BREAKS
         i += step
+
+
+def newline_at(text, i, quote):
+    """The newline the reading meets at i: text[i] itself, or the one a
+    backslash outside single quotes takes out of the line; None where the
+    reading meets none there."""
+    if text[i] == "\n":
+        return i
+    if text[i] == "\\" and quote != "'" and text.startswith("\n", i + 1):
+        return i + 1
+    return None
+
+
+def backquote_end(text, i):
+    """Where the backquoted command that opens at i ends: at the first
+    backquote after it that no backslash escapes, or at the text's end."""
+    at = i + 1
+    while at < len(text):
+        if text[at] == "`":
+            return at
+        at += 2 if text[at] == "\\" else 1
+    return len(text)
 
 
 def inside_quotes(text, i, frames):
@@ -440,21 +493,24 @@ def inside_quotes(text, i, frames):
     return 1
 
 
-def outside_quotes(text, i, frames):
+def outside_quotes(text, i, frames, handed):
     """One step of the reading outside quotes, and its length: a quote
-    opens; $( opens a frame, and the ) that closes it hands the
-    here-documents it left waiting to the frame around it; arithmetic and
-    ( nest; and a << that is neither a <<< nor in arithmetic opens a
-    here-document, whose delimiter is looked for within reach on its line."""
+    opens; $(, <( and >( open a frame, and the ) that closes one hands the
+    here-documents it left waiting to be read at the next newline;
+    arithmetic and ( nest, and the old $[ ] is passed over whole; and a <<
+    that is neither a <<< nor in arithmetic opens a here-document, whose
+    delimiter is looked for within reach on its line."""
     frame, ch = frames[-1], text[i]
     if ch in "'\"":
         frame.quote = ch
     elif text.startswith("$((", i):
         frame.arithmetic += 1
         return 3
-    elif text.startswith("$(", i):
+    elif text.startswith("$(", i) or (text.startswith(("<(", ">("), i) and not frame.arithmetic):
         frames.append(Frame())
         return 2
+    elif text.startswith("$[", i):
+        return bracket_end(text, i) - i
     elif text.startswith("((", i):
         frame.arithmetic += 1
         return 2
@@ -467,7 +523,7 @@ def outside_quotes(text, i, frames):
         frame.parens -= 1
     elif ch == ")" and len(frames) > 1:
         frames.pop()
-        frames[-1].waiting.extend(frame.waiting)
+        handed.extend(frame.waiting)
     elif text.startswith("<<<", i):
         return 3
     elif text.startswith("<<", i) and not frame.arithmetic:
@@ -478,6 +534,20 @@ def outside_quotes(text, i, frames):
     return 1
 
 
+def bracket_end(text, i):
+    """Where the old arithmetic $[ ] that opens at i ends: past the ] that
+    closes it, or at the end of its line, where none does."""
+    depth, stop = 0, line_end(text, i)
+    for at in range(i + 1, stop):
+        if text[at] == "[":
+            depth += 1
+        elif text[at] == "]":
+            depth -= 1
+            if not depth:
+                return at + 1
+    return stop
+
+
 def line_end(text, i):
     """Where the line holding text[i] ends: its newline, or the text's end."""
     end = text.find("\n", i)
@@ -486,37 +556,41 @@ def line_end(text, i):
 
 def past_bodies(text, at, waiting, in_substitution):
     """Where the command goes on after the bodies of the here-documents
-    waiting at a newline, the first body starting at at, and those still
-    waiting: the bodies follow in order, each up to its delimiter's line,
-    the last ending at its delimiter, and one the command ends inside runs
-    to its end; inside $( ) a body may also end at its delimiter followed by
-    the ) that closes it, as bash 5.2 takes it, and the command goes on
-    there, any here-documents after it left for the frame around."""
+    waiting at a newline, the first body starting at at, each taken from
+    waiting as it is read: the bodies follow in order, each up to its
+    delimiter's line, the last ending at its delimiter, and one the command
+    ends inside runs to its end; inside $( ) a body may also end at its
+    delimiter where a ) follows on the line, as bash 5.2 takes it, and the
+    command goes on there, those not yet read left waiting."""
     end = at
-    for index, (word, dashed) in enumerate(waiting):
+    while waiting:
+        word, dashed = waiting[0]
         while True:
             if at >= len(text):
-                return len(text), []
+                waiting.clear()
+                return len(text)
             stop = line_end(text, at)
             closing = delimiter_length(text[at:stop], word, dashed, in_substitution)
             if closing is not None:
                 break
             at = stop + 1
+        waiting.popleft()
         end = at + closing
         if end < stop:
-            return end, waiting[index + 1:]
+            return end
         at = stop + 1
-    return end, []
+    return end
 
 
 def delimiter_length(line, word, dashed, in_substitution):
     """How much of a line closes a here-document's body, or None: the whole
     line where it is the delimiter alone, after its leading tabs for <<-,
-    and inside $( ) the delimiter that blanks and a ) follow."""
+    and inside $( ) the delimiter that begins the line where a ) follows it
+    anywhere on the line, which bash 5.2 keeps for older scripts."""
     body = line.lstrip("\t") if dashed else line
     if body == word:
         return len(line)
-    if in_substitution and body.startswith(word) and body[len(word):].lstrip(" \t").startswith(")"):
+    if in_substitution and body.startswith(word) and ")" in body[len(word):]:
         return len(line) - len(body) + len(word)
     return None
 
@@ -549,10 +623,14 @@ def is_commit(command):
 
 def commit_arguments(command):
     """The words after commit in the first simple command of a shell
-    command that runs git commit, or None where none does."""
+    command that runs git commit, or None where none does. A reserved word
+    before it, as in if git commit; then, or { git commit; }, is the
+    shell's, and the command after it is read."""
     from sdlc_protocol import guard
     for argv in guard.simple_commands(without_heredocs(command or "")):
         words = [word for word in argv if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", word)]
+        while words and words[0] in RESERVED_WORDS:
+            words = words[1:]
         if not words or os.path.basename(words[0]) != "git":
             continue
         rest = words[1:]
@@ -563,34 +641,58 @@ def commit_arguments(command):
     return None
 
 
-def strips_comments(arguments):
-    """Whether git takes the comment lines out of the message of a commit
-    made with these arguments: as its --cleanup says, else where git opens
-    the editor, for a commit given no message by -m or -F or told to edit
-    one, whose message is then the editor's template; a message given keeps
-    them, a line such as "#42 fix login" its subject. Short options run
-    together count, as -am does, with the flags that take no value first,
-    an e among them opening the editor as -e does."""
-    cleanup, given, edits = None, False, False
+def commit_options(arguments):
+    """What a git commit's words say of its message: the --cleanup they
+    give, None where they give none, and whether git opens the editor,
+    which it does unless -m, -F, -C or a plain --fixup gives the message or
+    --no-edit says not to, and does for -e however the message is given.
+    The words are read as git's option parser reads them: a long option by
+    any prefix that names it alone, short options run together, a value
+    the rest of its word or else the next word, and nothing after -- an
+    option."""
+    cleanup, given, edit = None, False, None
     words = iter(arguments)
     for word in words:
         if word == "--":
             break
-        if word == "--cleanup":
-            cleanup = next(words, None)
-        elif word.startswith("--cleanup="):
-            cleanup = word.partition("=")[2]
-        elif word in ("-e", "--edit"):
-            edits = True
-        elif word in ("--message", "--file") or word.startswith(("--message=", "--file=")):
-            given = True
-        elif run := re.fullmatch(r"-([apsenqvioz]*)[mF].*", word):
-            given, edits = True, edits or "e" in run[1]
-    if cleanup in ("strip", "scissors"):
-        return True
-    if cleanup in ("verbatim", "whitespace"):
-        return False
-    return edits or not given
+        if word.startswith("--"):
+            name, joined, value = word[2:].partition("=")
+            option, negated = long_option(name) or (None, False)
+            if option in LONG_VALUED and not joined and not negated:
+                value = next(words, "")
+            if option == "cleanup":
+                cleanup = value
+            elif option == "edit":
+                edit = not negated
+            elif option in ("message", "file", "reuse-message") and not negated:
+                given = True
+            elif option == "fixup" and not negated and not re.match(r"(amend|reword):", value):
+                given = True
+        elif word.startswith("-") and len(word) > 1:
+            for index, flag in enumerate(word[1:], 2):
+                if flag == "e":
+                    edit = True
+                elif flag in SHORT_VALUED:
+                    given = given or flag in "mFC"
+                    if index == len(word):
+                        next(words, None)
+                    break
+                elif flag not in SHORT_FLAGS:
+                    break
+    return cleanup, not given if edit is None else edit
+
+
+def long_option(name):
+    """The long option of git commit that --name gives, and whether it is
+    given as --no-name, as git's option parser reads the options the hook
+    reads: the option of that name, else the one option the name begins;
+    None where it names none or more than one."""
+    if name in LONG_OPTIONS:
+        return name, False
+    found = [(option, False) for option in LONG_OPTIONS if option.startswith(name)]
+    if name.startswith("no-") and len(name) > 3:
+        found += [(option, True) for option in LONG_OPTIONS if option.startswith(name[3:])]
+    return found[0] if len(found) == 1 else None
 
 
 def run_hook(payload, environ=None):
@@ -611,7 +713,8 @@ def run_hook(payload, environ=None):
     if sharing_off(root, environ):
         return
     pending = state_dir(cwd) / "pending.json"
-    left = {"session": str(session), "at": time.time(), "strips": strips_comments(arguments),
+    cleanup, editor = commit_options(arguments)
+    left = {"session": str(session), "at": time.time(), "cleanup": cleanup, "editor": editor,
             **session_usage(transcript)}
     write_json(pending, left)
     profiled = profile_so_far(transcript)
@@ -634,12 +737,14 @@ def run_trailer(message_file, cwd=None, environ=None, now=None):
     the old counts."""
     if in_actions(environ):
         return
+    environ = os.environ if environ is None else environ
     folder = state_dir(cwd)
     pending = read_json(folder / "pending.json")
     now = time.time() if now is None else now
     if not pending or now - float(pending.get("at") or 0) > PENDING_FRESH:
         return
-    if says_nothing(message_file, cwd, strips=pending.get("strips") is not False):
+    editor = editor_opened(pending, environ)
+    if says_nothing(message_file, cwd, editor, cleanup_mode(pending, cwd)):
         return
     (folder / "pending.json").unlink(missing_ok=True)
     session = re.sub(r"[^A-Za-z0-9-]", "", str(pending.get("session")))
@@ -660,39 +765,87 @@ def run_trailer(message_file, cwd=None, environ=None, now=None):
     lines = [f"{TRAILER_KEY}: {trailer(session, spent)}"]
     if profiled:
         lines.append(profiled)
-    add_trailers(message_file, lines, cwd)
+    add_trailers(message_file, lines, cwd, editor)
 
 
-def says_nothing(message_file, cwd=None, strips=True):
-    """Whether a commit's message says nothing as git reads it: blanks
-    alone, or, where git takes the comments out (strips_comments), blanks
-    and comments above its scissors line, as a bare git commit's message is
-    where the editor is true, as in Claude Code's shell. git refuses such a
-    commit once the hooks are done, but the lines added to it would give it
-    a message, the usage line its subject; so nothing is added, and the
-    usage waits for the commit that follows. git strips by its own rules,
-    with the comment string its config names; the text goes to it as UTF-8
-    whatever the locale, since nothing is written back from it."""
+def editor_opened(pending, environ):
+    """Whether git opened the editor for the commit whose commit-msg hook
+    this is. git tells its hooks by GIT_EDITOR, which it sets to : where it
+    opens none; where : is the person's own editor, which git leaves as it
+    is, the words the hook read say instead (commit_options)."""
+    return environ.get("GIT_EDITOR") != ":" or pending.get("editor") is True
+
+
+def cleanup_mode(pending, cwd=None):
+    """How git cleans up the commit's message: as the command's --cleanup
+    says, else commit.cleanup in git's config, a git -c's included, which
+    git hands its hooks; None for git's default."""
+    if pending.get("cleanup"):
+        return str(pending["cleanup"])
     try:
-        text = Path(message_file).read_text(encoding="utf-8", errors="replace")
-        if not strips:
-            return not text.strip()
-        done = subprocess.run(["git", "stripspace", "--strip-comments"], input=SCISSORS.split(text, maxsplit=1)[0],
-                              cwd=cwd, capture_output=True, encoding="utf-8", errors="replace", timeout=30)
-    except (OSError, subprocess.SubprocessError):
+        return git("config", "--get", "commit.cleanup", cwd=cwd) or None
+    except OSError:
+        return None
+
+
+def says_nothing(message_file, cwd=None, editor=True, cleanup=None):
+    """Whether a commit's message says nothing once git has cleaned it up,
+    so that git refuses the commit, as it refuses a bare git commit's where
+    the editor is true, as in Claude Code's shell: the lines added to it
+    would give it a message, the usage line its subject, so nothing is
+    added and the usage waits for the commit that follows. git cleans the
+    message as cleanup says (cleanup_mode): by default it takes out the
+    comments where it opened the editor (editor_opened) and only the blanks
+    where it did not; it cuts an edited message at its scissors line, below
+    which -v and commit.verbose put the diff; and it counts Signed-off-by
+    lines as nothing. The comment string is the scissors line's, where there
+    is one, as git picks it for commentChar auto, else the config's; the
+    text goes to git as UTF-8 whatever the locale, and with its line ends as
+    they are, since git cuts only at a scissors line that LF alone ends."""
+    try:
+        text = Path(message_file).read_bytes().decode("utf-8", errors="replace")
+    except OSError:
         return False
-    return done.returncode == 0 and not done.stdout.strip()
+    if cleanup == "verbatim":
+        return not text
+    cut = SCISSORS.search(text) if editor else None
+    if cut:
+        text = text[:cut.start()]
+    if cleanup == "strip" or (cleanup in (None, "default") and editor):
+        text = stripped(text, cut, cwd)
+        if text is None:
+            return False
+    return all(not line.strip() or line.startswith("Signed-off-by: ") for line in text.splitlines())
 
 
-def add_trailers(message_file, lines, cwd=None):
+def stripped(text, cut, cwd=None):
+    """The text with its comment lines taken out by git stripspace, the
+    comment string the scissors line's where it was cut at one; None where
+    git cannot."""
+    config = ["-c", f"core.commentChar={cut[1]}"] if cut else []
+    try:
+        done = subprocess.run(["git", *config, "stripspace", "--strip-comments"], input=text, cwd=cwd,
+                              capture_output=True, encoding="utf-8", errors="replace", timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+def add_trailers(message_file, lines, cwd=None, editor=True):
     """Add the trailer lines to the commit's message by git's own rules for
     a trailer block, or at its end where git cannot. A message whose last
     line has no newline, as git merge leaves a merge's, is given one first:
     git interpret-trailers would join the lines to that line, with no blank
-    line between, the usage line part of the merge's subject."""
-    end_last_line(message_file)
+    line between, the usage line part of the merge's subject. Where git
+    opened the editor and a scissors line cuts the message, git is told the
+    comment string that line begins with, which git commit may have picked
+    for commentChar auto and git interpret-trailers would not know: the
+    lines would go below the scissors line, where git cuts them away."""
+    text = end_last_line(message_file)
+    cut = SCISSORS.search(text) if editor else None
+    config = ["-c", f"core.commentChar={cut[1]}"] if cut else []
     try:
-        git("interpret-trailers", "--in-place", *[arg for line in lines for arg in ("--trailer", line)],
+        git(*config, "interpret-trailers", "--in-place", *[arg for line in lines for arg in ("--trailer", line)],
             str(message_file), cwd=cwd)
     except OSError:
         with open(message_file, "a", encoding="utf-8") as stream:
@@ -700,13 +853,17 @@ def add_trailers(message_file, lines, cwd=None):
 
 
 def end_last_line(path):
+    """The text of the file at path, its last line ended with a newline
+    where it had none; empty where the file cannot be read."""
     try:
         data = Path(path).read_bytes()
         if data and not data.endswith(b"\n"):
             with open(path, "ab") as stream:
                 stream.write(b"\n")
+            data += b"\n"
     except OSError:
-        pass
+        return ""
+    return data.decode("utf-8", errors="replace")
 
 
 # --- the profile beside the usage -------------------------------------------------

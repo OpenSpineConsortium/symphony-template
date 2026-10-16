@@ -659,6 +659,10 @@ class ReadingShellCommands(unittest.TestCase):
         # The ) that ends the first body ends the $( ), and the second body
         # follows the line, as bash reads it.
         self.assertEqual(profile.without_heredocs("x=$(cat <<A <<B\na\nA)\nb\nB\nls"), "x=$(cat <<A <<B)\nls")
+        # The bodies of a $( ) closed on the line that opens them come first,
+        # at the very next newline, one a backslash takes out of the line too.
+        self.assertEqual(profile.without_heredocs("cat <<X; v=$(cat <<Z)\nz\nZ\nx\nX\nls"), "cat <<X; v=$(cat <<Z)\nls")
+        self.assertEqual(profile.without_heredocs("x=$(cat <<A) \\\nl1\nA\nls"), "x=$(cat <<A) \\\nls")
 
     def test_what_each_command_is_for(self):
         self.assertEqual(profile.shell_uses("cd /r && ls -la | grep x; git log; python3 t.py; wc -l a; echo hi"),

@@ -9,6 +9,7 @@ import io
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -197,11 +198,12 @@ class ARepository(unittest.TestCase):
                    "tool_input": {"command": command}}
         self.assertEqual(usage.main(["hook"], stdin=io.StringIO(json.dumps(payload))), 0)
 
-    def shell_commit(self, *args, environ=None):
-        """git commit as Claude Code's shell runs it, its editor true: the
-        result, which may be git's refusal."""
+    def shell_commit(self, *args, environ=None, config=()):
+        """git commit as Claude Code's shell runs it, its editor true, with
+        git's own options (config) before commit: the result, which may be
+        git's refusal."""
         return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c",
-                               "commit.gpgsign=false", "commit", *args], cwd=self.repo, capture_output=True,
+                               "commit.gpgsign=false", *config, "commit", *args], cwd=self.repo, capture_output=True,
                               text=True, timeout=60, env={**os.environ, "GIT_EDITOR": "true", **(environ or {})})
 
     def commit(self, name, where=None):
@@ -310,6 +312,94 @@ class Commits(ARepository):
         self.assertEqual(message.splitlines()[0], "#42 fix login")
         self.assertEqual(usage.parse_trailer(message), [("6e4cb20b", 0, {"claude-opus-5-5": [10, 0, 0, 100, 5]})])
 
+    def test_a_message_of_comments_alone_is_refused_wherever_git_takes_them_out(self):
+        """git takes the comments out where its config says, where a
+        shortened --cleanup or --edit says and where an e runs together with
+        other flags; a message of comments alone is then empty, and the lines
+        must not give it a subject. git tells the hook by GIT_EDITOR whether
+        it opened the editor, so a bare commit the hook did not see, after
+        one that failed, is refused too."""
+        usage.install(cwd=self.repo)
+        write_lines(self.transcript, [assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5))])
+        (self.repo / "a.txt").write_text("a", encoding="ascii")
+        self.git("add", "a.txt")
+        for config, args in ((("-c", "commit.cleanup=strip"), ("-m", "#42 fix login")),
+                             ((), ("-m", "#42 fix login", "--clean=strip")), ((), ("-m", "#42 fix login", "--ed")),
+                             ((), ("-m", "#42 fix login", "-ae")), ((), ("-s",))):
+            self.hook(command=shlex.join(["git", *config, "commit", *args]))
+            self.assertIn("empty commit message", self.shell_commit(*args, config=config).stderr, args)
+        self.git("config", "commit.cleanup", "strip")
+        self.hook(command="git commit -m '#42 fix login'")
+        self.assertIn("empty commit message", self.shell_commit("-m", "#42 fix login").stderr, "commit.cleanup")
+        self.git("config", "--unset", "commit.cleanup")
+        self.hook(command="git commit -m 'Add notes'")
+        self.assertIn("empty commit message", self.shell_commit().stderr, "after a failed commit")
+        # Where : is the person's own editor, git leaves GIT_EDITOR as it is,
+        # and the words say that git opened it.
+        for args in ((), ("-e", "-m", "#42 fix login"), ("-m", "#42 fix login", "--edit")):
+            self.hook(command=shlex.join(["git", "commit", *args]))
+            self.assertIn("empty commit message", self.shell_commit(*args, environ={"GIT_EDITOR": ":"}).stderr, args)
+        self.assertEqual(self.git("rev-list", "--all"), "", "no commit was made")
+
+    def test_a_message_git_opens_no_editor_for_keeps_its_comment_like_subject(self):
+        """--amend --no-edit keeps the commit's message as it is, a subject
+        such as "#42 fix login" with it, since git opens no editor for it."""
+        usage.install(cwd=self.repo)
+        (self.repo / "a.txt").write_text("a", encoding="ascii")
+        self.git("add", "a.txt")
+        self.git("commit", "-q", "-m", "#42 fix login")
+        write_lines(self.transcript, [assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5))])
+        self.hook(command="git commit --amend --no-edit")
+        self.assertEqual(self.shell_commit("--amend", "--no-edit").returncode, 0)
+        message = self.git("log", "-1", "--format=%B")
+        self.assertEqual(message.splitlines()[0], "#42 fix login")
+        self.assertEqual(usage.parse_trailer(message), [("6e4cb20b", 0, {"claude-opus-5-5": [10, 0, 0, 100, 5]})])
+
+    def test_with_the_comment_string_git_picks_the_usage_goes_above_the_scissors(self):
+        """With core.commentChar auto, git commit picks a comment string the
+        message does not begin a line with, here ; for a message that begins
+        with #, and git interpret-trailers, which reads auto as #, put the
+        lines below the scissors line, where git cut them away."""
+        usage.install(cwd=self.repo)
+        self.git("config", "core.commentChar", "auto")
+        self.git("config", "commit.verbose", "true")
+        (self.repo / "a.txt").write_text("a", encoding="ascii")
+        self.git("add", "a.txt")
+        self.git("commit", "-q", "-m", "#42 fix login")
+        (self.repo / "a.txt").write_text("b", encoding="ascii")
+        self.git("add", "a.txt")
+        write_lines(self.transcript, [assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5))])
+        self.hook(command="git commit --amend")
+        self.assertEqual(self.shell_commit("--amend").returncode, 0)
+        message = self.git("log", "-1", "--format=%B")
+        self.assertEqual(message.splitlines()[0], "#42 fix login")
+        self.assertEqual(usage.parse_trailer(message), [("6e4cb20b", 0, {"claude-opus-5-5": [10, 0, 0, 100, 5]})])
+
+    def test_with_the_comment_string_git_picks_a_message_of_its_comments_alone_is_refused(self):
+        """Where git picked ; for a message that began with #, and the
+        editor took that line out, only git's ; comments are left: git
+        stripspace, which reads auto as #, kept them as a message, and the
+        lines gave git a commit of themselves alone."""
+        usage.install(cwd=self.repo)
+        self.git("config", "core.commentChar", "auto")
+        self.git("config", "commit.verbose", "true")
+        (self.repo / "a.txt").write_text("a", encoding="ascii")
+        self.git("add", "a.txt")
+        write_lines(self.transcript, [assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5))])
+        self.hook(command="git commit -e -m '#42 fix login'")
+        done = self.shell_commit("-e", "-m", "#42 fix login", environ={"GIT_EDITOR": "sed -i.bak /^#/d"})
+        self.assertIn("empty commit message", done.stderr)
+        self.assertEqual(self.git("rev-list", "--all"), "", "no commit was made")
+
+    def test_a_scissors_line_that_crlf_ends_cuts_nothing(self):
+        """git cuts only at a scissors line that LF alone ends, so one an
+        editor wrote with CRLF leaves the diff below it in the message."""
+        message = self.folder / "COMMIT_EDITMSG"
+        message.write_bytes(b"\n# ------------------------ >8 ------------------------\r\ndiff --git a/a b/a\n")
+        self.assertFalse(usage.says_nothing(message, self.repo))
+        message.write_bytes(b"\n# ------------------------ >8 ------------------------\ndiff --git a/a b/a\n")
+        self.assertTrue(usage.says_nothing(message, self.repo))
+
     def test_a_message_outside_the_locales_characters_keeps_its_usage(self):
         """The message goes to git stripspace as UTF-8: in the locale's own
         encoding, ASCII here and cp1252 on Windows, an arrow raised, and the
@@ -347,16 +437,30 @@ class Commits(ARepository):
         self.assertEqual(usage.parse_trailer(self.git("log", "-1", "--format=%B")),
                          [("6e4cb20b", 0, {"claude-opus-5-5": [10, 0, 0, 100, 5]})])
 
-    def test_what_git_does_with_the_comments_is_read_from_the_command(self):
-        for command, strips in (("git commit", True), ("git commit -v", True), ("git commit --amend", True),
-                                ("git commit -m x", False), ("git commit -qam x", False), ("git commit -mx", False),
-                                ("git commit --message=x", False), ("git commit -F m.txt", False),
-                                ("git commit --file m.txt", False), ("git commit -m x -e", True),
-                                ("git commit -em ''", True), ("git commit -aem x", True),
-                                ("git commit -m x --cleanup=strip", True), ("git commit --cleanup strip -m x", True),
-                                ("git commit --cleanup=verbatim", False), ("git commit -Smykey", True),
-                                ("git commit -C HEAD", True), ("git commit -- -m", True)):
-            self.assertEqual(usage.strips_comments(usage.commit_arguments(command)), strips, command)
+    def test_what_the_words_say_of_the_editor_and_the_cleanup(self):
+        """The --cleanup a command gives and whether git opens the editor,
+        read as git's option parser reads the words: shortened long options,
+        short ones run together, a value taken from the next word, and
+        nothing after --."""
+        for command, read in (("git commit", (None, True)), ("git commit -v", (None, True)),
+                              ("git commit --amend", (None, True)), ("git commit -m x", (None, False)),
+                              ("git commit -qam x", (None, False)), ("git commit -mx", (None, False)),
+                              ("git commit --message=x", (None, False)), ("git commit --mess x", (None, False)),
+                              ("git commit -F m.txt", (None, False)), ("git commit --file m.txt", (None, False)),
+                              ("git commit -m x -e", (None, True)), ("git commit -em ''", (None, True)),
+                              ("git commit -aem x", (None, True)), ("git commit -m x -ae", (None, True)),
+                              ("git commit -m x --ed", (None, True)), ("git commit -m -e", (None, False)),
+                              ("git commit -e -m x --no-edit", (None, False)),
+                              ("git commit --amend --no-edit", (None, False)), ("git commit -C HEAD", (None, False)),
+                              ("git commit -c HEAD", (None, True)), ("git commit --fixup=HEAD", (None, False)),
+                              ("git commit --fixup=amend:HEAD", (None, True)), ("git commit --squash HEAD", (None, True)),
+                              ("git commit -t t.txt", (None, True)), ("git commit --author -m x", (None, True)),
+                              ("git commit -m x --cleanup=strip", ("strip", False)),
+                              ("git commit --cleanup strip -m x", ("strip", False)),
+                              ("git commit -m x --clean=strip", ("strip", False)),
+                              ("git commit --cleanup=verbatim", ("verbatim", True)),
+                              ("git commit -Smykey", (None, True)), ("git commit -- -m", (None, True))):
+            self.assertEqual(usage.commit_options(usage.commit_arguments(command)), read, command)
 
     def test_a_clones_own_commit_msg_hook_is_left_alone(self):
         hooks = Path(self.git("rev-parse", "--absolute-git-dir")) / "hooks"
@@ -403,7 +507,30 @@ class Commits(ARepository):
                                  ("cat > m.txt <<'EOF'\r\nIt's done\r\nEOF\r\ngit commit -F m.txt\r\n", True),
                                  ("cat << -EOF\nit's\n-EOF\ngit commit -m x", True),
                                  ("git commit -m \"$(# note <<EOF\necho hi\n)\"", True),
-                                 ("echo a \\\n#<<EOF\ngit commit -m x", True)):
+                                 ("echo a \\\n#<<EOF\ngit commit -m x", True),
+                                 # The bodies of a $( ) that closes on the line opening them follow
+                                 # the very next newline, in quotes or a later $( ) too, first.
+                                 ("cat <<A >a.txt; x=$(cat <<B)\nb-line\nB\na-line\nA\ngit commit -m wip\n", True),
+                                 ("x=$(cat <<A) y=$(cat\nA\n)\ngit commit -m wip\n", True),
+                                 ("x=$(cat <<A) y=$(cat <<B\nl1\nA\nl2\nB\n)\ngit commit -m wip\n", True),
+                                 ("x=$(cat <<A) && echo \"q\nl1\nA\nstill quoted\"\ngit commit -m wip\n", True),
+                                 ("x=$(cat <<A)\nit's\nA\ngit commit -m wip\n", True),
+                                 # <( ) reads as $( ) does, a backquoted command by itself, $[ ] is
+                                 # arithmetic, and inside $( ) a delimiter with a ) after it ends.
+                                 ("cat <(cat <<EOF\na\nEOF)\ngit commit -m wip\n", True),
+                                 ("x=`cat <<EOF\nhi\nEOF`\ngit commit -m wip\n", True),
+                                 ("x=`cat <<EOF`\ngit commit -m wip\nEOF\n", True),
+                                 ("x=`cat <<'EOF'\nit's\nEOF`\ngit commit -m wip\n", True),
+                                 ("echo $[1<<2]\ngit commit -m wip\n", True),
+                                 ("x=$(cat <<EOF\nhi\nEOFX) && git commit -m wip\n", True),
+                                 # What follows such a delimiter is read anew, a # there a comment;
+                                 # a backquote a backslash escapes ends nothing; $[ ] nests.
+                                 ("x=$(cat <<EOF\nEOF#)\ncat <<B\nb\nB)\ngit commit -m wip\n", True),
+                                 ("x=`cat <<'EOF'\nit\\`s, it's\nEOF`\ngit commit -m wip\n", True),
+                                 ("echo $[a[1]<<2] <<EOF\nit's\nEOF\ngit commit -m wip\n", True),
+                                 # A reserved word before git is the shell's.
+                                 ("if git commit; then echo done; fi", True), ("{ git commit -m x; }", True),
+                                 ("! git commit -m x", True), ("time git commit -m x", True)):
             self.assertEqual(usage.is_commit(command), commits, command)
 
     def test_a_payload_the_hook_cannot_read_passes(self):
