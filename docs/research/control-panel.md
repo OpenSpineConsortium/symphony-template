@@ -336,6 +336,11 @@ Follow-ups).
   in its last minute. Seventy-nine mutants, one per fix, each fail the check meant for it against
   the fifth round's script, and the panel's earlier checks and the 13 checks of hostile input
   pass with the change.
+- Where the checks are kept: OpenSpineConsortium/symphony-app, folder signin/panel-checks/
+  (symphony-app#16, merged 2026-10-16), beside the sign-in service. It holds the 112 checks, the
+  panel's walkthrough, the 13 hostile-input checks, the 79 mutants and the five reviews' scripts
+  and reports, and its README says how to run them again. CI does not run them, since they need
+  Playwright with Chromium and a checkout of the site.
 - Adversarial reviews, as the handoff requires before a substantive pull request: one of the
   pages, one of the service and the privacy statement, and five of the sign-in as the first way
   in; what each found and what was done:
