@@ -11,7 +11,7 @@ Three rules hold in every programme, taken from OpenSpineConsortium/coordbench, 
 Programmes:
 
 - [beyond-cooperation](beyond-cooperation/README.md): what one agent spends, context, tool calls, reading and time, and how to spend less, measured with tools/profile.py, with MAST's failure taxonomy as the outcome side.
-- [flowbench](flowbench/README.md): the workflow as a plug-in, on SWE-bench Verified: whether Symphony's flow (an issue claimed by its branch, a draft pull request, a review by three lenses, an answer to every finding) resolves as many issues as the owner's map-reduce script and as one agent alone, and at what cost in tokens and time; the design, the pre-registered plan, the parity with SWE-bench row by row and a tested scaffold that scores through SWE-bench's own harness in the published images, rehearsed end to end; no agent has run on the owner's tokens yet, and the pilot waits for the owner's word.
+- [flowbench](flowbench/README.md): the workflow as a plug-in, on SWE-bench Verified: whether Symphony's flow (an issue claimed by its branch, a draft pull request, a review by three lenses, an answer to every finding) resolves as many issues as the owner's map-reduce script and as one agent alone, and at what cost in tokens and time; these notes say where it stands, and the benchmark itself, the design, the pre-registered plan, the parity with SWE-bench row by row and a tested harness that scores through SWE-bench's own harness in the published images, rehearsed end to end, is its own repository, OpenSpineConsortium/flowbench; no agent has run on the owner's tokens yet, and the pilot waits for the owner's word.
 
 ## Notes
 
@@ -41,6 +41,7 @@ Written before this folder existed and left where its links point:
 ## Research in the project's other repositories
 
 - OpenSpineConsortium/coordbench: docs/research.md (CooperBench's paper, read and verified), PARITY.md, bench/cooperbench/PLAN.md (the pre-registered run) and bench/cooperbench/results/curse-of-coordination-notes/ (the experiment's notes and figures).
+- OpenSpineConsortium/flowbench: DESIGN.md, PLAN.md (the pre-registered run) and PARITY.md, with the harness they describe; the programme's notes are docs/research/flowbench/ here.
 - OpenSpineConsortium/symphony-protocol: validation/ (DESIGN.md, GUARANTEES.md and the harness's findings).
 - OpenSpineConsortium/spine-program: 01_carm_level_detection/grants/aidas_2027/ (the grant's record, evidence and review notes).
 
