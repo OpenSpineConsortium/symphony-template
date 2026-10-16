@@ -129,8 +129,8 @@ before any store upload, and the store upload stays off.
 
 ## Related work
 
-The thread "Symphony on the WSU grid" (handoff item 10) builds a different route onto the same
-node: a GitHub Actions self-hosted runner started as a Slurm job through hpcworker's tools, with
-the logs coming back as artifacts, so Symphony's workflows run on the grid; its second step is the
-SSH gate. It does not touch the project's threads and this note does not touch the runner; the two
-meet only in hpcworker, each in a pull request of its own.
+The thread "Symphony on the WSU grid" (item 10 of the same list) builds a different route onto the
+same node: a GitHub Actions self-hosted runner started as a Slurm job through hpcworker's tools,
+with the logs coming back as artifacts, so Symphony's workflows run on the grid; its second step
+is the SSH gate. It does not touch the project's threads and this note does not touch the runner;
+the two meet only in hpcworker, each in a pull request of its own.
