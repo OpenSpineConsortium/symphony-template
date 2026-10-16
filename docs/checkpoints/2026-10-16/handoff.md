@@ -103,7 +103,9 @@ Brief for a new thread, once the owner sends the Worker's address and the Client
 
 ### 2.7 Symphony on the WSU grid (hpcworker, symphony-template; thread "Symphony on the WSU grid")
 
-Merged on 2026-10-16: hpcworker#13 (the runner, tools/grid_runner.sh, a self-hosted runner served as a chain of Slurm jobs) and symphony-template#103 (.github/workflows/grid.yml and docs/setup/grid.md), with the review's eleven fixes. The study is docs/research/wsu-grid-and-github-actions.md. Waiting on the owner's three steps (owner-todo.md, item 6): one CI line in hpcworker, starting the runner from the grid's shell, and the test of whether a key alone signs in from outside the VPN; the ssh gate's pull request follows the test's result. The thread's checkpoint reply had not landed when this version was written.
+Done, nothing open (the thread's checkpoint of 19:00 UTC): hpcworker#13 (the runner, tools/grid_runner.sh, a self-hosted runner served as a chain of Slurm jobs, merge d8a03e7) and symphony-template#103 (.github/workflows/grid.yml, docs/setup/grid.md and the research note, merge d669562), with the review's eleven fixes. Everything the thread found is docs/research/wsu-grid-and-github-actions.md; no branch holds unmerged work. Waiting on the owner's three steps (owner-todo.md, item 6): one CI line in hpcworker (a session may not write workflow files there), starting the runner from the grid's shell, and the test of whether a key alone signs in from outside the VPN, with C&IT's word on such a key if it has come.
+
+Next for a session, once the owner sends the test's output: the ssh gate's pull request, a key on the grid that can run only one fixed command, kept as a GitHub environment secret, so the owner's password is never stored.
 
 Brief for a new thread, once the owner sends the test's result: "Attach OpenSpineConsortium/hpcworker and OpenSpineConsortium/symphony-template with push access. Read docs/checkpoints/2026-10-16/handoff.md part 2.7, docs/research/wsu-grid-and-github-actions.md and docs/setup/grid.md. Open the ssh gate's pull request for the result I give, with an adversarial review, and merge once green."
 
