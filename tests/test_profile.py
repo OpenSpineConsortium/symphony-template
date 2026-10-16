@@ -673,6 +673,14 @@ class AnExecutionFile(ATranscriptOnDisk):
         self.assertEqual(split.call_count, 1)
         self.assertEqual((record["reads"]["files_named"], record["shell"]["read"], record["shell"]["list"]), (1, 1, 1))
 
+    def test_a_byte_that_is_not_utf8_is_read_past(self):
+        execution = self.folder / "execution.json"
+        execution.write_bytes(b'[{"type": "user", "text": "cut \xe2\x80"}]')
+        self.assertEqual(profile.entries_of(execution), [{"type": "user", "text": "cut \ufffd"}])
+        transcript = self.folder / "cut.jsonl"
+        transcript.write_bytes(b'{"type": "user", "text": "cut \xe2\x80\n{"type": "user"}\n')
+        self.assertEqual(profile.entries_of(transcript), [{"type": "user"}])
+
     def test_a_file_with_no_entries_is_no_transcript(self):
         empty = self.folder / "empty.jsonl"
         empty.write_text("", encoding="utf-8")

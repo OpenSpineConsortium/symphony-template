@@ -158,7 +158,7 @@ def entries_of(path):
     taken for the file's one entry."""
     if opens_an_array(path):
         try:
-            data = json.loads(Path(path).read_text(encoding="utf-8"))
+            data = json.loads(Path(path).read_text(encoding="utf-8", errors="replace"))
         except (OSError, ValueError):
             data = None
         if isinstance(data, list):

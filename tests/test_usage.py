@@ -136,6 +136,15 @@ class ReadingATranscript(unittest.TestCase):
         self.assertLess(time.monotonic() - started, 1.0)
         self.assertEqual(usage.parse_trailer("Symphony-Usage: v1 \t session=y\t \r\n"), [("y", 0, {})])
 
+    def test_a_byte_that_is_not_utf8_costs_its_line_alone(self):
+        """A read that ends inside a character Claude Code is still writing,
+        an em dash cut after two of its three bytes, passes over that line
+        and reads the rest."""
+        line = json.dumps(assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5)))
+        self.transcript.write_bytes(line.encode("ascii") + b'\n{"type": "user", "text": "cut \xe2\x80\n'
+                                    + line.replace("m1", "m2").encode("ascii") + b"\n")
+        self.assertEqual(usage.session_usage(self.transcript)["models"], {"claude-opus-5-5": [20, 0, 0, 200, 10]})
+
     def test_the_trailer_carries_eight_characters_of_the_session_and_nothing_more(self):
         spent = {"models": {"m": [1, 0, 0, 0, 1]}, "seconds": 1}
         self.assertTrue(usage.trailer("session_01AMrLKnvPcvNBSchUXZbDDX", spent).startswith("v1 session=01AMrLKn "))
@@ -231,6 +240,25 @@ class Commits(ARepository):
         self.assertFalse((usage.state_dir(self.repo) / "pending.json").exists())
         self.assertIn("switch is off", usage.install(cwd=self.repo))
         self.assertIn("GitHub Actions", usage.install(cwd=self.repo, environ={"GITHUB_ACTIONS": "true"}))
+
+    def test_a_commit_with_nothing_for_its_message_is_still_refused(self):
+        """Where the editor is true, as in Claude Code's shell, a bare git
+        commit has an empty message, which git refuses; the lines must not
+        give it one, and the usage waits for the commit that follows."""
+        usage.install(cwd=self.repo)
+        write_lines(self.transcript, [assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5))])
+        self.hook(command="git commit")
+        (self.repo / "a.txt").write_text("a", encoding="ascii")
+        self.git("add", "a.txt")
+        done = subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c",
+                               "commit.gpgsign=false", "commit"], cwd=self.repo, capture_output=True, text=True,
+                              timeout=60, env={**os.environ, "GIT_EDITOR": "true"})
+        self.assertNotEqual(done.returncode, 0, done.stdout)
+        self.assertIn("empty commit message", done.stderr)
+        self.assertEqual(self.git("rev-list", "--all"), "", "no commit was made")
+        self.git("commit", "-q", "-m", "Add a.txt")
+        self.assertEqual(usage.parse_trailer(self.git("log", "-1", "--format=%B")),
+                         [("6e4cb20b", 0, {"claude-opus-5-5": [10, 0, 0, 100, 5]})])
 
     def test_a_clones_own_commit_msg_hook_is_left_alone(self):
         hooks = Path(self.git("rev-parse", "--absolute-git-dir")) / "hooks"

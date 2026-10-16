@@ -179,9 +179,12 @@ def add(totals, model, counts):
 
 def transcript_lines(path):
     """Every JSON object of a transcript, one a line; a line that is not
-    one, a transcript still being written, is passed over."""
+    one, a transcript still being written, is passed over, and so is a
+    line with a byte that is not UTF-8, as where a read ends inside a
+    character Claude Code is still writing, which would otherwise stop the
+    whole read."""
     try:
-        with open(path, encoding="utf-8") as stream:
+        with open(path, encoding="utf-8", errors="replace") as stream:
             for line in stream:
                 try:
                     entry = json.loads(line)
@@ -398,7 +401,7 @@ def run_trailer(message_file, cwd=None, environ=None, now=None):
     remembered, a transcript replaced under the session, so the lines after
     it count on from there rather than wait for the session to spend past
     the old counts."""
-    if in_actions(environ):
+    if in_actions(environ) or says_nothing(message_file, cwd):
         return
     folder = state_dir(cwd)
     pending = read_json(folder / "pending.json")
@@ -425,6 +428,21 @@ def run_trailer(message_file, cwd=None, environ=None, now=None):
     if profiled:
         lines.append(profiled)
     add_trailers(message_file, lines, cwd)
+
+
+def says_nothing(message_file, cwd=None):
+    """Whether a commit's message holds nothing but blanks and comments, as
+    a bare git commit's does where the editor is true, as in Claude Code's
+    shell. git refuses such a commit once the hooks are done, but the lines
+    added to it would give it a message, the usage line its subject; so
+    nothing is added, and the usage waits for the commit that follows."""
+    try:
+        text = Path(message_file).read_text(encoding="utf-8", errors="replace")
+        done = subprocess.run(["git", "stripspace", "--strip-comments"], input=text, cwd=cwd,
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return done.returncode == 0 and not done.stdout.strip()
 
 
 def add_trailers(message_file, lines, cwd=None):
