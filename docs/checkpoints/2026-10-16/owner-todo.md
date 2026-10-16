@@ -6,22 +6,23 @@ The one urgent item is the grant, due tonight, Friday 2026-10-16 at 11:59 p.m. E
 
 ## Do now, most urgent first
 
-### 1. Before you switch accounts, keep what lives only in this Project
+### 1. The AIDaS grant (spine-program): submit tonight, by 11:59 p.m. ET
 
-A new account cannot read this Project's shared folder. Open the Project at https://claude.ai/code/project/chan_01JV1B5DpVW16Xd9rDo7wKF5 , open its files, and download:
+Dr. Han and Dr. Schwiebert both approved (11:19 and 11:54 a.m. ET), so only your submission is left; at 19:10 UTC your mail showed nothing sent to aidas@wayne.edu yet. The grant's own handoff, with the same steps, is https://github.com/OpenSpineConsortium/spine-program/blob/main/01_carm_level_detection/grants/aidas_2027/HANDOFF_2026-10-16.md .
 
-1. grant/AIDaS_SEED_2027_proposal_2026-10-16.pdf, the final PDF you send tonight.
-2. grant/AIDaS_SEED_2027_overleaf.zip, which builds the same 10 pages and holds your contact lines and both biosketches; a later grant thread needs it attached to rebuild, since those files never go into git.
-3. Optional: coordbench/curse-1-logs-2026-10-16.tar.gz (about 45 MB), the bench's logs and the agents' transcripts. The runs' results are in git without it.
+1. Build the PDF in Overleaf: open your Overleaf project from the link in your e-mail of 7:51 a.m. ET ("AIDaS seed grant: final PDF for your approval"), or find it at https://www.overleaf.com/project ; click "Recompile", check that the PDF is 10 pages, and click "Download PDF" (the download button beside "Recompile"). Use this copy, not the PDF in the Project's files: Dr. Schwiebert updated both investigators' addresses after that one was built, most likely in Overleaf.
+2. Run the disclosure audit (spine-program's CLAUDE.md rule 8): run spinesurg-ct-nnunet's tools/disclosure_audit.py over that PDF. It quotes the level model's held-out results (Figure 1f), so what reviewers may see is your call.
+3. Submit: open https://outlook.office.com/mail/deeplink/compose?to=aidas@wayne.edu , click "Attach", pick the PDF, then click "Send", before 11:59 p.m. ET (03:59 UTC on Saturday). No connector can attach a file for you.
 
-### 2. The AIDaS grant (spine-program), due tonight at 11:59 p.m. ET
+Later, at your pace:
 
-1. Send the PDF to Dr. Han and Dr. Schwiebert: open Outlook's Drafts folder at https://outlook.office365.com/mail/drafts , open the draft "AIDaS seed grant: final PDF for your approval", click "Attach" (the paperclip), then "Browse this computer", choose AIDaS_SEED_2027_proposal_2026-10-16.pdf, and click "Send". No connector can attach a file for you.
-2. Replace the approximations as values come in: https://github.com/OpenSpineConsortium/spine-program/blob/main/01_carm_level_detection/grants/aidas_2027/APPROXIMATIONS.md lists all 17 with their basis and who can confirm each. Send the values in the grant thread for a rebuild, or type them into Overleaf in step 5.
-3. Ask aidas@wayne.edu whether lines B (the cadaver set), C3 (the $1,500 reimbursement), D (the FDA regulatory consultant) and F (the symposium poster) are allowable. Without B the request is $14,768; without B and D, $11,768; without B, D and F, $11,696, still above the $10,000 floor (RECORD.md section 4).
-4. Run the disclosure audit (spine-program's tools/disclosure_audit.py, its CLAUDE.md rule 8) over the final PDF before it leaves WSU: it quotes the level model's held-out results (Figure 1f), so what reviewers may see is your call.
-5. Overleaf, if you edit there: open https://www.overleaf.com/project , click "New Project", then "Upload Project", and choose AIDaS_SEED_2027_overleaf.zip; under "Menu" set the compiler to pdfLaTeX if it is not already; click "Recompile"; check the PDF is 10 pages; click "Download PDF".
-6. Submit: e-mail the one PDF to aidas@wayne.edu by 11:59 p.m. ET tonight.
+4. Ask aidas@wayne.edu, with the submission or after it, whether lines B (the cadaver set), C3 (the $1,500 reimbursement), D (the FDA regulatory consultant) and F (the poster) are allowable, and how line A may be hired; the totals without them are in RECORD.md section 4.
+5. Replace the 17 approximations as values come in: https://github.com/OpenSpineConsortium/spine-program/blob/main/01_carm_level_detection/grants/aidas_2027/APPROXIMATIONS.md lists each with its basis and who can confirm it. Send the values to a grant thread for a rebuild, with contacts.tex and the two biosketches from Overleaf (Menu, then "Source" under Download), or edit them in Overleaf.
+6. The other submissions you plan, to Anthropic's AI for Science program and other fits, are yours; nothing about them is recorded.
+
+### 2. Before you switch accounts (optional)
+
+A new account cannot read this Project's shared folder, and nothing in it is needed to carry on: the work is in git and the grant's current copy is your Overleaf project. If you want the bench's logs and the agents' transcripts kept (about 45 MB; transcripts stay out of git), open the Project at https://claude.ai/code/project/chan_01JV1B5DpVW16Xd9rDo7wKF5 , open its files, and download coordbench/curse-1-logs-2026-10-16.tar.gz.
 
 ### 3. Approve the symphony-protocol 0.5.0 release
 
@@ -34,7 +35,7 @@ Open https://github.com/OpenSpineConsortium/symphony-protocol/actions/runs/38889
 3. Open https://github.com/OpenSpineConsortium/symphony-app/blob/main/signin/worker.js and press "Copy raw file"; on the Worker press "Edit code", replace everything with it and press "Deploy".
 4. On the Worker open "Settings", then "Variables and Secrets", press "Add": type Text, name GITHUB_CLIENT_ID, value the Client ID; press "Add" again: type Secret, name GITHUB_CLIENT_SECRET, value the client secret; press "Deploy".
 5. In the same "Settings", under "Observability", turn "Workers Logs" off.
-6. Send the Worker's address (https://symphony-signin.<yours>.workers.dev) and the Client ID in the control website thread, never the secret. One small site pull request then switches the button on.
+6. Send the Worker's address (https://symphony-signin.<yours>.workers.dev) and the Client ID to the thread that picks this up (the control website thread, or its successor on the new account), never the secret. One small site pull request then switches the button on.
 
 Optional: for the panel's four "Run now" buttons to work through the sign-in too, on the same App page open "Permissions & events", set "Actions" to "Read and write" and press "Save changes"; each installation accepts it once.
 
