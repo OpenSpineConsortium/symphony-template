@@ -18,11 +18,15 @@ account you have, without the token ever being shown.
 | SYMPHONY_CLAUDE_<slot>_LABEL | slot, optional | nothing; a word of your own so that `status` can say which account a slot is. A variable is readable by anyone who can read the repository's workflows, so never an e-mail address |
 
 A secret on an organization reaches the repositories on its list (GitHub's
-"Selected repositories"), or all of them; a repository's own secret of the
-same name outranks the organization's. The slots are the owner's own
-accounts: the project never holds anyone else's credential
-(docs/setup/crowdsourcing.md), and the owner decided on 2026-10-13 to run
-their own several accounts as one pool.
+"Selected repositories"), or all of them; a repository's own secret or
+variable of the same name outranks the organization's. For each repository
+the wizard names, `status` lists such secrets of its own, and a
+SYMPHONY_CLAUDE_ACCOUNTS of its own with the page to delete it on, since a
+list made there by hand would hide the one the wizard keeps from that
+repository's workflows. The slots are the owner's own accounts: the
+project never holds anyone else's credential (docs/setup/crowdsourcing.md),
+and the owner decided on 2026-10-13 to run their own several accounts as
+one pool.
 
 ## One run of the wizard
 

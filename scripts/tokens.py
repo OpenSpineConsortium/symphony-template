@@ -551,13 +551,24 @@ def slot_label(slot):
     return f"{SLOT_PREFIX}{slot}{LABEL_SUFFIX}"
 
 
+def slot_number(text):
+    """The slot a word names, or None. The word may be typed or made by
+    hand, so it is read only when it is a few ASCII digits: int() refuses a
+    digit such as a superscript two that isdigit() takes, and a string of
+    more than 4,300 digits."""
+    if text.isascii() and text.isdigit() and len(text) <= 9 and int(text) in SLOTS:
+        return int(text)
+    return None
+
+
 def parse_slots(text):
     """The slots a list names, as the bench reads it: numbers between commas
     or blanks."""
     found = []
     for part in (text or "").replace(",", " ").split():
-        if part.isdigit() and int(part) in SLOTS and int(part) not in found:
-            found.append(int(part))
+        slot = slot_number(part)
+        if slot is not None and slot not in found:
+            found.append(slot)
     return sorted(found)
 
 
@@ -648,17 +659,37 @@ def reach_note(state, kind, name):
 
 
 def print_repository_own(state):
-    """A repository's own secret of the same name outranks the
-    organization's, so the named repositories' own are listed too."""
+    """A repository's own secret or variable of the same name outranks the
+    organization's, so the named repositories' own are listed too: a list
+    of slots of a repository's own, made by hand before the wizard, would
+    hide from its workflows the list the wizard keeps."""
     for full in state.target.repositories():
-        try:
-            own = {item["name"]: item for item in state.gh.json(["secret", "list", "--repo", full, "--json", "name,updatedAt"])}
-        except TokensError as error:
-            print(f"  {full}: its own secrets could not be read ({error})")
-            continue
-        mine = [name for name in own if name == MAIN_SECRET or name.startswith(SLOT_PREFIX)]
-        for name in mine:
-            print(f"  {full} holds its own {name} ({age_line(own[name])}), which outranks the organization's")
+        print_own_secrets(state, full)
+        print_own_accounts(state, full)
+
+
+def print_own_secrets(state, full):
+    try:
+        own = {item["name"]: item for item in state.gh.json(["secret", "list", "--repo", full, "--json", "name,updatedAt"])}
+    except TokensError as error:
+        print(f"  {full}: its own secrets could not be read ({error})")
+        return
+    mine = [name for name in own if name == MAIN_SECRET or name.startswith(SLOT_PREFIX)]
+    for name in mine:
+        print(f"  {full} holds its own {name} ({age_line(own[name])}), which outranks the organization's")
+
+
+def print_own_accounts(state, full):
+    try:
+        own = {item["name"]: item for item in state.gh.json(["variable", "list", "--repo", full, "--json", "name,value"])}
+    except TokensError as error:
+        print(f"  {full}: its own variables could not be read ({error})")
+        return
+    if ACCOUNTS_VARIABLE in own:
+        named = ",".join(str(slot) for slot in parse_slots(own[ACCOUNTS_VARIABLE].get("value", ""))) or "no slot"
+        print(f"  {full} holds its own {ACCOUNTS_VARIABLE} ({named}), which outranks the organization's, so its "
+              f"workflows read that list and not the one kept here: delete it on "
+              f"https://github.com/{full}/settings/variables/actions (the delete icon beside it)")
 
 
 # Writes.
@@ -878,8 +909,9 @@ def chosen_slot(state, ask):
         return free[0] if free else None
     if answer in ("n", "no", "q", "quit", "stop"):
         return None
-    if answer.isdigit() and int(answer) in SLOTS:
-        return int(answer)
+    slot = slot_number(answer)
+    if slot is not None:
+        return slot
     raise TokensError(f"a slot is a number from 1 to {SLOTS[-1]}")
 
 

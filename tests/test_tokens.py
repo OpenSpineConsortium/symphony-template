@@ -653,6 +653,45 @@ class Status(unittest.TestCase):
         self.assertIn("renew soon", tokens.age_line(secret("x", OLD), datetime(2026, 12, 20, tzinfo=timezone.utc)))
         self.assertNotIn("renew now", tokens.age_line(secret("x", NEW), now))
 
+    def test_a_repository_s_own_list_of_slots_is_shown_as_outranking(self):
+        # The to-do list of 2026-10-15b told the owner to make the list by
+        # hand as coordbench's own variable, which would hide the
+        # organization's list the wizard keeps.
+        world = World(self, secrets=[secret(tokens.slot_secret(1))], variables=[variable(tokens.ACCOUNTS_VARIABLE, "1")])
+        routes = read_json(world.routes_file)
+        routes["secret list"] = [answer(200, world.secrets), answer(200, [])]
+        routes["variable list"] = [answer(200, world.variables), answer(200, [{"name": tokens.ACCOUNTS_VARIABLE, "value": "1,2"}])]
+        fake_gh.write_routes(world.routes_file, routes)
+        run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+        printed = io.StringIO()
+        with patch.object(tokens.subprocess, "run", run), redirect_stdout(printed):
+            tokens.print_status(tokens.State(tokens.Gh(), target()))
+        text = printed.getvalue()
+        self.assertIn(f"{ORG}/{REPO} holds its own {tokens.ACCOUNTS_VARIABLE} (1,2), which outranks", text)
+        self.assertIn(f"https://github.com/{ORG}/{REPO}/settings/variables/actions", text)
+        self.assertEqual(find(world.calls(), "variable list")[-1]["args"], ["variable", "list", "--repo", f"{ORG}/{REPO}", "--json", "name,value"])
+        # A repository that holds none is not named.
+        world = World(self, variables=[variable(tokens.ACCOUNTS_VARIABLE, "1")])
+        routes = read_json(world.routes_file)
+        routes["secret list"] = [answer(200, []), answer(200, [])]
+        routes["variable list"] = [answer(200, world.variables), answer(200, [])]
+        fake_gh.write_routes(world.routes_file, routes)
+        run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+        printed = io.StringIO()
+        with patch.object(tokens.subprocess, "run", run), redirect_stdout(printed):
+            tokens.print_status(tokens.State(tokens.Gh(), target()))
+        self.assertNotIn("holds its own", printed.getvalue())
+
+    def test_a_list_made_by_hand_is_read_as_slots_or_not_at_all(self):
+        # A superscript two passes isdigit() and fails int(), and int()
+        # refuses more than 4,300 digits: neither may stop status.
+        self.assertEqual(tokens.parse_slots("3, 1 1,9,0,08"), [1, 3, 8])
+        self.assertEqual(tokens.parse_slots("\u00b2,2"), [2])
+        self.assertEqual(tokens.parse_slots("1" * 5000 + ",4"), [4])
+        self.assertEqual(tokens.parse_slots("\x1b[2J"), [])
+        self.assertIsNone(tokens.slot_number("\u00b2"))
+        self.assertEqual(tokens.slot_number("08"), 8)
+
     def test_a_repository_s_own_secret_is_shown_as_outranking(self):
         world = World(self, secrets=[secret(tokens.MAIN_SECRET, OLD, "all", 0)])
         routes = read_json(world.routes_file)
@@ -815,8 +854,9 @@ class TheWizard(unittest.TestCase):
         self.assertEqual(tokens.chosen_slot(state, lambda prompt: ""), 2)
         self.assertEqual(tokens.chosen_slot(state, lambda prompt: "1"), 1)
         self.assertIsNone(tokens.chosen_slot(state, lambda prompt: "n"))
-        with self.assertRaises(tokens.TokensError):
-            tokens.chosen_slot(state, lambda prompt: "9")
+        for answer in ("9", "\u00b2", "1" * 5000):
+            with self.assertRaises(tokens.TokensError):
+                tokens.chosen_slot(state, lambda prompt: answer)
 
 
 class TheScript(unittest.TestCase):

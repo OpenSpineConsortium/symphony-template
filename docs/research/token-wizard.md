@@ -281,6 +281,25 @@ claimed two things the code did not hold. Fixed on the branch:
   ~/.claude/local/claude, and the native installer's ~/.local/bin is on
   PATH where it is installed.
 
+## After the merge (symphony-template#100)
+
+- A repository's own variable outranks the organization's of the same
+  name, as its own secret does, and the 2026-10-15b to-do list told the
+  owner to make SYMPHONY_CLAUDE_ACCOUNTS by hand as coordbench's own
+  variable; the wizard keeps the organization's list, which such a
+  variable would hide from bench.yml. `status` now names a repository's
+  own SYMPHONY_CLAUDE_ACCOUNTS with the slots it names and the page to
+  delete it on, as it named a repository's own secrets already. The wizard does not
+  delete it itself, since it never removes what it did not write.
+- A list may be made by hand and a slot's number is typed, so both are
+  read only when they are at most nine ASCII digits (slot_number): a
+  superscript two passed isdigit() and failed int(), and int() refuses
+  more than 4,300 digits, either of which stopped `status` or the slot
+  question with a traceback; the project's constraint on readers of
+  digits someone else writes asks for that bound. A repository's own
+  list is printed as the slots it names, never as written, so nothing a
+  person typed into it reaches the terminal.
+
 ## Open items
 
 - tools/crowd_check.py's SECRET_NAMES does not name SYMPHONY_CLAUDE_1 to
@@ -288,6 +307,10 @@ claimed two things the code did not hold. Fixed on the branch:
   pass the crowd check; the wizard refuses to put one there, the by-hand
   path does not. A pull request of its own, with ci.yml's values job
   naming the eight.
+- An environment's own secret or variable outranks the repository's and
+  the organization's, and `status` reads no environment; none of the
+  repositories uses one for the slots yet (the bench's environment named
+  bench is not built).
 - Nothing warns a year later: `status` says "renew soon" and "renew now",
   and only when run. A scheduled workflow could list the secrets' dates
   on GITHUB_TOKEN and open an issue; not built.
