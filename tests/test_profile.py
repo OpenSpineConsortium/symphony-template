@@ -1,7 +1,7 @@
 """tools/profile.py: a session's profile from its transcript, each API call
 counted once, each tool call with its answer, the files read and read
-again, the context's growth shared out to the tools, the time in tools and
-waiting for the model; and a record that carries counts alone."""
+again, the context's growth shared out to the tools, the time in tools
+and outside them; and a record that carries counts alone."""
 
 import io
 import json
@@ -9,7 +9,7 @@ import shutil
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,12 +18,13 @@ sys.path.insert(0, str(ROOT / "tools"))
 import profile  # noqa: E402
 
 CWD = "/work/repo"
+SHELL = {"read": 3, "filter": 0, "search": 1, "list": 0, "git": 0, "run": 1}
 
 
 def at(seconds):
     """A timestamp seconds after the start of a session that began at 10:00."""
     minute, second = divmod(seconds, 60)
-    return f"2026-10-15T10:{minute:02d}:{second:06.3f}Z"
+    return f"2026-10-15T10:{int(minute):02d}:{second:06.3f}Z"
 
 
 def assistant(message_id, usage_fields, blocks, seconds, model="claude-opus-5-5", thinking=None):
@@ -60,9 +61,19 @@ def prompt(text, seconds):
     return {"type": "user", "timestamp": at(seconds), "cwd": CWD, "message": {"role": "user", "content": text}}
 
 
+def attachment(seconds):
+    return {"type": "attachment", "timestamp": at(seconds), "attachment": {"type": "hook_success"}}
+
+
 def write_lines(path, entries):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(json.dumps(e) + "\n" for e in entries) + "half a line\n", encoding="utf-8")
+
+
+def undated(entries):
+    """The same messages as a run's execution file carries them: no
+    timestamp and no working directory on any."""
+    return [{k: v for k, v in e.items() if k not in ("timestamp", "cwd")} for e in entries]
 
 
 def session_entries():
@@ -88,17 +99,25 @@ def session_entries():
         result("t3", "boom", 25, error=True),
         result("t4", "a.py:1:def f", 26),
         *assistant("m3", used(0, 100, 2250, 30), [{"type": "text", "text": "Done."}], 30),
-        {"type": "attachment", "timestamp": at(31), "attachment": {"type": "hook_success"}},
+        attachment(31),
     ]
 
 
-class ReadingATranscript(unittest.TestCase):
+class ATranscriptOnDisk(unittest.TestCase):
     def setUp(self):
         self.folder = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.folder, True)
         self.transcript = self.folder / "abcdef12-3456-7890.jsonl"
-        write_lines(self.transcript, session_entries())
-        self.record, self.built = profile.profile(self.transcript)
+
+    def profiled(self, entries):
+        write_lines(self.transcript, entries)
+        return profile.profile(self.transcript)
+
+
+class ReadingATranscript(ATranscriptOnDisk):
+    def setUp(self):
+        super().setUp()
+        self.record, self.built = self.profiled(session_entries())
 
     def test_each_api_call_counts_once_whatever_its_lines(self):
         self.assertEqual(self.record["context"]["calls"], 3)
@@ -115,12 +134,13 @@ class ReadingATranscript(unittest.TestCase):
         self.assertEqual(context["cached_share"], round(3250 / (1000 + 2250 + 2350), 3))
         # 2250 - 1000 - 50 from the first call's tools, 2350 - 2250 - 20 from the second's.
         self.assertEqual(context["growth"], 1200 + 80)
-        self.assertEqual(context["growth_from_tools_estimated"], 1200 + 80)
         by_tool = self.record["calls"]["by_tool"]
         self.assertEqual(by_tool["Read"]["context_tokens_estimated"], 480)
         self.assertEqual(by_tool["Bash"]["context_tokens_estimated"], 720 + 80 * 4 // 16)
         self.assertEqual(by_tool["Grep"]["context_tokens_estimated"], 80 * 12 // 16)
         self.assertEqual((context["compactions"], context["drops"]), (0, 0))
+        self.assertEqual(sorted(context), ["cached_share", "calls", "compactions", "drops", "first", "growth",
+                                           "last", "mean", "peak"])
 
     def test_tool_calls_by_tool_with_their_answers(self):
         calls = self.record["calls"]
@@ -129,10 +149,12 @@ class ReadingATranscript(unittest.TestCase):
         self.assertEqual(calls["by_tool"]["Bash"]["failed"], 1)
         self.assertEqual(calls["by_tool"]["Bash"]["result_bytes"], 600 + 4)
         self.assertEqual(calls["by_tool"]["Read"]["result_bytes"], 400)
-        # From the line that asked (t1 at 11 s, t2 at 12 s) to the line that answered.
+        # From the line that asked (t1 at 11 s, t2 at 12 s) to the line that
+        # answered; per tool, calls that ran at once each count.
         self.assertEqual(calls["by_tool"]["Read"]["seconds_in_tool"], 3)
         self.assertEqual(calls["by_tool"]["Bash"]["seconds_in_tool"], 4 + 5)
-        self.assertEqual(self.record["shell"], {"read": 3, "search": 1, "list": 0, "git": 0, "run": 1})
+        self.assertEqual(calls["by_tool"]["Grep"]["seconds_in_tool"], 5)
+        self.assertEqual(self.record["shell"], SHELL)
 
     def test_reads_and_rereads(self):
         reads = self.record["reads"]
@@ -147,14 +169,14 @@ class ReadingATranscript(unittest.TestCase):
         self.assertEqual(self.built.per_path["/work/repo/a.py"], 2)
         self.assertEqual(self.built.per_path["/work/repo/docs/c.md"], 1)
 
-    def test_time_in_tools_and_waiting_for_the_model(self):
+    def test_time_in_tools_and_outside_them(self):
         seconds = self.record["seconds"]
-        self.assertEqual(seconds["span"], 31)
-        # t1 asked at 11 s and answered at 14, t2 12 to 16, t3 20 to 25, t4 21 to 26.
-        self.assertEqual(seconds["in_tools"], 3 + 4 + 5 + 5)
-        # The prompt at 0 to m1's last line at 12; t2's answer at 16 to m2's
-        # last line at 21; t4's answer at 26 to m3's line at 30.
-        self.assertEqual(seconds["waiting_for_model"], 12 + 5 + 4)
+        self.assertEqual((seconds["span"], seconds["active"]), (31, 31))
+        # t1 ran from 11 s to 14 and t2 from 12 to 16, together 11 to 16;
+        # t3 from 20 to 25 and t4 from 21 to 26, together 20 to 26.
+        self.assertEqual(seconds["in_tools"], 5 + 6)
+        # The gaps between lines, 31 s in all, less the 11 s a tool was running.
+        self.assertEqual(seconds["outside_tools"], 20)
         self.assertEqual(seconds["thinking"], 2)
 
     def test_the_record_carries_no_path_command_or_text(self):
@@ -167,19 +189,60 @@ class ReadingATranscript(unittest.TestCase):
     def test_the_report_reads_the_record(self):
         text = profile.report(self.record)
         self.assertIn("Profile of session abcdef12", text)
+        self.assertIn("in tools 11 s (35% of active), outside tools 20 s (65%)", text)
+        self.assertIn("the harness counted 2 s of thinking", text)
         self.assertIn("Tool calls: 4, 1 failed, 0 unanswered", text)
         self.assertIn("Reads: 3 calls naming 5 files (3 distinct), 2 re-reads (40%), 2 partial", text)
-        self.assertIn("Shell commands: read 3, search 1, list 0, git 0, run 1", text)
+        self.assertIn("Shell commands: read 3, filter 0, search 1, list 0, git 0, run 1", text)
+        self.assertIn("shared out to the tools below (an estimate)", text)
         self.assertIn("compactions", text)
         self.assertTrue(text.isascii())
 
 
-class HelpersAndCompactions(unittest.TestCase):
-    def setUp(self):
-        self.folder = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.folder, True)
-        self.transcript = self.folder / "abcdef12-3456-7890.jsonl"
+class TheTranscriptsClock(ATranscriptOnDisk):
+    def test_an_answer_between_two_asks_of_one_call_is_timed_from_its_own_ask(self):
+        """The harness writes a message's tool lines as it runs them, so a
+        tool's answer can come before the message's next line; each tool
+        runs from its own line, and the call's lines do not bound it."""
+        text, ask_one, ask_two = assistant("m1", used(100, 0, 0, 10), [
+            {"type": "text", "text": "Two at a time."},
+            tool_use("t1", "Bash", command="ls"),
+            tool_use("t2", "Bash", command="git status"),
+        ], 10)
+        ask_two["timestamp"] = at(13)
+        record, _ = self.profiled([text, ask_one, result("t1", "x", 12), ask_two, result("t2", "y", 15)])
+        self.assertEqual(record["context"]["calls"], 1)
+        self.assertEqual(record["calls"]["total"], 2)
+        self.assertEqual(record["calls"]["by_tool"]["Bash"]["seconds_in_tool"], 1 + 2)
+        self.assertEqual(record["seconds"], {"span": 5, "active": 5, "in_tools": 3, "outside_tools": 2, "thinking": 0})
+        self.assertEqual(record["shell"], {"read": 0, "filter": 0, "search": 0, "list": 1, "git": 1, "run": 0})
 
+    def test_two_tools_running_at_once_count_once(self):
+        self.assertEqual(profile.union([(2, 6), (1, 4), (8, 9), (9, 10)]), [(1, 6), (8, 10)])
+        self.assertEqual(profile.active_outside([0, 10, 20], [(5, 12)]), 10 + 10 - 7)
+
+    def test_an_attachment_written_as_the_answer_arrives_takes_no_time_from_the_model(self):
+        """The harness writes an attachment line the instant a response
+        arrives, before the response's own lines; the time before it is
+        still time outside the tools."""
+        entries = session_entries()
+        entries.insert(6, attachment(19.9))
+        record, _ = self.profiled(entries)
+        self.assertEqual(record["attachments"], 2)
+        self.assertEqual(record["seconds"]["outside_tools"], 20)
+        self.assertEqual(record["seconds"]["in_tools"], 11)
+
+    def test_a_pause_over_five_minutes_is_not_active(self):
+        entries = session_entries()
+        entries.append(prompt("Back after lunch.", 31 + 1800))
+        record, _ = self.profiled(entries)
+        self.assertEqual(record["seconds"]["span"], 1831)
+        self.assertEqual(record["seconds"]["active"], 31)
+        self.assertEqual(record["seconds"]["outside_tools"], 20)
+        self.assertEqual(record["prompts"], 2)
+
+
+class HelpersAndCompactions(ATranscriptOnDisk):
     def test_a_helpers_calls_count_and_its_context_does_not(self):
         write_lines(self.transcript, session_entries())
         helper = self.folder / "abcdef12-3456-7890" / "subagents" / "agent-1.jsonl"
@@ -208,8 +271,7 @@ class HelpersAndCompactions(unittest.TestCase):
              "message": {"role": "user", "content": "This session is being continued"}},
             *assistant("m2", used(1200, 0, 0, 10), [{"type": "text", "text": "Going on."}], 15),
         ]
-        write_lines(self.transcript, entries)
-        record, _ = profile.profile(self.transcript)
+        record, _ = self.profiled(entries)
         self.assertEqual(record["context"]["compactions"], 1)
         self.assertEqual(record["context"]["drops"], 1)
         self.assertEqual(record["context"]["growth"], 0)
@@ -223,11 +285,29 @@ class HelpersAndCompactions(unittest.TestCase):
                                                                     "content": [tool_use("t9", "Bash", command="ls")]}},
             result("t9", "", 3),
         ]
-        write_lines(self.transcript, entries)
-        record, _ = profile.profile(self.transcript)
+        record, _ = self.profiled(entries)
         self.assertEqual(record["context"]["calls"], 0)
         self.assertEqual(record["models"], {})
         self.assertEqual(record["calls"]["total"], 1)
+
+    def test_a_call_whose_usage_says_it_sent_nothing_is_not_measured(self):
+        """An error line carries a usage of zeros; it is no context and
+        breaks no pair of consecutive calls."""
+        entries = session_entries()
+        entries.insert(7, assistant("e1", used(0, 0, 0, 0), [{"type": "text", "text": "API error"}], 27)[0])
+        record, _ = self.profiled(entries)
+        self.assertEqual(record["context"]["calls"], 3)
+        self.assertEqual((record["context"]["last"], record["context"]["growth"]), (2350, 1280))
+        self.assertEqual(record["models"], {"claude-opus-5-5": [100, 2250, 0, 3250, 100]})
+
+
+class WhatATextIsWorth(unittest.TestCase):
+    def test_a_tools_answer_is_measured_as_the_model_saw_it(self):
+        self.assertEqual(profile.text_bytes("abc"), 3)
+        self.assertEqual(profile.text_bytes([{"type": "text", "text": "ab"}, {"type": "text", "text": "\u00e9"}]), 4)
+        reference = {"type": "tool_reference", "tool_name": "Read"}
+        self.assertEqual(profile.text_bytes([reference]), len(json.dumps(reference, sort_keys=True)))
+        self.assertEqual(profile.text_bytes(None), 0)
 
 
 class ReadingShellCommands(unittest.TestCase):
@@ -236,13 +316,27 @@ class ReadingShellCommands(unittest.TestCase):
         self.assertEqual(profile.shell_reads("head -n 20 a; tail -5 b; tail -c 10 c", "/r"), ["/r/a", "/r/b", "/r/c"])
         self.assertEqual(profile.shell_reads("sed -n '1,20p' tools/x.py", "/r"), ["/r/tools/x.py"])
         self.assertEqual(profile.shell_reads("sed -e 's/a/b/' -n x.py y.py", "/r"), ["/r/x.py", "/r/y.py"])
-        self.assertEqual(profile.shell_reads("sed -i 's/a/b/' x.py", "/r"), [])
         self.assertEqual(profile.shell_reads("cat -; cat '*.py'; cat $HOME/x; cat ~/y", "/r"), [])
         self.assertEqual(profile.shell_reads("cd /elsewhere && cat a && cd sub && cat b", "/r"),
-                         ["/elsewhere/a", "/elsewhere/sub/a".replace("/a", "/b")])
+                         ["/elsewhere/a", "/elsewhere/sub/b"])
         self.assertEqual(profile.shell_reads("FOO=1 cat /abs/../x", "/r"), ["/x"])
         self.assertEqual(profile.shell_reads("cat a", ""), ["a"])
+        self.assertEqual(profile.shell_reads("cat a > out 2>&1 | tee b", "/r"), ["/r/a"])
         self.assertEqual(profile.shell_reads("echo 'unclosed", "/r"), [])
+
+    def test_a_readers_options_and_their_values_are_no_files(self):
+        for command in ("head --lines 20 x.py", "head --lines=20 x.py", "head -20 x.py", "head -n20 x.py",
+                        "tail -n +5 x.py", "nl -w 3 x.py", "nl -ba x.py", "sed -f script.sed x.py",
+                        "sed --expression='s/a/b/' x.py", "sed -ne 's/a/b/p' x.py", "sed -n -e p x.py",
+                        "less x.py", "more x.py"):
+            self.assertEqual(profile.shell_reads(command, "/r"), ["/r/x.py"], command)
+            self.assertEqual(profile.shell_uses(command), {"read": 1}, command)
+
+    def test_sed_in_place_writes_and_reads_for_nobody(self):
+        for command in ("sed -i 's/a/b/' x.py", "sed -ni 's/a/b/p' x.py", "sed -i.bak 's/a/b/' x.py",
+                        "sed --in-place 's/a/b/' x.py", "sed --in-place=.bak -e 's/a/b/' x.py"):
+            self.assertEqual(profile.shell_reads(command, "/r"), [], command)
+            self.assertEqual(profile.shell_uses(command), {"run": 1}, command)
 
     def test_a_here_document_is_data_not_commands(self):
         command = "python3 - x <<'EOF'\ncat secret\nls\nEOF\ngit status"
@@ -250,19 +344,56 @@ class ReadingShellCommands(unittest.TestCase):
         self.assertEqual(profile.shell_uses(command), {"run": 1, "git": 1})
         self.assertEqual(profile.without_heredocs("cat <<EOF > f\nline\nEOF"), "cat <<EOF > f")
         self.assertEqual(profile.without_heredocs('a <<"X"\nb\nX\nc'), "a <<\"X\"\nc")
+        self.assertEqual(profile.without_heredocs("cat <<-EOF\n\tx\n\tEOF\nls"), "cat <<-EOF\nls")
+        self.assertEqual(profile.without_heredocs("cat << EOF\nx\nEOF\nls"), "cat << EOF\nls")
+        self.assertEqual(profile.shell_uses("cat <<EOF > f\ncat a\nEOF"), {"filter": 1})
+
+    def test_what_only_looks_like_a_here_document_opens_none(self):
+        for line in ('cat <<<"bar"', "grep -rn '<<EOF' x", 'python3 -c "x << y"', "cat a", "a <<", "a << ;"):
+            self.assertIsNone(profile.heredoc_opener(line), line)
+        self.assertEqual(profile.shell_uses("grep -rn '<<EOF' x\ncat y"), {"search": 1, "read": 1})
+        self.assertEqual(profile.heredoc_opener("cat <<-EOF"), "EOF")
+        self.assertEqual(profile.heredoc_opener("cat << EOF | sort"), "EOF")
 
     def test_what_each_command_is_for(self):
         self.assertEqual(profile.shell_uses("cd /r && ls -la | grep x; git log; python3 t.py; wc -l a; echo hi"),
                          {"list": 2, "search": 1, "git": 1, "run": 1})
         self.assertEqual(profile.shell_uses("rg -n def tools/ && find . -name '*.py'"), {"search": 1, "list": 1})
+        # A reader naming no file filters another command's output.
+        self.assertEqual(profile.shell_uses("ls | head -5"), {"list": 1, "filter": 1})
+        self.assertEqual(profile.shell_uses("cat - | sed 's/a/b/'"), {"filter": 2})
         self.assertEqual(profile.shell_uses(""), {})
 
 
-class TheCommandLine(unittest.TestCase):
+class AnExecutionFile(ATranscriptOnDisk):
+    def test_a_runs_execution_file_is_one_array_with_no_clock(self):
+        execution = self.folder / "execution.json"
+        execution.write_text(json.dumps(undated(session_entries())), encoding="utf-8")
+        self.assertEqual(len(profile.entries_of(execution)), len(session_entries()))
+        record, built = profile.profile(execution)
+        self.assertEqual(record["calls"]["total"], 4)
+        self.assertEqual(record["context"]["calls"], 3)
+        self.assertEqual(record["seconds"], dict.fromkeys(profile.SECONDS_KEYS, 0))
+        self.assertEqual((record["started_at"], record["ended_at"]), (None, None))
+        self.assertEqual(record["reads"]["calls"], 3)
+        self.assertEqual(built.lines, len(session_entries()))
+
+    def test_a_file_with_no_entries_is_no_transcript(self):
+        empty = self.folder / "empty.jsonl"
+        empty.write_text("", encoding="utf-8")
+        half = self.folder / "half.jsonl"
+        half.write_text("half a line\n", encoding="utf-8")
+        self.assertEqual(profile.entries_of(empty), [])
+        self.assertEqual(profile.entries_of(half), [])
+        for path in (empty, half):
+            with redirect_stderr(io.StringIO()) as said:
+                self.assertEqual(profile.main([str(path)]), 2)
+            self.assertIn("no entries", said.getvalue())
+
+
+class TheCommandLine(ATranscriptOnDisk):
     def setUp(self):
-        self.folder = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.folder, True)
-        self.transcript = self.folder / "abcdef12-3456-7890.jsonl"
+        super().setUp()
         write_lines(self.transcript, session_entries())
 
     def test_prints_the_report_and_writes_the_record(self):
@@ -279,9 +410,9 @@ class TheCommandLine(unittest.TestCase):
         self.assertNotIn("a.py", out.read_text())
 
     def test_a_missing_transcript_is_said(self):
-        printed = io.StringIO()
-        with redirect_stdout(printed):
+        with redirect_stderr(io.StringIO()) as said:
             self.assertEqual(profile.main([str(self.folder / "none.jsonl")]), 2)
+        self.assertIn("no transcript", said.getvalue())
 
 
 if __name__ == "__main__":

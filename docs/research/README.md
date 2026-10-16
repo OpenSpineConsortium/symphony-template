@@ -1,6 +1,6 @@
 # Research
 
-This folder holds the project's running research programmes: for each, the question, the instrument that measures it, the measurements taken with it and what they found, kept beside each other so that a reader can go from a claim to the record it rests on and to the command that reproduces it. One folder per programme, with a README that says where the programme stands. docs/history/ is for what a piece of work found and settled; a programme lives here while its questions are open, and a settled finding goes to docs/history/ or, when every session should know it, to docs/memory/.
+This folder holds the project's running research programmes: for each, the question, the instrument that measures it, the measurements taken with it and what they found, kept beside each other so that a reader can go from a claim to the record it rests on and to the command that made it, which reproduces it wherever what it read is kept. One folder per programme, with a README that says where the programme stands. docs/history/ is for what a piece of work found and settled; a programme lives here while its questions are open, and a settled finding goes to docs/history/ or, when every session should know it, to docs/memory/.
 
 Three rules hold in every programme, taken from OpenSpineConsortium/coordbench, where the project measured coordination first:
 

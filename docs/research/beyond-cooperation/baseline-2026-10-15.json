@@ -1,111 +1,190 @@
 {
-  "attachments": 88,
+  "attachments": 205,
   "calls": {
     "by_tool": {
-      "Bash": {
-        "calls": 45,
-        "context_tokens_estimated": 115154,
-        "failed": 2,
-        "input_bytes": 89400,
-        "result_bytes": 297741,
-        "seconds_in_tool": 87
-      },
-      "ToolSearch": {
+      "Agent": {
         "calls": 1,
-        "context_tokens_estimated": 2831,
+        "context_tokens_estimated": 498,
         "failed": 0,
-        "input_bytes": 126,
-        "result_bytes": 0,
+        "input_bytes": 4405,
+        "result_bytes": 1059,
+        "seconds_in_tool": 2
+      },
+      "Bash": {
+        "calls": 101,
+        "context_tokens_estimated": 149880,
+        "failed": 2,
+        "input_bytes": 205097,
+        "result_bytes": 537166,
+        "seconds_in_tool": 468
+      },
+      "ReadNotifications": {
+        "calls": 2,
+        "context_tokens_estimated": 9749,
+        "failed": 0,
+        "input_bytes": 4,
+        "result_bytes": 29444,
         "seconds_in_tool": 0
       },
-      "WebFetch": {
+      "SubagentHandback": {
+        "calls": 1,
+        "context_tokens_estimated": 0,
+        "failed": 0,
+        "input_bytes": 13298,
+        "result_bytes": 61,
+        "seconds_in_tool": 2
+      },
+      "ToolSearch": {
         "calls": 5,
+        "context_tokens_estimated": 9789,
+        "failed": 0,
+        "input_bytes": 582,
+        "result_bytes": 1027,
+        "seconds_in_tool": 4
+      },
+      "WebFetch": {
+        "calls": 8,
         "context_tokens_estimated": 4400,
         "failed": 3,
-        "input_bytes": 2445,
-        "result_bytes": 10707,
-        "seconds_in_tool": 39
+        "input_bytes": 4013,
+        "result_bytes": 15470,
+        "seconds_in_tool": 69
       },
       "WebSearch": {
-        "calls": 3,
+        "calls": 6,
         "context_tokens_estimated": 3242,
         "failed": 0,
-        "input_bytes": 380,
-        "result_bytes": 8498,
-        "seconds_in_tool": 26
+        "input_bytes": 732,
+        "result_bytes": 19126,
+        "seconds_in_tool": 248
+      },
+      "mcp__claude-code-remote__subscribe_pr_activity": {
+        "calls": 1,
+        "context_tokens_estimated": 256,
+        "failed": 0,
+        "input_bytes": 79,
+        "result_bytes": 242,
+        "seconds_in_tool": 3
+      },
+      "mcp__github__create_pull_request": {
+        "calls": 1,
+        "context_tokens_estimated": 71,
+        "failed": 0,
+        "input_bytes": 3652,
+        "result_bytes": 92,
+        "seconds_in_tool": 2
+      },
+      "mcp__github__get_file_contents": {
+        "calls": 2,
+        "context_tokens_estimated": 0,
+        "failed": 2,
+        "input_bytes": 222,
+        "result_bytes": 974,
+        "seconds_in_tool": 1
+      },
+      "mcp__github__issue_write": {
+        "calls": 1,
+        "context_tokens_estimated": 97,
+        "failed": 0,
+        "input_bytes": 142,
+        "result_bytes": 92,
+        "seconds_in_tool": 2
+      },
+      "mcp__github__pull_request_read": {
+        "calls": 3,
+        "context_tokens_estimated": 3428,
+        "failed": 0,
+        "input_bytes": 310,
+        "result_bytes": 7795,
+        "seconds_in_tool": 5
+      },
+      "mcp__github__update_pull_request": {
+        "calls": 1,
+        "context_tokens_estimated": 86,
+        "failed": 1,
+        "input_bytes": 120,
+        "result_bytes": 81,
+        "seconds_in_tool": 2
+      },
+      "mcp__hearthbot__reply": {
+        "calls": 1,
+        "context_tokens_estimated": 142,
+        "failed": 0,
+        "input_bytes": 513,
+        "result_bytes": 134,
+        "seconds_in_tool": 0
       },
       "mcp__hearthbot__update_status": {
-        "calls": 4,
-        "context_tokens_estimated": 132,
+        "calls": 10,
+        "context_tokens_estimated": 2396,
         "failed": 0,
-        "input_bytes": 2001,
-        "result_bytes": 60,
-        "seconds_in_tool": 1
+        "input_bytes": 5978,
+        "result_bytes": 150,
+        "seconds_in_tool": 3
       }
     },
-    "failed": 5,
-    "total": 58,
-    "unanswered": 0
+    "failed": 8,
+    "total": 144,
+    "unanswered": 1
   },
   "context": {
-    "cached_share": 0.946,
-    "calls": 23,
-    "compactions": 0,
-    "drops": 0,
+    "cached_share": 0.972,
+    "calls": 60,
+    "compactions": 1,
+    "drops": 1,
     "first": 120867,
-    "growth": 125761,
-    "growth_from_tools_estimated": 125761,
-    "growth_other_estimated": 2,
-    "last": 319411,
-    "mean": 222243,
-    "peak": 319411
+    "growth": 190233,
+    "last": 184764,
+    "mean": 271138,
+    "peak": 379356
   },
-  "ended_at": "2026-10-15T23:58:56Z",
-  "estimated_usd": 10.4249,
-  "helpers": 0,
+  "ended_at": "2026-10-16T00:29:50Z",
+  "estimated_usd": 23.0654,
+  "helpers": 1,
   "models": {
     "claude-fable-5-1": [
-      706,
-      0,
-      275911,
-      4834966,
-      73817
+      2070,
+      206024,
+      448454,
+      17442847,
+      142792
     ]
   },
   "prices_as_of": "2026-10-06",
-  "prompts": 1,
+  "prompts": 3,
   "reads": {
-    "bytes": 274247,
-    "calls": 26,
-    "files": 35,
-    "files_named": 43,
-    "partial": 21,
-    "reread_bytes": 102693,
-    "rereads": 6
+    "bytes": 460283,
+    "calls": 45,
+    "files": 46,
+    "files_named": 68,
+    "partial": 31,
+    "reread_bytes": 129337,
+    "rereads": 11
   },
   "schema": "symphony-profile/1",
   "seconds": {
-    "active": 1056,
-    "in_tools": 153,
-    "span": 1057,
-    "thinking": 550,
-    "waiting_for_model": 547
+    "active": 2252,
+    "in_tools": 172,
+    "outside_tools": 2081,
+    "span": 2911,
+    "thinking": 989
   },
   "session": "7667c678",
   "shell": {
-    "git": 13,
-    "list": 24,
-    "read": 92,
-    "run": 29,
-    "search": 20
+    "filter": 95,
+    "git": 32,
+    "list": 36,
+    "read": 71,
+    "run": 102,
+    "search": 44
   },
   "started_at": "2026-10-15T23:41:20Z",
   "tokens": {
-    "cache_read": 4834966,
-    "cache_write": 275911,
-    "input": 706,
-    "output": 73817,
-    "total": 5185400
+    "cache_read": 17442847,
+    "cache_write": 654478,
+    "input": 2070,
+    "output": 142792,
+    "total": 18242187
   },
   "tokens_unpriced": 0
 }
