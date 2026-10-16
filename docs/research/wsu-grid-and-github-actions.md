@@ -12,7 +12,8 @@ request. Every claim below names what it rests on; what the grid has not yet sho
 The pull requests, both merged on 2026-10-16: OpenSpineConsortium/hpcworker#13, the runner
 (tools/grid_runner.sh and its tests; merge d8a03e7), and OpenSpineConsortium/symphony-template#103,
 the workflow, docs/setup/grid.md and this note (merge d669562). Where the work stands, what waits on
-the owner and the plan for the ssh gate are the last sections but one.
+the owner, the plan for the ssh gate and how the fixes were proven are the three sections before the
+sources.
 
 ## The answer
 
@@ -291,8 +292,9 @@ whether each run waits for his approval, are his to settle on the pull request.
 - In hpcworker: tools/grid_gate.sh, the forced command. It reads SSH_ORIGINAL_COMMAND without a
   shell evaluating it and runs exactly one of a fixed list, start, status or stop
   (`grid_runner.sh --start`, `--status`, `--stop`), for a repository named as owner/name in
-  [A-Za-z0-9_.-] and the site its profile names, each at most one scheduler call on the login node,
-  as Beethoven's etiquette allows. It refuses any other word or argument, an input longer than a
+  [A-Za-z0-9_.-] and the site its profile names, each making on the login node the calls it makes
+  when a person types it: one squeue and one sbatch to start, one squeue to read, one squeue and one
+  scancel to stop. It refuses any other word or argument, an input longer than a
   fixed bound or holding a newline, and a second call within 60 seconds of the last, and it writes
   one line per call, never the key, to the runner's folder. A subcommand, say
   `grid_runner.sh --gate-key <public key file>`, writes the one line
@@ -338,12 +340,16 @@ What each undoes:
 - nojob-counted: a runner that ends with no job run taken for one that ran a job;
 - creds-linger: a registration's files left in the runner's home for the next registration.
 
-The runner's tests and the CI lane's were also run under the login node's stack, bash 4.2.46 and
-Python 3.6, which hpcworker's CI does not do for them (its centos 7 job runs the framework suite
-alone): wsu-grid-and-github-actions-centos7.sh, beside this note, runs both in a centos:7 container,
-its header giving the command, and both passed there on 2026-10-16, as they did on the session's own
-host under CentOS 7's bash 4.2 and gawk 4.0.2, copied out of the image with their libraries and put
-first on PATH.
+The runner's tests were also run under the login node's bash and awk, which hpcworker's CI does not
+do for them (its centos 7 job runs the framework suite alone): in their final form, on 2026-10-16,
+all 189 passed under CentOS 7's bash 4.2.46 and gawk 4.0.2 on the session's own host. Both were
+copied out of the centos:7 image with `docker create` and `docker cp`, bash with its libtinfo.so.5,
+and a folder put first on PATH held a bash that runs the copied one through the host's own loader,
+`exec /lib64/ld-linux-x86-64.so.2 --library-path <the folder holding libtinfo.so.5> <the copied bash> "$@"`,
+with awk and gawk as links to the copied gawk; then
+`PATH=<that folder>:$PATH bash tools/tests/test_grid_runner.sh`. A run inside a centos:7 container
+did not get as far as the tests, since its yum could not resolve vault.centos.org from the cloud
+session.
 
 ## Sources
 
