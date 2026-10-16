@@ -74,6 +74,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import NamedTuple
 
 TOOLS = Path(__file__).resolve().parent
 ROOT = TOOLS.parent
@@ -111,9 +112,8 @@ SCISSORS = re.compile(r"(?m)^(\S{1,16}) -{24} >8 -{24}\n")
 # The comment characters git commit picks from for core.commentChar auto, in
 # its order: the first that begins no line of the message.
 AUTO_COMMENTS = "#;@!$%^&|:"
-# The shell's reserved words that may come before a command, which the
-# guard's reading leaves at the head of the command's words.
-RESERVED_WORDS = ("{", "!", "if", "then", "else", "elif", "do", "while", "until", "time")
+# The start of a line git counts as nothing in a message, as it counts blanks.
+SIGNED_OFF = "Signed-off-by: "
 # git commit's options as its option parser reads them, for the hook's
 # reading of a command's words (commit_options): the short ones that take a
 # value, the rest of their word or else the next word; the short flags; and
@@ -429,7 +429,10 @@ def heredoc_bodies(text):
         frame, ch = frames[-1], text[i]
         if handed and (newline := newline_at(text, i, frame.quote)) is not None:
             end = past_bodies(text, newline + 1, handed, len(frames) > 1)
-            yield newline, end
+            # A backslash before the newline joins the next line to this
+            # one, the bodies between; with nothing after them it would be
+            # left joining nothing, which no reading of the rest takes.
+            yield (i if end == len(text) else newline), end
             i, word_start = end, True
             continue
         if ch == "\\" and frame.quote != "'":
@@ -443,8 +446,12 @@ def heredoc_bodies(text):
             yield i, end
             i, word_start = end, True
             continue
-        if ch == "`" and frame.quote != "'":
-            close = backquote_end(text, i)
+        close = backquote_end(text, i) if ch == "`" and frame.quote != "'" else None
+        if close is not None and handed and "\n" in text[i:close]:
+            # The bodies handed on wait for the newline inside it, so it is
+            # read as it comes, up to that newline.
+            step = 1
+        elif close is not None:
             inner = text[i + 1:close]
             if "<<" in inner:
                 yield from ((i + 1 + start, i + 1 + end) for start, end in heredoc_bodies(inner))
@@ -539,8 +546,8 @@ def outside_quotes(text, i, frames, handed):
 
 def bracket_end(text, i):
     """Where the old arithmetic $[ ] that opens at i ends: past the ] that
-    closes it, or at the end of its line, where none does."""
-    depth, stop = 0, line_end(text, i)
+    closes it, on a later line too, or at the text's end, where none does."""
+    depth, stop = 0, len(text)
     for at in range(i + 1, stop):
         if text[at] == "[":
             depth += 1
@@ -626,17 +633,16 @@ def is_commit(command):
 
 def commit_arguments(command):
     """The words after commit in the first simple command of a shell
-    command that runs git commit, or None where none does. A reserved word
-    before it, as in if git commit; then, or { git commit; }, is the
-    shell's, and the command after it is read."""
+    command that runs git commit, or None where none does. git may stand
+    after assignments, a reserved word of the shell's, as in if git commit;
+    then, or { git commit; }, and a wrapper with its options, as in time -p
+    or nice -n 5, which the guard reads past as it does for a push."""
     from sdlc_protocol import guard
     for argv in guard.simple_commands(without_heredocs(command or "")):
-        words = [word for word in argv if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", word)]
-        while words and words[0] in RESERVED_WORDS:
-            words = words[1:]
-        if not words or os.path.basename(words[0]) != "git":
+        start = guard.command_start(argv)
+        if start is None or os.path.basename(argv[start]) != "git":
             continue
-        rest = words[1:]
+        rest = argv[start + 1:]
         while rest and rest[0].startswith("-"):
             rest = rest[2:] if rest[0] in ("-c", "-C") else rest[1:]
         if rest and rest[0] == "commit":
@@ -644,16 +650,27 @@ def commit_arguments(command):
     return None
 
 
+class Words(NamedTuple):
+    """What a git commit's words say of its message (commit_options): the
+    --cleanup they give, None where they give none; whether git opens the
+    editor; the template -t gives, "" for --no-template and None where they
+    give none; and whether --fixup is given, in any of its forms."""
+
+    cleanup: str | None
+    editor: bool
+    template: str | None
+    fixup: bool
+
+
 def commit_options(arguments):
-    """What a git commit's words say of its message: the --cleanup they
-    give, None where they give none, and whether git opens the editor,
-    which it does unless -m, -F, -C or a plain --fixup gives the message or
+    """What a git commit's words say of its message, as Words. git opens
+    the editor unless -m, -F, -C or a plain --fixup gives the message or
     --no-edit says not to, and does for -e however the message is given.
     The words are read as git's option parser reads them: a long option by
     any prefix that names it alone, short options run together, a value
     the rest of its word or else the next word, and nothing after -- an
     option."""
-    cleanup, given, edit = None, False, None
+    cleanup, given, edit, template, fixup = None, False, None, None, False
     words = iter(arguments)
     for word in words:
         if word == "--":
@@ -667,22 +684,25 @@ def commit_options(arguments):
                 cleanup = value
             elif option == "edit":
                 edit = not negated
+            elif option == "template":
+                template = "" if negated else value
             elif option in ("message", "file", "reuse-message") and not negated:
                 given = True
-            elif option == "fixup" and not negated and not re.match(r"(amend|reword):", value):
-                given = True
+            elif option == "fixup" and not negated:
+                fixup = True
+                given = given or not re.match(r"(amend|reword):", value)
         elif word.startswith("-") and len(word) > 1:
             for index, flag in enumerate(word[1:], 2):
                 if flag == "e":
                     edit = True
                 elif flag in SHORT_VALUED:
+                    value = word[index:] if index < len(word) else next(words, "")
                     given = given or flag in "mFC"
-                    if index == len(word):
-                        next(words, None)
+                    template = value if flag == "t" else template
                     break
                 elif flag not in SHORT_FLAGS:
                     break
-    return cleanup, not given if edit is None else edit
+    return Words(cleanup, not given if edit is None else edit, template, fixup)
 
 
 def long_option(name):
@@ -716,9 +736,9 @@ def run_hook(payload, environ=None):
     if sharing_off(root, environ):
         return
     pending = state_dir(cwd) / "pending.json"
-    cleanup, editor = commit_options(arguments)
-    left = {"session": str(session), "at": time.time(), "cleanup": cleanup, "editor": editor,
-            **session_usage(transcript)}
+    words = commit_options(arguments)
+    left = {"session": str(session), "at": time.time(), "cleanup": words.cleanup, "editor": words.editor,
+            "template": given_template(words.template, cwd), "fixup": words.fixup, **session_usage(transcript)}
     write_json(pending, left)
     profiled = profile_so_far(transcript)
     # Another session's hook in the same clone may have left its own usage
@@ -726,6 +746,15 @@ def run_hook(payload, environ=None):
     again = read_json(pending) or {}
     if profiled is not None and (again.get("session"), again.get("at")) == (left["session"], left["at"]):
         write_json(pending, {**left, "profile": profiled})
+
+
+def given_template(template, cwd=None):
+    """The template a command's -t names, as a path from where the command
+    runs, since git reads it from there and the commit-msg hook runs at the
+    top of the tree; "" for --no-template, None where the words name none."""
+    if not template:
+        return template
+    return str(Path(cwd or os.getcwd()) / os.path.expanduser(template))
 
 
 def run_trailer(message_file, cwd=None, environ=None, now=None):
@@ -747,7 +776,9 @@ def run_trailer(message_file, cwd=None, environ=None, now=None):
     if not pending or now - float(pending.get("at") or 0) > PENDING_FRESH:
         return
     editor = editor_opened(pending, environ)
-    if says_nothing(message_file, cwd, editor, cleanup_mode(pending, cwd)):
+    template = pending.get("template")
+    template = commit_template(cwd) if template is None else str(template)
+    if says_nothing(message_file, cwd, editor, cleanup_mode(pending, cwd), template, pending.get("fixup") is True):
         return
     (folder / "pending.json").unlink(missing_ok=True)
     session = re.sub(r"[^A-Za-z0-9-]", "", str(pending.get("session")))
@@ -791,40 +822,104 @@ def cleanup_mode(pending, cwd=None):
         return None
 
 
-def says_nothing(message_file, cwd=None, editor=True, cleanup=None):
-    """Whether a commit's message says nothing once git has cleaned it up,
-    so that git refuses the commit, as it refuses a bare git commit's where
-    the editor is true, as in Claude Code's shell: the lines added to it
-    would give it a message, the usage line its subject, so nothing is
-    added and the usage waits for the commit that follows. git cleans the
-    message as cleanup says (cleanup_mode): by default it takes out the
-    comments where it opened the editor (editor_opened) and only the blanks
-    where it did not; it cuts an edited message at its scissors line, below
-    which -v and commit.verbose put the diff; and it counts Signed-off-by
-    lines as nothing. The comment string is the scissors line's, where there
-    is one, as git picks it for commentChar auto, else the config's; for
-    auto with no scissors line, the message says nothing where any string
-    git can pick takes it all, which is git's own answer wherever its
-    comments are in the file, and at worst holds the usage back a commit.
-    The text goes to git as UTF-8 whatever the locale, and with its line
-    ends as they are, since git cuts only at a scissors line that LF alone
-    ends."""
+def says_nothing(message_file, cwd=None, editor=True, cleanup=None, template="", fixup=False):
+    """Whether git, once it has cleaned the commit's message up, refuses it
+    for saying nothing, as it refuses a bare git commit's where the editor
+    is true, as in Claude Code's shell, or would commit nothing but its own
+    comments: the lines added to it would give it a message, the usage line
+    its subject, so nothing is added and the usage waits for the commit
+    that follows. git cuts the message at its scissors line, below which -v
+    and commit.verbose put the diff, and cutting where git does not only
+    holds the usage back; it takes the comments out as cleanup says
+    (cleanup_mode), by default where it opened the editor (editor_opened),
+    and counts Signed-off-by lines as nothing; and it refuses a message
+    that is the commit template and nothing more (untouched), and an
+    amend! commit of --fixup with nothing past its subject. The text goes
+    to git as UTF-8 whatever the locale, and with its line ends as they
+    are, since git cuts only at a scissors line that LF alone ends."""
     try:
         text = Path(message_file).read_bytes().decode("utf-8", errors="replace")
     except OSError:
         return False
-    if cleanup == "verbatim":
-        return not text
-    cut = SCISSORS.search(text) if editor else None
+    cut = SCISSORS.search(text)
     if cut:
         text = text[:cut.start()]
-    if cleanup == "strip" or (cleanup in (None, "default") and editor):
-        if not cut and (comment_setting(cwd) or "").lower() == "auto":
-            return any(nothing_but(text, (mark, "Signed-off-by: ")) for mark in AUTO_COMMENTS)
-        text = stripped(text, cut, cwd)
-        if text is None:
-            return False
-    return nothing_but(text, ("Signed-off-by: ",))
+    if cleanup == "verbatim":
+        return not text or (fixup and amend_says_nothing(text))
+    strips = cleanup == "strip" or (cleanup in (None, "default") and editor)
+    if strips or editor:
+        alone = comments_alone(text, cut, cwd)
+        if alone is None or alone:
+            return bool(alone)
+    elif nothing_but(text, (SIGNED_OFF,)):
+        return True
+    if not template and not fixup:
+        return False
+    cleaned = stripped(text, cut, cwd, comments=strips)
+    return cleaned is not None and (untouched(cleaned, template, strips, cut, cwd)
+                                    or (fixup and amend_says_nothing(cleaned)))
+
+
+def comments_alone(text, cut, cwd=None):
+    """Whether the text is nothing but blanks, comments and Signed-off-by
+    lines, the comment string the scissors line's where there is one, as
+    git picks it for commentChar auto, else the config's; None where git
+    cannot say. For auto with no scissors line, any string git can pick
+    that takes it all will do: wherever git's own comments are in the file,
+    only git's pick takes them, and with none there the worst is a usage
+    line held back a commit."""
+    if not cut and (comment_setting(cwd) or "").lower() == "auto":
+        return any(nothing_but(text, (mark, SIGNED_OFF)) for mark in AUTO_COMMENTS)
+    left = stripped(text, cut, cwd)
+    return None if left is None else nothing_but(left, (SIGNED_OFF,))
+
+
+def untouched(cleaned, template, comments, cut, cwd=None):
+    """Whether a cleaned-up message is the commit template and nothing
+    more, as git's template_untouched reads it: the template, read from its
+    file and cleaned up as the message was, begins the message, and the rest
+    is blanks and Signed-off-by lines. A template git cannot read, or an
+    empty one, is none."""
+    try:
+        raw = Path(template).read_bytes().decode("utf-8", errors="replace") if template else ""
+    except OSError:
+        return False
+    model = stripped(raw, cut, cwd, comments) if raw else None
+    return model is not None and cleaned.startswith(model) and nothing_but(cleaned[len(model):], (SIGNED_OFF,))
+
+
+def amend_says_nothing(cleaned):
+    """Whether an amend! commit's cleaned-up message has nothing past its
+    subject but blanks and Signed-off-by lines, which git refuses for
+    --fixup=amend: and reword: as an empty body. Kept verbatim, only no body
+    at all is empty to git, but the lines would be the body all the same,
+    which an autosquash makes the amended commit's message, so they wait."""
+    if not cleaned.startswith("amend! "):
+        return False
+    return nothing_but(cleaned[subject_length(cleaned):], (SIGNED_OFF,))
+
+
+def subject_length(text):
+    """How long a message's subject is, as git's commit_subject_length reads
+    it: its lines up to the first that is blank or only whitespace."""
+    at = 0
+    while at < len(text):
+        end = text.find("\n", at)
+        end = len(text) if end == -1 else end + 1
+        if not text[at:end].strip():
+            break
+        at = end
+    return at
+
+
+def commit_template(cwd=None):
+    """commit.template in git's config, a git -c's included, as a path from
+    where the hook runs, ~ taken as git takes it; "" where none is set."""
+    try:
+        path = git("config", "--path", "--get", "commit.template", cwd=cwd)
+    except OSError:
+        return ""
+    return str(Path(cwd or ".") / path) if path else ""
 
 
 def nothing_but(text, starts):
@@ -844,13 +939,14 @@ def comment_setting(cwd=None):
     return last.partition(" ")[2] or None
 
 
-def stripped(text, cut, cwd=None):
-    """The text with its comment lines taken out by git stripspace, the
-    comment string the scissors line's where it was cut at one; None where
-    git cannot."""
+def stripped(text, cut, cwd=None, comments=True):
+    """The text cleaned up by git stripspace, its comment lines taken out
+    where comments is true, the comment string the scissors line's where it
+    was cut at one; None where git cannot."""
     config = ["-c", f"core.commentChar={cut[1]}"] if cut else []
+    options = ["--strip-comments"] if comments else []
     try:
-        done = subprocess.run(["git", *config, "stripspace", "--strip-comments"], input=text, cwd=cwd,
+        done = subprocess.run(["git", *config, "stripspace", *options], input=text, cwd=cwd,
                               capture_output=True, encoding="utf-8", errors="replace", timeout=30)
     except (OSError, subprocess.SubprocessError):
         return None
