@@ -22,7 +22,7 @@ named "notsorry" was found on GitHub; the spelling is taken as a slip for unsorr
 
 ## The answer in short
 
-- Built, in four pull requests (the table under Where it lives): the control panel at
+- Built, in four pull requests, three merged on 2026-10-16 (the table under Where it lives): the control panel at
   /symphony/control/ and the cost page at /symphony/cost.html on the site, one script behind
   both; the stateless sign-in service in symphony-app; version 8 of the Apps' privacy statement
   in symphony-start; this note and a memory fact in the template.
@@ -48,14 +48,14 @@ named "notsorry" was found on GitHub; the spelling is taken as a slip for unsorr
 
 | Repository | Files | Pull request |
 | --- | --- | --- |
-| OpenSpineConsortium/openspineconsortium.github.io | tools/pages/symphony/control/index/body.html, tools/pages/symphony/cost/body.html, assets/js/symphony-panel.js, assets/css/control.css, tools/build_site.py (two nodes), README.md; the built pages symphony/control/index.html and symphony/cost.html | the site's pull request from the branch claude/control-panel |
-| OpenSpineConsortium/symphony-app | signin/worker.js, signin/test_worker.mjs, signin/README.md, scripts/check.sh | symphony-app's pull request from claude/control-panel |
-| OpenSpineConsortium/symphony-start | PRIVACY.md, version 8 (rendered by the site at /symphony/apps-privacy.html) | symphony-start's pull request from claude/control-panel |
-| OpenSpineConsortium/symphony-template | docs/research/control-panel.md (this file), docs/memory/the-control-panel.md and its index line | #95 |
+| OpenSpineConsortium/openspineconsortium.github.io | tools/pages/symphony/control/index/body.html, tools/pages/symphony/cost/body.html, assets/js/symphony-panel.js, assets/css/control.css, tools/build_site.py (two nodes), README.md; the built pages symphony/control/index.html and symphony/cost.html | #20, merged 2026-10-16 |
+| OpenSpineConsortium/symphony-app | signin/worker.js, signin/test_worker.mjs, signin/README.md, scripts/check.sh | #14, merged 2026-10-16 |
+| OpenSpineConsortium/symphony-start | PRIVACY.md, version 8 (rendered by the site at /symphony/apps-privacy.html) | #44, merged 2026-10-16 |
+| OpenSpineConsortium/symphony-template | docs/research/control-panel.md (this file), docs/memory/the-control-panel.md and its index line | #95, merged last |
 
-The pull requests' numbers are filled in here as they open, by the same branch; the order of
-merging is symphony-start first (the site renders its privacy statement), then the site, then
-symphony-app, then the template.
+They merged in the order symphony-start (the site renders its privacy statement), the site,
+symphony-app, then the template, each with a merge commit once its check was green, on the
+owner's standing permission; the site has no check of its own beyond its build.
 
 ## What the panel does
 
@@ -260,10 +260,14 @@ Follow-ups).
     non-JSON answer from GitHub and two refreshes in flight each had a wrong answer (each has its
     own); no way to revoke (POST /revoke, pressed by Forget the token); index.html in the
     callback (stripped); GitHub unreachable answered 500 (502 with words).
-  - The reviewer's own probe script, written against the pages before the rewrite, was rerun
-    after it: its checks on repository switching, the 300-issue cut and the merge button pass;
-    its check that a failed read is said now looks in the wrong place (the failure is in the
-    summary line, not the message line), and the summary line was read by hand to say so.
+  - The reviewer's own probe script, 13 checks written against the pages before the rewrite
+    (repository switching mid-load, a failed read said in words, the 300-issue cut, the merge
+    button on a draft and on a failed check, a hostile board, an escaped pipe, the fallback
+    without Actions: read, a private repository's minutes, sharing off and a missing record,
+    the tab-only token, a dropped todo label, a hostile ?repo=, an archived repository), was
+    rerun after the rewrite with its fixtures served as raw text, as the page now reads files,
+    and its failed-read check pointed at the summary line, where the failure is now said: all
+    13 pass.
 
 ## What waits on the owner
 
