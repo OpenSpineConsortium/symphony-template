@@ -414,8 +414,16 @@ class ReadingShellCommands(unittest.TestCase):
         self.assertEqual(profile.heredoc_opener("cat <<-EOF"), "-EOF")
         self.assertEqual(profile.heredoc_opener("cat <<- EOF"), "-EOF")
         self.assertEqual(profile.heredoc_opener("cat << EOF | sort"), "EOF")
-        for line in ("cat <<'EOF'", 'cat <<"EOF" > f', "cat <<\\EOF"):
+        for line in ("cat <<'EOF'", 'cat <<"EOF" > f', "cat <<\\EOF", "cat <<EOF; echo started", "sort 0<<EOF"):
             self.assertEqual(profile.heredoc_opener(line), "EOF", line)
+        # A << the shell reads as no operator: mid-word quotes, arithmetic.
+        for line in ('x="a << b" cat f', "echo $((1 << 3))", "(( x <<= 2 ))", 'echo "a" \\<< b'):
+            self.assertIsNone(profile.heredoc_opener(line), line)
+        # A commit message written through a here-document inside $( ) in
+        # double quotes is one quoted word to the shell: one git command.
+        commit = "git commit -m \"$(cat <<'EOF'\nfix: cat secret\nEOF\n)\""
+        self.assertEqual(profile.shell_uses(commit), {"git": 1})
+        self.assertEqual(profile.shell_reads(commit, "/r"), [])
         # The delimiter closes a here-document only where it stands alone at the
         # line's start; <<- forgives leading tabs.
         self.assertEqual(profile.without_heredocs("cat <<EOF\n  EOF  \nls"), "cat <<EOF")

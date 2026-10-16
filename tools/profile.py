@@ -256,30 +256,47 @@ def program_of(argv):
 
 def heredoc_opener(line):
     """The word that closes the here-document a line opens, with a leading
-    - where the shell strips the body's tabs (<<-), or None: the << the
-    shell reads as an operator, outside quotes and not in a comment,
-    followed by its word, whose quotes or backslash mean only that the
-    body is literal; a quoted << and a <<< here-string open nothing. The
-    lexer keeps quotes (posix=False), so a quoted << is told from the
-    operator, and the guard's plain_shell drops a comment first."""
-    lexer = shlex.shlex(guard.plain_shell(line), posix=False, punctuation_chars=True)
+    - where the shell strips the body's tabs (<<-), or None. The line is
+    read as the shell reads it, after the guard's plain_shell has dropped a
+    comment: a << inside quotes, in a <<< here-string or in arithmetic,
+    $(( )) or (( )), opens nothing, so a quoted << is told from the
+    operator wherever its quotes begin."""
+    text, quote, arithmetic, i = guard.plain_shell(line), None, 0, 0
+    while i < len(text):
+        ch = text[i]
+        step = 1
+        if ch == "\\" and quote != "'":
+            step = 2
+        elif quote:
+            quote = None if ch == quote else quote
+        elif ch in "'\"":
+            quote = ch
+        elif text.startswith("((", i):
+            arithmetic, step = arithmetic + 1, 2
+        elif arithmetic and text.startswith("))", i):
+            arithmetic, step = arithmetic - 1, 2
+        elif text.startswith("<<<", i):
+            step = 3
+        elif text.startswith("<<", i) and not arithmetic:
+            return delimiter_of(text[i + 2:])
+        i += step
+    return None
+
+
+def delimiter_of(rest):
+    """The word after a <<, as the shell reads it: its quotes or a
+    backslash only make the body literal, and a - before it is kept."""
+    dashed = rest.startswith("-")
+    lexer = shlex.shlex(rest[1:] if dashed else rest, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
     lexer.commenters = ""
     try:
-        tokens = list(lexer)
+        word = next(iter(lexer), "")
     except ValueError:
         return None
-    for index, token in enumerate(tokens[:-1]):
-        if token != "<<":
-            continue
-        following = tokens[index + 1]
-        dashed = following.startswith("-")
-        if following == "-" and index + 2 < len(tokens):
-            following = tokens[index + 2]
-        word = following.lstrip("-").lstrip("\\").strip("'\"")
-        if word and not all(ch in "();<>|&" for ch in word):
-            return ("-" if dashed else "") + word
-    return None
+    if not word or all(ch in "();<>|&" for ch in word):
+        return None
+    return ("-" if dashed else "") + word
 
 
 def without_heredocs(command):
