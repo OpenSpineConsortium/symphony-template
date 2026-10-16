@@ -1,0 +1,691 @@
+"""What a Claude Code session spent, read from the transcript it leaves:
+its context, call by call; its tool calls, by tool; what it read, and
+read again; and where its time went. The first instrument of the research
+programme in docs/research/beyond-cooperation/README.md, which measures a
+way of working before changing it.
+
+  python3 tools/profile.py TRANSCRIPT [--json FILE] [--paths N] [--no-helpers]
+
+prints a report and, with --json, writes the record docs/research/
+beyond-cooperation/README.md describes, aggregates only: counts, bytes,
+seconds and tokens, with tool names and model names, and never a path, a
+command, a prompt or any text of the conversation, so a record can be
+committed beside the question it answers. --paths N prints the N files
+read most often, which stays on the screen.
+
+The transcript is the one Claude Code writes under ~/.claude/projects/,
+one JSON object a line, the same file tools/usage.py reads for the usage
+trailer, and its helpers' transcripts (the subagents') are read beside it
+as usage.py reads them: their calls join the per-tool rows and their
+tokens the totals, with their part given in the record's helpers block,
+while the context, the time and the prompts are the session's own. The
+Agent SDK's execution file of a run in Actions, one JSON array of the
+same messages, is read too, though its messages carry no timestamps, so
+its time measures are empty and it has no session token. Each API call is
+counted once by its message id: a message written as several lines, one
+per block, carries its usage on each, the input and cache counts the same
+on every line and the output count as far as the message had got when
+the line was written, so the largest is taken; a third-party counter that
+sums every line over-counts.
+
+The time measures rest on the transcript's own clock, line by line: the
+active seconds are the gaps between consecutive lines with pauses of more
+than five minutes left out, as usage.py counts them; the seconds in tools
+are the union of each tool call's interval, from the line that asked to
+the line that answered, so two tools running at once count once; the
+seconds outside tools are the active seconds not covered by that union,
+which is the model's time, its thinking and its answer, and the harness's
+own time between lines, which the transcript cannot tell apart; the
+harness's own count of the thinking is given beside them. Per tool, the
+seconds are summed over its calls, so parallel calls each count. The
+tokens each tool brought into the context are an estimate, and the key
+says so: the context's growth from one call to the next, less the call's
+own output, shared among the call's answered tools by the size of their
+answers; a reminder the harness added with the answers is counted with
+them. A repeated call is one the same as an earlier call in the same
+transcript, the same tool with the same input: MAST's step repetition
+(arXiv:2503.13657) read by code, and an upper bound on waste, since a
+git status after a change is a repeat and no waste.
+
+Standard library only, like every tool here; the shell commands are split
+by the vendored protocol library's reader, the one the push guard uses.
+"""
+
+import argparse
+import json
+import posixpath
+import re
+import shlex
+import sys
+from collections import Counter
+from datetime import datetime, timezone
+from pathlib import Path
+
+TOOLS = Path(__file__).resolve().parent
+sys.path.insert(0, str(TOOLS))
+
+import economics  # noqa: E402
+import usage  # noqa: E402
+from sdlc_protocol import guard  # noqa: E402
+
+SCHEMA = "symphony-profile/1"
+# Programs that print a file: a shell command of one of them naming a file
+# is a read of it, as a call of the Read tool is; one naming none is a
+# filter on another command's output.
+READERS = ("cat", "head", "tail", "sed", "less", "more", "nl")
+# Those that print part of a file, as a Read with an offset or a limit does.
+PARTIAL_READERS = ("head", "tail", "sed")
+SEARCHERS = ("grep", "rg", "ag", "ack", "egrep", "fgrep")
+LISTERS = ("ls", "find", "tree", "wc", "stat", "du", "file")
+GIT = ("git", "gh")
+# Builtins that read and run nothing worth counting.
+QUIET = ("cd", "echo", "printf", "true", "false", "exit", "export", "set", "test", "[", "pwd", "read", "shift",
+         "local", "declare", "unset", "break", "continue", "return", "wait", ":")
+# Words the shell reads before a command and that name none: its reserved
+# words, the guard's and the ones that close a construct, and the wrappers
+# that run the command after them as it is (timeout and nice take a value
+# first and are not read); a loop or case header names no command at all.
+KEYWORDS = guard.RESERVED | {"}", "done", "fi", "esac"}
+WRAPPERS = ("time", "sudo", "nohup", "exec", "command", "builtin", "env", "xargs")
+HEADERS = ("for", "select", "case")
+SHELL_USES = ("read", "filter", "search", "list", "git", "run")
+# The readers' options whose value is the next word, so that it is not
+# taken for a file: head -n 20 FILE, sed -e SCRIPT FILE, nl -w 3 FILE; the
+# short ones by their letter, the long ones by name (a value joined with =
+# is in the same word).
+SHORT_VALUED = {"head": "nc", "tail": "nc", "sed": "efl", "nl": "bdfhilnsvw"}
+LONG_VALUED = {"head": ("--lines", "--bytes"), "tail": ("--lines", "--bytes"),
+               "sed": ("--expression", "--file"),
+               "nl": ("--body-numbering", "--footer-numbering", "--header-numbering", "--line-increment",
+                      "--number-format", "--number-separator", "--number-width", "--section-delimiter",
+                      "--starting-line-number")}
+# The sed options that give the script, after which every plain word is a file.
+SCRIPT_OPTIONS = ("--expression", "--file")
+# A fall of the context between two consecutive calls by more than this
+# share is a drop: a compaction, or the harness trimming what it sends.
+DROP = 0.5
+GLOB = "*?[$~`"
+# A transcript is named for its session id; any other name is a run's file.
+SESSION_STEM = re.compile(r"[0-9a-f]{8}(-[0-9a-f]+)*")
+BY_TOOL_KEYS = ("calls", "failed", "repeated", "input_bytes", "result_bytes", "seconds_in_tool",
+                "context_tokens_estimated")
+SECONDS_KEYS = ("span", "active", "in_tools", "outside_tools", "thinking")
+HELPERS_KEYS = ("transcripts", "calls", "seconds_in_tool", "output_tokens")
+READS_KEYS = ("calls", "files_named", "files", "rereads", "partial", "bytes", "reread_bytes")
+
+
+# --- reading the transcript -----------------------------------------------------
+
+def entries_of(path):
+    """A transcript's entries: one JSON object a line, as Claude Code
+    writes a session's, or one JSON array, as the Agent SDK writes a run's
+    execution file in Actions."""
+    entries = list(usage.transcript_lines(path))
+    if entries:
+        return entries
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [e for e in data if isinstance(e, dict)] if isinstance(data, list) else []
+
+
+def blocks(message):
+    """The content blocks of a message; a string content has none."""
+    content = message.get("content") if isinstance(message, dict) else None
+    return [b for b in content if isinstance(b, dict)] if isinstance(content, list) else []
+
+
+def text_bytes(content):
+    """The size of what a tool returned as the model saw it: a string, the
+    text of a text block, and any other block by the size of its JSON (a
+    tool reference, or an image by its data, which is not what an image
+    costs in tokens)."""
+    if isinstance(content, str):
+        return len(content.encode("utf-8"))
+    if not isinstance(content, list):
+        return 0
+    total = 0
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            total += len(str(block.get("text") or "").encode("utf-8"))
+        else:
+            total += len(json.dumps(block, sort_keys=True).encode("utf-8"))
+    return total
+
+
+def api_calls(entries):
+    """Each API call of a transcript once, in order of its first line, with
+    the tool calls it made: a message's lines share its id, and its
+    tool_use blocks are told apart by theirs. Its usage is the largest its
+    lines carry, since a helper's lines carry the output count as it grew."""
+    calls, by_id = [], {}
+    for entry in entries:
+        message = entry.get("message") if entry.get("type") == "assistant" else None
+        if not isinstance(message, dict) or message.get("model") == usage.SYNTHETIC:
+            continue
+        key = message.get("id") or entry.get("requestId") or entry.get("uuid")
+        at = usage.moment(entry.get("timestamp"))
+        call = by_id.get(key)
+        counts = usage.counts_of(message.get("usage")) if message.get("usage") else None
+        thinking = entry.get("thinkingDurationMs") or 0
+        if call is None:
+            call = {"model": message.get("model") or "unknown", "at": at, "until": at, "counts": counts,
+                    "tools": [], "thinking_ms": thinking}
+            by_id[key] = call
+            calls.append(call)
+        else:
+            if at is not None and (call["until"] is None or at > call["until"]):
+                call["until"] = at
+            if counts:
+                call["counts"] = [max(a, b) for a, b in zip(call["counts"], counts)] if call["counts"] else counts
+            call["thinking_ms"] = max(call["thinking_ms"], thinking)
+        seen = {t["id"] for t in call["tools"]}
+        for block in blocks(message):
+            if block.get("type") == "tool_use" and block.get("id") and block["id"] not in seen:
+                call["tools"].append({"id": block["id"], "name": str(block.get("name") or "unknown"),
+                                      "input": block.get("input") if isinstance(block.get("input"), dict) else {},
+                                      "at": at, "cwd": entry.get("cwd") or "", "result": None})
+    return calls
+
+
+def tool_results(entries):
+    """Each tool's answer by the id of the call it answers: when it came,
+    how big it was and whether it was an error."""
+    found = {}
+    for entry in entries:
+        if entry.get("type") != "user":
+            continue
+        for block in blocks(entry.get("message")):
+            if block.get("type") == "tool_result" and block.get("tool_use_id"):
+                found[block["tool_use_id"]] = {"at": usage.moment(entry.get("timestamp")),
+                                               "bytes": text_bytes(block.get("content")),
+                                               "error": bool(block.get("is_error"))}
+    return found
+
+
+def context_of(counts):
+    """The tokens an API call sent: uncached input, cache writes and cache reads."""
+    return counts[0] + counts[1] + counts[2] + counts[3]
+
+
+def is_prompt(entry):
+    """A person's own message: a user line that is no tool result, no
+    attachment the harness added and no summary a compaction wrote."""
+    if entry.get("type") != "user" or entry.get("isMeta") or entry.get("isCompactSummary"):
+        return False
+    message = entry.get("message")
+    if isinstance(message, dict) and isinstance(message.get("content"), str):
+        return True
+    return bool(blocks(message)) and all(b.get("type") == "text" for b in blocks(message))
+
+
+def compactions(entries):
+    """How many times the context was compacted: the boundary lines the
+    harness writes, or, where it writes none, the summaries it starts the
+    continued conversation with."""
+    boundaries = sum(1 for e in entries if e.get("type") == "system" and e.get("subtype") == "compact_boundary")
+    summaries = sum(1 for e in entries if e.get("type") == "user" and e.get("isCompactSummary"))
+    return max(boundaries, summaries)
+
+
+# --- what was read --------------------------------------------------------------
+
+def resolve(path, base):
+    """A path as the transcript names it, made absolute against the line's
+    working directory where it is a plain path; a pattern or a variable is
+    kept as written, since the file it means cannot be told."""
+    if not path or path == "-" or any(ch in path for ch in GLOB):
+        return None
+    if posixpath.isabs(path) or (len(path) > 1 and path[1] == ":"):
+        return posixpath.normpath(path)
+    return posixpath.normpath(posixpath.join(base or "", path)) if base else path
+
+
+def program_of(argv):
+    """The program a simple command runs, after any VAR=value words, the
+    shell's keywords and the wrappers that run it as it is; a loop or case
+    header runs none."""
+    words = list(argv)
+    while words and (guard.ASSIGNMENT.match(words[0]) or words[0] in KEYWORDS or words[0] in WRAPPERS):
+        words.pop(0)
+    if not words or words[0] in HEADERS:
+        return "", []
+    return guard.program(words[0]), words[1:]
+
+
+def heredoc_opener(line):
+    """The word that closes the here-document a line opens, with a leading
+    - where the shell strips the body's tabs (<<-), or None. The line is
+    read as the shell reads it, after the guard's plain_shell has dropped a
+    comment: a << inside quotes, in a <<< here-string or in arithmetic,
+    $(( )) or (( )), opens nothing, so a quoted << is told from the
+    operator wherever its quotes begin."""
+    text, quote, arithmetic, i = guard.plain_shell(line), None, 0, 0
+    while i < len(text):
+        ch = text[i]
+        step = 1
+        if ch == "\\" and quote != "'":
+            step = 2
+        elif quote:
+            quote = None if ch == quote else quote
+        elif ch in "'\"":
+            quote = ch
+        elif text.startswith("((", i):
+            arithmetic, step = arithmetic + 1, 2
+        elif arithmetic and text.startswith("))", i):
+            arithmetic, step = arithmetic - 1, 2
+        elif text.startswith("<<<", i):
+            step = 3
+        elif text.startswith("<<", i) and not arithmetic:
+            return delimiter_of(text[i + 2:])
+        i += step
+    return None
+
+
+def delimiter_of(rest):
+    """The word after a <<, as the shell reads it: its quotes or a
+    backslash only make the body literal, and a - before it is kept."""
+    dashed = rest.startswith("-")
+    lexer = shlex.shlex(rest[1:] if dashed else rest, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    try:
+        word = next(iter(lexer), "")
+    except ValueError:
+        return None
+    if not word or all(ch in "();<>|&" for ch in word):
+        return None
+    return ("-" if dashed else "") + word
+
+
+def without_heredocs(command):
+    """The command with its here-document bodies left out, since they are
+    data the command reads, not commands the shell runs."""
+    kept, closing, dashed = [], None, False
+    for line in str(command).split("\n"):
+        if closing is not None:
+            if (line.lstrip("\t") if dashed else line) == closing:
+                closing = None
+            continue
+        kept.append(line)
+        opener = heredoc_opener(line)
+        dashed = bool(opener) and opener.startswith("-")
+        closing = opener.lstrip("-") if opener else None
+    return "\n".join(kept)
+
+
+def commands_of(command):
+    return guard.simple_commands(without_heredocs(command))
+
+
+def is_write(program, arguments):
+    """sed editing in place writes the file and reads it for nobody."""
+    return program == "sed" and any(
+        word == "--in-place" or word.startswith("--in-place=") or (word.startswith("-") and not word.startswith("--")
+                                                                     and "i" in word)
+        for word in arguments)
+
+
+def files_of(program, arguments):
+    """The files a reading command names: its words that are no option
+    (less and more take +options too), no option's value and not the
+    standard input (-), and for sed, whose script is its first plain word
+    unless an option gave it, the words after the script."""
+    files, skip, script_seen = [], False, program != "sed"
+    for word in arguments:
+        if skip:
+            skip = False
+        elif word == "-" or (word.startswith("+") and program in ("less", "more")):
+            continue
+        elif word.startswith("--"):
+            name, joined, _ = word.partition("=")
+            if name in LONG_VALUED.get(program, ()):
+                skip = not joined
+                script_seen = script_seen or name in SCRIPT_OPTIONS
+        elif word.startswith("-") and len(word) > 1:
+            if word[-1] in SHORT_VALUED.get(program, "") and not word[1:-1].isdigit():
+                skip = True
+                script_seen = script_seen or word[-1] in "ef"
+        elif not script_seen:
+            script_seen = True
+        else:
+            files.append(word)
+    return files
+
+
+def shell_reads(command, base):
+    """The files a shell command prints, as resolve() names them, following
+    a cd inside the command."""
+    paths = []
+    for argv in commands_of(command):
+        program, arguments = program_of(argv)
+        if program == "cd" and len(arguments) == 1:
+            base = resolve(arguments[0], base) or base
+        elif program in READERS and not is_write(program, arguments):
+            paths.extend(p for p in (resolve(f, base) for f in files_of(program, arguments)) if p)
+    return paths
+
+
+def shell_uses(command):
+    """What each simple command of a shell command is for."""
+    uses = Counter()
+    for argv in commands_of(command):
+        program, arguments = program_of(argv)
+        if not program or program in QUIET:
+            continue
+        if program in READERS and not is_write(program, arguments):
+            uses["read" if files_of(program, arguments) else "filter"] += 1
+        elif program in SEARCHERS:
+            uses["search"] += 1
+        elif program in LISTERS:
+            uses["list"] += 1
+        elif program in GIT:
+            uses["git"] += 1
+        else:
+            uses["run"] += 1
+    return uses
+
+
+def reads_of(tool):
+    """The files one tool call reads, and whether it reads part of them."""
+    name, given = tool["name"], tool["input"]
+    if name == "Read":
+        path = resolve(str(given.get("file_path") or ""), tool["cwd"])
+        return ([path] if path else []), bool(given.get("offset") or given.get("limit"))
+    if name == "Bash":
+        command = str(given.get("command") or "")
+        partial = any(program_of(argv)[0] in PARTIAL_READERS for argv in commands_of(command))
+        return shell_reads(command, tool["cwd"]), partial
+    return [], False
+
+
+# --- time -------------------------------------------------------------------------
+
+def tool_seconds(tool):
+    """From the line that asked to the line that answered; nothing when
+    either is missing or the answer came first."""
+    result = tool["result"]
+    if result is None or result["at"] is None or tool["at"] is None or result["at"] < tool["at"]:
+        return 0
+    return result["at"] - tool["at"]
+
+
+def union(intervals):
+    """The intervals merged, so time two tools shared counts once."""
+    merged = []
+    for start, end in sorted(intervals):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def overlap(a, b, intervals):
+    return sum(max(0.0, min(b, end) - max(a, start)) for start, end in intervals)
+
+
+def active_outside(times, intervals):
+    """The active seconds, each gap between consecutive lines of at most
+    IDLE_GAP, less the part of each a tool was running."""
+    times = sorted(times)
+    gaps = [(a, b) for a, b in zip(times, times[1:]) if b - a <= usage.IDLE_GAP]
+    return sum((b - a) - overlap(a, b, intervals) for a, b in gaps)
+
+
+# --- the profile -------------------------------------------------------------------
+
+def empty_tool():
+    return dict.fromkeys(BY_TOOL_KEYS, 0)
+
+
+class Profile:
+    """The record as it is built, one transcript at a time."""
+
+    def __init__(self):
+        self.models = {}
+        self.by_tool = {}
+        self.calls = Counter()
+        self.shell = Counter()
+        self.reads = Counter()
+        self.files = set()
+        self.per_path = Counter()
+        self.context = {}
+        self.seconds = dict.fromkeys(SECONDS_KEYS, 0)
+        self.prompts = 0
+        self.attachments = 0
+        self.helpers = dict.fromkeys(HELPERS_KEYS, 0)
+        self.lines = 0
+        self.started = None
+        self.ended = None
+
+    def add_transcript(self, entries, main):
+        calls, results = api_calls(entries), tool_results(entries)
+        for call in calls:
+            if call["counts"]:
+                usage.add(self.models, call["model"], call["counts"])
+            for tool in call["tools"]:
+                tool["result"] = results.get(tool["id"])
+        self.add_tools(calls)
+        if not main:
+            self.add_helper(calls)
+        if main:
+            self.lines = len(entries)
+            self.add_context(calls)
+            self.context["compactions"] = compactions(entries)
+            self.add_time(entries, calls)
+            self.prompts = sum(1 for e in entries if is_prompt(e))
+            self.attachments = sum(1 for e in entries if e.get("type") == "attachment")
+
+    def add_tools(self, calls):
+        seen, made = set(), set()
+        for call in calls:
+            for tool in call["tools"]:
+                row = self.by_tool.setdefault(tool["name"], empty_tool())
+                row["calls"] += 1
+                given = json.dumps(tool["input"], sort_keys=True)
+                row["input_bytes"] += len(given.encode("utf-8"))
+                self.calls["total"] += 1
+                if (tool["name"], given) in made:
+                    row["repeated"] += 1
+                    self.calls["repeated"] += 1
+                made.add((tool["name"], given))
+                result = tool["result"]
+                if result is None:
+                    self.calls["unanswered"] += 1
+                else:
+                    row["result_bytes"] += result["bytes"]
+                    row["failed"] += int(result["error"])
+                    self.calls["failed"] += int(result["error"])
+                    row["seconds_in_tool"] += tool_seconds(tool)
+                if tool["name"] == "Bash":
+                    self.shell.update(shell_uses(str(tool["input"].get("command") or "")))
+                self.add_reads(tool, seen)
+
+    def add_helper(self, calls):
+        """What a helper's transcript added to the rows and the totals, so
+        that a reader can take it back out."""
+        self.helpers["transcripts"] += 1
+        self.helpers["calls"] += sum(len(c["tools"]) for c in calls)
+        self.helpers["output_tokens"] += sum(c["counts"][4] for c in calls if c["counts"])
+        self.helpers["seconds_in_tool"] += sum(tool_seconds(t) for c in calls for t in c["tools"])
+
+    def add_reads(self, tool, seen):
+        paths, partial = reads_of(tool)
+        if not paths:
+            return
+        new = [p for p in paths if p not in seen]
+        self.reads["calls"] += 1
+        self.reads["files_named"] += len(paths)
+        self.reads["rereads"] += len(paths) - len(new)
+        self.reads["partial"] += int(partial)
+        size = tool["result"]["bytes"] if tool["result"] else 0
+        self.reads["bytes"] += size
+        if not new:
+            self.reads["reread_bytes"] += size
+        seen.update(paths)
+        self.files.update(paths)
+        self.per_path.update(paths)
+
+    def add_context(self, calls):
+        """The context call by call, and its growth shared out to the tools
+        whose answers it carried; a call whose usage says it sent nothing
+        is an error line, not a call."""
+        measured = [c for c in calls if c["counts"] and context_of(c["counts"]) > 0]
+        sizes = [context_of(c["counts"]) for c in measured]
+        cached = sum(c["counts"][3] for c in measured)
+        self.context = {"calls": len(sizes), "first": sizes[0] if sizes else 0, "peak": max(sizes, default=0),
+                        "last": sizes[-1] if sizes else 0, "mean": round(sum(sizes) / len(sizes)) if sizes else 0,
+                        "cached_share": round(cached / sum(sizes), 3) if sum(sizes) else 0,
+                        "compactions": 0, "drops": 0, "growth": 0}
+        for call, size, following in zip(measured, sizes, sizes[1:]):
+            if following < size * (1 - DROP):
+                self.context["drops"] += 1
+                continue
+            growth = max(0, following - size - call["counts"][4])
+            self.context["growth"] += growth
+            self.share_growth(call, growth)
+
+    def share_growth(self, call, growth):
+        answered = [t for t in call["tools"] if t["result"] is not None]
+        if not answered:
+            return
+        weights = [t["result"]["bytes"] for t in answered]
+        if not sum(weights):
+            weights = [1] * len(answered)
+        for tool, weight in zip(answered, weights):
+            self.by_tool[tool["name"]]["context_tokens_estimated"] += round(growth * weight / sum(weights))
+
+    def add_time(self, entries, calls):
+        times = [t for t in (usage.moment(e.get("timestamp")) for e in entries) if t is not None]
+        if not times:
+            return
+        self.started, self.ended = min(times), max(times)
+        intervals = union([(t["at"], t["result"]["at"]) for c in calls for t in c["tools"]
+                           if t["result"] and t["at"] is not None and t["result"]["at"] is not None
+                           and t["result"]["at"] >= t["at"]])
+        self.seconds["span"] = self.ended - self.started
+        self.seconds["active"] = usage.active_seconds(entries)
+        self.seconds["in_tools"] = sum(end - start for start, end in intervals)
+        self.seconds["outside_tools"] = active_outside(times, intervals)
+        self.seconds["thinking"] = sum(c["thinking_ms"] for c in calls) / 1000
+
+    def record(self, session):
+        usd, unpriced = economics.priced(self.models)
+        tokens = economics.by_kind(self.models)
+        tokens["total"] = sum(tokens.values())
+        by_tool = {name: {k: round(v) for k, v in row.items()} for name, row in sorted(self.by_tool.items())}
+        return {
+            "schema": SCHEMA, "session": session, "helpers": {k: round(v) for k, v in self.helpers.items()},
+            "started_at": stamp(self.started), "ended_at": stamp(self.ended),
+            "prompts": self.prompts, "attachments": self.attachments,
+            "seconds": {k: round(self.seconds[k]) for k in SECONDS_KEYS},
+            "models": {m: list(c) for m, c in sorted(self.models.items())},
+            "tokens": tokens, "estimated_usd": round(usd, 4), "tokens_unpriced": unpriced,
+            "prices_as_of": economics.PRICES_AS_OF,
+            "context": dict(self.context),
+            "calls": {"total": self.calls["total"], "failed": self.calls["failed"],
+                      "unanswered": self.calls["unanswered"], "repeated": self.calls["repeated"], "by_tool": by_tool},
+            "shell": {k: self.shell[k] for k in SHELL_USES},
+            "reads": {k: (len(self.files) if k == "files" else self.reads[k]) for k in READS_KEYS},
+        }
+
+
+def stamp(moment):
+    if moment is None:
+        return None
+    return datetime.fromtimestamp(moment, timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def profile(transcript, helpers=True):
+    """The record of one session: its transcript and, by default, its
+    helpers' beside it."""
+    built = Profile()
+    built.add_transcript(entries_of(transcript), main=True)
+    if helpers:
+        for helper in usage.helper_transcripts(transcript):
+            built.add_transcript(entries_of(helper), main=False)
+    stem = Path(transcript).stem
+    return built.record(usage.session_token(stem) if SESSION_STEM.fullmatch(stem) else None), built
+
+
+# --- the report ---------------------------------------------------------------------
+
+def share(part, whole):
+    return f"{100 * part / whole:.0f}%" if whole else "n/a"
+
+
+def report(record):
+    """The record as a person reads it."""
+    seconds, context, calls, reads, tokens = (record[k] for k in ("seconds", "context", "calls", "reads", "tokens"))
+    helpers = record["helpers"]
+    who = f"session {record['session']}" if record["session"] else "a run"
+    when = f"{record['started_at']} to {record['ended_at']}" if record["started_at"] else "no clock"
+    lines = [f"Profile of {who} ({when}, {helpers['transcripts']} helper transcript"
+             f"{'s' if helpers['transcripts'] != 1 else ''}, {record['prompts']} prompts, "
+             f"{record['attachments']} attachments)",
+             f"Time: span {seconds['span']:,} s, active {seconds['active']:,} s; in tools {seconds['in_tools']:,} s "
+             f"({share(seconds['in_tools'], seconds['active'])} of active), outside tools "
+             f"{seconds['outside_tools']:,} s ({share(seconds['outside_tools'], seconds['active'])}), "
+             f"the model and the harness between lines; the harness counted {seconds['thinking']:,} s of thinking",
+             f"Tokens: input {tokens['input']:,}, cache writes {tokens['cache_write']:,}, cache reads "
+             f"{tokens['cache_read']:,}, output {tokens['output']:,}; estimated USD {record['estimated_usd']:.2f} "
+             f"at list prices of {record['prices_as_of']} ({', '.join(record['models']) or 'no model'})",
+             f"Context: {context.get('calls', 0):,} API calls, first {context.get('first', 0):,} tokens, peak "
+             f"{context.get('peak', 0):,}, last {context.get('last', 0):,}, mean {context.get('mean', 0):,}; "
+             f"{share(context.get('cached_share', 0), 1)} served from cache; {context.get('compactions', 0)} "
+             f"compactions, {context.get('drops', 0)} drops; grew by {context.get('growth', 0):,} tokens, "
+             f"shared out to the tools below (an estimate)",
+             f"Tool calls: {calls['total']:,}, {calls['failed']:,} failed, {calls['unanswered']:,} unanswered, "
+             f"{calls['repeated']:,} repeated (the same tool with the same input again)"]
+    lines.append(f"  {'tool':34} {'calls':>6} {'failed':>6} {'in KB':>8} {'out KB':>8} {'seconds':>8} {'context':>10}")
+    for name, row in calls["by_tool"].items():
+        lines.append(f"  {name[:34]:34} {row['calls']:>6,} {row['failed']:>6,} {row['input_bytes'] / 1024:>8.1f} "
+                     f"{row['result_bytes'] / 1024:>8.1f} {row['seconds_in_tool']:>8,} "
+                     f"{row['context_tokens_estimated']:>10,}")
+    if helpers["transcripts"]:
+        lines.append(f"Helpers: {helpers['transcripts']} transcripts added {helpers['calls']:,} calls, "
+                     f"{helpers['seconds_in_tool']:,} s and {helpers['output_tokens']:,} output tokens to the rows "
+                     f"and totals above; the context and the time are the session's own")
+    shell = record["shell"]
+    lines.append("Shell commands: " + ", ".join(f"{k} {shell[k]:,}" for k in SHELL_USES))
+    lines.append(f"Reads: {reads['calls']:,} calls naming {reads['files_named']:,} files ({reads['files']:,} "
+                 f"distinct), {reads['rereads']:,} re-reads ({share(reads['rereads'], reads['files_named'])}), "
+                 f"{reads['partial']:,} partial; {reads['bytes'] / 1024:,.1f} KB returned, "
+                 f"{reads['reread_bytes'] / 1024:,.1f} KB of it by calls that only re-read")
+    return "\n".join(lines) + "\n"
+
+
+def most_read(built, count):
+    rows = sorted(built.per_path.items(), key=lambda item: (-item[1], item[0]))[:count]
+    return "".join(f"{n:>5}  {path}\n" for path, n in rows)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="python3 tools/profile.py", description=__doc__.split("\n\n")[0])
+    parser.add_argument("transcript", help="a session's transcript (.jsonl), or a run's execution file")
+    parser.add_argument("--json", help="write the record here, aggregates only")
+    parser.add_argument("--paths", type=int, default=0, help="also print the N files read most often")
+    parser.add_argument("--no-helpers", action="store_true", help="leave the helpers' transcripts out")
+    args = parser.parse_args(argv)
+    if not Path(args.transcript).is_file():
+        print(f"profile: no transcript at {args.transcript}", file=sys.stderr)
+        return 2
+    record, built = profile(args.transcript, helpers=not args.no_helpers)
+    if not built.lines:
+        print(f"profile: no entries read from {args.transcript}", file=sys.stderr)
+        return 2
+    sys.stdout.write(report(record))
+    if args.paths:
+        sys.stdout.write(f"Files read most often (not in the record):\n{most_read(built, args.paths)}")
+    if args.json:
+        out = Path(args.json)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="ascii")
+        print(f"record written to {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

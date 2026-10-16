@@ -8,7 +8,9 @@ Three rules hold in every programme, taken from OpenSpineConsortium/coordbench, 
 - A run that spends tokens or money waits for the owner's word and the number: how many runs, of what, at about what cost. Nothing here starts a run by itself; a schedule, where one exists, is a fallback and never the only trigger.
 - A record carries counts, bytes, seconds and tokens, with tool names and model names, and never a path, a command, a prompt, a title or any text of a conversation, so it can be committed and shared. Transcripts and logs stay where they were written.
 
-Programmes: none has landed on main yet; each adds its folder and its line here in the pull request that brings it.
+Programmes:
+
+- [beyond-cooperation](beyond-cooperation/README.md): what one agent spends, context, tool calls, reading and time, and how to spend less, measured with tools/profile.py, with MAST's failure taxonomy as the outcome side.
 
 ## Notes
 
@@ -20,6 +22,7 @@ A note is one finished piece of research, a study, a comparison, a deep-research
 - [The Symphony control panel and what Symphony costs](control-panel.md): the notes of the thread "Symphony control website" (item 7 of the 2026-10-15b handoff), written 2026-10-16 and kept current as the work goes on: the ask, the answer in short, where the panel lives and what it does, its design decisions, the cost comparison, the checks and reviews, and what waits on the owner.
 - [Outside code bases](outside-code-bases.md): the assessment of 2026-10-16, in the thread "Integrating outside code bases", of the four code bases the owner named (delm-agent-plugin, Claim Plane, HyperAgent, autonomous-software-agent) and of the git-native candidates in the note above: none taken as a library and no code copied, DeLM's check receipt and Claim Plane's pre-write admission measured first as coordbench arms, Claim Plane's published gain matched by its own serial arm, and the order the steps wait in.
 - [The token wizard](token-wizard.md): the notes of the thread "Claude token setup wizard" (item 11 of the 2026-10-15b handoff), written 2026-10-16: how Claude tokens were taken before, what claude setup-token and gh do, why scripts/tokens.py runs the sign-in behind a pseudo-terminal of its own and stores each account's token as an Actions secret without showing it, the checks, the two adversarial review passes and what changed for them, and what stays open.
+- [Beethoven's worker and Claude projects](beethoven-worker-opening.md): the notes of the thread "Beethoven worker opening" (item 9 of the list the owner gave the project chat on 2026-10-15), written 2026-10-16: why a Claude project cannot take the session Beethoven's worker starts and reaches the worker only through its own Work locally, what the worker runs today, what claude.ai's documentation says, the owner's goal feature by feature, what Beethoven 21.0.0 changes, and what is not yet measured on the grid.
 
 ## Research kept elsewhere in this repository
 
