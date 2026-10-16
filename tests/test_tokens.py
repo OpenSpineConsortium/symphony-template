@@ -504,6 +504,24 @@ class Adding(unittest.TestCase):
         self.assertEqual(find(calls, "variable set", tokens.ACCOUNTS_VARIABLE), [])
         self.assertIn("unchanged", printed)
 
+    def test_a_list_the_bench_refuses_is_written_again(self):
+        # 01,02 names slots 1 and 2 to a reader that takes any number, and
+        # stops the bench's real runs, which take only the words 1 to 8.
+        for written, kept in (("01,02", False), ("1,2,9", False), ("1, 2", True)):
+            world = World(self, secrets=[secret(tokens.slot_secret(1)), secret(tokens.slot_secret(2))],
+                          variables=[variable(tokens.ACCOUNTS_VARIABLE, written)])
+            run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+            printed = io.StringIO()
+            with patch.object(tokens.subprocess, "run", run), redirect_stdout(printed):
+                tokens.update_accounts(tokens.State(tokens.Gh(), target()))
+            stores = find(world.calls(), "variable set", tokens.ACCOUNTS_VARIABLE)
+            if kept:
+                self.assertEqual(stores, [], written)
+                self.assertIn("1,2 (unchanged)", printed.getvalue())
+            else:
+                self.assertEqual(len(stores), 1, written)
+                self.assertEqual(stores[0]["args"][-2:], ["--body", "1,2"])
+
     def test_also_main_stores_the_same_token_under_the_workflows_name(self):
         world = World(self)
         world.expect_store(tokens.slot_secret(1), tokens.MAIN_SECRET)
@@ -659,17 +677,26 @@ class Status(unittest.TestCase):
         # organization's list the wizard keeps.
         world = World(self, secrets=[secret(tokens.slot_secret(1))], variables=[variable(tokens.ACCOUNTS_VARIABLE, "1")])
         routes = read_json(world.routes_file)
-        routes["secret list"] = [answer(200, world.secrets), answer(200, [])]
-        routes["variable list"] = [answer(200, world.variables), answer(200, [{"name": tokens.ACCOUNTS_VARIABLE, "value": "1,2"}])]
+        # The organization's list reaches a repository the options do not
+        # name, as coordbench, which status reads too; the one named cannot
+        # be read, and status goes on.
+        routes[f"GET orgs/{ORG}/actions/variables/{tokens.ACCOUNTS_VARIABLE}/repositories"] = [answer(200, f"{REPO}\nbench\n")]
+        routes["secret list"] = [answer(200, world.secrets), answer(200, []), answer(200, [])]
+        routes["variable list"] = [answer(200, world.variables), answer(403, {"message": "Resource not accessible"}),
+                                   answer(200, [{"name": tokens.ACCOUNTS_VARIABLE.lower(), "value": "\x1b[2J,1,2"}])]
         fake_gh.write_routes(world.routes_file, routes)
         run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
         printed = io.StringIO()
         with patch.object(tokens.subprocess, "run", run), redirect_stdout(printed):
             tokens.print_status(tokens.State(tokens.Gh(), target()))
         text = printed.getvalue()
-        self.assertIn(f"{ORG}/{REPO} holds its own {tokens.ACCOUNTS_VARIABLE} (1,2), which outranks", text)
-        self.assertIn(f"https://github.com/{ORG}/{REPO}/settings/variables/actions", text)
-        self.assertEqual(find(world.calls(), "variable list")[-1]["args"], ["variable", "list", "--repo", f"{ORG}/{REPO}", "--json", "name,value"])
+        self.assertIn(f"{ORG}/{REPO}: its own variables could not be read", text)
+        self.assertIn(f"{ORG}/bench holds its own {tokens.ACCOUNTS_VARIABLE} (1,2, and a word that is not a slot", text)
+        self.assertIn(f"https://github.com/{ORG}/bench/settings/variables/actions", text)
+        self.assertNotIn("\x1b", text)
+        self.assertEqual([call["args"] for call in find(world.calls(), "variable list")][1:], [
+            ["variable", "list", "--repo", f"{ORG}/{REPO}", "--json", "name,value"],
+            ["variable", "list", "--repo", f"{ORG}/bench", "--json", "name,value"]])
         # A repository that holds none is not named.
         world = World(self, variables=[variable(tokens.ACCOUNTS_VARIABLE, "1")])
         routes = read_json(world.routes_file)
@@ -682,15 +709,36 @@ class Status(unittest.TestCase):
             tokens.print_status(tokens.State(tokens.Gh(), target()))
         self.assertNotIn("holds its own", printed.getvalue())
 
-    def test_a_list_made_by_hand_is_read_as_slots_or_not_at_all(self):
-        # A superscript two passes isdigit() and fails int(), and int()
-        # refuses more than 4,300 digits: neither may stop status.
-        self.assertEqual(tokens.parse_slots("3, 1 1,9,0,08"), [1, 3, 8])
+    def test_a_list_is_read_as_the_bench_reads_it(self):
+        # coordbench's plan.py splits the list on commas and blanks and
+        # refuses a real run on any word that is not 1 to 8. A superscript
+        # two passes isdigit() and fails int(), and int() refuses more than
+        # 4,300 digits: neither may stop status.
+        self.assertEqual(tokens.parse_slots("3, 1 1,2"), [1, 2, 3])
+        self.assertEqual(tokens.parse_slots("01,02,9,0,08"), [])
         self.assertEqual(tokens.parse_slots("\u00b2,2"), [2])
         self.assertEqual(tokens.parse_slots("1" * 5000 + ",4"), [4])
-        self.assertEqual(tokens.parse_slots("\x1b[2J"), [])
-        self.assertIsNone(tokens.slot_number("\u00b2"))
-        self.assertEqual(tokens.slot_number("08"), 8)
+        self.assertIsNone(tokens.slot_number("08"))
+        for refused in ("01,02", "1,2,9", "1,2,junk", "\u00b2,2", "\x1b[2J,1"):
+            self.assertTrue(tokens.holds_other_words(refused), refused)
+        for taken in ("1,2", "2 1", " 1 , 2 ", "1\t2", ""):
+            self.assertFalse(tokens.holds_other_words(taken), taken)
+        self.assertEqual(tokens.slots_text("\x1b[2J,1,2"), "1,2, and a word that is not a slot, which stops the bench's real runs")
+        self.assertEqual(tokens.slots_text("junk"), "no slot, and a word that is not a slot, which stops the bench's real runs")
+
+    def test_a_label_made_by_hand_is_shown_only_as_a_word(self):
+        world = World(self, secrets=[secret(tokens.slot_secret(1))],
+                      variables=[variable(tokens.slot_label(1), "\x1b]0;title\x07work"), variable(tokens.slot_label(2), "work\n")])
+        run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+        printed = io.StringIO()
+        with patch.object(tokens.subprocess, "run", run), redirect_stdout(printed):
+            tokens.print_status(tokens.State(tokens.Gh(), target()))
+        text = printed.getvalue()
+        self.assertIn("slot 1 (a label not shown, not a word of a label's shape)", text)
+        self.assertIn("the label of slot 2 (a label not shown, not a word of a label's shape) outlives its secret", text)
+        self.assertNotIn("\x1b", text)
+        with self.assertRaises(tokens.TokensError):
+            tokens.check_label("work\n")
 
     def test_a_repository_s_own_secret_is_shown_as_outranking(self):
         world = World(self, secrets=[secret(tokens.MAIN_SECRET, OLD, "all", 0)])
@@ -854,7 +902,7 @@ class TheWizard(unittest.TestCase):
         self.assertEqual(tokens.chosen_slot(state, lambda prompt: ""), 2)
         self.assertEqual(tokens.chosen_slot(state, lambda prompt: "1"), 1)
         self.assertIsNone(tokens.chosen_slot(state, lambda prompt: "n"))
-        for answer in ("9", "\u00b2", "1" * 5000):
+        for answer in ("9", "08", "\u00b2", "1" * 5000):
             with self.assertRaises(tokens.TokensError):
                 tokens.chosen_slot(state, lambda prompt: answer)
 

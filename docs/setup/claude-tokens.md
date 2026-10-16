@@ -14,13 +14,14 @@ account you have, without the token ever being shown.
 | --- | --- | --- |
 | CLAUDE_CODE_OAUTH_TOKEN | repository, or organization | @claude, the workers in Actions and the coordinator workflow of every repository that sees it (docs/setup/claude-action.md) |
 | SYMPHONY_CLAUDE_1 to SYMPHONY_CLAUDE_8 | account: one slot each | a benchmark in Actions, which spreads its agents over the slots, one account per job at a time (OpenSpineConsortium/coordbench's bench.yml); any workflow that names a slot |
-| SYMPHONY_CLAUDE_ACCOUNTS | the place | the slots in use, as a list such as `1,2,3`; the wizard keeps it equal to the slots whose secret exists |
+| SYMPHONY_CLAUDE_ACCOUNTS | the place | the slots in use, as a list such as `1,2,3`; the wizard keeps it equal to the slots whose secret exists. The bench stops a real run on any other word, such as `01` or `9`, so the wizard writes such a list again |
 | SYMPHONY_CLAUDE_<slot>_LABEL | slot, optional | nothing; a word of your own so that `status` can say which account a slot is. A variable is readable by anyone who can read the repository's workflows, so never an e-mail address |
 
 A secret on an organization reaches the repositories on its list (GitHub's
 "Selected repositories"), or all of them; a repository's own secret or
 variable of the same name outranks the organization's. For each repository
-the wizard names, `status` lists such secrets of its own, and a
+the wizard names, and each one GitHub lists as seeing the list of slots or
+a token, `status` lists such secrets of its own, and a
 SYMPHONY_CLAUDE_ACCOUNTS of its own with the page to delete it on, since a
 list made there by hand would hide the one the wizard keeps from that
 repository's workflows. The slots are the owner's own accounts: the

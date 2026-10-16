@@ -20,7 +20,10 @@ a machine without claude takes `add --paste` or `main --paste`, a hidden
 prompt. Everything that can fail is tried before the sign-in, since a
 token minted and not stored is lost with the process: that each
 repository named is visible to the login, each secret's scope, and that
-gh's token carries admin:org, which an organization's secrets need.
-docs/setup/claude-tokens.md is the page, with the by-hand links;
+gh's token carries admin:org, which an organization's secrets need. A
+repository's own SYMPHONY_CLAUDE_ACCOUNTS hides the organization's list
+the wizard keeps, so none is made by hand; status names one, with the
+page to delete it on, and reads the list as the bench does, only the
+words 1 to 8. docs/setup/claude-tokens.md is the page, with the by-hand links;
 tests/test_tokens.py proves the token never reaches the screen at any
 chunk size. From symphony-template's token wizard thread, 2026-10-16.

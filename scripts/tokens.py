@@ -70,6 +70,11 @@ SLOT_PREFIX = "SYMPHONY_CLAUDE_"
 LABEL_SUFFIX = "_LABEL"
 ACCOUNTS_VARIABLE = SLOT_PREFIX + "ACCOUNTS"
 SLOTS = tuple(range(1, 9))
+# A list of slots is read as coordbench's bench/cooperbench/actions/plan.py
+# reads SYMPHONY_CLAUDE_ACCOUNTS: split on commas and blanks, with a real run
+# refused on any word that is not one of these.
+SLOT_WORDS = {str(slot): slot for slot in SLOTS}
+LIST_SEPARATORS = re.compile(r"[,\s]+")
 CROWD_VARIABLE = "CLAUDE_CROWD"
 TOKEN_LIFE = timedelta(days=365)
 RENEW_SOON = timedelta(days=30)
@@ -551,25 +556,37 @@ def slot_label(slot):
     return f"{SLOT_PREFIX}{slot}{LABEL_SUFFIX}"
 
 
+def list_words(text):
+    """The words of a list of slots, split as the bench splits them."""
+    return [word for word in LIST_SEPARATORS.split((text or "").strip()) if word]
+
+
 def slot_number(text):
-    """The slot a word names, or None. The word may be typed or made by
-    hand, so it is read only when it is a few ASCII digits: int() refuses a
-    digit such as a superscript two that isdigit() takes, and a string of
-    more than 4,300 digits."""
-    if text.isascii() and text.isdigit() and len(text) <= 9 and int(text) in SLOTS:
-        return int(text)
-    return None
+    """The slot a word names, or None. The word is looked up among the words
+    the bench takes, never read by int(), which would take 08 and refuse a
+    digit such as a superscript two that isdigit() takes, or more than 4,300
+    digits."""
+    return SLOT_WORDS.get(text)
 
 
 def parse_slots(text):
-    """The slots a list names, as the bench reads it: numbers between commas
-    or blanks."""
-    found = []
-    for part in (text or "").replace(",", " ").split():
-        slot = slot_number(part)
-        if slot is not None and slot not in found:
-            found.append(slot)
-    return sorted(found)
+    """The slots a list names, each once, in order."""
+    return sorted({slot for slot in map(slot_number, list_words(text)) if slot is not None})
+
+
+def holds_other_words(text):
+    """Whether a list holds a word that is not a slot, which stops the
+    bench's real runs whatever else it names."""
+    return any(slot_number(word) is None for word in list_words(text))
+
+
+def slots_text(text):
+    """A list as status shows it: the slots it names, never the text as
+    written, since a list may be made by hand."""
+    shown = ",".join(str(slot) for slot in parse_slots(text)) or "no slot"
+    if holds_other_words(text):
+        shown += ", and a word that is not a slot, which stops the bench's real runs"
+    return shown
 
 
 class State:
@@ -592,10 +609,16 @@ class State:
         return [slot for slot in SLOTS if slot_secret(slot) in self.secrets]
 
     def labels(self):
-        return {slot: self.variables[slot_label(slot)].get("value", "") for slot in SLOTS if slot_label(slot) in self.variables}
-
-    def accounts(self):
-        return parse_slots(self.variables.get(ACCOUNTS_VARIABLE, {}).get("value", ""))
+        """Each slot's label as status may print it. A label may be made by
+        hand on the variables page, so one that is not a word of the label's
+        shape is never printed as written."""
+        found = {}
+        for slot in SLOTS:
+            item = self.variables.get(slot_label(slot))
+            if item is not None:
+                value = item.get("value", "")
+                found[slot] = value if LABEL_SHAPE.fullmatch(value) else "a label not shown, not a word of a label's shape"
+        return found
 
 
 def when(item):
@@ -634,8 +657,13 @@ def print_status(state, now=None):
         print(f"  slot {slot}{label}: {name} {age_line(state.secrets[name], now)}{reach_note(state, 'secrets', name)}")
     free = [slot for slot in SLOTS if slot_secret(slot) not in state.secrets]
     print("  free slots: " + (", ".join(str(slot) for slot in free) if free else "none"))
-    accounts = state.accounts()
-    print(f"  {ACCOUNTS_VARIABLE}: " + (",".join(str(slot) for slot in accounts) if accounts else "not set"))
+    have = state.variables.get(ACCOUNTS_VARIABLE)
+    if have is None:
+        print(f"  {ACCOUNTS_VARIABLE}: not set")
+    else:
+        value = have.get("value", "")
+        rewrite = "; the next add or remove rewrites it" if holds_other_words(value) else ""
+        print(f"  {ACCOUNTS_VARIABLE}: {slots_text(value)}{rewrite}")
     if MAIN_SECRET in state.secrets:
         print(f"  {MAIN_SECRET}: {age_line(state.secrets[MAIN_SECRET], now)}{reach_note(state, 'secrets', MAIN_SECRET)} (the workflows' token)")
     else:
@@ -660,17 +688,44 @@ def reach_note(state, kind, name):
 
 def print_repository_own(state):
     """A repository's own secret or variable of the same name outranks the
-    organization's, so the named repositories' own are listed too: a list
-    of slots of a repository's own, made by hand before the wizard, would
-    hide from its workflows the list the wizard keeps."""
-    for full in state.target.repositories():
+    organization's, so status lists them for every repository that reads
+    what is kept here: a list of slots of a repository's own, made by hand
+    before the wizard, would hide from its workflows the list the wizard
+    keeps."""
+    for full in repositories_reading(state):
         print_own_secrets(state, full)
         print_own_accounts(state, full)
 
 
+def repositories_reading(state):
+    """The repositories named, and the ones GitHub lists as seeing the list
+    of slots or a token secret of selected visibility, such as the bench's,
+    which the options need not name."""
+    found = list(state.target.repositories())
+    seen = {full.lower() for full in found}
+    names = [MAIN_SECRET] + [slot_secret(slot) for slot in SLOTS]
+    kept = [("variables", ACCOUNTS_VARIABLE)] + [("secrets", name) for name in names if name in state.secrets]
+    for kind, name in kept:
+        item = (state.secrets if kind == "secrets" else state.variables).get(name)
+        if (item or {}).get("visibility") != "selected":
+            continue
+        try:
+            reached = state.reach(kind, name)
+        except TokensError as error:
+            if kind == "variables":
+                print(f"  the repositories that see {name} could not be listed ({error})")
+            continue
+        for repo in reached:
+            full = f"{state.target.owner}/{repo}"
+            if full.lower() not in seen:
+                seen.add(full.lower())
+                found.append(full)
+    return found
+
+
 def print_own_secrets(state, full):
     try:
-        own = {item["name"]: item for item in state.gh.json(["secret", "list", "--repo", full, "--json", "name,updatedAt"])}
+        own = {item["name"].upper(): item for item in state.gh.json(["secret", "list", "--repo", full, "--json", "name,updatedAt"])}
     except TokensError as error:
         print(f"  {full}: its own secrets could not be read ({error})")
         return
@@ -681,14 +736,13 @@ def print_own_secrets(state, full):
 
 def print_own_accounts(state, full):
     try:
-        own = {item["name"]: item for item in state.gh.json(["variable", "list", "--repo", full, "--json", "name,value"])}
+        own = {item["name"].upper(): item for item in state.gh.json(["variable", "list", "--repo", full, "--json", "name,value"])}
     except TokensError as error:
         print(f"  {full}: its own variables could not be read ({error})")
         return
     if ACCOUNTS_VARIABLE in own:
-        named = ",".join(str(slot) for slot in parse_slots(own[ACCOUNTS_VARIABLE].get("value", ""))) or "no slot"
-        print(f"  {full} holds its own {ACCOUNTS_VARIABLE} ({named}), which outranks the organization's, so its "
-              f"workflows read that list and not the one kept here: delete it on "
+        print(f"  {full} holds its own {ACCOUNTS_VARIABLE} ({slots_text(own[ACCOUNTS_VARIABLE].get('value', ''))}), which "
+              f"outranks the organization's, so its workflows read that list and not the one kept here: delete it on "
               f"https://github.com/{full}/settings/variables/actions (the delete icon beside it)")
 
 
@@ -755,10 +809,12 @@ def verify(state, names):
 
 def update_accounts(state, scope=None):
     """The variable names every slot whose secret exists, as the bench reads
-    it, and is written only when that changed."""
-    wanted = ",".join(str(slot) for slot in state.slots_set())
+    it, and is written only when that changed: a list with any other word,
+    which the bench refuses, is written again."""
+    words = [str(slot) for slot in state.slots_set()]
+    wanted = ",".join(words)
     have = state.variables.get(ACCOUNTS_VARIABLE)
-    if have is not None and parse_slots(have.get("value", "")) == state.slots_set():
+    if have is not None and list_words(have.get("value", "")) == words:
         print(f"  {ACCOUNTS_VARIABLE}: {wanted or 'empty'} (unchanged)")
         return
     if not wanted:
@@ -821,7 +877,7 @@ def check_scopes(status, target):
 
 
 def check_label(label):
-    if label and not LABEL_SHAPE.match(label):
+    if label and not LABEL_SHAPE.fullmatch(label):
         raise TokensError("a label is a word of your own, up to 40 letters, digits, spaces, dots or dashes, and never an e-mail address")
 
 

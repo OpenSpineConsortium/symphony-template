@@ -39,7 +39,8 @@ wizard runs on the owner's own computer.
   (a secret looked up by a computed name would hand the runner every
   secret, which CodeQL flags), runs one job per account at a time in the
   concurrency group of its slot, and reads the slots in use from the
-  variable SYMPHONY_CLAUDE_ACCOUNTS, numbers between commas or blanks
+  variable SYMPHONY_CLAUDE_ACCOUNTS, words between commas or blanks,
+  each exactly one of 1 to 8, a real run refused on any other
   (bench/cooperbench/actions/plan.py, chosen_accounts). The owner's
   to-do list of 2026-10-15b, item 3, had the owner make each of those
   secrets by hand on the organization's secrets page with "Selected
@@ -283,22 +284,44 @@ claimed two things the code did not hold. Fixed on the branch:
 
 ## After the merge (symphony-template#100)
 
+The follow-up and its adversarial review, 2026-10-16. The bench's own
+reader was read from coordbench's bench/cooperbench/actions/plan.py
+(parse_list and chosen_accounts) that day.
+
 - A repository's own variable outranks the organization's of the same
   name, as its own secret does, and the 2026-10-15b to-do list told the
   owner to make SYMPHONY_CLAUDE_ACCOUNTS by hand as coordbench's own
   variable; the wizard keeps the organization's list, which such a
   variable would hide from bench.yml. `status` now names a repository's
   own SYMPHONY_CLAUDE_ACCOUNTS with the slots it names and the page to
-  delete it on, as it named a repository's own secrets already. The wizard does not
-  delete it itself, since it never removes what it did not write.
-- A list may be made by hand and a slot's number is typed, so both are
-  read only when they are at most nine ASCII digits (slot_number): a
-  superscript two passed isdigit() and failed int(), and int() refuses
-  more than 4,300 digits, either of which stopped `status` or the slot
-  question with a traceback; the project's constraint on readers of
-  digits someone else writes asks for that bound. A repository's own
-  list is printed as the slots it names, never as written, so nothing a
-  person typed into it reaches the terminal.
+  delete it on, as it named a repository's own secrets already. The
+  wizard does not delete it, since it changes only the place it was
+  given. The to-do list's step now says to run the wizard and to delete
+  such a variable if it was made.
+- `status` reads the own secrets and variables of every repository the
+  options name and of every one GitHub lists as seeing the list of slots
+  or a token secret of selected visibility, so a run from a clone of
+  symphony-template that names no repository still reads coordbench's.
+  A repository that sees them through "all repositories" is not listed by
+  GitHub and is read only when named.
+- The bench splits the list on commas and blanks and refuses a real run
+  on any word that is not exactly 1 to 8. The wizard read numbers, so
+  `01,02` named slots 1 and 2 to it, the list was left as it was, and the
+  bench refused the run while `status` showed a good list. A slot is now
+  a word looked up among 1 to 8 (slot_number), for the list and the slot
+  question alike, which also ends two tracebacks: a superscript two
+  passed isdigit() and failed int(), and int() refuses more than 4,300
+  digits. A list with any other word is written again on the next add or
+  remove, and `status` says it stops the bench's real runs.
+- What a person typed into a variable never reaches the terminal as
+  written: a list is printed as the slots it names, and a label made by
+  hand on the variables page is printed only when it is a word of the
+  label's shape. The label check uses fullmatch, since `$` let a label
+  ending in a newline through.
+- The review's mutants (the raw value printed, the failed read not
+  caught, only the named repositories read, the labels raw, the list
+  compared by slots, a reader by int(), match for fullmatch, names
+  compared by case) each fail the tests.
 
 ## Open items
 
