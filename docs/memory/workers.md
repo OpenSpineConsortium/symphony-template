@@ -49,9 +49,11 @@ next blocker or queued issue in its area), so no two legs of one run
 race for one claim or are dealt one issue from looks at different
 moments, and an idle worker spends no Claude usage; a leg that
 waited looks again and keeps only its worker's own work from that look,
-taking a queued or shared issue only as dealt; in a copy whose vendored
-library has no team deal yet, each leg asks for itself until the release
-0.5.0 reaches it. The sessions run on the secret
+taking a queued or shared issue only as dealt; in a copy made before
+symphony-template#77 (2026-10-14), whose workers.yml is older, each leg
+asks for itself until the copy takes the template's workers.yml, and in
+one made between #77 and #78 until the release 0.5.0 reaches it. The
+sessions run on the secret
 CLAUDE_CODE_OAUTH_TOKEN; no repository variable switches workers on.
 
 The coordinator is two things. A step of the board's own run, on

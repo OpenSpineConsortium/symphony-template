@@ -112,7 +112,7 @@ jobs:
             gh issue close "$number" --repo "$REPO" --comment "$(cat "$comment")"
             echo "closed issue #$number"
           done 3< "$RUNNER_TEMP/issues.txt"
-          echo "up to date: the copy is at symphony-protocol $RECORDED, the newest release" >> "$GITHUB_STEP_SUMMARY"
+          echo "up to date: the copy is at symphony-protocol $RECORDED, no older than the newest release" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Vendor the newest release on the branch symphony-protocol/sync
         id: vendor

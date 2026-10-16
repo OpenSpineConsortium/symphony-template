@@ -153,7 +153,7 @@ class Texts(unittest.TestCase):
         self.assertEqual(protocol_update.issue_title("v0.3.1"), "symphony-protocol 0.3.1 is ready to bring in")
 
     def test_the_closing_comment_names_the_release_the_default_branch_carries(self):
-        self.assertIn("symphony-protocol 0.3.1, the newest release", protocol_update.closing("0.3.1"))
+        self.assertIn("symphony-protocol 0.3.1, no older than the newest release", protocol_update.closing("0.3.1"))
 
     def test_every_text_is_ascii(self):
         for text in (protocol_update.message("v0.3.1"), protocol_update.body("v0.3.1", "0.3.0", COMMIT),

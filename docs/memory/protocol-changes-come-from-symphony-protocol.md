@@ -1,7 +1,7 @@
 A change to the claim protocol is made in OpenSpineConsortium/symphony-protocol, whose sync pull request brings it to OpenSpineConsortium/symphony-template and whose release tags a repository made from the template takes by its own workflow, protocol.yml; tools/sdlc_protocol is never edited in place.
 
 tools/sdlc_protocol is a vendored copy of the package sdlc_protocol, and
-tools/VENDORED records it: the release and the commit on the first line,
+tools/VENDORED records it: the version and the commit on the first line,
 then the sha256 of every copied file. scripts/check.sh runs
 `python3 tools/sdlc_protocol/vendoring.py verify tools` before the tests, so
 a pull request that edits the copy by hand, adds a file to it or loses one,
@@ -41,11 +41,11 @@ the template runs ahead of the newest release. From symphony-template#78
 0.4.1 with their commit; since 2026-10-16 the copy is 0.5.0's, the
 version symphony-protocol's main raised that day, which waits for the
 owner's approval. Its VENDORED names 0.5.0 and a8e0e56, the last commit
-that changed the package before the tag, since scripts/vendor.py records
-that commit and not the one it copies from, so the sync of the tag
-v0.5.0 finds the copy level, opens nothing and closes a sync pull request
-still open. A copy made from the template meanwhile starts on 0.5.0, and its
-protocol.yml takes no older tag. Until the owner approves 0.5.0, Sync,
+that changed the package before the tag, since symphony-protocol's
+scripts/vendor.py records that commit and not the one it copies from, so
+the sync of the tag v0.5.0 finds the copy level, opens nothing and closes
+a sync pull request still open. A copy made from the template meanwhile
+starts on 0.5.0, and its protocol.yml takes no older tag. Until the owner approves 0.5.0, Sync,
 weekly and by hand, knows only 0.4.1, the newest published release, so
 it opens `symphony-protocol/sync` taking the template's copy back to
 0.4.1, with auto-merge armed. That pull request is a downgrade: close it
