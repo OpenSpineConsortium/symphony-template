@@ -87,22 +87,40 @@ image stands.
 
 ## What Beethoven 21.0.0 changes
 
-Pull request 17 on OpenSpineConsortium/beethoven-extension, opened 2026-10-16: Settings takes the
-project's address (a card *Your project on claude.ai*; a thread's address is reduced to the
-project's, a session's or environment link is refused with a sentence saying what to paste,
-*Clear* forgets it); with one named, the panel's button is *Open my project*, on the home and on
-the "You're online." moment, with "In your project, choose Work locally from the + menu, write
-the task, and press Allow once on the card." under it; the tab Beethoven opens when a worker the
-student started comes online is the project's page, while that switch is on, or the project's tab
-Beethoven opened earlier brought forward, never a second one; *New session*,
-*Copy link* and *Phone* keep the worker's own link, and a worker online on a resumed session's own
-link keeps an outline *Open my session*; the worker's link and the project's page each keep a
-claude.ai tab of their own; a one-time card points at Settings while no project is named. The
-address is new browser data and a new kind of page Beethoven opens, so the privacy statement is
-version 16 and the agreement version 15, accepted once more. The pull request's description
-records the checks, the fit measurement at the panel's smallest sizes and the two adversarial
-review rounds; the website's terms.html and privacy.html, built from those texts, need a rebuild
-before any store upload, and the store upload stays off.
+Pull request 17 on OpenSpineConsortium/beethoven-extension, merged 2026-10-16 at 09:24 UTC as
+87e06c8: Settings takes the project's address (a card *Your project on claude.ai*; a thread's
+address is reduced to the project's, a session's or environment link is refused with a sentence
+saying what to paste, *Clear* forgets it); with one named, the panel's button is *Open my
+project*, on the home and on the "You're online." moment, with "In your project, choose Work
+locally from the + menu, write the task, and press Allow once on the card." under it; the tab
+Beethoven opens when a worker the student started comes online is the project's page, while that
+switch is on, or the project's tab Beethoven opened earlier brought forward, never a second one;
+*New session*, *Copy link* and *Phone* keep the worker's own link, and a worker online on a
+resumed session's own link keeps an outline *Open my session*; the worker's link and the project's
+page each keep a claude.ai tab of their own; a one-time card points at Settings while no project
+is named. The address is new browser data and a new kind of page Beethoven opens, so the privacy
+statement is version 16 and the agreement version 15, accepted once more. The pull request's
+description records the checks; the two adversarial review rounds, finding by finding, and the fit
+measurement at the panel's smallest sizes, with its script, are in beethoven-21-reviews.md beside
+this file.
+
+## Where it stands, 2026-10-16 at 19:15 UTC
+
+- The website's terms.html and privacy.html, which the site's build renders from the extension's
+  LICENSE.txt and PRIVACY.md, show versions 15 and 16 since that morning, and support.html has a
+  paragraph on projects (OpenSpineConsortium/openspineconsortium.github.io pull request 21, merge
+  07200e6). The site's build needs beethoven-extension, beethoven-vscode, symphony-extension and
+  symphony-start cloned beside it.
+- The five Chrome Web Store secrets were set on beethoven-extension that day, and a run of
+  release.yml started by hand at 18:49 UTC, with upload ticked and publish not, put 21.0.0.108
+  (the extension's version and the repository's commit count) in the store as the item's draft.
+  It was not yet submitted for review. Submitting it is the owner's: in the store's dashboard
+  (https://chrome.google.com/webstore/devconsole, the item, then Submit for review), or by running
+  release.yml with upload and publish ticked
+  (https://github.com/OpenSpineConsortium/beethoven-extension/actions/workflows/release.yml).
+- Whether the repository variable `CWS_ON_PUSH` is set cannot be read from a cloud session. Once it
+  says upload, every merge to beethoven-extension's main uploads a new draft; once it says
+  publish, every merge is submitted for review, a release to students once Google approves it.
 
 ## Not yet measured, and the choices left
 
@@ -123,6 +141,10 @@ before any store upload, and the store upload stays off.
   (`tabs.onUpdated` "loading") is not yet measured; it decides whether *Open my project* brings
   the project's tab forward or opens another, by the same rule the session's tab has followed
   since 14.0.0.
+- Neither adversarial review tried the premise itself, a project refusing the worker's session
+  and *Work locally* offering the worker's folder: both rest on the owner's report and the
+  documentation page (beethoven-21-reviews.md, What neither round verified), and a first
+  project's thread run through *Work locally* on the grid would measure it.
 - The owner's account is on Max (the login measured on 2026-09-28), so the projects beta and
   *Work locally* are expected to be there; whether "Require trusted devices" is on for any
   organization of the owner's was not checked.
