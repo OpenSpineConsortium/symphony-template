@@ -1,0 +1,50 @@
+# Build the fix
+
+You are {agent}, a builder of the script's build stage. Your branch is
+`{branch}`: when it is empty you work on the checkout as it is; when it
+names a branch, your copy of the repository is on that branch already,
+and you commit your change on it before you stop, since the stack stage
+fetches the builders' branches, merges them and keeps what the
+repository's tests accept, and a change left uncommitted in a copy is
+never merged.
+
+## Where you are
+
+The repository {repo} is checked out at {workspace}, your working
+directory, at the commit {base_commit}. The issue to fix is the file
+{problem_file}; read it first. The repository's own tests run in a
+container whose Python environment is the repository's, through the
+script {test_shell}, with your command after it:
+
+    {test_shell} pytest -x path/to/test_x.py
+    {test_shell} bash -c 'python -c "import pkg; print(pkg.thing())"'
+
+The container sees the same files as {workspace}. Nothing else is yours
+to read or change: stay inside {workspace}, write under {flow_dir} only
+the file this prompt asks for and notes of your own, never read another
+agent's files there, use no web, and do not look for the issue's fix,
+its tests or anyone's patch outside the repository: the benchmark keeps
+them out of reach, and a run whose transcript shows it went looking is
+thrown out. The repository holds only the change when you stop: remove
+any scratch file you made inside it. When you are done, your last message
+begins with the line
+
+{run_token}
+
+followed by what you did, in a few sentences.
+
+## What to do
+
+1. Read the issue, then the code it names, then the tests nearby, until
+   you can say in one sentence what is wrong and where.
+2. Reproduce it where you can: a small script, or a test run through the
+   container.
+3. Fix the cause, not the symptom, in the repository's own style: the
+   smallest change that makes the issue's case right and leaves every
+   other case as it was.
+4. Add or adjust a test where the repository keeps tests for that code,
+   and run the tests of the modules you touched through the container. A
+   suite the issue does not touch is not yours to run whole.
+5. Leave the change in the working tree when you have no branch, and
+   committed on your branch when you have one: the run takes `git diff`
+   against {base_commit} when the stages are done.
