@@ -189,6 +189,26 @@ class AloneAndParallel(unittest.TestCase):
         self.assertEqual(found["parallel"]["pull_requests"], 0)
         self.assertTrue(all(value is None for value in found["ratios"].values()))
 
+    def waited(self, *waits):
+        """The alone side of merged pull requests one a day apart, each
+        merged the given seconds after it opened."""
+        works = []
+        for number, wait in enumerate(waits, start=1):
+            opened = at(24 * number)
+            works.append(economics.Work(number, start=opened, end=opened + timedelta(seconds=abs(wait)),
+                                        merged=opened + timedelta(seconds=wait), opened=opened))
+        return economics.coordination(works, [], self.NOW)["alone"]
+
+    def test_the_median_wait_to_merge_rounds_half_up_as_the_durations_do(self):
+        self.assertEqual(self.waited(1, 2)["open_to_merge_median"], 2)
+        self.assertEqual(self.waited(4, 1, 2)["open_to_merge_median"], 2)
+        self.assertEqual(economics.median_seconds([1, 2]), 2)
+        self.assertIsNone(economics.median_seconds([]))
+
+    def test_a_merge_dated_before_its_opening_is_left_out_of_the_median(self):
+        found = self.waited(3, 5, -100)
+        self.assertEqual((found["merged"], found["open_to_merge_median"]), (3, 4))
+
     def test_work_from_before_the_window_counts_as_beside(self):
         works = self.works()[:1]
         earlier = [economics.Work(9, start=at(-5), end=at(2))]
