@@ -572,31 +572,43 @@ class ReadingShellCommands(unittest.TestCase):
         self.assertEqual(profile.without_heredocs("cat << EOF\nx\nEOF\nls"), "cat << EOF\nls")
         self.assertEqual(profile.shell_uses("cat <<EOF > f\ncat a\nEOF"), {"filter": 1})
 
-    def test_a_line_with_no_here_document_is_not_read_for_one(self):
-        """Reading a long line a character at a time for a << it does not
+    def test_a_command_with_no_here_document_is_not_read_for_one(self):
+        """Reading a long command a character at a time for a << it does not
         hold was most of what a long inline script cost a profile."""
-        with mock.patch.object(profile.guard, "plain_shell", wraps=profile.guard.plain_shell) as reader:
-            self.assertIsNone(profile.heredoc_opener("python3 -c 'x = 1; y = 2'"))
+        with mock.patch.object(usage, "heredoc_bodies", wraps=usage.heredoc_bodies) as reader:
+            self.assertEqual(profile.without_heredocs("python3 -c 'x = 1; y = 2'"), "python3 -c 'x = 1; y = 2'")
             self.assertEqual(reader.call_count, 0)
-            self.assertEqual(profile.heredoc_opener("cat <<EOF"), "EOF")
+            self.assertEqual(profile.without_heredocs("cat <<EOF\nx\nEOF"), "cat <<EOF")
             self.assertEqual(reader.call_count, 1)
+
+    def test_a_delimiter_is_looked_for_within_reach(self):
+        """Reading the rest of a long line for each << on it took time with
+        the square of the line: about 2 seconds for 32,000 of them."""
+        line, empty_bodies = "cat <<a " * 2_000 + "x" * 5_000, "\na" * 2_000
+        with mock.patch.object(usage, "delimiter_of", wraps=usage.delimiter_of) as reader:
+            self.assertEqual(profile.without_heredocs(line + empty_bodies + "\nls"), line + "\nls")
+        self.assertEqual(reader.call_count, 2_000)
+        self.assertLessEqual(max(len(call.args[0]) for call in reader.call_args_list), usage.DELIMITER_REACH)
 
     def test_what_only_looks_like_a_here_document_opens_none(self):
         for line in ('cat <<<"bar"', "grep -rn '<<EOF' x", 'python3 -c "x << y"', "cat a", "a <<", "a << ;",
                      "# cat <<EOF", "cat f # comment <<EOF", 'echo "<<" x; cat g', 'grep -rn "<<" tools/'):
-            self.assertIsNone(profile.heredoc_opener(line), line)
+            command = line + "\ncat body\nEOF\nls"
+            self.assertEqual(profile.without_heredocs(command), command, line)
         self.assertEqual(profile.shell_uses("grep -rn '<<EOF' x\ncat y"), {"search": 1, "read": 1})
         self.assertEqual(profile.shell_reads("# cat <<EOF\ncat real.py\nls", "/r"), ["/r/real.py"])
         self.assertEqual(profile.shell_reads("cat f # comment <<EOF\ncat g", "/r"), ["/r/f", "/r/g"])
         self.assertEqual(profile.shell_reads('echo "<<" x; cat g', "/r"), ["/r/g"])
-        self.assertEqual(profile.heredoc_opener("cat <<-EOF"), "-EOF")
-        self.assertEqual(profile.heredoc_opener("cat <<- EOF"), "-EOF")
-        self.assertEqual(profile.heredoc_opener("cat << EOF | sort"), "EOF")
-        for line in ("cat <<'EOF'", 'cat <<"EOF" > f', "cat <<\\EOF", "cat <<EOF; echo started", "sort 0<<EOF"):
-            self.assertEqual(profile.heredoc_opener(line), "EOF", line)
+        for line in ("cat <<-EOF", "cat <<- EOF"):
+            self.assertEqual(profile.without_heredocs(line + "\n\tbody\n\tEOF\nls"), line + "\nls", line)
+        for line in ("cat <<'EOF'", 'cat <<"EOF" > f', "cat <<\\EOF", "cat <<EOF; echo started", "sort 0<<EOF",
+                     "cat << EOF | sort"):
+            self.assertEqual(profile.without_heredocs(line + "\nbody\nEOF\nls"), line + "\nls", line)
         # A << the shell reads as no operator: mid-word quotes, arithmetic.
-        for line in ('x="a << b" cat f', "echo $((1 << 3))", "(( x <<= 2 ))", 'echo "a" \\<< b'):
-            self.assertIsNone(profile.heredoc_opener(line), line)
+        for line in ('x="a << b" cat f', "echo $((1 << 3))", 'echo "$((1 << 3))"', "(( x <<= 2 ))",
+                     'echo "a" \\<< b'):
+            command = line + "\nb\n3\n=\nls"
+            self.assertEqual(profile.without_heredocs(command), command, line)
         # A commit message written through a here-document inside $( ) in
         # double quotes is one quoted word to the shell: one git command.
         commit = "git commit -m \"$(cat <<'EOF'\nfix: cat secret\nEOF\n)\""
@@ -606,6 +618,51 @@ class ReadingShellCommands(unittest.TestCase):
         # line's start; <<- forgives leading tabs.
         self.assertEqual(profile.without_heredocs("cat <<EOF\n  EOF  \nls"), "cat <<EOF")
         self.assertEqual(profile.without_heredocs("cat <<-EOF\n\tEOF\nls"), "cat <<-EOF\nls")
+
+    def test_a_command_is_read_whole_for_its_here_documents(self):
+        """Read a line at a time, a << on a line that a string carries on
+        from an earlier one opened a here-document, which hid every line
+        after it, and one inside $( ) in double quotes opened none, so a "
+        in its body ended the string."""
+        message = 'git commit -m "Read here-documents\n\nA body after <<EOF is data.\nMore text."\ncat f'
+        self.assertEqual(profile.without_heredocs(message), message)
+        self.assertEqual(profile.shell_reads(message, "/r"), ["/r/f"])
+        quoted = "git commit -m \"$(cat <<'EOF'\nThe 6\" display\nEOF\n)\"\ncat f"
+        self.assertEqual(profile.without_heredocs(quoted), "git commit -m \"$(cat <<'EOF'\n)\"\ncat f")
+        self.assertEqual(profile.shell_uses(quoted), {"git": 1, "read": 1})
+        # Two here-documents on one line: their bodies follow it in order.
+        self.assertEqual(profile.without_heredocs("cat <<A <<B\na\nA\nb\nB\nls"), "cat <<A <<B\nls")
+        # A line the shell carries on with a backslash opens the bodies at its end.
+        self.assertEqual(profile.without_heredocs("cat <<EOF \\\n| sort\nx\nEOF\nls"), "cat <<EOF \\\n| sort\nls")
+        # A body the command ends inside runs to its end; a body with no line is empty.
+        self.assertEqual(profile.without_heredocs("cat <<EOF\n"), "cat <<EOF")
+        self.assertEqual(profile.without_heredocs("cat <<A <<B\nA"), "cat <<A <<B")
+        # A $( ) unquoted keeps its quotes apart from the line's, and its ( ) nest.
+        nested = "x=$( (cat <<EOF\nit's\nEOF\n) )\ngit status"
+        self.assertEqual(profile.without_heredocs(nested), "x=$( (cat <<EOF\n) )\ngit status")
+        inner = 'echo "$(printf "%s" "$(cat <<EOF\nit\'s\nEOF\n)")"\ngit status'
+        self.assertEqual(profile.without_heredocs(inner), 'echo "$(printf "%s" "$(cat <<EOF\n)")"\ngit status')
+        subshell = 'echo "$( (true); cat <<EOF\nit\'s\nEOF\n)"\ngit status'
+        self.assertEqual(profile.without_heredocs(subshell), 'echo "$( (true); cat <<EOF\n)"\ngit status')
+        # A # inside a word starts no comment.
+        self.assertEqual(profile.without_heredocs("echo a#b <<EOF\nbody\nEOF\nls"), "echo a#b <<EOF\nls")
+        # Each depth of $( ) reads its own bodies, the inner one's after the
+        # newline inside it, the outer one's after the line; a $( ) closed on
+        # its line hands its bodies to the line.
+        two = 'cat <<A && echo "$(cat <<B\nb\nB\n)"\na\nA\nls'
+        self.assertEqual(profile.without_heredocs(two), 'cat <<A && echo "$(cat <<B\n)"\nls')
+        self.assertEqual(profile.without_heredocs("x=$(cat <<EOF) && cat f\nbody\nEOF\nls"), "x=$(cat <<EOF) && cat f\nls")
+        # Inside $( ), bash 5.2 ends a body at its delimiter and the ) too;
+        # outside, that line is the body's.
+        self.assertEqual(profile.without_heredocs("x=$(cat <<EOF\nhello\nEOF )\nls"), "x=$(cat <<EOF )\nls")
+        self.assertEqual(profile.without_heredocs("cat <<EOF\nhello\nEOF)\nEOF\nls"), "cat <<EOF\nls")
+        # The ) that ends the first body ends the $( ), and the second body
+        # follows the line, as bash reads it.
+        self.assertEqual(profile.without_heredocs("x=$(cat <<A <<B\na\nA)\nb\nB\nls"), "x=$(cat <<A <<B)\nls")
+        # The bodies of a $( ) closed on the line that opens them come first,
+        # at the very next newline, one a backslash takes out of the line too.
+        self.assertEqual(profile.without_heredocs("cat <<X; v=$(cat <<Z)\nz\nZ\nx\nX\nls"), "cat <<X; v=$(cat <<Z)\nls")
+        self.assertEqual(profile.without_heredocs("x=$(cat <<A) \\\nl1\nA\nls"), "x=$(cat <<A) \\\nls")
 
     def test_what_each_command_is_for(self):
         self.assertEqual(profile.shell_uses("cd /r && ls -la | grep x; git log; python3 t.py; wc -l a; echo hi"),
@@ -672,6 +729,14 @@ class AnExecutionFile(ATranscriptOnDisk):
                                        result("t1", "x", 1)])
         self.assertEqual(split.call_count, 1)
         self.assertEqual((record["reads"]["files_named"], record["shell"]["read"], record["shell"]["list"]), (1, 1, 1))
+
+    def test_a_byte_that_is_not_utf8_is_read_past(self):
+        execution = self.folder / "execution.json"
+        execution.write_bytes(b'[{"type": "user", "text": "cut \xe2\x80"}]')
+        self.assertEqual(profile.entries_of(execution), [{"type": "user", "text": "cut \ufffd"}])
+        transcript = self.folder / "cut.jsonl"
+        transcript.write_bytes(b'{"type": "user", "text": "cut \xe2\x80\n{"type": "user"}\n')
+        self.assertEqual(profile.entries_of(transcript), [{"type": "user"}])
 
     def test_a_file_with_no_entries_is_no_transcript(self):
         empty = self.folder / "empty.jsonl"
