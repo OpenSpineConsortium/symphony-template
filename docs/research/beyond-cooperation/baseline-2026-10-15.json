@@ -1,5 +1,5 @@
 {
-  "attachments": 310,
+  "attachments": 361,
   "calls": {
     "by_tool": {
       "Agent": {
@@ -12,13 +12,13 @@
         "seconds_in_tool": 4
       },
       "Bash": {
-        "calls": 168,
-        "context_tokens_estimated": 169521,
-        "failed": 6,
-        "input_bytes": 425655,
+        "calls": 188,
+        "context_tokens_estimated": 189754,
+        "failed": 7,
+        "input_bytes": 451808,
         "repeated": 0,
-        "result_bytes": 784643,
-        "seconds_in_tool": 691
+        "result_bytes": 834099,
+        "seconds_in_tool": 959
       },
       "Read": {
         "calls": 1,
@@ -75,13 +75,13 @@
         "seconds_in_tool": 118
       },
       "WebSearch": {
-        "calls": 10,
-        "context_tokens_estimated": 8607,
+        "calls": 11,
+        "context_tokens_estimated": 10213,
         "failed": 0,
-        "input_bytes": 1494,
+        "input_bytes": 1653,
         "repeated": 0,
-        "result_bytes": 31011,
-        "seconds_in_tool": 286
+        "result_bytes": 33824,
+        "seconds_in_tool": 294
       },
       "mcp__claude-code-remote__subscribe_pr_activity": {
         "calls": 1,
@@ -156,33 +156,33 @@
         "seconds_in_tool": 0
       },
       "mcp__hearthbot__update_status": {
-        "calls": 16,
-        "context_tokens_estimated": 2790,
+        "calls": 17,
+        "context_tokens_estimated": 2824,
         "failed": 0,
-        "input_bytes": 10183,
+        "input_bytes": 10792,
         "repeated": 0,
-        "result_bytes": 240,
+        "result_bytes": 255,
         "seconds_in_tool": 5
       }
     },
-    "failed": 20,
+    "failed": 21,
     "repeated": 4,
-    "total": 243,
+    "total": 265,
     "unanswered": 1
   },
   "context": {
-    "cached_share": 0.968,
-    "calls": 92,
+    "cached_share": 0.965,
+    "calls": 112,
     "compactions": 1,
     "drops": 1,
     "first": 120867,
-    "growth": 251479,
-    "last": 354357,
-    "mean": 269832,
+    "growth": 273352,
+    "last": 344769,
+    "mean": 280654,
     "peak": 379356
   },
-  "ended_at": "2026-10-16T04:45:46Z",
-  "estimated_usd": 50.5802,
+  "ended_at": "2026-10-16T08:47:08Z",
+  "estimated_usd": 55.1557,
   "helpers": {
     "calls": 76,
     "output_tokens": 181317,
@@ -191,48 +191,55 @@
   },
   "models": {
     "claude-fable-5-1": [
-      3296,
+      3360,
       529222,
-      790106,
-      27007758,
-      427558
+      794906,
+      27717225,
+      432727
+    ],
+    "claude-opus-5-5": [
+      36,
+      0,
+      301299,
+      5593071,
+      25694
     ]
   },
   "prices_as_of": "2026-10-06",
   "prompts": 12,
   "reads": {
-    "bytes": 582227,
-    "calls": 59,
-    "files": 52,
-    "files_named": 93,
-    "partial": 38,
-    "reread_bytes": 167892,
-    "rereads": 17
+    "bytes": 595385,
+    "calls": 63,
+    "files": 53,
+    "files_named": 97,
+    "partial": 41,
+    "reread_bytes": 178166,
+    "rereads": 19
   },
   "schema": "symphony-profile/1",
   "seconds": {
-    "active": 4088,
-    "in_tools": 380,
-    "outside_tools": 3708,
-    "span": 18266,
-    "thinking": 1640
+    "active": 4595,
+    "in_tools": 560,
+    "outside_tools": 4035,
+    "span": 32749,
+    "thinking": 1826
   },
   "session": "7667c678",
   "shell": {
-    "filter": 157,
-    "git": 49,
-    "list": 53,
-    "read": 93,
-    "run": 171,
-    "search": 86
+    "filter": 178,
+    "git": 76,
+    "list": 56,
+    "read": 99,
+    "run": 195,
+    "search": 93
   },
   "started_at": "2026-10-15T23:41:20Z",
   "tokens": {
-    "cache_read": 27007758,
-    "cache_write": 1319328,
-    "input": 3296,
-    "output": 427558,
-    "total": 28757940
+    "cache_read": 33310296,
+    "cache_write": 1625427,
+    "input": 3396,
+    "output": 458421,
+    "total": 35397540
   },
   "tokens_unpriced": 0
 }
