@@ -14,8 +14,8 @@ and OpenSpineConsortium/symphony-template, the workflow, docs/setup/grid.md and 
 
 ## The answer
 
-Yes, with the connection pointing from the grid out. GitHub's own runners cannot reach the grid,
-and no credential of the grid's may sit at GitHub nor one of GitHub's on the grid beyond a job's
+Yes, with the connection pointing from the grid out. GitHub's own runners cannot sign in to the
+grid, and no credential of the grid's may sit at GitHub nor one of GitHub's on the grid beyond a job's
 own, so Beethoven does what its CI lane already does: a Slurm job on a compute node polls GitHub
 over outbound HTTPS. The job serves GitHub's own self-hosted runner, inside GitHub's own runner
 image, registered for one GitHub job at a time with a just-in-time credential that the account's gh
@@ -50,8 +50,15 @@ framework/profiles/wayne.json:
   for short allocations; gmsap and gvohp carry GPUs. The lab's volume is /rs/rs_grp_oschome (CephFS);
   $TMPDIR there is not node-local, so a job's temp goes under /tmp/$USER on the node, which is swept
   while jobs run; IPC goes under /dev/shm.
-- The portal, https://ondemand.grid.wayne.edu, and ssh sit behind the university's VPN and a one-time
-  code; the student types both into Beethoven's own sign-in sheet, which never stores them.
+- The portal, https://ondemand.grid.wayne.edu, sits behind the university's VPN. The ssh port,
+  grid.wayne.edu:22, answers from the internet (OpenSSH 7.4; publickey, password and
+  keyboard-interactive offered), and a password sign-in there also asks for the Google
+  Authenticator code; no sign-in from outside the VPN has been made with a password or a key
+  (hpcworker's docs/V12_CONTRACT.md, "Facts", 2026-10-01 and 2026-10-02). Beethoven 12's own key
+  gate, a forced command on one line of authorized_keys, is tested against OpenSSH and unproven on
+  the grid (framework/README.md, "The browser's key"), and the lab lead's guide asks C&IT whether
+  such a key, used from outside the VPN, is acceptable (docs/guides/LAB_LEAD.md); the answer is not
+  on record.
 - Egress was measured on 2026-09-28 from the compute node asx15: api.anthropic.com answered directly
   (no proxy), claude.ai answered 403 to curl. github.com was not tried from a compute node; the login
   node's clone of a private repository through gh was measured on 2026-10-03 (the CI lane's first
@@ -106,8 +113,10 @@ GitHub secret, and the WSU user and password beside it as the owner suggested. W
 a step that runs a command on the grid with no runner waiting in Slurm's queue, from any workflow.
 What it needs: a credential of the grid's at GitHub, readable by every writer's workflows
 (docs/start/team.md takes the repository's secrets out before anyone else gets Write for the same
-reason); the VPN or an exception for GitHub's address ranges, which change; and the one-time code,
-which a stored password does not supply. Beethoven's rules say never a credential on a command line,
+reason); a sign-in with no one-time code, since the ssh port answers from the internet but a
+password sign-in also asks the Google Authenticator code, which a stored password does not supply,
+and whether a key alone signs in from outside the VPN has never been tried; and C&IT's word on a key
+used from outside the VPN, the question hpcworker's lab lead guide already asks for Beethoven's own. Beethoven's rules say never a credential on a command line,
 in a job file or in a log, and nothing on the login node beyond one scheduler call per action, so
 the only form of it that fits is the gate above: a key that may run one forced command, with the
 password nowhere.
