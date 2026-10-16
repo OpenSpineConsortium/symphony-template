@@ -45,13 +45,13 @@ that changed the package before the tag, since symphony-protocol's
 scripts/vendor.py records that commit and not the one it copies from, so
 the sync of the tag v0.5.0 finds the copy level, opens nothing and closes
 a sync pull request still open. A copy made from the template meanwhile
-starts on 0.5.0, and its protocol.yml takes no older tag. Until the owner approves 0.5.0, Sync,
-weekly and by hand, knows only 0.4.1, the newest published release, so
-it opens `symphony-protocol/sync` taking the template's copy back to
-0.4.1, with auto-merge armed. That pull request is a downgrade: close it
-each time it comes back, and never turn it green, by regenerating a
-fixture or otherwise. The fixture of the board's Given to workers
-heading keeps it red meanwhile.
+starts on 0.5.0, and its protocol.yml takes no older tag. Until the
+owner approves 0.5.0, Sync, weekly and by hand, knows only 0.4.1, the
+newest published release, so it opens `symphony-protocol/sync` taking
+the template's copy back to 0.4.1, with auto-merge armed. That pull
+request is a downgrade: close it each time it comes back, and never
+turn it green, by regenerating a fixture or otherwise. The fixture of
+the board's Given to workers heading keeps it red meanwhile.
 
 A repository made from the template is not on that list, so no sync pull
 request reaches it. Its own .github/workflows/protocol.yml takes each
@@ -71,6 +71,11 @@ it is
 `python3 <symphony-protocol>/scripts/vendor.py <this repository> --consumer OpenSpineConsortium/symphony-template`,
 which copies what the template takes, and a pull request; in the template
 the same command needs no `--consumer`, since its remote names it.
+protocol.yml brings only tools/, so a release that changes what a copy's
+tests pin reaches that copy by hand, with the template's answer to the
+change copied in (docs/start/protocol.md, step 7): 0.5.0 changes the
+board's Given to workers heading, which tests/fixtures/board-STATE.md
+pins in a copy made before symphony-template#78.
 
 What is this repository's own changes here as usual: the shims
 tools/board.py, check_protocol.py, team.py, workers.py and guard_push.py,

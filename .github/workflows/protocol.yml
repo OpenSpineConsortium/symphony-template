@@ -12,8 +12,9 @@ name: Protocol
 # request from it, or updates the one already open. This repository's
 # check decides, as on any pull request. It pushes only when the branch
 # does not already hold this copy on the default branch as it is, so a
-# quiet week starts nothing, and once the default branch carries the
-# newest release it closes the update's pull request or issue still open.
+# quiet week starts nothing, and once the default branch carries a copy
+# no older than the newest release it closes the update's pull request
+# or issue still open.
 #
 # GITHUB_TOKEN does it all, so no secret is named, and only the steps that
 # call GitHub hold it: the library's script runs without it. A push or a pull request
@@ -88,7 +89,7 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         run: python3 tools/protocol_update.py plan --library "$RUNNER_TEMP/symphony-protocol" >> "$GITHUB_OUTPUT"
 
-      - name: Close the update still open, the default branch carrying the newest release
+      - name: Close the update still open, the default branch's copy no older than the newest release
         if: steps.plan.outputs.needed == 'false'
         env:
           GH_TOKEN: ${{ github.token }}

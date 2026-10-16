@@ -21,8 +21,11 @@ reads whose claim the branch on origin and the branch pushed carry, from
 the claim file docs/agents/claims/N.md, and refuses a lease that would
 take another worker's claim (guard.other_holder, its claim_file_reader).
 main() hands it that reader when the vendored copy has one, so a copy
-whose library is older gains the fence once its protocol.yml vendors
-that release, and runs as before until then.
+whose library is older gains the fence once it vendors that release,
+and runs as before until then; a copy made before symphony-template#78
+takes the release by hand, with the template's
+tests/fixtures/board-STATE.md, whose Given to workers heading the
+release changes (docs/start/protocol.md, step 7).
 """
 
 import json

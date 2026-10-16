@@ -52,9 +52,10 @@ waited looks again and keeps only its worker's own work from that look,
 taking a queued or shared issue only as dealt; in a copy made before
 symphony-template#77 (2026-10-14), whose workers.yml is older, each leg
 asks for itself until the copy takes the template's workers.yml, and in
-one made between #77 and #78 until the release 0.5.0 reaches it. The
-sessions run on the secret
-CLAUDE_CODE_OAUTH_TOKEN; no repository variable switches workers on.
+one made between #77 and #78 until the release 0.5.0 reaches it, by hand
+with the template's tests/fixtures/board-STATE.md, which its protocol.yml
+does not bring. The sessions run on the secret CLAUDE_CODE_OAUTH_TOKEN;
+no repository variable switches workers on.
 
 The coordinator is two things. A step of the board's own run, on
 GITHUB_TOKEN and with no Claude usage, releases a claim idle for 24 hours
