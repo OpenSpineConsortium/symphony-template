@@ -30,11 +30,13 @@ import usage
 
 # Anthropic's API list prices in US dollars per million tokens, as of
 # PRICES_AS_OF: uncached input, cache writes kept five minutes (1.25 times
-# input) and an hour (2 times input), cache reads, and output. The
+# input) and an hour (2 times input), cache reads (0.1 times input, but
+# 0.05 times on Opus 5.5 and Sonnet 5.5 and 0.025 times on Fable 5.1, as
+# the page's footnotes say), and output. The
 # estimate is what the same tokens would cost on the API, whatever plan
 # actually paid for them; a model this table does not know is left out of
 # the estimate and its tokens counted as unpriced.
-PRICES_AS_OF = "2026-10-06"
+PRICES_AS_OF = "2026-10-16"
 PRICES = {
     "claude-fable-5-1": (10.0, 12.5, 20.0, 0.25, 50.0),
     "claude-opus-5-5": (4.0, 5.0, 8.0, 0.20, 20.0),
@@ -45,7 +47,7 @@ PRICES = {
     "claude-opus-4-5": (5.0, 6.25, 10.0, 0.50, 25.0),
     "claude-opus-4-1": (15.0, 18.75, 30.0, 1.50, 75.0),
     "claude-opus-4": (15.0, 18.75, 30.0, 1.50, 75.0),
-    "claude-sonnet-5-5": (2.0, 2.5, 4.0, 0.20, 10.0),
+    "claude-sonnet-5-5": (2.0, 2.5, 4.0, 0.10, 10.0),
     "claude-sonnet-5": (2.0, 2.5, 4.0, 0.20, 10.0),
     "claude-sonnet-4-6": (3.0, 3.75, 6.0, 0.30, 15.0),
     "claude-sonnet-4-5": (3.0, 3.75, 6.0, 0.30, 15.0),
