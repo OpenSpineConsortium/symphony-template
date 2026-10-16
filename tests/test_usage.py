@@ -38,9 +38,12 @@ QUIET = {key: value for key, value in os.environ.items()
 # tests/test_claim_skill.py sets them.
 NO_MAINTENANCE = {"gc.auto": "0", "gc.autoDetach": "false", "maintenance.auto": "false",
                   "maintenance.autoDetach": "false", "receive.autogc": "false"}
+# Nor does any read the config of the person running them, whose
+# commit.verbose, say, puts a diff in a bare commit's message.
 GIT_QUIET = {"GIT_CONFIG_COUNT": str(len(NO_MAINTENANCE)),
              **{f"GIT_CONFIG_KEY_{i}": key for i, key in enumerate(NO_MAINTENANCE)},
-             **{f"GIT_CONFIG_VALUE_{i}": value for i, value in enumerate(NO_MAINTENANCE.values())}}
+             **{f"GIT_CONFIG_VALUE_{i}": value for i, value in enumerate(NO_MAINTENANCE.values())},
+             "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
 
 
 def assistant(message_id, model, usage_fields, at="2026-10-12T10:00:00Z"):
@@ -145,6 +148,16 @@ class ReadingATranscript(unittest.TestCase):
                                     + line.replace("m1", "m2").encode("ascii") + b"\n")
         self.assertEqual(usage.session_usage(self.transcript)["models"], {"claude-opus-5-5": [20, 0, 0, 200, 10]})
 
+    def test_a_line_with_a_byte_that_is_not_utf8_is_passed_over_whole(self):
+        """Read with a stand-in character, a bad byte in a message's id made
+        another message of the same one, counted twice, and one in a model's
+        name a model no trailer can carry."""
+        line = json.dumps(assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5)))
+        self.transcript.write_bytes(line.encode("ascii") + b"\n" + line.replace('"m1"', '"m\xff1"').encode("latin-1")
+                                    + b"\n" + line.replace("opus", "op\xffus").replace("m1", "m3").encode("latin-1")
+                                    + b"\n")
+        self.assertEqual(usage.session_usage(self.transcript)["models"], {"claude-opus-5-5": [10, 0, 0, 100, 5]})
+
     def test_the_trailer_carries_eight_characters_of_the_session_and_nothing_more(self):
         spent = {"models": {"m": [1, 0, 0, 0, 1]}, "seconds": 1}
         self.assertTrue(usage.trailer("session_01AMrLKnvPcvNBSchUXZbDDX", spent).startswith("v1 session=01AMrLKn "))
@@ -183,6 +196,13 @@ class ARepository(unittest.TestCase):
         payload = {"session_id": session, "transcript_path": str(self.transcript), "cwd": str(where or self.repo),
                    "tool_input": {"command": command}}
         self.assertEqual(usage.main(["hook"], stdin=io.StringIO(json.dumps(payload))), 0)
+
+    def shell_commit(self, *args, environ=None):
+        """git commit as Claude Code's shell runs it, its editor true: the
+        result, which may be git's refusal."""
+        return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c",
+                               "commit.gpgsign=false", "commit", *args], cwd=self.repo, capture_output=True,
+                              text=True, timeout=60, env={**os.environ, "GIT_EDITOR": "true", **(environ or {})})
 
     def commit(self, name, where=None):
         where = where or self.repo
@@ -250,15 +270,93 @@ class Commits(ARepository):
         self.hook(command="git commit")
         (self.repo / "a.txt").write_text("a", encoding="ascii")
         self.git("add", "a.txt")
-        done = subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c",
-                               "commit.gpgsign=false", "commit"], cwd=self.repo, capture_output=True, text=True,
-                              timeout=60, env={**os.environ, "GIT_EDITOR": "true"})
+        done = self.shell_commit()
         self.assertNotEqual(done.returncode, 0, done.stdout)
         self.assertIn("empty commit message", done.stderr)
         self.assertEqual(self.git("rev-list", "--all"), "", "no commit was made")
         self.git("commit", "-q", "-m", "Add a.txt")
         self.assertEqual(usage.parse_trailer(self.git("log", "-1", "--format=%B")),
                          [("6e4cb20b", 0, {"claude-opus-5-5": [10, 0, 0, 100, 5]})])
+
+    def test_a_commit_with_its_diff_below_the_message_and_nothing_above_is_still_refused(self):
+        """With -v or commit.verbose, git puts the diff below its scissors
+        line in the editor's template and cuts the message there: blanks and
+        comments above it are no message, whatever the diff holds."""
+        usage.install(cwd=self.repo)
+        write_lines(self.transcript, [assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5))])
+        (self.repo / "a.txt").write_text("a", encoding="ascii")
+        self.git("add", "a.txt")
+        for command, args in (("git commit -v", ("-v",)), ("git commit", ("-c", "commit.verbose=true"))):
+            self.hook(command=command)
+            done = self.shell_commit(*args) if args[0] == "-v" else subprocess.run(
+                ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.verbose=true",
+                 "commit"], cwd=self.repo, capture_output=True, text=True, timeout=60,
+                env={**os.environ, "GIT_EDITOR": "true"})
+            self.assertIn("empty commit message", done.stderr, command)
+        self.assertEqual(self.git("rev-list", "--all"), "", "no commit was made")
+
+    def test_a_message_given_keeps_its_comment_like_lines_and_its_usage(self):
+        """A message given with -m keeps a line that starts with #, as git
+        keeps it, and the usage goes on it; an empty one given is refused."""
+        usage.install(cwd=self.repo)
+        write_lines(self.transcript, [assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5))])
+        (self.repo / "a.txt").write_text("a", encoding="ascii")
+        self.git("add", "a.txt")
+        self.hook(command="git commit -m ''")
+        self.assertIn("empty commit message", self.shell_commit("-m", "").stderr)
+        self.hook(command="git commit -m '#42 fix login'")
+        self.assertEqual(self.shell_commit("-m", "#42 fix login").returncode, 0)
+        message = self.git("log", "-1", "--format=%B")
+        self.assertEqual(message.splitlines()[0], "#42 fix login")
+        self.assertEqual(usage.parse_trailer(message), [("6e4cb20b", 0, {"claude-opus-5-5": [10, 0, 0, 100, 5]})])
+
+    def test_a_message_outside_the_locales_characters_keeps_its_usage(self):
+        """The message goes to git stripspace as UTF-8: in the locale's own
+        encoding, ASCII here and cp1252 on Windows, an arrow raised, and the
+        commit lost its lines."""
+        usage.install(cwd=self.repo)
+        (self.repo / "a.txt").write_text("a", encoding="ascii")
+        self.git("add", "a.txt")
+        self.git("commit", "-q", "-m", "Fix the caf\u00e9 \u2192 bar")
+        write_lines(self.transcript, [assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5))])
+        self.hook(command="git commit --amend")
+        ascii_locale = {"LC_ALL": "C", "LANG": "C", "PYTHONUTF8": "0", "PYTHONCOERCECLOCALE": "0"}
+        self.assertEqual(self.shell_commit("--amend", environ=ascii_locale).returncode, 0)
+        message = self.git("log", "-1", "--format=%B")
+        self.assertTrue(message.startswith("Fix the caf\u00e9 \u2192 bar"), message)
+        self.assertEqual(usage.parse_trailer(message), [("6e4cb20b", 0, {"claude-opus-5-5": [10, 0, 0, 100, 5]})])
+
+    def test_a_merge_that_takes_the_usage_keeps_its_subject(self):
+        """git merge leaves its message with no newline at the end, and git
+        interpret-trailers joined the lines to it: the usage line in the
+        merge's subject."""
+        usage.install(cwd=self.repo)
+        self.commit("a.txt")
+        base = self.git("rev-parse", "--abbrev-ref", "HEAD")
+        self.git("checkout", "-q", "-b", "side")
+        self.commit("b.txt")
+        self.git("checkout", "-q", base)
+        self.commit("c.txt")
+        write_lines(self.transcript, [assistant("m1", "claude-opus-5-5", used(10, 0, 100, 5))])
+        self.hook(command="git commit -m x")
+        done = subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "merge", "-q", "side"],
+                              cwd=self.repo, capture_output=True, text=True, timeout=60,
+                              env={**os.environ, "GIT_EDITOR": "true"})
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(self.git("log", "-1", "--format=%s"), "Merge branch 'side'")
+        self.assertEqual(usage.parse_trailer(self.git("log", "-1", "--format=%B")),
+                         [("6e4cb20b", 0, {"claude-opus-5-5": [10, 0, 0, 100, 5]})])
+
+    def test_what_git_does_with_the_comments_is_read_from_the_command(self):
+        for command, strips in (("git commit", True), ("git commit -v", True), ("git commit --amend", True),
+                                ("git commit -m x", False), ("git commit -qam x", False), ("git commit -mx", False),
+                                ("git commit --message=x", False), ("git commit -F m.txt", False),
+                                ("git commit --file m.txt", False), ("git commit -m x -e", True),
+                                ("git commit -em ''", True), ("git commit -aem x", True),
+                                ("git commit -m x --cleanup=strip", True), ("git commit --cleanup strip -m x", True),
+                                ("git commit --cleanup=verbatim", False), ("git commit -Smykey", True),
+                                ("git commit -C HEAD", True), ("git commit -- -m", True)):
+            self.assertEqual(usage.strips_comments(usage.commit_arguments(command)), strips, command)
 
     def test_a_clones_own_commit_msg_hook_is_left_alone(self):
         hooks = Path(self.git("rev-parse", "--absolute-git-dir")) / "hooks"
@@ -285,7 +383,27 @@ class Commits(ARepository):
                                  # A << in a message that spans lines opens nothing, and a " in
                                  # the body of one inside $( ) in double quotes ends no string.
                                  ("git commit -m \"Read them\n\nA body after <<EOF is data.\nMore.\"", True),
-                                 ("git commit -m \"$(cat <<'EOF'\nThe 6\" display\nEOF\n)\"", True)):
+                                 ("git commit -m \"$(cat <<'EOF'\nThe 6\" display\nEOF\n)\"", True),
+                                 # Here-documents opened on one line at two depths of $( ): the
+                                 # inner body follows the newline inside it, the outer the line.
+                                 ("git commit -F - <<'EOF' && gh pr create --body \"$(cat <<'BODY'\nPR body\nBODY\n"
+                                  ")\"\nCommit message\nEOF", True),
+                                 ("cat > notes.md <<'EOF' && git commit -m \"$(cat <<'MSG'\nAdd notes\nMSG\n)\"\n"
+                                  "# Notes\nEOF", True),
+                                 ("cat <<EOF >/dev/null; out=$(true\ngit commit -m wip)\nbody\nEOF", True),
+                                 # Inside $( ), bash 5.2 ends a body at its delimiter and the ).
+                                 ("git commit -m \"$(cat <<'EOF'\nhello\nEOF)\"\nls", True),
+                                 # The ) closes its frame, and )) closes two where no arithmetic is open.
+                                 ("git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n)\" && cat > notes <<'X'\nit's\nX", True),
+                                 ("echo $(echo $(echo a)) <<EOF\nit's\nEOF\ngit commit -m x", True),
+                                 # A delimiter longer than a few letters, a carriage return in it,
+                                 # one that starts with a -, a comment after $(, and one after a
+                                 # line carried on with a backslash.
+                                 ("git commit -F - <<'END_OF_MESSAGE'\nIt's done\nEND_OF_MESSAGE", True),
+                                 ("cat > m.txt <<'EOF'\r\nIt's done\r\nEOF\r\ngit commit -F m.txt\r\n", True),
+                                 ("cat << -EOF\nit's\n-EOF\ngit commit -m x", True),
+                                 ("git commit -m \"$(# note <<EOF\necho hi\n)\"", True),
+                                 ("echo a \\\n#<<EOF\ngit commit -m x", True)):
             self.assertEqual(usage.is_commit(command), commits, command)
 
     def test_a_payload_the_hook_cannot_read_passes(self):
@@ -562,6 +680,18 @@ class AnActionsRun(unittest.TestCase):
                                          self.READING[:3] + helper + self.READING[3:], indent=2)
         self.assertEqual(record["profile"], {**self.READ, "calls": 2, "reads": 2, "read_bytes": 9})
         self.assertEqual(record["models"]["claude-haiku-5-5"], [5000, 0, 0, 0, 2])
+
+    def test_an_execution_file_with_a_cut_character_is_still_read(self):
+        with tempfile.TemporaryDirectory() as folder:
+            execution = Path(folder) / "claude-execution-output.json"
+            execution.write_bytes(json.dumps(self.MESSAGES).replace("success", "succ\u2014ess").encode("utf-8")
+                                  .replace("\u2014".encode("utf-8"), b"\xe2\x80"))
+            out = Path(folder) / "record.json"
+            argv = ["actions", "--execution-file", str(execution), "--out", str(out), "--workflow", "workers",
+                    "--job", "worker", "--root", folder]
+            with mock.patch("sys.stdout", io.StringIO()):
+                self.assertEqual(usage.main(argv, environ={}), 0)
+            self.assertEqual(json.loads(out.read_text())["models"]["claude-sonnet-5-5"], [5, 10, 0, 20, 30])
 
     def test_without_a_result_the_messages_are_summed_and_the_run_marked(self):
         record = usage.actions_record(self.MESSAGES[:2], "plan", "coordinator")

@@ -646,6 +646,19 @@ class ReadingShellCommands(unittest.TestCase):
         self.assertEqual(profile.without_heredocs(subshell), 'echo "$( (true); cat <<EOF\n)"\ngit status')
         # A # inside a word starts no comment.
         self.assertEqual(profile.without_heredocs("echo a#b <<EOF\nbody\nEOF\nls"), "echo a#b <<EOF\nls")
+        # Each depth of $( ) reads its own bodies, the inner one's after the
+        # newline inside it, the outer one's after the line; a $( ) closed on
+        # its line hands its bodies to the line.
+        two = 'cat <<A && echo "$(cat <<B\nb\nB\n)"\na\nA\nls'
+        self.assertEqual(profile.without_heredocs(two), 'cat <<A && echo "$(cat <<B\n)"\nls')
+        self.assertEqual(profile.without_heredocs("x=$(cat <<EOF) && cat f\nbody\nEOF\nls"), "x=$(cat <<EOF) && cat f\nls")
+        # Inside $( ), bash 5.2 ends a body at its delimiter and the ) too;
+        # outside, that line is the body's.
+        self.assertEqual(profile.without_heredocs("x=$(cat <<EOF\nhello\nEOF )\nls"), "x=$(cat <<EOF )\nls")
+        self.assertEqual(profile.without_heredocs("cat <<EOF\nhello\nEOF)\nEOF\nls"), "cat <<EOF\nls")
+        # The ) that ends the first body ends the $( ), and the second body
+        # follows the line, as bash reads it.
+        self.assertEqual(profile.without_heredocs("x=$(cat <<A <<B\na\nA)\nb\nB\nls"), "x=$(cat <<A <<B)\nls")
 
     def test_what_each_command_is_for(self):
         self.assertEqual(profile.shell_uses("cd /r && ls -la | grep x; git log; python3 t.py; wc -l a; echo hi"),
