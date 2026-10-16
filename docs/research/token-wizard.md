@@ -1,8 +1,11 @@
 # The token wizard: research notes
 
-Notes of the thread that built scripts/tokens.py (symphony-template, the
-token wizard thread of 2026-10-16), kept here so they accumulate in the
-repository, as the owner asked on 2026-10-16. No line here holds a token
+Notes of the thread "Claude token setup wizard" (item 11 of the
+2026-10-15b handoff), written 2026-10-16 and kept current as the work goes
+on, from the thread's own reading and probes: no Claude Doc, artifact or
+upload lies behind it. It built scripts/tokens.py, and these notes stay
+here so they accumulate in the repository, as the owner asked on
+2026-10-16. No line here holds a token
 or a credential; a token's shape is written in pieces where it has to be
 named. docs/setup/claude-tokens.md is the page for a person who wants to
 use the wizard; this file is why it is built the way it is.
