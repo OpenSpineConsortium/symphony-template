@@ -1,0 +1,111 @@
+{
+  "attachments": 88,
+  "calls": {
+    "by_tool": {
+      "Bash": {
+        "calls": 45,
+        "context_tokens_estimated": 115154,
+        "failed": 2,
+        "input_bytes": 89400,
+        "result_bytes": 297741,
+        "seconds_in_tool": 87
+      },
+      "ToolSearch": {
+        "calls": 1,
+        "context_tokens_estimated": 2831,
+        "failed": 0,
+        "input_bytes": 126,
+        "result_bytes": 0,
+        "seconds_in_tool": 0
+      },
+      "WebFetch": {
+        "calls": 5,
+        "context_tokens_estimated": 4400,
+        "failed": 3,
+        "input_bytes": 2445,
+        "result_bytes": 10707,
+        "seconds_in_tool": 39
+      },
+      "WebSearch": {
+        "calls": 3,
+        "context_tokens_estimated": 3242,
+        "failed": 0,
+        "input_bytes": 380,
+        "result_bytes": 8498,
+        "seconds_in_tool": 26
+      },
+      "mcp__hearthbot__update_status": {
+        "calls": 4,
+        "context_tokens_estimated": 132,
+        "failed": 0,
+        "input_bytes": 2001,
+        "result_bytes": 60,
+        "seconds_in_tool": 1
+      }
+    },
+    "failed": 5,
+    "total": 58,
+    "unanswered": 0
+  },
+  "context": {
+    "cached_share": 0.946,
+    "calls": 23,
+    "compactions": 0,
+    "drops": 0,
+    "first": 120867,
+    "growth": 125761,
+    "growth_from_tools_estimated": 125761,
+    "growth_other_estimated": 2,
+    "last": 319411,
+    "mean": 222243,
+    "peak": 319411
+  },
+  "ended_at": "2026-10-15T23:58:56Z",
+  "estimated_usd": 10.4249,
+  "helpers": 0,
+  "models": {
+    "claude-fable-5-1": [
+      706,
+      0,
+      275911,
+      4834966,
+      73817
+    ]
+  },
+  "prices_as_of": "2026-10-06",
+  "prompts": 1,
+  "reads": {
+    "bytes": 274247,
+    "calls": 26,
+    "files": 35,
+    "files_named": 43,
+    "partial": 21,
+    "reread_bytes": 102693,
+    "rereads": 6
+  },
+  "schema": "symphony-profile/1",
+  "seconds": {
+    "active": 1056,
+    "in_tools": 153,
+    "span": 1057,
+    "thinking": 550,
+    "waiting_for_model": 547
+  },
+  "session": "7667c678",
+  "shell": {
+    "git": 13,
+    "list": 24,
+    "read": 92,
+    "run": 29,
+    "search": 20
+  },
+  "started_at": "2026-10-15T23:41:20Z",
+  "tokens": {
+    "cache_read": 4834966,
+    "cache_write": 275911,
+    "input": 706,
+    "output": 73817,
+    "total": 5185400
+  },
+  "tokens_unpriced": 0
+}
