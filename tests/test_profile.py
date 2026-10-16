@@ -581,6 +581,15 @@ class ReadingShellCommands(unittest.TestCase):
             self.assertEqual(profile.without_heredocs("cat <<EOF\nx\nEOF"), "cat <<EOF")
             self.assertEqual(reader.call_count, 1)
 
+    def test_a_delimiter_is_looked_for_within_reach(self):
+        """Reading the rest of a long line for each << on it took time with
+        the square of the line: about 2 seconds for 32,000 of them."""
+        line, empty_bodies = "cat <<a " * 2_000 + "x" * 5_000, "\na" * 2_000
+        with mock.patch.object(usage, "delimiter_of", wraps=usage.delimiter_of) as reader:
+            self.assertEqual(profile.without_heredocs(line + empty_bodies + "\nls"), line + "\nls")
+        self.assertEqual(reader.call_count, 2_000)
+        self.assertLessEqual(max(len(call.args[0]) for call in reader.call_args_list), usage.DELIMITER_REACH)
+
     def test_what_only_looks_like_a_here_document_opens_none(self):
         for line in ('cat <<<"bar"', "grep -rn '<<EOF' x", 'python3 -c "x << y"', "cat a", "a <<", "a << ;",
                      "# cat <<EOF", "cat f # comment <<EOF", 'echo "<<" x; cat g', 'grep -rn "<<" tools/'):

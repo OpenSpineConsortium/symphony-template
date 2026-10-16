@@ -98,6 +98,10 @@ IDLE_GAP = 300
 # A usage left by the hook belongs to the commit that follows it within
 # this long; an older one is a commit that never happened.
 PENDING_FRESH = 600
+# How far past a << its delimiter is looked for: a delimiter is one word,
+# and reading the rest of a long line for each << on it took time with the
+# square of the line.
+DELIMITER_REACH = 1024
 SWITCH_FILES = (".github/symphony-metrics", ".github/sdlc-metrics")
 SWITCH_FILE = SWITCH_FILES[0]
 SWITCH_VARIABLE = "SDLC_METRICS"
@@ -439,7 +443,7 @@ def outside_quotes(text, i, frames, waiting):
     elif text.startswith("<<<", i):
         return 3
     elif text.startswith("<<", i) and not frame[1]:
-        delimiter = delimiter_of(text[i + 2:line_end(text, i)])
+        delimiter = delimiter_of(text[i + 2:i + 2 + DELIMITER_REACH].split("\n", 1)[0])
         if delimiter:
             waiting.append(delimiter)
         return 2
