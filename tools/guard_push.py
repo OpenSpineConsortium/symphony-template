@@ -16,8 +16,8 @@ caller patch this module's branches(), which the library's run() would
 not see. Anything the guard cannot read it lets through rather than
 wedging the session; branch protection on GitHub refuses what matters.
 
-Before a lease push onto claude/N the library's guard, from its change
-after 0.4.1, which the template vendored ahead of that release, reads
+Before a lease push onto claude/N the library's guard, from its 0.5.0,
+reads
 whose claim the branch on origin and the branch pushed carry, from the
 claim file docs/agents/claims/N.md, and refuses a lease that would take
 another worker's claim (guard.other_holder, its claim_file_reader).
