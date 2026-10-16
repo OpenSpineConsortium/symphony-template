@@ -9,4 +9,11 @@ Settings and opens that page in place of the worker's link, which stays on New s
 link and Phone. The worker's Claude Code 2.1.283 meets the minimum; it does not pass `--spawn
 worktree`, and 2.1.283 refuses that together with the successor job's `--continue`, a choice left
 to hpcworker. Whether the successor's resume brings a project's thread back after the job ends is
-not yet measured. The research is docs/research/beethoven-worker-opening.md.
+not yet measured. The research is docs/research/beethoven-worker-opening.md, and the two
+adversarial reviews of 21.0.0 are docs/research/beethoven-21-reviews.md.
+
+A merge to beethoven-extension's main is a release: its release.yml builds and keeps every push to
+main as a GitHub release, and with the five CWS_ secrets set (2026-10-16) the repository variable
+`CWS_ON_PUSH` decides the rest, upload sending each merge to the Chrome Web Store as a draft and
+publish submitting it for review. A cloud session cannot read that variable, so it takes any merge
+there as one that may reach students.
