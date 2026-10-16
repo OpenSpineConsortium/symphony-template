@@ -8,7 +8,9 @@ Three rules hold in every programme, taken from OpenSpineConsortium/coordbench, 
 - A run that spends tokens or money waits for the owner's word and the number: how many runs, of what, at about what cost. Nothing here starts a run by itself; a schedule, where one exists, is a fallback and never the only trigger.
 - A record carries counts, bytes, seconds and tokens, with tool names and model names, and never a path, a command, a prompt, a title or any text of a conversation, so it can be committed and shared. Transcripts and logs stay where they were written.
 
-Programmes: none has landed on main yet; each adds its folder and its line here in the pull request that brings it.
+Programmes:
+
+- [beyond-cooperation](beyond-cooperation/README.md): what one agent spends, context, tool calls, reading and time, and how to spend less, measured with tools/profile.py, with MAST's failure taxonomy as the outcome side.
 
 ## Notes
 
