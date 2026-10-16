@@ -76,7 +76,8 @@ source too, and SDLC_METRICS=off in a person's environment keeps their
 sessions' usage off their commits. A second line after the usage one,
 Symphony-Profile, carries the session's profile since its last commit,
 and a run's record its profile where the workflow copied profile.py
-(profiling-sessions.md); collect does not read either yet.
+beside the recorder (profiling-sessions.md); collect does not read
+either yet.
 
 Two conventions the counts rest on: the coordinator, the board's run or a
 coordinator routine, starts each release comment with

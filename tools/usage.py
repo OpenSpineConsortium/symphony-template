@@ -27,9 +27,15 @@ metrics workflow can read it with GITHUB_TOKEN alone:
   session's profile since its last commit by tools/profile.py, whose
   docstring gives it: counts of calls, reads, the context and seconds in
   tools, for the research programme in docs/research/beyond-cooperation/.
-  It never stands in the usage line's way: a profile that cannot be read,
-  or a last commit whose profile is not known, leaves that one commit
-  without it.
+  It never stands in the usage line's way: the hook leaves the usage
+  before it reads the profile, which takes longer, and a profile that
+  cannot be read leaves that one commit without the line, the next
+  commit's line counting from the last commit that carried one; a last
+  commit whose profile is not known, made before the line existed, leaves
+  the next commit without it. The counts written on a session's last
+  commit are kept in the clone's common git directory, which its linked
+  worktrees share, so a session that commits from two of them counts
+  nothing twice.
 
   A run in GitHub Actions: a worker's, the coordinator's or @claude's.
   After claude-code-action the workflow runs `python3 tools/usage.py
@@ -50,11 +56,11 @@ Nothing is recorded while the metrics switch is off (the word off in
 word of the conversation is kept: token counts by model, seconds, turns,
 the profile's counts, the first eight characters of the session's id,
 and, for a run in Actions, which job ran and for which worker, issue and
-pull request. A
-hook never stops the session or the commit: whatever it cannot read, it
-leaves alone, and it always exits 0.
+pull request. A hook never stops the session or the commit: whatever it
+cannot read, it leaves alone, and it always exits 0.
 """
 
+import functools
 import importlib.util
 import json
 import os
@@ -302,9 +308,24 @@ def git(*args, cwd=None):
 
 
 def state_dir(cwd=None):
-    """Where the hook keeps what it read, inside the git directory, so no
-    clone ever commits it."""
+    """Where the hook leaves what it read for the commit that follows,
+    inside the git directory, so no clone ever commits it."""
     folder = Path(git("rev-parse", "--absolute-git-dir", cwd=cwd)) / "symphony" / "usage"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def kept_dir(cwd=None):
+    """Where the counts written on a session's last commit are kept: the
+    clone's common git directory, the same folder as state_dir's in the
+    clone's own worktree, and shared by its linked worktrees, each of
+    which has a git directory of its own, so that a session committing
+    from two of them counts each call once."""
+    try:
+        common = git("rev-parse", "--git-common-dir", cwd=cwd)
+    except OSError:
+        return state_dir(cwd)
+    folder = (Path(cwd or os.getcwd()) / common).resolve() / "symphony" / "usage"
     folder.mkdir(parents=True, exist_ok=True)
     return folder
 
@@ -342,7 +363,10 @@ def is_commit(command):
 
 def run_hook(payload, environ=None):
     """The PreToolUse hook: before a git commit, leave the session's usage
-    so far for the commit-msg hook. Silent, and never in the way."""
+    so far for the commit-msg hook, then its profile so far beside it.
+    Silent, and never in the way: the usage is left first, so that a hook
+    stopped while it reads the profile, at Claude Code's timeout for a
+    hook, still leaves the usage for the commit."""
     if not isinstance(payload, dict) or in_actions(environ):
         return
     command = (payload.get("tool_input") or {}).get("command") if isinstance(payload.get("tool_input"), dict) else ""
@@ -353,15 +377,19 @@ def run_hook(payload, environ=None):
     root = git("rev-parse", "--show-toplevel", cwd=cwd)
     if sharing_off(root, environ):
         return
-    usage = session_usage(transcript)
-    write_json(state_dir(cwd) / "pending.json",
-               {"session": str(session), "at": time.time(), **usage, "profile": profile_so_far(transcript)})
+    pending = state_dir(cwd) / "pending.json"
+    left = {"session": str(session), "at": time.time(), **session_usage(transcript)}
+    write_json(pending, left)
+    profiled = profile_so_far(transcript)
+    if profiled is not None:
+        write_json(pending, {**left, "profile": profiled})
 
 
 def run_trailer(message_file, cwd=None, environ=None, now=None):
     """The commit-msg hook's step: add to the commit the usage and the
     profile the hook left since the session's last commit, and remember
-    them as written."""
+    them as written; a commit that carries no line remembers nothing, so
+    what was spent since the last line waits for the next."""
     if in_actions(environ):
         return
     folder = state_dir(cwd)
@@ -373,16 +401,16 @@ def run_trailer(message_file, cwd=None, environ=None, now=None):
     session = re.sub(r"[^A-Za-z0-9-]", "", str(pending.get("session")))
     if not session:
         return
-    written = folder / f"{session}.json"
+    written = kept_dir(cwd) / f"{session}.json"
     before = read_json(written) or {}
     spent = since(pending, before)
-    profiled, profile_kept = profile_line(session, pending.get("profile"), before)
-    state = {"models": pending.get("models") or {}, "seconds": pending.get("seconds") or 0}
-    if profile_kept:
-        state["profile"] = profile_kept
-    write_json(written, state)
     if not spent["models"]:
         return
+    profiled, profile_kept = profile_line(session, pending.get("profile"), before)
+    state = {"models": pending.get("models") or {}, "seconds": pending.get("seconds") or 0}
+    if profile_kept is not None:
+        state["profile"] = profile_kept
+    write_json(written, state)
     lines = [f"{TRAILER_KEY}: {trailer(session, spent)}"]
     if profiled:
         lines.append(profiled)
@@ -402,12 +430,14 @@ def add_trailers(message_file, lines, cwd=None):
 
 # --- the profile beside the usage -------------------------------------------------
 
+@functools.lru_cache(maxsize=None)
 def profiler():
     """tools/profile.py, which reads a session's profile for its line,
-    loaded by its path beside this file, since the standard library has a
-    module of the same name; loaded only for a commit, so that this file
-    alone still records a run in Actions, from the copy each workflow makes
-    of it."""
+    loaded once by its path beside this file, since the standard library
+    has a module of the same name, which a test run under cProfile has
+    already imported; loaded only when a profile is read, so that this
+    file alone still records a run in Actions, from the copy each workflow
+    makes of it."""
     spec = importlib.util.spec_from_file_location("symphony_profile", TOOLS / "profile.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -436,21 +466,27 @@ def run_profile(execution_file):
 
 def profile_line(session, now, before):
     """The Symphony-Profile line for the profile since the session's last
-    commit, and what is kept of the counts for the next, each None when it
-    cannot be told: no profile read now, or a last commit recorded without
-    one, by a hook older than the line or one that could not read it, whose
-    counts this line would claim for itself."""
+    commit that carried one, and the counts to keep for the next commit.
+    No profile read now gives no line and keeps the counts kept before, so
+    the next line counts this commit's calls too. A last commit recorded
+    without a profile, by a hook older than the line, gives no line, since
+    the counts since it are not known and this line would claim them all,
+    and starts the count from now; so do counts kept before that cannot be
+    read."""
+    earlier = before.get("profile") if before else {}
+    earlier = earlier if isinstance(earlier, dict) else None
     if not isinstance(now, dict):
-        return None, None
+        return None, earlier
     try:
         profile = profiler()
         kept = profile.kept(now)
-        if before and not isinstance(before.get("profile"), dict):
-            return None, kept
-        spent = profile.since(now, before.get("profile") or {})
-        return f"{profile.TRAILER_KEY}: {profile.trailer(session, spent)}", kept
     except Exception:
-        return None, None
+        return None, earlier
+    try:
+        spent = None if earlier is None else profile.since(now, earlier)
+        return (None if spent is None else f"{profile.TRAILER_KEY}: {profile.trailer(session, spent)}"), kept
+    except Exception:
+        return None, kept
 
 
 def hooks_dir(cwd=None):
