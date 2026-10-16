@@ -203,7 +203,8 @@ things to fix, none of them must-fix. All twelve are fixed on the branch:
   cut token and the mint refused, saying the screen may show part of it;
   and a captured token shorter than 60 characters is refused as a piece.
   Whether Claude Code's renderer honours the window it is given is still
-  only inferred (open items).
+  only inferred (open items). The second pass found the run's check
+  incomplete (below).
 - The page said a token can be revoked at claude.ai under Settings,
   which nothing verified; it now says what the documentation says, that
   deleting the secret does not revoke the token, and names no page.
@@ -233,6 +234,50 @@ things to fix, none of them must-fix. All twelve are fixed on the branch:
   wizard printed the sign-in note twice; all three fixed, and the Git
   Bash window named.
 
+## The second review pass (2026-10-16) and what changed for it
+
+The same reviewer read the fixes: eleven of the twelve were right and
+complete, the check for a token cut over two lines was not, and the page
+claimed two things the code did not hold. Fixed on the branch:
+
+- The cut-token check missed the realistic cut. It wanted 20 characters
+  or more of the token on the next line, while a token of about 108
+  characters wrapped at a width of 90 to 108 leaves a rest of 1 to 19,
+  and the 60-character floor let the first piece through; a rest begun
+  by blanks or by a code other than a cursor move was missed too. The
+  tests cut at 50 characters, below the floor, so they proved nothing
+  about the check. Now the rest is known by where it stands, not by its
+  length: a run of a token's characters alone on the line after the
+  masked part, past blanks and any terminal code, ending with its line.
+  claude prints the token last on its line, and a word of claude's is
+  followed by a blank or by the code that places the next word, so a
+  word is never taken for a rest. The tests cut at 40, 50 and 79
+  characters and before the last one, in Ink's form and in the
+  renderer's placed form, indented and after a hyperlink code; a fuzz
+  of every width from 20 to 419 columns, three token lengths, both forms
+  and four chunk sizes (9,600 runs) stored no wrong token and refused
+  nothing at 400 columns or wider. The exact length of a setup-token
+  token would close every width at once, but neither the documentation
+  nor the binary's own pattern for it (20 characters or more after its
+  head) pins it, so it is not guessed.
+- A run past the hold limit that came in pieces was refused as a cut
+  token, with the wrong words; what follows such a run is no longer
+  watched, so it is refused by its length.
+- A word of 20 characters or more at the start of the line after the
+  token was taken for a cut; a word followed by a blank is not.
+- The page said the wizard refuses a paste in Git Bash's own window;
+  getpass there takes the console's path and may hang or echo rather
+  than warn, so the page says that.
+- After a store, a failure in the label, the read-back or the list of
+  slots ended with gh's error alone, though the token was stored; the
+  error now says the token was sent, and to run status before storing
+  another.
+- Left as they are: the terminal reset leaves the alternate screen alone,
+  which claude setup-token is not known to use, and is written only when
+  the keyboard is a terminal; claude is looked for on PATH and at
+  ~/.claude/local/claude, and the native installer's ~/.local/bin is on
+  PATH where it is installed.
+
 ## Open items
 
 - tools/crowd_check.py's SECRET_NAMES does not name SYMPHONY_CLAUDE_1 to
@@ -255,5 +300,5 @@ things to fix, none of them must-fix. All twelve are fixed on the branch:
   renderer wraps at the 400-column window the wizard gives it is
   inferred from Node reading the terminal's size; the cut-token refusal
   and the length floor stand behind that inference. Python's getpass
-  under Git Bash's own window (mintty) is known to hang or echo; the page
-  says to use winpty or another terminal there, unverified here.
+  under Git Bash's own window (mintty) may hang or echo; the page says to
+  use winpty or another terminal there, unverified here.

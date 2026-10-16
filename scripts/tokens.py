@@ -103,13 +103,14 @@ TOKEN_START = re.compile(
 # What the screen shows in a token's place; neither matches a secret's shape.
 MASK = TOKEN_HEAD + "**-" + "*" * 16 + " (kept by the wizard, not shown)"
 OTHER_MASK = SECRET_HEAD + "****" + " (not a token from claude setup-token; not shown)"
-# The rest of a token cut over two lines: a run of a token's characters
-# that begins the line after the masked part, past line ends and cursor
-# codes; shorter runs are words. A cursor code cut by the chunk's end is
-# waited for.
-CONTINUATION = re.compile(r"^(?:\r|\n|\x1b\[[0-9;?]*[A-Za-z])*([A-Za-z0-9_-]*)")
-CONTINUATION_RUN = 20
-PARTIAL_CODE = re.compile(r"\x1b(?:\[[0-9;?]*)?")
+# The rest of a token cut over two lines stands alone on the line after
+# the masked part: a run of a token's characters, past line ends, blanks
+# and terminal codes, that ends with its line, where a word of claude's is
+# followed by a blank or by the code that places the next word. A code cut
+# by the chunk's end is waited for.
+CODE = r"(?:\x1b\[[0-9;?<>=]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[^\[\]])"
+CONTINUATION = re.compile(r"^(?:[ \t\r\n]|" + CODE + r")*([A-Za-z0-9_-]*)(" + CODE + r"*)")
+PARTIAL_CODE = re.compile(r"\x1b(?:\[[0-9;?<>=]*|\][^\x07\x1b]*\x1b?)?")
 # What claude turns on in the terminal and may leave on when it is killed.
 TERMINAL_RESET = "\x1b[?2004l\x1b[?1004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2026l\x1b[<u\x1b[?25h\x1b[0m"
 LABEL_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$")
@@ -306,8 +307,11 @@ class Masker:
             found = match.group(0)
             if TOKEN_SHAPE.fullmatch(found) and found not in self.tokens:
                 self.tokens.append(found)
-            pieces.append(text[position:max(match.start(), shown)])
-            pieces.append(MASK if TOKEN_SHAPE.fullmatch(found) else OTHER_MASK)
+            pieces.append((text[position:max(match.start(), shown)], "shown"))
+            # A run past the hold limit is refused by its length later, so
+            # what follows it is not watched for a cut token's rest.
+            kind = "mask" if len(found) <= HOLD_LIMIT else "mask of a run"
+            pieces.append((MASK if TOKEN_SHAPE.fullmatch(found) else OTHER_MASK, kind))
             position = max(match.end(), shown)
         cut = len(text)
         if not final:
@@ -315,31 +319,45 @@ class Masker:
             if start and len(start.group(0)) <= HOLD_LIMIT:
                 cut = max(start.start(), position)
         self.held = text[cut:]
-        pieces.append(text[position:cut])
-        self.watch(pieces)
-        emit = "".join(pieces)
+        pieces.append((text[position:cut], "shown"))
+        self.watch(pieces, final)
+        emit = "".join(piece for piece, _ in pieces)
         if emit:
             self.shown = (self.shown + emit)[-12:]
         return emit
 
-    def watch(self, pieces):
-        """A run of a token's characters that begins the line after a
-        masked token is the rest of one cut over two lines by a terminal
-        narrower than the one claude was given: the piece kept is then no
-        token, and the rest is already on the screen, so it is noted here
-        and the run refused."""
-        for piece in pieces:
-            if piece in (MASK, OTHER_MASK):
+    def watch(self, pieces, final):
+        """A run of a token's characters that stands alone on the line
+        after a masked token is the rest of one cut over two lines by a
+        terminal narrower than the one claude was given: the piece kept
+        is then no token, and the rest is already on the screen, so it is
+        noted here and the mint refused. A word of claude's is followed by
+        a blank or by the code that places the next word, never by its
+        line's end."""
+        for piece, kind in pieces:
+            if kind == "mask":
                 self.after = ""
+            elif kind == "mask of a run":
+                self.after = None
             elif self.after is not None and piece:
                 self.after += piece
-                run = CONTINUATION.match(self.after)
-                rest = self.after[run.end():]
-                if len(run.group(1)) >= CONTINUATION_RUN:
-                    self.cut_over_lines = True
-                    self.after = None
-                elif (rest and not PARTIAL_CODE.fullmatch(rest)) or len(self.after) > HOLD_LIMIT:
-                    self.after = None
+                self.decide(final)
+        if final and self.after:
+            self.decide(final)
+
+    def decide(self, final):
+        run = CONTINUATION.match(self.after)
+        word, tail = run.group(1), self.after[run.end():]
+        if not word:
+            if tail and not PARTIAL_CODE.fullmatch(tail):
+                self.after = None
+        elif tail[:1] in ("\r", "\n") or (final and not tail):
+            self.cut_over_lines = True
+            self.after = None
+        elif tail and not PARTIAL_CODE.fullmatch(tail):
+            self.after = None
+        if self.after is not None and len(self.after) > HOLD_LIMIT:
+            self.after = None
 
 
 def pty_available():
@@ -812,10 +830,14 @@ def add(gh, target, slot=None, label="", also_main=False, paste=False, write=Non
     for each in names:
         store_secret(state, each, token, scopes[each])
     token = None
-    if label:
-        set_variable(state, slot_label(slot), label, label_scope)
-    state = verify(state, names)
-    update_accounts(state, accounts_scope)
+    try:
+        if label:
+            set_variable(state, slot_label(slot), label, label_scope)
+        state = verify(state, names)
+        update_accounts(state, accounts_scope)
+    except TokensError as error:
+        raise TokensError(f"{error}; the token itself was sent to GitHub, so run status before storing another, and set the "
+                          "label or the list of slots by hand on the variables page if status shows them missing") from None
     return state
 
 

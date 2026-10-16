@@ -285,20 +285,32 @@ class TheMask(unittest.TestCase):
 
     def test_a_token_cut_over_two_lines_is_noticed(self):
         # A terminal narrower than claude's would end the line inside the
-        # token: the first piece is masked and kept, the rest comes as the
-        # next line's first word, which no shape finds, so the run after
-        # the mask is the sign.
-        cut = TOKEN[:50] + "\r\n" + TOKEN[50:] + "\r\nStore this token securely.\n"
-        for size in (1, 3, 30, 1000):
-            masker, out = self.masker_fed(cut, size)
-            self.assertTrue(masker.cut_over_lines, size)
-            self.assertEqual(masker.tokens, [TOKEN[:50]], size)
-            self.assertFalse(has_token(out), size)
-        # A line of words after the token, with cursor codes between, is none.
-        for after in ("\r\r\n\x1b[2GStore\x1b[8Gthis", "\n\n" + "-" * 10 + " done", "\x1b[22m\r\n"):
-            masker, out = self.masker_fed("\x1b[1m" + TOKEN + after, 1)
-            self.assertFalse(masker.cut_over_lines, repr(after))
-            self.assertEqual(masker.tokens, [TOKEN])
+        # token: the first piece is masked and kept, the rest stands alone
+        # on the next line, which no shape finds and no word of claude's
+        # does, so that is the sign, whatever the rest's length, and
+        # however the line is begun (Ink's padding, the renderer's column
+        # code with bold put back) or ended (a code before the line end).
+        for at in (79, len(TOKEN) - 1, 50, 40):
+            for before, after in (("\r\n", "\r\nStore this token securely.\n"), ("\r\r\n\x1b[2G\x1b[1m", "\x1b[22m\r\r\n\r\r\n\x1b[2GStore\x1b[8Gthis"),
+                                  ("\n  ", "\n"), ("\n\t", ""), ("\n\x1b[<u\x1b]8;;\x1b\\", "\n")):
+                cut = TOKEN[:at] + before + TOKEN[at:] + after
+                for size in (1, 3, 30, 1000):
+                    masker, out = self.masker_fed(cut, size)
+                    self.assertTrue(masker.cut_over_lines, (at, repr(before), repr(after), size))
+                    self.assertEqual(masker.tokens, [TOKEN[:at]], (at, size))
+                    self.assertFalse(has_token(out), (at, size))
+        # A line of words after the token, with blanks or cursor codes
+        # between, is none, however long its first word; nor is a line
+        # that begins with something else.
+        for after in ("\r\r\n\x1b[2GStore\x1b[8Gthis", "\n\n" + "-" * 10 + " done", "\x1b[22m\r\n", "\n\nAuthentication_complete_for_this_account now\n",
+                      "\r\r\n\r\r\n\x1b[2GStore\x1b[8Gthis\x1b[13Gtoken\r\r\n", "\n(done)\n", "\n\x1b[?25h"):
+            for size in (1, 5, 1000):
+                masker, out = self.masker_fed("\x1b[1m" + TOKEN + after, size)
+                self.assertFalse(masker.cut_over_lines, (repr(after), size))
+                self.assertEqual(masker.tokens, [TOKEN])
+        # A run past the hold limit is refused by its length, not as a cut.
+        masker, out = self.masker_fed("x " + TOKEN + "Q" * (tokens.HOLD_LIMIT + 40) + "\n", 50)
+        self.assertFalse(masker.cut_over_lines)
 
     def test_a_token_of_another_length_is_refused(self):
         with self.assertRaises(tokens.TokensError) as caught:
@@ -387,18 +399,21 @@ class TheMint(unittest.TestCase):
         bin_dir = Path(folder) / "bin"
         bin_dir.mkdir()
         claude = bin_dir / "claude"
-        claude.write_text(f"#!{sys.executable} -IS\nimport sys\nsys.stdout.write('Your token:\\n' + {TOKEN[:50]!r} + '\\r\\n' + {TOKEN[50:]!r} + '\\r\\n')\n")
-        claude.chmod(0o755)
-        collector = Collector()
-        reader = code_pipe("")
-        try:
-            with self.assertRaises(tokens.TokensError) as caught:
-                tokens.minted_token(stdin_fd=reader, write=collector, command=(str(claude), "setup-token"))
-        finally:
-            os.close(reader)
-        self.assertIn("cut over two lines", str(caught.exception))
-        self.assertNotIn(TOKEN[:50], collector.text)
-        self.assertNotIn(TOKEN[:50], str(caught.exception))
+        # Cut at 79, past the length floor, with a rest of 17 characters;
+        # and cut before the last character alone.
+        for at in (79, len(TOKEN) - 1):
+            claude.write_text(f"#!{sys.executable} -IS\nimport sys\nsys.stdout.write('Your token:\\n' + {TOKEN[:at]!r} + '\\r\\n' + {TOKEN[at:]!r} + '\\r\\n')\n")
+            claude.chmod(0o755)
+            collector = Collector()
+            reader = code_pipe("")
+            try:
+                with self.assertRaises(tokens.TokensError) as caught:
+                    tokens.minted_token(stdin_fd=reader, write=collector, command=(str(claude), "setup-token"))
+            finally:
+                os.close(reader)
+            self.assertIn("cut over two lines", str(caught.exception))
+            self.assertNotIn(TOKEN[:at], collector.text)
+            self.assertNotIn(TOKEN[:20], str(caught.exception))
 
     def test_claude_is_found_where_its_own_installer_puts_it(self):
         folder = tempfile.mkdtemp(prefix="tokens-home-")
@@ -514,10 +529,20 @@ class Adding(unittest.TestCase):
 
     def test_a_store_github_does_not_list_is_an_error(self):
         world = World(self)
-        _, printed, calls = (None, "", [])
         with self.assertRaises(tokens.TokensError) as caught:
             world.run_in_process(self, tokens.add, tokens.Gh(), target(), None, "", False, False)
         self.assertIn("does not list", str(caught.exception))
+        # What fails after the store says the token was sent all the same.
+        world = World(self)
+        world.expect_store(tokens.slot_secret(1))
+        routes = read_json(world.routes_file)
+        routes["variable set"] = [answer(500, {"message": "down"})]
+        fake_gh.write_routes(world.routes_file, routes)
+        with self.assertRaises(tokens.TokensError) as caught:
+            world.run_in_process(self, tokens.add, tokens.Gh(), target(), None, "", False, False)
+        self.assertIn("500", str(caught.exception))
+        self.assertIn("run status", str(caught.exception))
+        self.assertEqual(find(world.calls(), "secret set")[0]["stdin"], TOKEN)
 
     def test_what_can_fail_fails_before_the_sign_in(self):
         # The list an existing secret reaches cannot be read (no admin:org

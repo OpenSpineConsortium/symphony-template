@@ -105,11 +105,13 @@ pseudo-terminal, and a machine may have gh but not claude: there, run
 `claude setup-token` wherever claude is and give the wizard the token with
 `add --paste` or `main --paste`, at a hidden prompt that echoes nothing,
 as gh's own prompt would; the wizard takes the paste path by itself when
-it cannot run claude, and refuses a paste in a window that cannot hide it
-(Git Bash's own window is one: run it there through winpty, or from cmd,
-PowerShell or Windows Terminal). A token that claude wrapped over two
-lines, or a piece of one, is refused rather than stored, and the wizard
-says so.
+it cannot run claude, and refuses a paste where Python says it cannot
+hide what is typed. In Git Bash's own window (mintty) a hidden prompt may
+hang or echo instead, so run the wizard there through winpty, or from
+cmd, PowerShell or Windows Terminal. claude is given a terminal 400
+columns wide, so it never wraps the token; were it ever to, the cut token
+would be refused rather than stored, and the wizard would say that the
+screen may show part of it.
 
 ## By hand, where the wizard cannot run
 
