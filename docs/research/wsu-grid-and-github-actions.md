@@ -15,8 +15,8 @@ and OpenSpineConsortium/symphony-template, the workflow, docs/setup/grid.md and 
 ## The answer
 
 Yes, with the connection pointing from the grid out. GitHub's own runners cannot sign in to the
-grid, and no credential of the grid's may sit at GitHub nor one of GitHub's on the grid beyond a job's
-own, so Beethoven does what its CI lane already does: a Slurm job on a compute node polls GitHub
+grid, and no credential of the grid's may sit at GitHub nor one of GitHub's reach a workflow's job
+beyond that job's own, so Beethoven does what its CI lane already does: a Slurm job on a compute node polls GitHub
 over outbound HTTPS. The job serves GitHub's own self-hosted runner, inside GitHub's own runner
 image, registered for one GitHub job at a time with a just-in-time credential that the account's gh
 sign-in mints on the grid as the registration starts and that GitHub discards once the job has run.
@@ -68,7 +68,8 @@ framework/profiles/wayne.json:
 - The host's Slurm client runs inside a container on the nodes with the binds measured on asx1 on
   2026-09-28 (lib/adapters/common.sh, hpcw_slurm_in_container): /usr/bin under /opt/host/bin,
   /usr/lib64/slurm, the munge library and socket, /etc/slurm, and an /etc/passwd that adds the slurm
-  and munge users.
+  and munge users. The worker uses them to queue its successor; the runner's container is given none
+  of them (The two directions weighed, below).
 
 GitHub's rules for self-hosted runners, read on 2026-10-16 from the github/docs repository's content
 files, since docs.github.com is blocked from the cloud session (the paths are the pages'):
@@ -98,8 +99,21 @@ files, since docs.github.com is blocked from the cloud session (the paths are th
   Beethoven's rules forbid; the chain writes the three files itself, mode 0600, from gh's answer in a
   mode-0600 file on the node's disk.
 - GitHub's runner image is ghcr.io/actions/actions-runner (actions/runner, images/Dockerfile): Ubuntu
-  22.04 with the runner, git and the runner's own node, and no python. What else it carries is read
-  from that file, not measured here.
+  24.04 (.NET's runtime-deps:8.0-noble) with the runner, git, curl, jq, sudo, the docker client, the
+  runner's own node and, since software-properties-common needs it, Ubuntu's python3. Its
+  environment sets ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1, which would copy the runner's whole trace
+  into the chain's log (src/Runner.Common/HostContext.cs), so the chain sets it false. What else it
+  carries is read from that file, not measured here.
+- A runner told to update downloads the new version and exits with code 3 or 4 for a script to
+  restart it (src/Runner.Listener/SelfUpdater.cs,
+  src/Misc/layoutroot/run-helper.sh.template); inside a container that
+  ends with the listener, and from an image that holds the old version, that cannot finish, so the
+  chain stops with the reason and a person installs the new image. GitHub's page says a runner
+  updates itself when a job is assigned to it once a new version is out, and that ephemeral runners
+  in containers can update again on every release unless registered with config.sh's
+  --disableupdate (actions/reference/runners/self-hosted-runners.md, "Runner software updates on
+  self-hosted runners"), which generate-jitconfig does not take; how often it happens to the chain
+  is not yet measured.
 
 Apptainer: `--no-mount bind-paths`, which keeps the site's own bind paths (the home, the volume) out
 of the container, exists since 1.2.0 (its CHANGELOG.md, v1.2.0 of 2023-07-18), so the grid's 1.2.2
@@ -129,9 +143,12 @@ pipelines.actions.githubusercontent.com and ghcr.io, and a container for the run
 a chain of jobs on reqp/requeue, idle most of the time (one registration listening), the margin before
 each wall time during which no new job starts, a job queued for up to 24 hours when the chain itself
 waits in Slurm's queue, and a GitHub job lost when its chain job is preempted. What it rules out: a
-public repository, and any step that needs the home or the lab volume, which the container does not
-see (a step that needs the grid's files queues a job of its own with --slurm, or reads them through
-a bind the chain is told to add).
+public repository, and any step that needs the scheduler, the home or the lab volume, none of which
+the container sees: a job a step queued as the account, or a bind of the home or the volume, would
+give every workflow's code all the account holds, its gh sign-in and its Claude login among them. A
+workflow that needs more than a small share of one node runs on a chain sized for it (--cpus, --mem,
+--gres, a GPU given with --nv); a step that must queue a job or read a file on the grid waits for
+the ssh gate, which does each through one forced command.
 
 The decision, on the card of 2026-10-16 00:24 UTC: both, the runner first.
 
@@ -145,17 +162,22 @@ chain's exact flags, so a flag the site refuses is seen there and never in a cha
 tools/grid_runner.sbatch (a chain's job: queue the successor, mint, listen, one GitHub job at a time,
 until the margin or STOP), and tools/tests/test_grid_runner.sh with the stand-ins
 tools/tests/shim/apptainer and tools/tests/shim/runner-listener beside the extended shim/gh and
-shim/slurm: 163 checks against stand-ins (nothing reaches GitHub, a registry, a scheduler or the
+shim/slurm: 189 checks against stand-ins (nothing reaches GitHub, a registry, a scheduler or the
 grid), among them that no token and no registration ever leaves a job, that the job looks at the
-runner once a minute and never faster, and that every bind the container gets is on the node's own
-disk or the test's folder. The README's paragraph "A GitHub Actions runner on the grid" and the
+runner once a minute and never faster, that every bind the container gets is on the node's own
+disk or the test's folder, that no Apptainer setting of the shell's reaches the container, and that
+the chain stops itself with the reason after three jobs in a row that could not serve, on a public
+repository and when the runner asks for an update. An adversarial review before the pull requests
+were marked ready found faults in the first version (the update and failure paths, the runner's
+version read through Apptainer's own lines, Apptainer settings from the shell, --slurm, a fork's
+pull request reaching grid.yml); each fix was checked by undoing it and seeing the tests fail. The README's paragraph "A GitHub Actions runner on the grid" and the
 section of the same name in docs/OPEN_QUESTIONS.md describe it; CLAUDE.md there carries the rule.
 
 In this repository: .github/workflows/grid.yml (one command, from the workflow's page or another
-workflow, on `runs-on: [self-hosted, grid]`, only while the repository is private and never for a
-fork's event, Python 3.12 set up unless unticked, the output as the job's log and the artifact
-grid-<run>-<attempt>), docs/setup/grid.md (how it works, what it takes, the owner's eight steps with
-their links), the memory fact "The grid runs a job through Beethoven", and this note.
+workflow, on `runs-on: [self-hosted, grid]`, only for an event that names a private repository that
+is not a fork and never for a fork's pull request, Python 3.12 set up unless unticked, the output as
+the job's log and the artifact grid-<run>-<attempt>, whose prefix a caller may change),
+docs/setup/grid.md (how it works, what it takes, the owner's nine steps with their links), the memory fact "The grid runs a job through Beethoven", and this note.
 
 ## What is not yet measured
 
@@ -166,15 +188,17 @@ first test that answers it; in short:
   pipelines.actions.githubusercontent.com (the runner's long poll);
 - `--no-mount bind-paths`, `--home` and `--cleanenv --containall` as the chain uses them, on the
   grid's Apptainer 1.2.2 and under the site's configuration;
-- the runner, .NET 8 in an Ubuntu 22.04 image, on an EL7 node's 3.10 kernel;
+- the runner, .NET 8 in an Ubuntu 24.04 image, on an EL7 node's 3.10 kernel;
 - whether Slurm at Wayne State exports SLURM_JOB_END_TIME to a batch job (the job's clock; without
   it the margin is read from the start time and --hours);
 - the chain: a successor queued from inside a job with `--dependency=afterany:<id>,singleton` on
   reqp/requeue, and a requeued job finding its successor instead of queuing a second;
 - how long a GitHub job takes to start on the runner, and whether GitHub holds a job that arrives
   while no runner is online until the next registration;
-- actions/setup-python and actions/checkout inside the runner's container on the grid, and `--slurm`
-  with this image rather than the worker's sandbox.
+- actions/setup-python and actions/checkout inside the runner's container on the grid, and the
+  node's GPU given to it with --nv;
+- how often GitHub asks a just-in-time runner to update, each time stopping the chain until --install
+  and --start.
 
 The install job is the first test of the first three; the first chain job and the first Run workflow
 press answer the rest.
@@ -187,8 +211,8 @@ hardware, from one Beethoven session. The runner and that session meet in four p
 note says so, since both are built on the same account:
 
 - The same gh sign-in: the runner's registrations and a session's own GitHub work use the account's
-  one gh sign-in on the grid, under the owner's own login. Nothing the runner writes is where a
-  session reads: its registration lives in mode-0600 files on the node's disk inside the chain's
+  one gh sign-in on the grid, under the owner's own login, which stays in the home, where the
+  runner's container never looks. Nothing the runner writes is where a session reads: its registration lives in mode-0600 files on the node's disk inside the chain's
   job, and its chain folder on the volume holds STOP, status.json, the jobs' logs and a copy of the
   runner's own diagnostic logs when a run ended badly, no credential.
 - The same queue: a chain job and a worker job both run on reqp/requeue and count against the
@@ -196,8 +220,7 @@ note says so, since both are built on the same account:
   One chain per repository and account, and one GitHub job at a time on it.
 - The same tools: tools/grid_runner.sh lives beside the worker's job template in hpcworker, reads the
   same site profile with the same awk reader (the runtime, the worker queue and the folder beside
-  the account's state), and reuses lib/adapters/common.sh's Slurm binds for --slurm; a change to
-  those binds changes both.
+  the account's state); a change to the reader or to those fields changes both.
 - No Claude credential near the runner, by construction: a session's sign-in lives under $HOME
   (the profile's claude_config_dir), which the runner's container does not mount
   (`--containall --cleanenv --no-mount bind-paths`), and the chain's job files unset the agent
@@ -218,8 +241,11 @@ note says so, since both are built on the same account:
   (add-runners, configure-the-application, remove-runners, manage-access), rest/actions/self-hosted-runners.
 - actions/runner: src/Runner.Common/Constants.cs, src/Runner.Listener/Runner.cs,
   src/Runner.Listener/Program.cs, src/Runner.Listener/Configuration/ConfigurationManager.cs,
-  images/Dockerfile, docs/start/envlinux.md.
-- apptainer/apptainer: CHANGELOG.md (v1.2.0, 2023-07-18).
+  src/Runner.Listener/SelfUpdater.cs, src/Runner.Common/HostContext.cs,
+  src/Misc/layoutroot/run-helper.sh.template, images/Dockerfile, docs/start/envlinux.md.
+- apptainer/apptainer: CHANGELOG.md (v1.2.0, 2023-07-18); apptainer/apptainer-userdocs, branch
+  release-1.2: environment_and_metadata.rst (the image's environment, APPTAINERENV_ and --env, and
+  which wins).
 - The thread "Symphony on the WSU grid" in the Symphony project: the owner's messages of 2026-10-15
   23:35 and 23:54 UTC, the decision card answered at 2026-10-16 00:24 UTC, and the coordinator's
   relays of 00:25 UTC (research notes accumulate in the repository) and 00:29 UTC (the session on

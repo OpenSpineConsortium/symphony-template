@@ -58,7 +58,7 @@ cswap is the optional multi-account switcher (claude-swap-cloud on PyPI); its `c
 
 ## A job on the lab's cluster
 
-.github/workflows/grid.yml runs one command on a compute node of Wayne State's grid, through the GitHub runner that Beethoven's hpcworker serves there as a chain of Slurm jobs, and brings the output back as the job's log and an artifact. The connection points from the grid out, no credential crosses it, the repository must be private, and the Claude workflows stay on GitHub's machines. docs/setup/grid.md has how it works and the owner's steps; docs/research/wsu-grid-and-github-actions.md what was measured and weighed.
+.github/workflows/grid.yml runs one command on a compute node of Wayne State's grid, through the GitHub runner that Beethoven's hpcworker serves there as a chain of Slurm jobs, and brings the output back as the job's log and an artifact. The connection points from the grid out, nothing of the grid's goes to GitHub, a job there holds only its own one-job credential, the repository must be private, and the Claude workflows stay on GitHub's machines. docs/setup/grid.md has how it works and the owner's steps; docs/research/wsu-grid-and-github-actions.md what was measured and weighed.
 
 ## What comes next
 
