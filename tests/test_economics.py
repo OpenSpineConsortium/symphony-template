@@ -201,13 +201,21 @@ class AloneAndParallel(unittest.TestCase):
 
     def test_the_median_wait_to_merge_rounds_half_up_as_the_durations_do(self):
         self.assertEqual(self.waited(1, 2)["open_to_merge_median"], 2)
+        self.assertEqual(self.waited(2, 3)["open_to_merge_median"], 3)
         self.assertEqual(self.waited(4, 1, 2)["open_to_merge_median"], 2)
-        self.assertEqual(economics.median_seconds([1, 2]), 2)
+        self.assertEqual(economics.median_seconds([2, 3]), 3)
         self.assertIsNone(economics.median_seconds([]))
 
     def test_a_merge_dated_before_its_opening_is_left_out_of_the_median(self):
-        found = self.waited(3, 5, -100)
-        self.assertEqual((found["merged"], found["open_to_merge_median"]), (3, 4))
+        found = self.waited(0, 10, -100)
+        self.assertEqual((found["merged"], found["open_to_merge_median"]), (3, 5))
+
+    def test_a_wait_counts_in_whole_seconds_as_the_durations_do(self):
+        opened = at(24)
+        work = economics.Work(1, start=opened, end=opened + timedelta(seconds=2),
+                              merged=opened + timedelta(seconds=1, milliseconds=600), opened=opened)
+        found = economics.coordination([work], [], self.NOW)["alone"]
+        self.assertEqual(found["open_to_merge_median"], 1)
 
     def test_work_from_before_the_window_counts_as_beside(self):
         works = self.works()[:1]

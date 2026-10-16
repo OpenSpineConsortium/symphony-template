@@ -330,8 +330,9 @@ def covered_seconds(works, now):
 def median_seconds(values):
     """The median, rounded half up to whole seconds; None for no values.
     Every median in the record is taken by this one rule, the durations'
-    in tools/metrics.py and the coordination block's here, so the two
-    open_to_merge_median keys agree on the same waits."""
+    in tools/metrics.py and the coordination block's here, so the
+    durations' open_to_merge_median and each side's agree on the same
+    waits."""
     return int(math.floor(statistics.median(values) + 0.5)) if values else None
 
 
@@ -340,11 +341,13 @@ def group(works, spent, now, extra_usd=0.0, extra_tokens=0):
     those of its measured pull requests, the ones with usage recorded, and
     what it costs beside them (extra_usd, extra_tokens), so they are divided
     by its measured merges and never by merges whose cost is unknown. Its
-    median wait to merge leaves out a merge dated before its opening, as
-    the durations leave out a wait against the clock."""
+    median wait to merge counts each wait in whole seconds and leaves out
+    a merge dated before its opening, as the durations do with a wait
+    against the clock."""
     merged = [w for w in works if w.merged is not None]
     measured = [w for w in works if spent[w.number].tokens]
-    waits = [(w.merged - w.opened).total_seconds() for w in merged if w.opened is not None and w.merged >= w.opened]
+    waits = [int((w.merged - w.opened).total_seconds()) for w in merged
+             if w.opened is not None and w.merged >= w.opened]
     verdicts = [w.first_check for w in works if w.first_check is not None]
     usd = sum(spent[w.number].usd for w in measured) + extra_usd
     return dict(zip(GROUP_KEYS, (
