@@ -65,6 +65,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import stat
 import subprocess
 import sys
@@ -349,10 +350,149 @@ def read_json(path):
 
 # --- the hook and the commit-msg hook -------------------------------------------
 
-def is_commit(command):
-    """Whether a shell command runs git commit, in any simple command of it."""
+def without_heredocs(command):
+    """The command with its here-document bodies left out, since they are
+    data the command reads, not commands the shell runs: a commit message
+    written in one, with an apostrophe in it, would read as a quote left
+    open and hide the git commit that follows it. A command with no << has
+    none and is not read, since reading a long one a character at a time is
+    most of what a here-document costs tools/profile.py's reading of a
+    session."""
+    text = str(command)
+    if "<<" not in text:
+        return text
+    kept, at = [], 0
+    for start, end in heredoc_bodies(text):
+        kept.append(text[at:start])
+        at = end
+    kept.append(text[at:])
+    return "".join(kept)
+
+
+def heredoc_bodies(text):
+    """Where the bodies of a command's here-documents lie, each span from
+    the newline that ends the line opening them to the end of the last
+    one's delimiter line. The command is read whole, as the shell reads it:
+    a << in quotes, in a <<< here-string, in arithmetic, $(( )) or (( )),
+    or in a comment opens nothing, on a line a string carries on from an
+    earlier one too, while one inside $( ) in double quotes, where Claude
+    Code writes its commit messages, opens a here-document as anywhere
+    else. Each frame is the quote open in it, how deep in arithmetic and
+    how many ( it has open; a $( in double quotes opens a frame of its own,
+    which its ) closes."""
     from sdlc_protocol import guard
-    for argv in guard.simple_commands(command or ""):
+    frames, waiting, i, word_start = [[None, 0, 0]], [], 0, True
+    while i < len(text):
+        ch, quote = text[i], frames[-1][0]
+        if ch == "\\" and quote != "'":
+            step = 2
+        elif quote:
+            step = inside_quotes(text, i, frames)
+        elif ch == "#" and word_start:
+            step = line_end(text, i) - i
+        elif ch == "\n" and waiting:
+            end = past_bodies(text, i + 1, waiting)
+            yield i, end
+            waiting, step = [], end - i
+        else:
+            step = outside_quotes(text, i, frames, waiting)
+        word_start = ch in guard.WORD_BREAKS
+        i += step
+
+
+def inside_quotes(text, i, frames):
+    """One step of the reading inside quotes, and its length: the quote's
+    own character closes it, and inside double quotes $( opens a frame in
+    which the shell reads commands again, while $(( is arithmetic."""
+    frame = frames[-1]
+    if frame[0] == '"' and text.startswith("$((", i):
+        return 3
+    if frame[0] == '"' and text.startswith("$(", i):
+        frames.append([None, 0, 0])
+        return 2
+    if text[i] == frame[0]:
+        frame[0] = None
+    return 1
+
+
+def outside_quotes(text, i, frames, waiting):
+    """One step of the reading outside quotes, and its length: a quote
+    opens, arithmetic and parentheses nest, the ) that closes a $( opened
+    in double quotes closes its frame, and a << that is neither a <<<
+    nor in arithmetic opens a here-document, whose delimiter waits for the
+    end of the line."""
+    frame, ch = frames[-1], text[i]
+    if ch in "'\"":
+        frame[0] = ch
+    elif text.startswith("((", i):
+        frame[1] += 1
+        return 2
+    elif frame[1] and text.startswith("))", i):
+        frame[1] -= 1
+        return 2
+    elif ch == "(":
+        frame[2] += 1
+    elif ch == ")" and frame[2]:
+        frame[2] -= 1
+    elif ch == ")" and len(frames) > 1:
+        frames.pop()
+    elif text.startswith("<<<", i):
+        return 3
+    elif text.startswith("<<", i) and not frame[1]:
+        delimiter = delimiter_of(text[i + 2:line_end(text, i)])
+        if delimiter:
+            waiting.append(delimiter)
+        return 2
+    return 1
+
+
+def line_end(text, i):
+    """Where the line holding text[i] ends: its newline, or the text's end."""
+    end = text.find("\n", i)
+    return len(text) if end == -1 else end
+
+
+def past_bodies(text, at, closing):
+    """Where the command goes on after the bodies of the here-documents
+    one line opened, the first starting at at: they follow in order, each
+    up to the line that is its delimiter alone, after its leading tabs for
+    <<-, and the last ends at its delimiter line's newline; a body the
+    command ends inside runs to its end."""
+    end = at
+    for delimiter in closing:
+        dashed = delimiter.startswith("-")
+        word = delimiter[1:] if dashed else delimiter
+        while True:
+            if at >= len(text):
+                return len(text)
+            end = line_end(text, at)
+            line, at = text[at:end], end + 1
+            if (line.lstrip("\t") if dashed else line) == word:
+                break
+    return end
+
+
+def delimiter_of(rest):
+    """The word after a <<, as the shell reads it: its quotes or a
+    backslash only make the body literal, and a - before it is kept."""
+    dashed = rest.startswith("-")
+    lexer = shlex.shlex(rest[1:] if dashed else rest, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    try:
+        word = next(iter(lexer), "")
+    except ValueError:
+        return None
+    if not word or all(ch in "();<>|&" for ch in word):
+        return None
+    return ("-" if dashed else "") + word
+
+
+def is_commit(command):
+    """Whether a shell command runs git commit, in any simple command of it,
+    its here-documents' bodies left out as data."""
+    from sdlc_protocol import guard
+    for argv in guard.simple_commands(without_heredocs(command or "")):
         words = [word for word in argv if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", word)]
         if not words or os.path.basename(words[0]) != "git":
             continue

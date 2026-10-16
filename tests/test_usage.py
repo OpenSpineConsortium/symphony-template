@@ -275,7 +275,17 @@ class Commits(ARepository):
         for command, commits in (("git commit -m x", True), ("git -C . commit -qm x", True),
                                  ("cd x && git commit --amend --no-edit", True), ("echo git commit", False),
                                  ("git log --grep commit", False), ("GIT_EDITOR=true git commit", True),
-                                 ("gh pr create", False), ("", False)):
+                                 ("gh pr create", False), ("", False),
+                                 # A message in a here-document, an apostrophe in it, read as a
+                                 # quote left open and hid the commit; a body is data.
+                                 ("git commit -F - <<'EOF'\nIt's done\nEOF", True),
+                                 ("cat > m.txt <<'EOF'\nIt's done\nEOF\ngit commit -F m.txt", True),
+                                 ("cat > s.sh <<'EOF'\ngit commit -m x\nEOF", False),
+                                 ("git commit -m \"$(cat <<'EOF'\nIt's done\nEOF\n)\"", True),
+                                 # A << in a message that spans lines opens nothing, and a " in
+                                 # the body of one inside $( ) in double quotes ends no string.
+                                 ("git commit -m \"Read them\n\nA body after <<EOF is data.\nMore.\"", True),
+                                 ("git commit -m \"$(cat <<'EOF'\nThe 6\" display\nEOF\n)\"", True)):
             self.assertEqual(usage.is_commit(command), commits, command)
 
     def test_a_payload_the_hook_cannot_read_passes(self):

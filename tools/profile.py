@@ -74,7 +74,6 @@ import functools
 import json
 import posixpath
 import re
-import shlex
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -314,69 +313,9 @@ def program_of(argv):
     return guard.program(words[0]), words[1:]
 
 
-def heredoc_opener(line):
-    """The word that closes the here-document a line opens, with a leading
-    - where the shell strips the body's tabs (<<-), or None. The line is
-    read as the shell reads it, after the guard's plain_shell has dropped a
-    comment: a << inside quotes, in a <<< here-string or in arithmetic,
-    $(( )) or (( )), opens nothing, so a quoted << is told from the
-    operator wherever its quotes begin. A line with no << opens nothing
-    and is not read, since reading a long one a character at a time is
-    most of what a here-document costs a profile."""
-    if "<<" not in line:
-        return None
-    text, quote, arithmetic, i = guard.plain_shell(line), None, 0, 0
-    while i < len(text):
-        ch = text[i]
-        step = 1
-        if ch == "\\" and quote != "'":
-            step = 2
-        elif quote:
-            quote = None if ch == quote else quote
-        elif ch in "'\"":
-            quote = ch
-        elif text.startswith("((", i):
-            arithmetic, step = arithmetic + 1, 2
-        elif arithmetic and text.startswith("))", i):
-            arithmetic, step = arithmetic - 1, 2
-        elif text.startswith("<<<", i):
-            step = 3
-        elif text.startswith("<<", i) and not arithmetic:
-            return delimiter_of(text[i + 2:])
-        i += step
-    return None
-
-
-def delimiter_of(rest):
-    """The word after a <<, as the shell reads it: its quotes or a
-    backslash only make the body literal, and a - before it is kept."""
-    dashed = rest.startswith("-")
-    lexer = shlex.shlex(rest[1:] if dashed else rest, posix=True, punctuation_chars=True)
-    lexer.whitespace_split = True
-    lexer.commenters = ""
-    try:
-        word = next(iter(lexer), "")
-    except ValueError:
-        return None
-    if not word or all(ch in "();<>|&" for ch in word):
-        return None
-    return ("-" if dashed else "") + word
-
-
-def without_heredocs(command):
-    """The command with its here-document bodies left out, since they are
-    data the command reads, not commands the shell runs."""
-    kept, closing, dashed = [], None, False
-    for line in str(command).split("\n"):
-        if closing is not None:
-            if (line.lstrip("\t") if dashed else line) == closing:
-                closing = None
-            continue
-        kept.append(line)
-        opener = heredoc_opener(line)
-        dashed = bool(opener) and opener.startswith("-")
-        closing = opener.lstrip("-") if opener else None
-    return "\n".join(kept)
+# The here-document reader is usage.py's, whose hook leaves the bodies out
+# too before it looks for a git commit.
+without_heredocs = usage.without_heredocs
 
 
 @functools.lru_cache(maxsize=256)
