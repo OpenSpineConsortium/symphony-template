@@ -41,7 +41,11 @@ run by you and signed in to the account whose subscription the runs
 should draw on, makes one, so the script asks you to run that in another
 terminal and paste the result (or run `/install-github-app` in Claude
 Code instead, which installs the app and stores the secret in one OAuth
-flow, docs/setup/claude-action.md). And anything outside the repository:
+flow, docs/setup/claude-action.md; or `python3 scripts/tokens.py`, the
+token wizard, which runs `claude setup-token` for you behind a terminal of
+its own, keeps the token out of sight and stores it through gh, for
+CLAUDE_CODE_OAUTH_TOKEN and for every account of yours as a slot of the
+pool a benchmark in Actions runs on, docs/setup/claude-tokens.md). And anything outside the repository:
 the Claude GitHub App's installation, the organization's rulesets,
 secrets, variables and workflow permissions (below), the cloud
 environment's variable (section 2) and the claude.ai Projects
@@ -111,7 +115,10 @@ could not be read from a primary source, it says so.
   `gh secret set CLAUDE_CODE_OAUTH_TOKEN --org ORG --visibility all` and
   `gh variable set NAME --org ORG --visibility all --body VALUE`;
   gh's default visibility is "private", which on a Free organization
-  would make the value readable nowhere. One organization-wide
+  would make the value readable nowhere. The token wizard,
+  `python3 scripts/tokens.py --org ORG --repos NAME,NAME`, makes the
+  tokens and stores them there without showing one
+  (docs/setup/claude-tokens.md). One organization-wide
   CLAUDE_CODE_OAUTH_TOKEN means every repository draws on the main
   account's subscription; Claude Code's own documentation suggests an API
   key for a secret shared across repositories, which this project's rule

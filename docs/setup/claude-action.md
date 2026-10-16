@@ -29,7 +29,13 @@ and writes the repository secret CLAUDE_CODE_OAUTH_TOKEN itself, so no
 token is ever copied by hand. The workflow is already on
 {{DEFAULT_BRANCH}}; the next @claude mention runs it.
 
-By hand, where that command is not at hand:
+Or run `python3 scripts/tokens.py main` from a clone with gh signed in:
+it runs `claude setup-token` for you behind a terminal of its own, keeps
+the token out of sight and stores it as the secret through gh, and the
+same wizard stores every account of yours as a slot of the pool a
+benchmark in Actions runs on (docs/setup/claude-tokens.md).
+
+By hand, where neither is at hand:
 
 1. Run `claude setup-token` and approve it in the browser. It prints a
    token good for about a year and saves it nowhere.

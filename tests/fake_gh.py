@@ -3,8 +3,9 @@
 No test has a signed-in gh or the network, so install() writes an executable
 named gh into a folder the test puts first on PATH; it runs respond() below.
 Each call is appended as one JSON line to the file FAKE_GH_LOG names: its
-arguments, the key it was answered by, and the body it read from stdin with
-`--input -`. Answers come from the JSON file FAKE_GH_ROUTES names, a map
+arguments, the key it was answered by, and what it read from stdin: a body
+given with `--input -`, or the value a `secret set` or `variable set` with no
+--body takes from the pipe. Answers come from the JSON file FAKE_GH_ROUTES names, a map
 from a key to a list of answers {status, headers, body} given in order, the
 last repeated: "METHOD path" for `gh api` (the query is part of the path),
 or the leading words of any other command, such as "pr merge" or
@@ -110,11 +111,18 @@ def changed(routes_file, after):
         json.dump(routes, handle)
 
 
+def reads_stdin(args):
+    """Whether gh would read its standard input: a body given as --input -,
+    or a secret or variable set with no --body, which gh takes from the pipe
+    when no terminal is attached (scripts/tokens.py sends a token that way)."""
+    if "--input" in args and args[args.index("--input") + 1] == "-":
+        return True
+    return args[:2] in (["secret", "set"], ["variable", "set"]) and not {"--body", "-b"} & set(args)
+
+
 def main():
     args = sys.argv[1:] or [""]
-    stdin = None
-    if "--input" in args and args[args.index("--input") + 1] == "-":
-        stdin = sys.stdin.read()
+    stdin = sys.stdin.read() if reads_stdin(args) else None
     code, out, err = respond(args, stdin, os.environ["FAKE_GH_LOG"], os.environ["FAKE_GH_ROUTES"])
     sys.stdout.write(out)
     sys.stderr.write(err)
@@ -169,7 +177,12 @@ def calls(log_path):
     found = []
     for line in path.read_text(encoding="utf-8").splitlines():
         call = json.loads(line)
-        call["body"] = json.loads(call["stdin"]) if call.get("stdin") else None
+        call["body"] = None
+        if call.get("stdin"):
+            try:
+                call["body"] = json.loads(call["stdin"])
+            except ValueError:
+                pass
         found.append(call)
     return found
 

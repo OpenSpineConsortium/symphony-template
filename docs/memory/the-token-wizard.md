@@ -1,0 +1,26 @@
+python3 scripts/tokens.py stores each Claude account's subscription token as an Actions secret without the token ever being shown or written anywhere; it is pasted only at a hidden prompt, where no terminal can run claude.
+
+A Claude run in Actions needs a subscription token, and there is one per
+account: CLAUDE_CODE_OAUTH_TOKEN for @claude, the workers in Actions and
+the coordinator workflow, and the pool SYMPHONY_CLAUDE_1 to
+SYMPHONY_CLAUDE_8, one account each, with the slots in use in the
+variable SYMPHONY_CLAUDE_ACCOUNTS, for a benchmark in Actions
+(OpenSpineConsortium/coordbench's bench.yml). By hand each goes from
+`claude setup-token` through a clipboard into a settings page. The wizard
+runs `claude setup-token` behind a pseudo-terminal of its own, so the
+browser sign-in and the keyboard go through, masks the token out of what
+claude prints before it reaches the screen, and hands it to `gh secret
+set` on a pipe, which encrypts it on the machine; then it reads GitHub's
+listing back by name and date, keeps the list of slots equal to the slots
+whose secret exists, and takes an optional label per slot, the variable
+SYMPHONY_CLAUDE_<slot>_LABEL, so status can say which account is which.
+An API key is refused on sight, a crowd repository is refused, a token
+cut over two lines is refused rather than stored, and a Windows shell or
+a machine without claude takes `add --paste` or `main --paste`, a hidden
+prompt. Everything that can fail is tried before the sign-in, since a
+token minted and not stored is lost with the process: that each
+repository named is visible to the login, each secret's scope, and that
+gh's token carries admin:org, which an organization's secrets need.
+docs/setup/claude-tokens.md is the page, with the by-hand links;
+tests/test_tokens.py proves the token never reaches the screen at any
+chunk size. From symphony-template's token wizard thread, 2026-10-16.
