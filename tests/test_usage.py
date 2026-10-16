@@ -381,7 +381,9 @@ class Commits(ARepository):
         stripspace, which reads auto as #, kept them as a message, and the
         lines gave git a commit of themselves alone."""
         usage.install(cwd=self.repo)
-        self.git("config", "core.commentChar", "auto")
+        # Two names for one setting, of which the last counts, auto in any case.
+        self.git("config", "core.commentString", "%")
+        self.git("config", "core.commentChar", "Auto")
         self.git("config", "commit.verbose", "true")
         (self.repo / "a.txt").write_text("a", encoding="ascii")
         self.git("add", "a.txt")
@@ -389,6 +391,12 @@ class Commits(ARepository):
         self.hook(command="git commit -e -m '#42 fix login'")
         done = self.shell_commit("-e", "-m", "#42 fix login", environ={"GIT_EDITOR": "sed -i.bak /^#/d"})
         self.assertIn("empty commit message", done.stderr)
+        # With no scissors line to read the string from, every string git
+        # can pick for auto is tried.
+        self.git("config", "commit.verbose", "false")
+        self.hook(command="git commit -e -m '#42 fix login'")
+        done = self.shell_commit("-e", "-m", "#42 fix login", environ={"GIT_EDITOR": "sed -i.bak /^#/d"})
+        self.assertIn("empty commit message", done.stderr, "no scissors line")
         self.assertEqual(self.git("rev-list", "--all"), "", "no commit was made")
 
     def test_a_scissors_line_that_crlf_ends_cuts_nothing(self):

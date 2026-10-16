@@ -108,6 +108,9 @@ DELIMITER_REACH = 1024
 # carries its diff in the editor's template and where git cuts the message:
 # the comment string, then 24 dashes, >8 and 24 dashes, and LF alone.
 SCISSORS = re.compile(r"(?m)^(\S{1,16}) -{24} >8 -{24}\n")
+# The comment characters git commit picks from for core.commentChar auto, in
+# its order: the first that begins no line of the message.
+AUTO_COMMENTS = "#;@!$%^&|:"
 # The shell's reserved words that may come before a command, which the
 # guard's reading leaves at the head of the command's words.
 RESERVED_WORDS = ("{", "!", "if", "then", "else", "elif", "do", "while", "until", "time")
@@ -799,9 +802,13 @@ def says_nothing(message_file, cwd=None, editor=True, cleanup=None):
     where it did not; it cuts an edited message at its scissors line, below
     which -v and commit.verbose put the diff; and it counts Signed-off-by
     lines as nothing. The comment string is the scissors line's, where there
-    is one, as git picks it for commentChar auto, else the config's; the
-    text goes to git as UTF-8 whatever the locale, and with its line ends as
-    they are, since git cuts only at a scissors line that LF alone ends."""
+    is one, as git picks it for commentChar auto, else the config's; for
+    auto with no scissors line, the message says nothing where any string
+    git can pick takes it all, which is git's own answer wherever its
+    comments are in the file, and at worst holds the usage back a commit.
+    The text goes to git as UTF-8 whatever the locale, and with its line
+    ends as they are, since git cuts only at a scissors line that LF alone
+    ends."""
     try:
         text = Path(message_file).read_bytes().decode("utf-8", errors="replace")
     except OSError:
@@ -812,10 +819,29 @@ def says_nothing(message_file, cwd=None, editor=True, cleanup=None):
     if cut:
         text = text[:cut.start()]
     if cleanup == "strip" or (cleanup in (None, "default") and editor):
+        if not cut and (comment_setting(cwd) or "").lower() == "auto":
+            return any(nothing_but(text, (mark, "Signed-off-by: ")) for mark in AUTO_COMMENTS)
         text = stripped(text, cut, cwd)
         if text is None:
             return False
-    return all(not line.strip() or line.startswith("Signed-off-by: ") for line in text.splitlines())
+    return nothing_but(text, ("Signed-off-by: ",))
+
+
+def nothing_but(text, starts):
+    """Whether every line of the text is blank or begins with one of starts."""
+    return all(not line.strip() or line.startswith(starts) for line in text.splitlines())
+
+
+def comment_setting(cwd=None):
+    """core.commentChar or core.commentString as git reads them, two names
+    for one setting of which the last given counts, and auto in any case;
+    None where neither is set or git cannot say."""
+    try:
+        listed = git("config", "--get-regexp", r"^core\.comment(char|string)$", cwd=cwd)
+    except OSError:
+        return None
+    last = listed.splitlines()[-1] if listed else ""
+    return last.partition(" ")[2] or None
 
 
 def stripped(text, cut, cwd=None):
