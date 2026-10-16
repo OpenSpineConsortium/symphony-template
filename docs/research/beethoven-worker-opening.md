@@ -1,9 +1,10 @@
 # Beethoven's worker and Claude projects
 
-What was learned on 2026-10-16 about how Beethoven's worker on the Wayne State grid meets a
-Claude project on claude.ai, for the owner's handoff item 9 of 2026-10-15 ("My Beethoven
-extension fucking opens a worker in claude code but projects can only be opened in", finished
-at 00:28 UTC: "no think what i need to do is have a cloud-enabled claude code session running
+The notes of the thread "Beethoven worker opening", written 2026-10-16: what was learned about
+how Beethoven's worker on the Wayne State grid meets a Claude project on claude.ai, for item 9 of
+the list the owner gave the project chat on 2026-10-15 ("My Beethoven extension fucking opens a
+worker in claude code but projects can only be opened in", finished in the thread at 00:28 UTC
+on 2026-10-16: "no think what i need to do is have a cloud-enabled claude code session running
 based on the grid which has all the features of desktop like projects beta, cloud sessions, and
 access tot eh lcoal resources of the grid, so it can develop and test on teh local hardware all
 from one session of beethoven"). The fix is Beethoven 21.0.0, pull request
@@ -92,7 +93,8 @@ project's, a session's or environment link is refused with a sentence saying wha
 *Clear* forgets it); with one named, the panel's button is *Open my project*, on the home and on
 the "You're online." moment, with "In your project, choose Work locally from the + menu, write
 the task, and press Allow once on the card." under it; the tab Beethoven opens when a worker the
-student started comes online is the project's page, while that switch is on; *New session*,
+student started comes online is the project's page, while that switch is on, or the project's tab
+Beethoven opened earlier brought forward, never a second one; *New session*,
 *Copy link* and *Phone* keep the worker's own link, and a worker online on a resumed session's own
 link keeps an outline *Open my session*; the worker's link and the project's page each keep a
 claude.ai tab of their own; a one-time card points at Settings while no project is named. The
@@ -117,6 +119,10 @@ before any store upload, and the store upload stays off.
   worktree either way.
 - Whether the card lets the student pick any folder or only the one `remote-control` was started
   in (the worker's workspace) is not yet measured; the page describes the latter.
+- Whether opening a thread inside the project counts as a new load of the tab in Chrome
+  (`tabs.onUpdated` "loading") is not yet measured; it decides whether *Open my project* brings
+  the project's tab forward or opens another, by the same rule the session's tab has followed
+  since 14.0.0.
 - The owner's account is on Max (the login measured on 2026-09-28), so the projects beta and
   *Work locally* are expected to be there; whether "Require trusted devices" is on for any
   organization of the owner's was not checked.
