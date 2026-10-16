@@ -39,7 +39,8 @@ wizard runs on the owner's own computer.
   (a secret looked up by a computed name would hand the runner every
   secret, which CodeQL flags), runs one job per account at a time in the
   concurrency group of its slot, and reads the slots in use from the
-  variable SYMPHONY_CLAUDE_ACCOUNTS, numbers between commas or blanks
+  variable SYMPHONY_CLAUDE_ACCOUNTS, words between commas or blanks,
+  each exactly one of 1 to 8, a real run refused on any other
   (bench/cooperbench/actions/plan.py, chosen_accounts). The owner's
   to-do list of 2026-10-15b, item 3, had the owner make each of those
   secrets by hand on the organization's secrets page with "Selected
@@ -281,6 +282,58 @@ claimed two things the code did not hold. Fixed on the branch:
   ~/.claude/local/claude, and the native installer's ~/.local/bin is on
   PATH where it is installed.
 
+## After the merge (symphony-template#100)
+
+The follow-up and its adversarial review, 2026-10-16. The bench's own
+reader was read from coordbench's bench/cooperbench/actions/plan.py
+(parse_list and chosen_accounts) that day.
+
+- A repository's own variable outranks the organization's of the same
+  name, as its own secret does, and the 2026-10-15b to-do list told the
+  owner to make SYMPHONY_CLAUDE_ACCOUNTS by hand as coordbench's own
+  variable; the wizard keeps the organization's list, which such a
+  variable would hide from bench.yml. `status` now names a repository's
+  own SYMPHONY_CLAUDE_ACCOUNTS with the slots it names and the page to
+  delete it on, as it named a repository's own secrets already. The
+  wizard does not delete it, since it changes only the place it was
+  given. The to-do list's step now says to run the wizard and to delete
+  such a variable if it was made.
+- `status` reads the own secrets and variables of every repository the
+  options name and of every one GitHub lists as seeing the list of slots
+  or a token secret of selected visibility, so a run from a clone of
+  symphony-template that names no repository still reads coordbench's.
+  A repository that sees them through "all repositories" is not listed by
+  GitHub and is read only when named. A repository found on a listing is
+  told only of its own of the names the organization gives it: one the
+  organization's list does not reach keeps its own list, its only one,
+  and is not told to delete it. Each listing is asked for once per state,
+  since a write is always followed by a new state.
+- The bench splits the list on commas and blanks and refuses a real run
+  on any word that is not exactly 1 to 8. The wizard read numbers, so
+  `01,02` named slots 1 and 2 to it, the list was left as it was, and the
+  bench refused the run while `status` showed a good list. A slot is now
+  a word looked up among 1 to 8 (slot_number), for the list and the slot
+  question alike, which also ends two tracebacks: a superscript two
+  passed isdigit() and failed int(), and int() refuses more than 4,300
+  digits. A list with any other word is written again on the next add or
+  remove, and `status` says it stops the bench's real runs.
+- What a person typed into a variable never reaches the terminal as
+  written: a list is printed as the slots it names, and a label made by
+  hand on the variables page is printed only when it is a word of the
+  label's shape. The label check uses fullmatch, since `$` let a label
+  ending in a newline through.
+- The wizard's closing status was printed from the check's read, made
+  before the list was written, so the owner's first run would have
+  printed SYMPHONY_CLAUDE_ACCOUNTS as written and then as not set; the
+  closing status reads everything again.
+- Two review passes; their mutants (the raw value printed, the failed
+  read not caught, only the named repositories read, the labels raw, the
+  list compared by slots, a reader by int(), match for fullmatch, names
+  compared by case, the closing status not read again, every repository
+  told of every name, no listing cache, no rewrite note, the secrets'
+  listings not read, a failed listing silent, repositories told apart by
+  case) each fail the tests.
+
 ## Open items
 
 - tools/crowd_check.py's SECRET_NAMES does not name SYMPHONY_CLAUDE_1 to
@@ -288,6 +341,10 @@ claimed two things the code did not hold. Fixed on the branch:
   pass the crowd check; the wizard refuses to put one there, the by-hand
   path does not. A pull request of its own, with ci.yml's values job
   naming the eight.
+- An environment's own secret or variable outranks the repository's and
+  the organization's, and `status` reads no environment; none of the
+  repositories uses one for the slots yet (the bench's environment named
+  bench is not built).
 - Nothing warns a year later: `status` says "renew soon" and "renew now",
   and only when run. A scheduled workflow could list the secrets' dates
   on GITHUB_TOKEN and open an issue; not built.

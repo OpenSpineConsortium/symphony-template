@@ -70,6 +70,11 @@ SLOT_PREFIX = "SYMPHONY_CLAUDE_"
 LABEL_SUFFIX = "_LABEL"
 ACCOUNTS_VARIABLE = SLOT_PREFIX + "ACCOUNTS"
 SLOTS = tuple(range(1, 9))
+# A list of slots is read as coordbench's bench/cooperbench/actions/plan.py
+# reads SYMPHONY_CLAUDE_ACCOUNTS: split on commas and blanks, with a real run
+# refused on any word that is not one of these.
+SLOT_WORDS = {str(slot): slot for slot in SLOTS}
+LIST_SEPARATORS = re.compile(r"[,\s]+")
 CROWD_VARIABLE = "CLAUDE_CROWD"
 TOKEN_LIFE = timedelta(days=365)
 RENEW_SOON = timedelta(days=30)
@@ -551,14 +556,37 @@ def slot_label(slot):
     return f"{SLOT_PREFIX}{slot}{LABEL_SUFFIX}"
 
 
+def list_words(text):
+    """The words of a list of slots, split as the bench splits them."""
+    return [word for word in LIST_SEPARATORS.split((text or "").strip()) if word]
+
+
+def slot_number(text):
+    """The slot a word names, or None. The word is looked up among the words
+    the bench takes, never read by int(), which would take 08 and refuse a
+    digit such as a superscript two that isdigit() takes, or more than 4,300
+    digits."""
+    return SLOT_WORDS.get(text)
+
+
 def parse_slots(text):
-    """The slots a list names, as the bench reads it: numbers between commas
-    or blanks."""
-    found = []
-    for part in (text or "").replace(",", " ").split():
-        if part.isdigit() and int(part) in SLOTS and int(part) not in found:
-            found.append(int(part))
-    return sorted(found)
+    """The slots a list names, each once, in order."""
+    return sorted({slot for slot in map(slot_number, list_words(text)) if slot is not None})
+
+
+def holds_other_words(text):
+    """Whether a list holds a word that is not a slot, which stops the
+    bench's real runs whatever else it names."""
+    return any(slot_number(word) is None for word in list_words(text))
+
+
+def slots_text(text):
+    """A list as status shows it: the slots it names, never the text as
+    written, since a list may be made by hand."""
+    shown = ",".join(str(slot) for slot in parse_slots(text)) or "no slot"
+    if holds_other_words(text):
+        shown += ", and a word that is not a slot, which stops the bench's real runs"
+    return shown
 
 
 class State:
@@ -571,20 +599,31 @@ class State:
         fields = "name,updatedAt,visibility,numSelectedRepos"
         self.secrets = {item["name"]: item for item in gh.json(["secret", "list"] + target.flags + ["--json", fields])}
         self.variables = {item["name"]: item for item in gh.json(["variable", "list"] + target.flags + ["--json", fields + ",value"])}
+        self.reached = {}
 
     def reach(self, kind, name):
-        """The repositories a selected organization secret or variable reaches."""
-        found, text = self.gh.read(["api", f"{self.target.api}/{kind}/{name}/repositories", "--paginate", "--jq", ".repositories[].name"])
-        return sorted(text.split()) if found else []
+        """The repositories a selected organization secret or variable
+        reaches, listed once for the state: a write is always followed by a
+        new state before anything is read from it again."""
+        if (kind, name) not in self.reached:
+            found, text = self.gh.read(["api", f"{self.target.api}/{kind}/{name}/repositories", "--paginate", "--jq", ".repositories[].name"])
+            self.reached[(kind, name)] = sorted(text.split()) if found else []
+        return self.reached[(kind, name)]
 
     def slots_set(self):
         return [slot for slot in SLOTS if slot_secret(slot) in self.secrets]
 
     def labels(self):
-        return {slot: self.variables[slot_label(slot)].get("value", "") for slot in SLOTS if slot_label(slot) in self.variables}
-
-    def accounts(self):
-        return parse_slots(self.variables.get(ACCOUNTS_VARIABLE, {}).get("value", ""))
+        """Each slot's label as status may print it. A label may be made by
+        hand on the variables page, so one that is not a word of the label's
+        shape is never printed as written."""
+        found = {}
+        for slot in SLOTS:
+            item = self.variables.get(slot_label(slot))
+            if item is not None:
+                value = item.get("value", "")
+                found[slot] = value if LABEL_SHAPE.fullmatch(value) else "a label not shown, not a word of a label's shape"
+        return found
 
 
 def when(item):
@@ -623,8 +662,13 @@ def print_status(state, now=None):
         print(f"  slot {slot}{label}: {name} {age_line(state.secrets[name], now)}{reach_note(state, 'secrets', name)}")
     free = [slot for slot in SLOTS if slot_secret(slot) not in state.secrets]
     print("  free slots: " + (", ".join(str(slot) for slot in free) if free else "none"))
-    accounts = state.accounts()
-    print(f"  {ACCOUNTS_VARIABLE}: " + (",".join(str(slot) for slot in accounts) if accounts else "not set"))
+    have = state.variables.get(ACCOUNTS_VARIABLE)
+    if have is None:
+        print(f"  {ACCOUNTS_VARIABLE}: not set")
+    else:
+        value = have.get("value", "")
+        rewrite = "; the next add or remove rewrites it" if holds_other_words(value) else ""
+        print(f"  {ACCOUNTS_VARIABLE}: {slots_text(value)}{rewrite}")
     if MAIN_SECRET in state.secrets:
         print(f"  {MAIN_SECRET}: {age_line(state.secrets[MAIN_SECRET], now)}{reach_note(state, 'secrets', MAIN_SECRET)} (the workflows' token)")
     else:
@@ -648,17 +692,74 @@ def reach_note(state, kind, name):
 
 
 def print_repository_own(state):
-    """A repository's own secret of the same name outranks the
-    organization's, so the named repositories' own are listed too."""
-    for full in state.target.repositories():
-        try:
-            own = {item["name"]: item for item in state.gh.json(["secret", "list", "--repo", full, "--json", "name,updatedAt"])}
-        except TokensError as error:
-            print(f"  {full}: its own secrets could not be read ({error})")
+    """A repository's own secret or variable of the same name outranks the
+    organization's, so status lists them for every repository that reads
+    what is kept here: a list of slots of a repository's own, made by hand
+    before the wizard, would hide from its workflows the list the wizard
+    keeps."""
+    for full, names in repositories_reading(state).items():
+        print_own_secrets(state, full, names)
+        print_own_accounts(state, full, names)
+
+
+def repositories_reading(state):
+    """Each repository that reads what is kept here, with the names it reads
+    from the organization. A repository named reads any of them (None),
+    since the wizard writes each with it; another, found on the listing of
+    a name of selected visibility, such as the bench's on the list's, reads
+    the names whose listing shows it and the ones every repository sees."""
+    reading = {full: None for full in state.target.repositories()}
+    known = {full.lower(): full for full in reading}
+    names = [MAIN_SECRET] + [slot_secret(slot) for slot in SLOTS]
+    kept = [("variables", ACCOUNTS_VARIABLE, state.variables.get(ACCOUNTS_VARIABLE))]
+    kept += [("secrets", name, state.secrets[name]) for name in names if name in state.secrets]
+    everywhere = {name for _, name, item in kept if (item or {}).get("visibility") in ("all", "private")}
+    for kind, name, item in kept:
+        if (item or {}).get("visibility") != "selected":
             continue
-        mine = [name for name in own if name == MAIN_SECRET or name.startswith(SLOT_PREFIX)]
-        for name in mine:
-            print(f"  {full} holds its own {name} ({age_line(own[name])}), which outranks the organization's")
+        try:
+            reached = state.reach(kind, name)
+        except TokensError as error:
+            if kind == "variables":
+                print(f"  the repositories that see {name} could not be listed ({error})")
+            continue
+        for repo in reached:
+            full = known.setdefault(f"{state.target.owner}/{repo}".lower(), f"{state.target.owner}/{repo}")
+            if full not in reading:
+                reading[full] = set(everywhere)
+            if reading[full] is not None:
+                reading[full].add(name)
+    return reading
+
+
+def print_own_secrets(state, full, names=None):
+    """A repository's own token secrets that outrank the organization's, of
+    the names it reads from the organization (any, for None)."""
+    try:
+        own = {item["name"].upper(): item for item in state.gh.json(["secret", "list", "--repo", full, "--json", "name,updatedAt"])}
+    except TokensError as error:
+        print(f"  {full}: its own secrets could not be read ({error})")
+        return
+    mine = [name for name in own if (name == MAIN_SECRET or name.startswith(SLOT_PREFIX)) and (names is None or name in names)]
+    for name in mine:
+        print(f"  {full} holds its own {name} ({age_line(own[name])}), which outranks the organization's")
+
+
+def print_own_accounts(state, full, names=None):
+    """A repository's own list of slots, when it would hide the
+    organization's: a repository the organization's list does not reach
+    keeps its own, which is its only list."""
+    if names is not None and ACCOUNTS_VARIABLE not in names:
+        return
+    try:
+        own = {item["name"].upper(): item for item in state.gh.json(["variable", "list", "--repo", full, "--json", "name,value"])}
+    except TokensError as error:
+        print(f"  {full}: its own variables could not be read ({error})")
+        return
+    if ACCOUNTS_VARIABLE in own:
+        print(f"  {full} holds its own {ACCOUNTS_VARIABLE} ({slots_text(own[ACCOUNTS_VARIABLE].get('value', ''))}), which "
+              f"outranks the organization's, so its workflows read that list and not the one kept here: delete it on "
+              f"https://github.com/{full}/settings/variables/actions (the delete icon beside it)")
 
 
 # Writes.
@@ -724,10 +825,12 @@ def verify(state, names):
 
 def update_accounts(state, scope=None):
     """The variable names every slot whose secret exists, as the bench reads
-    it, and is written only when that changed."""
-    wanted = ",".join(str(slot) for slot in state.slots_set())
+    it, and is written only when that changed: a list with any other word,
+    which the bench refuses, is written again."""
+    words = [str(slot) for slot in state.slots_set()]
+    wanted = ",".join(words)
     have = state.variables.get(ACCOUNTS_VARIABLE)
-    if have is not None and parse_slots(have.get("value", "")) == state.slots_set():
+    if have is not None and list_words(have.get("value", "")) == words:
         print(f"  {ACCOUNTS_VARIABLE}: {wanted or 'empty'} (unchanged)")
         return
     if not wanted:
@@ -790,7 +893,7 @@ def check_scopes(status, target):
 
 
 def check_label(label):
-    if label and not LABEL_SHAPE.match(label):
+    if label and not LABEL_SHAPE.fullmatch(label):
         raise TokensError("a label is a word of your own, up to 40 letters, digits, spaces, dots or dashes, and never an e-mail address")
 
 
@@ -878,8 +981,9 @@ def chosen_slot(state, ask):
         return free[0] if free else None
     if answer in ("n", "no", "q", "quit", "stop"):
         return None
-    if answer.isdigit() and int(answer) in SLOTS:
-        return int(answer)
+    slot = slot_number(answer)
+    if slot is not None:
+        return slot
     raise TokensError(f"a slot is a number from 1 to {SLOTS[-1]}")
 
 
@@ -894,6 +998,7 @@ def wizard(gh, target, ask=input, write=None, stdin_fd=None):
     refuse_crowd(gh, target)
     state = State(gh, target)
     print_status(state)
+    added = False
     while True:
         slot = chosen_slot(state, ask)
         if slot is None:
@@ -905,9 +1010,12 @@ def wizard(gh, target, ask=input, write=None, stdin_fd=None):
         also_main = MAIN_SECRET not in state.secrets and yes(
             ask(f"Store the same token as {MAIN_SECRET} too, the one @claude, the workers in Actions and the coordinator workflow run on? [y/N] "), False)
         state = add(gh, target, slot, label, also_main, write=write, stdin_fd=stdin_fd, noted=True)
+        added = True
         if not yes(ask("Another account? [y/N] "), False):
             break
-    print_status(state)
+    # The list of slots is written after the check's read, so the closing
+    # status reads everything again.
+    print_status(State(gh, target) if added else state)
 
 
 def add_place_options(parser, default):
