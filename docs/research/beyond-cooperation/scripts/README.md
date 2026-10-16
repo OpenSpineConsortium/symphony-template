@@ -1,0 +1,7 @@
+# Scripts behind the programme's figures
+
+Source: the thread "Symphony beyond cooperation" of the claude.ai Project, 2026-10-15 and 2026-10-16; kept in git on 2026-10-16 when the owner asked that every thread's work, intermediate or final, be in the repository for a session on another account. They are reference, not tools of the template: none is run by the checks, and the transcripts they read stay out of git (docs/research holds no transcript).
+
+- render_baseline.py renders ../baseline-2026-10-15.md from the record ../baseline-2026-10-15.json, so every figure the page quotes is the record's: `python3 docs/research/beyond-cooperation/scripts/render_baseline.py .` from the repository's root.
+- time_profile.py times tools/profile.py, best of three, on a real transcript and two synthetic sessions of 3,000 and 6,000 calls, in two trees: the hook timings quoted in step 1 of section 6.
+- diff_commands.py prints each Bash command of a transcript that two trees of tools/profile.py split differently, the check by eye behind a change to how a command line is split into commands.
