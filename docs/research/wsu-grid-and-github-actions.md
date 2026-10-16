@@ -9,8 +9,10 @@ ssh key in a GitHub environment secret could connect to the grid, "especially if
 pass was also stored". The owner decided on 2026-10-16 at 00:24 UTC, on the card that put the two
 directions side by side: both, the runner on the grid first, then the ssh gate as a second pull
 request. Every claim below names what it rests on; what the grid has not yet shown is said so.
-The pull requests: OpenSpineConsortium/hpcworker, the runner (tools/grid_runner.sh and its tests),
-and OpenSpineConsortium/symphony-template, the workflow, docs/setup/grid.md and this note.
+The pull requests, both merged on 2026-10-16: OpenSpineConsortium/hpcworker#13, the runner
+(tools/grid_runner.sh and its tests; merge d8a03e7), and OpenSpineConsortium/symphony-template#103,
+the workflow, docs/setup/grid.md and this note (merge d669562). Where the work stands, what waits on
+the owner and the plan for the ssh gate are the last sections but one.
 
 ## The answer
 
@@ -154,7 +156,7 @@ The decision, on the card of 2026-10-16 00:24 UTC: both, the runner first.
 
 ## What was built
 
-In OpenSpineConsortium/hpcworker, on the branch claude/grid-runner: tools/grid_runner.sh
+In OpenSpineConsortium/hpcworker, merged as hpcworker#13: tools/grid_runner.sh
 (--install, --start, --stop, --status on the login node; --pull and --serve inside the jobs),
 tools/grid_runner_install.sbatch (one job that pulls the image as a SIF under
 /rs/rs_grp_oschome/$USER/hpcworker-runner/image and runs the runner's --version inside it with the
@@ -173,7 +175,7 @@ version read through Apptainer's own lines, Apptainer settings from the shell, -
 pull request reaching grid.yml); each fix was checked by undoing it and seeing the tests fail. The README's paragraph "A GitHub Actions runner on the grid" and the
 section of the same name in docs/OPEN_QUESTIONS.md describe it; CLAUDE.md there carries the rule.
 
-In this repository: .github/workflows/grid.yml (one command, from the workflow's page or another
+In this repository, merged as #103: .github/workflows/grid.yml (one command, from the workflow's page or another
 workflow, on `runs-on: [self-hosted, grid]`, only for an event that names a private repository that
 is not a fork and never for a fork's pull request, Python 3.12 set up unless unticked, the output as
 the job's log and the artifact grid-<run>-<attempt>, whose prefix a caller may change),
@@ -228,6 +230,120 @@ note says so, since both are built on the same account:
   chain itself, since those are file work, gh, one squeue and one sbatch on the login node, the same
   calls the CI lane's watcher makes from a job; and a workflow job on the runner may in turn be what
   checks a session's push, since it runs the repository's own check on a node.
+
+## Where it stands on 2026-10-16
+
+Both pull requests are merged, and nothing of the runner has run on the grid yet. What runs it is
+the owner's, since it runs under his grid account or changes what a session may not change, and
+three steps wait on him, in this order:
+
+1. hpcworker's CI runs the runner's tests only once a step names them, and a session may not change
+   a workflow file there. The owner opens
+   https://github.com/OpenSpineConsortium/hpcworker/edit/main/.github/workflows/ci.yml, pastes the
+   two lines below right after the step that runs `bash tools/tests/test_grid_ci.sh`, indented like
+   it, presses "Commit changes...", keeps "Commit directly to the main branch" and presses "Commit
+   changes".
+
+   ```yaml
+         - name: the grid's Actions runner (tools/grid_runner.sh; Slurm, gh, Apptainer and the runner stood in for)
+           run: bash tools/tests/test_grid_runner.sh
+   ```
+
+2. Start the runner and run one job: docs/setup/grid.md, steps 1 to 6. The install job is the first
+   test of most of what hpcworker's docs/OPEN_QUESTIONS.md lists, and a line starting "STOP:" names
+   what the grid refused.
+3. The test the ssh gate waits on: whether a key alone signs in from outside the VPN. On his own
+   machine, in WSL, `ssh-keygen -t ed25519 -f ~/.ssh/grid_gate_test -N '' -C grid-gate-test`, then
+   `cat ~/.ssh/grid_gate_test.pub`. In the grid's shell (https://ondemand.grid.wayne.edu on the VPN,
+   the Clusters menu, the shell entry),
+   `printf '%s\n' 'restrict,command="echo key-only sign-in works" PASTE' >> ~/.ssh/authorized_keys`,
+   with the printed line in place of PASTE. With the VPN off, in WSL,
+   `ssh -i ~/.ssh/grid_gate_test -o IdentitiesOnly=yes -o PreferredAuthentications=publickey <AccessID>@grid.wayne.edu`
+   with his own AccessID: "key-only sign-in works" means a key alone gets in, and a password or code
+   prompt, or "Permission denied", means it does not. Then, in the grid's shell,
+   `sed -i '/grid-gate-test/d' ~/.ssh/authorized_keys` takes the test key out again. Beside it, C&IT's
+   answer to the first question in section 3 of hpcworker's docs/guides/LAB_LEAD.md, whether a key
+   restricted this way and used from outside the VPN is acceptable, if he has one.
+
+A thread that takes this up on another account reads this note, docs/setup/grid.md, and in
+hpcworker the README's paragraph "A GitHub Actions runner on the grid" and the section of the same
+name in docs/OPEN_QUESTIONS.md; then it asks the owner which of the three steps he has done and what
+each printed: the install job's log, the output of `--status`, the page of the first grid.yml run,
+step 3's one line. A fault the grid shows is fixed in hpcworker by a pull request whose fix a
+mutation proves (below); step 3's answer starts the ssh gate (next).
+
+## The ssh gate, planned
+
+The second pull request, chosen on the card of 2026-10-16 00:24 UTC, waits on step 3 above. What was
+decided: a key on the grid that accepts one forced command and nothing else, through hpcworker, used
+by a workflow from an environment secret, with the password nowhere. The rest of this section is
+the thread's plan for it and not yet the owner's decision: which commands the gate takes, and
+whether each run waits for his approval, are his to settle on the pull request.
+
+- If step 3 shows that a key alone does not get in from outside the VPN, GitHub's runners cannot
+  reach the gate and it is not built: the runner chain stays the one direction, and this note says so.
+- What it is for: a step on GitHub's own runner that starts the chain only when a job needs it, in
+  place of a chain kept waiting in Slurm's queue, and reads the chain's state into the run's log. A
+  gate that queued a job of the workflow's own would run the workflow's code under the account
+  outside the runner's container, beside the account's gh sign-in and Claude login, which the runner
+  was built to rule out; so the gate starts, reads and stops a chain, and every command of a
+  workflow's still runs on the runner.
+- In hpcworker: tools/grid_gate.sh, the forced command. It reads SSH_ORIGINAL_COMMAND without a
+  shell evaluating it and runs exactly one of a fixed list, start, status or stop
+  (`grid_runner.sh --start`, `--status`, `--stop`), for a repository named as owner/name in
+  [A-Za-z0-9_.-] and the site its profile names, each at most one scheduler call on the login node,
+  as Beethoven's etiquette allows. It refuses any other word or argument, an input longer than a
+  fixed bound or holding a newline, and a second call within 60 seconds of the last, and it writes
+  one line per call, never the key, to the runner's folder. A subcommand, say
+  `grid_runner.sh --gate-key <public key file>`, writes the one line
+  `restrict,command="<the gate's path>" <the key>` to ~/.ssh/authorized_keys, replacing an earlier
+  gate line and touching no other. Its tests, tools/tests/test_grid_gate.sh, run against stand-ins:
+  each command, each refusal, an injected `;`, `$(...)`, backquote and newline, an overlong
+  argument, the 60-second floor and the line the subcommand writes; and each fix is proven by a
+  mutation, as below.
+- In this repository: grid.yml, or a workflow beside it, gains a job on GitHub's runner, in an
+  environment named grid that only main may deploy to
+  (https://github.com/OpenSpineConsortium/symphony-template/settings/environments), which writes the
+  private key from the environment's secret to a mode-0600 file under $RUNNER_TEMP, runs
+  `ssh -i <that file> -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=<the grid's host key, from a repository variable> <AccessID, from a variable>@grid.wayne.edu start <owner/name>`,
+  and removes the file; the key is never in an argument, a log or the environment of another step.
+- The owner's steps for it go in docs/setup/grid.md, each with its link: make the key on his own
+  machine, put its public half on the grid with the subcommand, its private half in the
+  environment's secret, and the grid's host key and his AccessID in the repository's variables.
+
+## How the fixes were proven, and how to prove the next
+
+The review's fixes were each proven by a mutation: one fix undone in a copy of the checkout, the
+runner's tests run, and at least one check seen to fail. A mutation no check catches is a gap in the
+tests, as the registration files a job left behind were until the gh stand-in learned to report
+them (hpcworker's tools/tests/shim/gh lists them in $SHIM_GH/jit/over).
+wsu-grid-and-github-actions-mutations.sh, beside this note, runs the eleven, as
+`bash docs/research/wsu-grid-and-github-actions-mutations.sh <hpcworker checkout>`, and exits 1 when
+one goes uncaught or no longer applies; on 2026-10-16 it caught every one at hpcworker's merge of #13.
+What each undoes:
+
+- version-tail-1: the runner's version read as the last line of its output, which Apptainer's own
+  lines can follow;
+- no-scrub: the shell's APPTAINER_, SINGULARITY_, APPTAINERENV_ and SINGULARITYENV_ settings let
+  through to the container;
+- no-env-false: the runner's trace on standard output left on, as the image sets it;
+- no-nv: no GPU in the container for a chain started with a gpu --gres;
+- no-third-stop: no STOP after three jobs in a row that could not serve;
+- no-served: a job that serves leaves that count where it was;
+- squeue-ignored: a job run again, when squeue cannot answer, queues a second successor;
+- gh-error-as-public: gh's failure read as a public repository, which stops the chain, in place of
+  a job that could not serve;
+- update-retries: a runner that asks for a newer version started again, in place of a chain that
+  stops and says what a person does;
+- nojob-counted: a runner that ends with no job run taken for one that ran a job;
+- creds-linger: a registration's files left in the runner's home for the next registration.
+
+The runner's tests and the CI lane's were also run under the login node's stack, bash 4.2.46 and
+Python 3.6, which hpcworker's CI does not do for them (its centos 7 job runs the framework suite
+alone): wsu-grid-and-github-actions-centos7.sh, beside this note, runs both in a centos:7 container,
+its header giving the command, and both passed there on 2026-10-16, as they did on the session's own
+host under CentOS 7's bash 4.2 and gawk 4.0.2, copied out of the image with their libraries and put
+first on PATH.
 
 ## Sources
 
