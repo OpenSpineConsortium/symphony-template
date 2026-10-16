@@ -8,11 +8,12 @@ artifact.
 The notes of the owner's item 6 ("more sophisticated agentic workflow
 development ... build similar repos like coordbench but for other LLM
 performance domains, and include other software engineering benchmarks,
-SWE-bench etc."), kept here as the work goes on. The design is DESIGN.md,
-the pre-registration PLAN.md, the parity table PARITY.md, and scaffold/
-is the future repository OpenSpineConsortium/flowbench as its first
-commit, runnable today in fake mode and rehearsed on a real SWE-bench
-instance under all three arms.
+SWE-bench etc."), kept here as the work goes on. The benchmark is its own
+repository, OpenSpineConsortium/flowbench (public, MIT): the design
+(DESIGN.md), the pre-registration (PLAN.md), the parity table (PARITY.md)
+and the harness, runnable today in fake mode and rehearsed on a real
+SWE-bench instance under all three arms. A file these notes name without
+a path is that repository's.
 
 ## What was found
 
@@ -47,7 +48,7 @@ instance under all three arms.
   of its own on top ("SWE-bench", file modes), and the harness applies a
   patch on that state. So the harness takes the agent's diff against the
   commit the workspace starts at, checks that it descends from the base,
-  and records both (scaffold/flowbench/run.py, prepare and take_patch).
+  and records both (flowbench/run.py, prepare and take_patch).
   The first smoke test found this.
 - The adversarial review of the scaffold (2026-10-16) raised two blocking
   findings, eighteen to fix and eleven nits, and each is answered in the
@@ -80,7 +81,7 @@ instance under all three arms.
 
 ## What runs today
 
-- scaffold/: tasks (the pool and the order), backlog (the work list the
+- The harness: tasks (the pool and the order), backlog (the work list the
   lanes take), run (one attempt from the image to the record: the arm's
   stages as `claude -p` per agent, the patch, the score, result.json,
   events.jsonl, audit.json; a lane pulls each image when it is first
@@ -115,15 +116,11 @@ instance under all three arms.
 
 Nothing below runs or is created without the owner's word.
 
-1. The repository. A new public MIT repository is needed, as coordbench
-   is one, since the template ships to adopters and a benchmark does not
-   belong in every copy. Open
-   https://github.com/organizations/OpenSpineConsortium/repositories/new,
-   type `flowbench` as the name, choose Public, leave README, .gitignore
-   and license unticked, press "Create repository". Then say so in the
-   thread and a session attaches it and pushes scaffold/ as its first
-   commit (the design documents move with it). Another name is fine; the
-   folder and the package rename with it.
+1. The repository: done. The owner created OpenSpineConsortium/flowbench,
+   public, on 2026-10-16, and made its first commit with GitHub's "Add a
+   README", since a session's push guard refuses a push to main in any
+   repository; the harness and the design documents came in by
+   flowbench#1.
 2. The pilot. PLAN.md's first paid step is 8 instances under three arms,
    24 runs, estimated at one to two five-hour windows of one account (a
    guess until measured; DESIGN.md, Routes), on the host route from a
@@ -137,23 +134,23 @@ Nothing below runs or is created without the owner's word.
 
 ## Next steps, in order
 
-1. The repository created (above), the scaffold pushed, its CI green.
-2. The symphony arm's gate wired from coordbench's sdlc arm; a fake run
+1. The symphony arm's gate wired from coordbench's sdlc arm; a fake run
    through it; PARITY.md row 15 closed.
-3. The survey step of PLAN.md (no token): every image of the first 32
+2. The survey step of PLAN.md (no token): every image of the first 32
    instances pulled and the harness run on the gold patch, so a broken
    image is found before an agent meets it.
-4. The pilot, on the owner's word.
+3. The pilot, on the owner's word.
 
 ## How to resume
 
-    cd docs/research/flowbench/scaffold
+    git clone https://github.com/OpenSpineConsortium/flowbench
+    cd flowbench
     bash scripts/check.sh
     python3 flowbench/run.py run --logs /tmp/logs --tag rehearsal --arm script \
         --instance fake__alpha-1 --task-repo tests/fixtures/tasks --fake --option builders=2
     python3 flowbench/report.py --logs /tmp/logs --tag rehearsal --arms script
 
-The real-instance rehearsal is in scaffold/README.md (the task repository
+The real-instance rehearsal is in flowbench's README.md (the task repository
 cloned, the harness in a virtualenv, the dataset compiled with
 `score.py build`, `--fake-agents`).
 
@@ -173,4 +170,8 @@ cloned, the harness in a virtualenv, the dataset compiled with
   the scorer moved from `--task-repo` to the compiled dataset and checked
   on the gold patch; the real path rehearsed under all three arms; the
   design, the plan, the parity table and the memory fact corrected to
-  match.
+  match; symphony-template#96 merged as cd1920a.
+- 2026-10-16, evening: the owner created OpenSpineConsortium/flowbench;
+  the harness and the design documents moved there by flowbench#1, only
+  their paths changed, and the copies here were removed, these notes
+  staying as the programme's record.
