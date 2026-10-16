@@ -1,0 +1,17 @@
+# The required check: the same script a contributor runs, on the Python
+# GitHub's runner carries (3.12), with git and Docker already there. No
+# agent runs here and no token is read: a real run is the owner's, on
+# the owner's word, from a session or a dispatch of its own.
+name: check
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check.sh

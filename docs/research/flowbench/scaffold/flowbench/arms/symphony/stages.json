@@ -1,0 +1,31 @@
+{
+  "name": "symphony",
+  "description": "The issue under the claim protocol: a worker claims it on the branch claude/1 and opens the pull request, a reviewer reads it through the same three lenses as the script's, the worker answers every finding; the patch is the branch's diff. The protocol's gate is not wired yet (README.md).",
+  "stages": [
+    {
+      "name": "work",
+      "kind": "work",
+      "prompt": "prompts/work.md",
+      "writes": "{flow_dir}/pull-request.md"
+    },
+    {
+      "name": "review",
+      "kind": "review",
+      "prompt": "prompts/review.md",
+      "lenses": {
+        "correctness": "Does the change make the issue's case right, for every input the issue describes and the edge cases beside it (empty, None, the boundary, the other type the function accepts), and does it leave every other case as it was? Trace the code path for one concrete input of each kind.",
+        "conventions": "Does the change follow the repository's own way: its style, its names, its error types and messages, where it keeps tests and how it writes them, its compatibility and deprecation rules, its changelog where it keeps one? A fix the maintainers would ask to have rewritten is a finding.",
+        "path": "Follow the issue's path end to end, from the public call the issue's user makes to the line that changed and back out: is every caller of the changed code still right, is the change where the cause is rather than where the symptom showed, and do the docstring and the documentation still say what the code now does?"
+      },
+      "parallel": true,
+      "writes": "{findings_file}"
+    },
+    {
+      "name": "answer",
+      "kind": "answer",
+      "prompt": "prompts/answer.md",
+      "needs": "raised",
+      "writes": "{flow_dir}/answers-{stage}.json"
+    }
+  ]
+}
