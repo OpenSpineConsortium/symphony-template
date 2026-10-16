@@ -64,10 +64,18 @@ class Prices(unittest.TestCase):
         known = {"input": 1, "output": 2, "cache_read": 3, "cache_write": 4, "output_lower_bound": 2}
         unknown = {"input": 1, "output": None, "cache_read": 0, "cache_write": 0, "output_lower_bound": 7}
         total = record.sum_tokens([known, known])
-        self.assertEqual((total["input"], total["output"], total["cache_write"]), (2, 4, 8))
+        self.assertEqual((total["input"], total["output"], total["cache_write"], total["agents_uncounted"]), (2, 4, 8, 0))
         total = record.sum_tokens([known, unknown, None])
         self.assertEqual((total["input"], total["output"], total["output_lower_bound"]), (2, None, 9))
-        self.assertIsNone(record.sum_tokens([None]))
+        self.assertEqual(total["agents_uncounted"], 1)
+        self.assertIsNone(record.sum_tokens([]))
+
+    def test_an_agent_with_no_record_is_counted_as_uncounted_never_as_free(self):
+        known = {"input": 5, "output": 5, "cache_read": 0, "cache_write": 0, "output_lower_bound": 5}
+        total = record.sum_tokens([known, None])
+        self.assertEqual((total["input"], total["output"], total["agents_uncounted"]), (5, None, 1))
+        self.assertIsNone(record.price(total, "claude-sonnet-5-5"))
+        self.assertIsNotNone(record.price_lower_bound(total, "claude-sonnet-5-5"))
 
 
 class Streams(unittest.TestCase):
@@ -80,7 +88,8 @@ class Streams(unittest.TestCase):
 
     def test_the_result_event_gives_the_end_the_cost_and_the_tokens(self):
         lines(self.path, [
-            {"type": "system", "subtype": "init", "model": "claude-sonnet-5-5", "session_id": "s1"},
+            {"type": "system", "subtype": "init", "model": "claude-sonnet-5-5", "session_id": "s1",
+             "tools": ["Bash", "Read"], "mcp_servers": [{"name": "x", "status": "connected"}], "apiKeySource": "none"},
             {"type": "assistant", "message": {"id": "m1", "usage": usage(5, 5), "stop_reason": "end_turn"}},
             {"type": "result", "subtype": "success", "is_error": False, "num_turns": 3, "duration_ms": 1200,
              "total_cost_usd": 0.12345, "usage": usage(1000, 100, cache_read=400), "result": "done"},
@@ -93,6 +102,7 @@ class Streams(unittest.TestCase):
         self.assertEqual(summary["tokens"]["input"], 1000)
         self.assertEqual(summary["tokens"]["cache_read"], 400)
         self.assertEqual(summary["result_text"], "done")
+        self.assertEqual((summary["tools"], summary["mcp_servers"], summary["api_key_source"]), (["Bash", "Read"], ["x"], "none"))
 
     def test_a_stream_cut_off_before_its_result_is_an_error_with_the_messages_tokens(self):
         lines(self.path, [
@@ -120,6 +130,18 @@ class EventLogs(unittest.TestCase):
             entries = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
             self.assertEqual([e["kind"] for e in entries], ["a", "b", "c"])
             self.assertEqual(entries[1]["stage"], "x")
+
+    def test_threads_emitting_at_once_keep_one_sequence(self):
+        import threading
+        with tempfile.TemporaryDirectory() as temp:
+            events = record.Events(Path(temp) / "events.jsonl")
+            threads = [threading.Thread(target=lambda: [events.emit("x") for _ in range(50)]) for _ in range(4)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            entries = [json.loads(line) for line in events.path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(sorted(e["seq"] for e in entries), list(range(200)))
 
     def test_records_are_written_as_sorted_ascii_json(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -32,5 +32,5 @@ needs the repository and the owner's account slots first.
 One review round: work, review, answer. A second round (the reviewer
 reads the answers and asks again) is a repeat of the review and answer
 stages, which stages.json can list twice under names of its own
-(review-2, answer-2) once the first round's numbers say it is worth its
-cost.
+(review2, answer2; a stage's name has no dash) once the first round's
+numbers say it is worth its cost.

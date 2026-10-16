@@ -25,7 +25,7 @@
       "kind": "answer",
       "prompt": "prompts/answer.md",
       "needs": "raised",
-      "writes": "{flow_dir}/answers.json"
+      "writes": "{flow_dir}/answers-{stage}.json"
     }
   ]
 }

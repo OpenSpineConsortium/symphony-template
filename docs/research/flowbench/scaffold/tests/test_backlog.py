@@ -56,11 +56,27 @@ class TheBacklog(unittest.TestCase):
         backlog.finish(self.path, first["instance"], first["arm"], first["attempt"], "error", None, True)
         second = backlog.take(self.path, "lane-1")
         backlog.finish(self.path, second["instance"], second["arm"], second["attempt"], "error", None, False)
-        self.assertEqual(backlog.requeue(self.path, harness_only=True), 1)
+        self.assertEqual(backlog.requeue(self.path, harness_only=True), {"requeued": 1, "kept": 0})
         self.assertEqual(counted(self.path), {"failed": 1, "pending": 3})
-        self.assertEqual(backlog.requeue(self.path), 1)
+        self.assertEqual(backlog.requeue(self.path), {"requeued": 1, "kept": 0})
         taken = backlog.take(self.path, "lane-1")
         self.assertEqual(taken["attempt"], 2)
+
+    def test_requeue_stops_at_the_attempt_cap(self):
+        for _ in range(3):
+            item = backlog.take(self.path, "lane-1")
+            backlog.finish(self.path, item["instance"], item["arm"], item["attempt"], "error", None, True)
+            self.assertEqual(backlog.requeue(self.path)["requeued"], 1 if item["attempt"] < 3 else 0)
+        self.assertEqual(backlog.requeue(self.path), {"requeued": 0, "kept": 1})
+        self.assertEqual(backlog.requeue(self.path, max_attempts=4), {"requeued": 1, "kept": 0})
+
+    def test_a_dead_lanes_running_items_are_reset_to_pending(self):
+        mine = backlog.take(self.path, "lane-1")
+        backlog.take(self.path, "lane-2")
+        self.assertEqual(backlog.reset(self.path, "lane-1"), 1)
+        self.assertEqual(counted(self.path), {"pending": 3, "running": 1})
+        taken = backlog.take(self.path, "lane-3")
+        self.assertEqual((taken["instance"], taken["arm"], taken["attempt"]), (mine["instance"], mine["arm"], 2))
 
     def test_paused_items_are_not_taken_until_resumed(self):
         self.assertEqual(backlog.pause(self.path), 4)
@@ -95,6 +111,14 @@ class TheBacklog(unittest.TestCase):
             thread.join()
         self.assertEqual(len(taken), 4)
         self.assertEqual(len(set(taken)), 4)
+
+    def test_an_instance_is_open_while_any_of_its_items_is_to_run_or_running(self):
+        for arm in ("symphony", "script"):
+            item = backlog.take(self.path, "lane-1")
+            self.assertTrue(backlog.instance_open(self.path, "i1"))
+            backlog.finish(self.path, item["instance"], item["arm"], item["attempt"], "resolved")
+        self.assertFalse(backlog.instance_open(self.path, "i1"))
+        self.assertTrue(backlog.instance_open(self.path, "i2"))
 
     def test_options_parse_as_key_value_pairs(self):
         self.assertEqual(backlog.parse_options(["builders=3", "route=session"]), {"builders": "3", "route": "session"})

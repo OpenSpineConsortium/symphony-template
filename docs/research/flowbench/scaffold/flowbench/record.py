@@ -17,6 +17,7 @@ the host that made them and are never bundled: they hold the run token.
 """
 
 import json
+import threading
 import time
 from pathlib import Path
 
@@ -50,22 +51,26 @@ class Events:
     """events.jsonl: one line per event, with seq, t (seconds since this
     process opened the log, monotonic) and ts (epoch), appended as they
     happen; a process that opens an existing log carries its seq on, so
-    the stages of one run read in order whichever process ran them."""
+    the stages of one run read in order whichever process ran them. The
+    agents of a parallel stage emit from threads at once, so the sequence
+    and the write are taken under one lock."""
 
     def __init__(self, path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.started = time.monotonic()
+        self.lock = threading.Lock()
         self.seq = 0
         if self.path.is_file():
             self.seq = sum(1 for line in self.path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip())
 
     def emit(self, kind, **fields):
-        event = {"seq": self.seq, "t": round(time.monotonic() - self.started, 3), "ts": round(time.time(), 3),
-                 "kind": kind, **fields}
-        self.seq += 1
-        with self.path.open("a", encoding="utf-8") as out:
-            out.write(json.dumps(event, sort_keys=True, ensure_ascii=True) + "\n")
+        with self.lock:
+            event = {"seq": self.seq, "t": round(time.monotonic() - self.started, 3), "ts": round(time.time(), 3),
+                     "kind": kind, **fields}
+            self.seq += 1
+            with self.path.open("a", encoding="utf-8") as out:
+                out.write(json.dumps(event, sort_keys=True, ensure_ascii=True) + "\n")
         return event
 
 
@@ -131,27 +136,36 @@ def price_lower_bound(tokens, model):
 
 
 def sum_tokens(records):
-    """The run's tokens over its agents' records, None where any agent's
-    count is unknown, as coordbench's totals are."""
+    """The run's tokens over its agents' records: the output unknown
+    (None) where any agent's is, as coordbench's totals are, and an agent
+    with no record at all (no stream to read) counted in
+    agents_uncounted, with the output unknown too, so a run whose agent
+    left nothing never reads as a cheap one. None for no agents at all."""
+    records = list(records)
+    if not records:
+        return None
     totals = {kind: 0 for kind in TOKEN_KINDS}
     totals["output_lower_bound"] = 0
-    known = False
+    totals["agents_uncounted"] = 0
     for record in records:
         if not record:
+            totals["agents_uncounted"] += 1
+            totals["output"] = None
             continue
-        known = True
         for kind in ("input", "cache_read", "cache_write", "output_lower_bound"):
             totals[kind] += int(record.get(kind) or 0)
         if totals["output"] is not None and record.get("output") is not None:
             totals["output"] += int(record["output"])
         else:
             totals["output"] = None
-    return totals if known else None
+    return totals
 
 
 def stream_summary(path):
     """What one agent's stream-json output says about its run: the model it
-    ran with and its session id (the init event); how it ended, its turns,
+    ran with, its session id, its tools, its MCP servers and where its key
+    came from (the init event, kept so the record shows every arm's agents
+    had the same tools and none an API key); how it ended, its turns,
     its wall time and Claude Code's own cost (the result event); and its
     tokens, from the result event's usage when there is one, else summed
     once per message from the assistant lines, which are shaped as a
@@ -160,8 +174,9 @@ def stream_summary(path):
     path = Path(path)
     if not path.is_file():
         return None
-    summary = {"model": None, "session_id": None, "end": None, "is_error": None, "turns": None,
-               "duration_ms": None, "cost_usd": None, "cost_source": None, "tokens": None, "result_text": None}
+    summary = {"model": None, "session_id": None, "tools": None, "mcp_servers": None, "api_key_source": None,
+               "end": None, "is_error": None, "turns": None, "duration_ms": None, "cost_usd": None,
+               "cost_source": None, "tokens": None, "result_text": None}
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         try:
             entry = json.loads(line)
@@ -172,6 +187,10 @@ def stream_summary(path):
         if entry.get("type") == "system" and entry.get("subtype") == "init":
             summary["model"] = entry.get("model")
             summary["session_id"] = entry.get("session_id")
+            summary["tools"] = entry.get("tools") if isinstance(entry.get("tools"), list) else None
+            servers = entry.get("mcp_servers")
+            summary["mcp_servers"] = [s.get("name", s) if isinstance(s, dict) else s for s in servers] if isinstance(servers, list) else None
+            summary["api_key_source"] = entry.get("apiKeySource")
         elif entry.get("type") == "result":
             summary["end"] = entry.get("subtype") or "result"
             summary["is_error"] = bool(entry.get("is_error"))

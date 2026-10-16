@@ -1,6 +1,8 @@
 # flowbench: the workflow as a plug-in
 
-Written 2026-10-16 for item 6 of the owner's handoff message of 2026-10-15
+Source: the thread "Agentic workflow benchmarks" of the project symphony,
+2026-10-15 and 2026-10-16, from the owner's two attached documents; no
+Claude Doc or artifact. Written 2026-10-16 for item 6 of the owner's handoff message of 2026-10-15
 23:35 UTC: "More sophisticate agentic workflow development: see attached
 docs for naive approach we are competing against (script debugging and
 agent orchestration package) once again with real benchmarking in the
@@ -152,12 +154,21 @@ package: tasks/<instance_id>/task.yaml (repository, base commit, image,
 log parser, the datasets it is in), problem_statement.md, test.patch,
 tests.json (FAIL_TO_PASS and PASS_TO_PASS), gold.patch and eval.sh. The
 harness's own scorer, the swebench package on PyPI (5.0.2 at the time of
-writing), takes `--task-repo <that checkout>` and then needs no
-HuggingFace dataset: `swebench eval verified -p predictions.jsonl --run-id
-<tag> -i <instance> --task-repo <checkout>` applies the patch in the
-instance's image, runs eval.sh and parses the log, and writes
-logs/evaluation/<run_id>/results.json with the resolved, unresolved and
-error lists. flowbench calls that scorer in a virtualenv of its own, as
+writing), needs no HuggingFace dataset either: `swebench dataset build
+<checkout> -o <dir>` compiles the task repository into one parquet file
+per split, and `swebench eval <dir>/SWE-bench_Verified -p
+prediction.jsonl --run-id <id> -i <instance>` reads the local parquet,
+applies the patch in the instance's published image, runs eval.sh,
+parses the log and writes logs/run_evaluation/<run_id>/<model>/<instance>/
+(report.json and run_instance.log) and the summary <model>.<run_id>.json
+with the resolved, unresolved, empty-patch, error and
+infrastructure-failure lists. The same command given `--task-repo
+<checkout>` instead rebuilds the instance's image from the task's
+Dockerfile before scoring, and falls back to the published image when
+that build fails, so the image scored would not be the one the agent
+worked in; flowbench never passes it (the adversarial review of
+2026-10-16 found this, and the first smoke test's harness log showed the
+fallback). flowbench calls that scorer in a virtualenv of its own, as
 coordbench calls CooperBench's, and keeps its own code to the standard
 library.
 
@@ -180,17 +191,24 @@ arms do.
 | Arm | The flow | Agents | Needs | Status |
 | --- | --- | --- | --- | --- |
 | solo | one agent reads the issue and the repository and leaves a patch; the leaderboard's shape | 1 | nothing | scaffolded (prompt) |
-| script | the owner's script, made for one issue: build (one builder; `--builders K` for K candidates in K worktrees, the stack stage then picking by the repository's own tests), stack (merge and run the suites), review (three lenses: correctness, the repository's conventions, the issue's path end to end), verify (one refuter per finding, default not real), fix (the confirmed findings, with a test each) | 1 + K + 3 + findings + 1 | an orchestrator: the session's Workflow tool on the session route, flowbench's own stage runner (standard library, `claude -p` per stage) on the Actions route | scaffolded (stages.json and the prompts) |
+| script | the owner's script, made for one issue: build (one builder; `--option builders=K` for K candidates, each in a copy of the workspace on a branch of its own with a container of its own, the stack stage then fetching the branches and picking by the repository's own tests), stack (merge and run the suites), review (three lenses: correctness, the repository's conventions, the issue's path end to end), verify (one refuter per finding, default not real), fix (the confirmed findings, with a test each) | 1 + K + 3 + findings + 1 | an orchestrator: the session's Workflow tool on the session route, flowbench's own stage runner (standard library, `claude -p` per stage) on the Actions route | scaffolded (stages.json and the prompts) |
 | symphony | the issue becomes an issue of a repository under the claim protocol: a worker claims it (the first push of claude/<issue>), opens a draft pull request, the required check runs the repository's tests of the modules the diff touches, a reviewer worker reviews the pull request through the same three lenses as the script's and asks for changes or approves, the worker answers each thread or says why not, the merge gate merges on a green check; the patch is main's diff. The flow is the protocol's events; no orchestrator script. Decided by the protocol library (sdlc_protocol.gate over its bare-git adapter, vendored as coordbench vendors it) on the session route; by a scratch repository on GitHub with the template's workers.yml on the Actions route (symphony-github, below) | 1 worker + 1 reviewer, the worker again per review round | git_remote; the vendored library | scaffolded (prompts); the gate wiring is coordbench's sdlc arm's, to be carried over |
 | symphony-github | symphony on GitHub itself: one scratch repository per instance, made from the template's protocol-only files, the issue opened by the harness, the workers in Actions on the owner's accounts, the real required check, Claude Code Review on the pull request, auto-merge; "real benchmarking in the symphony protocol environment" in the owner's words | the registry's workers | a scratch organization or a prefix, the owner's account slots, an Actions minutes budget | designed; not scaffolded, since it needs the repository and the owner's accounts first |
 | framework-langgraph | the script's stages as a LangGraph.js graph (Send API fan-out, a checkpointer, retries, Zod on the findings), each node running `claude -p` on the subscription token, so the framework is measured and no API key is used | as script | Node and the packages in the arm's own image layer, never in the harness | designed; built when the owner wants the package report's remedy measured |
 | caid, storm | the two papers' systems | theirs | OpenHands and an LLM API key for both; STORM's repository has no licence file | out until the owner says: both bill an API, which the project's rules forbid |
 
-What the arms hold equal: the model, the effort, the agent's version, the
-tool surface (local tools only; WebFetch and WebSearch off, as the
-CooperBench runs and the leaderboard's bash-only track do), the wall-clock
-limit per instance, the instance's image, the order of the instances, and
-the day. What differs is the flow alone.
+What the arms hold equal: the model, the effort (one level for every
+agent, medium unless the owner names another), the agent's version, the
+tool surface (Claude Code's built-in local tools, with WebFetch and
+WebSearch off, as the CooperBench runs and the leaderboard's bash-only
+track do, and the Agent tool off, so one agent is one process and an
+arm's agent count is what its stages say), the settings (the login's own
+settings, hooks and MCP servers left out: `--setting-sources project` and
+`--strict-mcp-config` with an empty server list, and each agent's tools
+and servers read back from its stream into the record), the time limits
+(45 minutes per agent and 120 per run, no turn cap), the instance's
+image, the order of the instances, and the day. What differs is the flow
+alone.
 
 ## What is measured
 
@@ -198,8 +216,10 @@ Per (instance, arm) run, in result.json, with the audit beside it:
 
 - Outcome: resolved, SWE-bench's own verdict (every FAIL_TO_PASS test
   passes and every PASS_TO_PASS test still passes, in the official image,
-  by the official harness), and the harness's reasons when not (unresolved,
-  a patch that did not apply, an empty patch, an error). PARITY.md row 1.
+  by the official harness), and the harness's reasons when not
+  (unresolved; a patch that did not apply, which is the arm's failure; an
+  empty patch; the harness's own error or infrastructure failure, which
+  leaves the run out). PARITY.md row 1.
 - Cost: tokens by kind (input, output, cache creation, cache read) per
   agent and for the run, summed once from each agent's transcript as
   coordbench does, and an estimated price at Anthropic's list prices; the
@@ -213,14 +233,23 @@ Per (instance, arm) run, in result.json, with the audit beside it:
   symphony arm's check, the script's stack waiting on builders), and the
   scoring's own time apart.
 - The flow's own failures: an agent that ended in error for a cause outside
-  the benchmark (a usage limit, a lost subagent, a full disk) is a harness
-  error and the run is left out and named, as coordbench's audit does; a
+  the benchmark (a usage limit, a full disk, the scorer's infrastructure)
+  is a harness error and the run is left out and named, as coordbench's
+  audit does; a
   failure of the flow itself (a script that did not parse, a stage whose
   output the next stage could not read, a merge the stacking agent left
   broken, a verifier that confirmed nothing because its input was cut) is
   the arm's result, scored as a failure, and counted under
   `orchestration_failures`, since it is exactly what the owner's first
   document shows and the second document predicts.
+- Timeouts, turn limits and exclusions: an agent that ran out of its time
+  or its turns is counted apart from the orchestration failures, and its
+  run is kept and scored; a run whose agents' streams name the benchmark's
+  own files (the task repository's path or name, gold.patch, test.patch)
+  is excluded by the audit and named, since it went looking for the
+  answer, and a hidden test's name in a stream (a FAIL_TO_PASS test the
+  test patch adds) is recorded beside it without excluding the run, since
+  an agent may write a test of that name on its own.
 - Review precision, for the flows that review: findings raised per lens,
   findings confirmed by the verifier, findings the fix stage changed code
   for, and, read against the verdict, whether a run whose review raised a
@@ -245,25 +274,36 @@ instance.
 
 ## The record
 
-A run directory per (instance, arm, attempt), under logs/<tag>/<arm>/<instance>/:
+A run directory per (instance, arm, attempt), under
+logs/<tag>/<arm>/<instance>/attempt-<n>/:
 
-- result.json: instance, arm, driver, route, model, the agents (name,
-  stage, status, end_reason, tokens, cost, duration_ms), the stages in
-  order with their timings, the patch's size, the scoring (resolved,
-  reason, the harness's run id), the timings per phase (provision, agents,
-  patch, score, teardown), and the provenance (the task repository's
-  commit, the image id, flowbench's commit, the scorer's version).
+- result.json: instance, arm, driver, route, model, effort, the agents
+  (name, stage, status: success, timeout, turn_limit, usage_limit or
+  error; its turns, tokens, cost and duration, and the tools and MCP
+  servers its stream's init event lists), the stages in order with their
+  durations, the patch's size, the scoring (resolved, reason, the
+  harness's run id and failure reason), the timings (the agents' seconds
+  summed and the run's wall clock), whether the run is a harness error or
+  excluded, and the provenance (the image id, the base and start commits,
+  the task repository's commit, flowbench's commit, the scorer's version).
 - prediction.jsonl: the one line the scorer took (instance_id,
   model_name_or_path, model_patch).
 - events.jsonl: every stage start and end, every agent start and end,
-  every gate (a check run, a review posted, a merge), as coordbench's
-  trace writes them, so a timeline reads where the time went.
-- audit.json: the audit's verdict (harness error or not, and why), from
-  the transcripts while they are on disk.
+  and, once the symphony arm's gate is wired, every gate (a check run, a
+  review posted, a merge), as coordbench's trace writes them, so a
+  timeline reads where the time went.
+- audit.json: the audit's verdict (harness error or not, and why;
+  excluded or not, and which agent's stream named what; the network
+  commands the agents ran), from the agents' streams while they are on
+  disk.
 - The agents' transcripts and prompts, kept on the host that ran them and
   never bundled, since they hold the run token; a bundle (not in the
   scaffold yet) takes result, prediction, events, audit and the scorer's
-  log, as coordbench's bundle.py does.
+  log, as coordbench's bundle.py does, and keeps to docs/research's rule
+  for a record that is committed: counts, seconds, tokens, verdicts and
+  the patch, never a path, a command or an agent's text, so the bundle
+  drops each agent's result_text, the harness's command line and every
+  path from what it copies.
 
 ## Routes and what they cost
 
@@ -332,7 +372,10 @@ Read in full from this session, with the commit or version:
   (the predictions format, results.json, the v5 CLI's `--task-repo`); the
   swebench 5.0.2 wheel from PyPI (harness/utils.py and
   harness/run_evaluation.py load a task repository in place of the
-  dataset when `--task-repo` is given).
+  dataset when `--task-repo` is given and then rebuild the instance's
+  image before scoring; cli/dataset.py's `dataset build` compiles a task
+  repository into the parquet files `swebench eval` reads, and
+  harness/reporting.py writes the summary's lists).
 - The owner's two documents, converted with pandoc.
 - docs/checkpoints/2026-10-15b/taxonomy/spec.md and manual.md (the
   taxonomy thread's findings: only the combination is unique; unsorry the

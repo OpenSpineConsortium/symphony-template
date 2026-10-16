@@ -17,9 +17,14 @@ is refused by name rather than guessed at.
 The order is nested and stratified (PLAN.md): the pool's instances are
 grouped by stratum (the repository and the difficulty by default), each
 stratum is shuffled by the seed, and the order takes one instance from
-each stratum in turn, strata in name order, so the first N instances of
-the order are a balanced sample for every N and a run grows by taking
-more of the same order.
+each stratum in turn, the strata themselves in an order drawn from the
+seed, so the first N instances of the order are a balanced sample for
+every N, no stratum is first by its name, and a run grows by taking more
+of the same order.
+
+The hidden tests, the FAIL_TO_PASS entries whose test function the test
+patch adds, are read for the runner's audit of the agents' transcripts
+(run.py, forbidden_for), and never written anywhere an agent reads.
 
     python3 flowbench/tasks.py TASK_REPO table [--pool verified,lite]
     python3 flowbench/tasks.py TASK_REPO order --seed 0 [--sample N]
@@ -29,6 +34,7 @@ more of the same order.
 import argparse
 import json
 import random
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -62,6 +68,7 @@ class Task:
     problem_statement: str = ""
     fail_to_pass: int = 0
     pass_to_pass: int = 0
+    hidden_tests: tuple = ()
     gold_patch_lines: int = 0
     directory: str = ""
     fields: dict = field(default_factory=dict)
@@ -134,6 +141,42 @@ def patch_lines(text):
     return count
 
 
+ADDED_TEST = re.compile(r"^\+\s*(?:async\s+)?def\s+(test\w*)\s*\(", re.MULTILINE)
+
+
+def added_tests(patch_text):
+    """The names of the test functions a patch adds."""
+    return set(ADDED_TEST.findall(patch_text or ""))
+
+
+def test_name_of(entry):
+    """An entry's test without its parameters, and the test function it
+    names: a pytest id (path::Class::test_x[params]) keeps its path and
+    names its last part; any other form (test_x (module.Class), as
+    Django's and unittest's lists write it) is its first word."""
+    head = entry.split("[", 1)[0].strip()
+    if "::" in head:
+        return head, head.rsplit("::", 1)[-1]
+    word = head.split(" ", 1)[0] if head else ""
+    return word, word
+
+
+def hidden_test_names(fail_to_pass, test_patch_text):
+    """The FAIL_TO_PASS entries whose test function the test patch adds:
+    names an agent's transcript holds only when it saw the test patch,
+    or wrote a test of the same name on its own, since the function is
+    not in the repository it works in. An entry whose function the
+    repository already has (a test the fix makes pass, or one the patch
+    only gives new parameters) is left out, since an agent may run it."""
+    added = added_tests(test_patch_text)
+    names = []
+    for entry in fail_to_pass:
+        name, function = test_name_of(entry)
+        if function in added and name not in names:
+            names.append(name)
+    return tuple(names)
+
+
 def read_task(directory):
     """One instance from its directory; TaskError when a required file or
     key is missing or unreadable."""
@@ -160,6 +203,9 @@ def read_task(directory):
             raise TaskError(f"{tests_file}: {error}") from error
     statement = directory / "problem_statement.md"
     gold = directory / "gold.patch"
+    test_patch = directory / "test.patch"
+    hidden = hidden_test_names(tests.get("FAIL_TO_PASS", []),
+                               test_patch.read_text(encoding="utf-8", errors="replace") if test_patch.is_file() else "")
     return Task(
         instance_id=fields["instance_id"],
         repo=fields["repo"],
@@ -174,6 +220,7 @@ def read_task(directory):
         problem_statement=statement.read_text(encoding="utf-8") if statement.is_file() else "",
         fail_to_pass=len(tests.get("FAIL_TO_PASS", [])),
         pass_to_pass=len(tests.get("PASS_TO_PASS", [])),
+        hidden_tests=hidden,
         gold_patch_lines=patch_lines(gold.read_text(encoding="utf-8", errors="replace")) if gold.is_file() else 0,
         directory=str(directory),
         fields=fields,
@@ -230,12 +277,15 @@ def strata(tasks, keys=DEFAULT_STRATA):
 
 def order(tasks, seed=0, keys=DEFAULT_STRATA):
     """The nested stratified order: each stratum shuffled by the seed and
-    its name, then one instance from each stratum in turn until every
-    stratum is spent. The sample of size N is the first N."""
+    its name, the strata in an order drawn from the seed, then one
+    instance from each stratum in turn until every stratum is spent. The
+    sample of size N is the first N."""
     groups = strata(tasks, keys)
+    names = list(groups)
+    random.Random(f"{seed}:strata").shuffle(names)
     queues = []
-    for name, members in groups.items():
-        drawn = list(members)
+    for name in names:
+        drawn = list(groups[name])
         random.Random(f"{seed}:{name}").shuffle(drawn)
         queues.append(drawn)
     ordered = []
@@ -285,7 +335,8 @@ def main(argv=None):
             if not found:
                 print(f"{args.instance}: not in {args.task_repo}", file=sys.stderr)
                 return 1
-            shown = {k: v for k, v in found[0].__dict__.items() if k not in ("problem_statement", "fields")}
+            shown = {k: v for k, v in found[0].__dict__.items() if k not in ("problem_statement", "fields", "hidden_tests")}
+            shown["hidden_tests"] = len(found[0].hidden_tests)
             print(json.dumps(shown, indent=2, sort_keys=True))
     except TaskError as error:
         print(error, file=sys.stderr)

@@ -7,16 +7,21 @@ together and a run cut short still holds the same instances under every
 arm, which the paired tests need. `shuffle` draws each instance's order
 of arms from the seed and the instance, so no arm always meets a lane's
 first minutes or the end of a usage window. `requeue` puts failed items
-back as pending; with --harness-only, only those whose run the audit
-called a harness error, since an agent that ran out of time is its arm's
-result. `pause` and `resume` hold and release the pending items, all or
-the instances named, which is how a run grows one batch at a time with
-the owner's word on each (PLAN.md).
+back as pending, up to --max-attempts (three) tries each, so a run that
+breaks the same way every time stops rather than spending usage on it
+again; with --harness-only, only those whose run the audit called a
+harness error, since an agent that ran out of time is its arm's result.
+`reset --lane` puts a dead lane's running items back as pending, for a
+lane whose process was killed with an item in hand. `pause` and `resume`
+hold and release the pending items, all or the instances named, which is
+how a run grows one batch at a time with the owner's word on each
+(PLAN.md).
 
     python3 flowbench/backlog.py add Q --tag TAG --arms symphony,script,solo --instances a,b,c [--option K=V]
     python3 flowbench/backlog.py take Q --lane lane-1
     python3 flowbench/backlog.py finish Q --instance I --arm A --attempt N --verdict resolved|failed|error --run-dir DIR [--harness-error]
-    python3 flowbench/backlog.py requeue Q [--harness-only]
+    python3 flowbench/backlog.py requeue Q [--harness-only] [--max-attempts 3]
+    python3 flowbench/backlog.py reset Q --lane lane-1
     python3 flowbench/backlog.py pause Q [--instances a,b]    resume the same way
     python3 flowbench/backlog.py shuffle Q --seed 1
     python3 flowbench/backlog.py status Q
@@ -34,6 +39,7 @@ from pathlib import Path
 
 STATES = ("pending", "paused", "running", "done", "failed")
 VERDICTS = ("resolved", "failed", "error")
+DEFAULT_MAX_ATTEMPTS = 3
 
 
 class BacklogError(ValueError):
@@ -140,18 +146,42 @@ def finish(path, instance, arm, attempt, verdict, run_dir=None, harness_error=Fa
     raise BacklogError(f"{instance} {arm}: not in the queue")
 
 
-def requeue(path, harness_only=False):
-    """Failed items, or only the harness errors, back to pending; the count."""
-    count = 0
+def requeue(path, harness_only=False, max_attempts=DEFAULT_MAX_ATTEMPTS):
+    """Failed items, or only the harness errors, back to pending while
+    they have attempts left: {"requeued": n, "kept": m}, kept being the
+    failed items at the cap, left as they are for a person to look at."""
+    counts = {"requeued": 0, "kept": 0}
     with locked(path) as items:
         for item in items:
-            failed = item["state"] == "failed" or (harness_only and item["harness_error"])
-            if not failed or (harness_only and not item["harness_error"]):
+            if item["state"] != "failed" or (harness_only and not item["harness_error"]):
+                continue
+            if item["attempt"] >= max_attempts:
+                counts["kept"] += 1
                 continue
             item.update({"state": "pending", "lane": None, "run_dir": None, "verdict": None,
                          "harness_error": False, "updated": now()})
-            count += 1
+            counts["requeued"] += 1
+    return counts
+
+
+def reset(path, lane):
+    """The lane's running items back to pending, for a lane that died
+    with an item in hand; the count. The item's next take counts a new
+    attempt, and the runner gives it a directory of its own."""
+    count = 0
+    with locked(path) as items:
+        for item in items:
+            if item["state"] == "running" and item["lane"] == lane:
+                item.update({"state": "pending", "lane": None, "updated": now()})
+                count += 1
     return count
+
+
+def instance_open(path, instance):
+    """Whether an item of the instance is still to run or running, so the
+    instance's image is still needed."""
+    return any(item["instance"] == instance and item["state"] in ("pending", "paused", "running")
+               for item in read_items(path))
 
 
 def set_state(path, from_state, to_state, instances=None):
@@ -244,6 +274,11 @@ def main(argv=None):
     requeuing = commands.add_parser("requeue")
     requeuing.add_argument("queue")
     requeuing.add_argument("--harness-only", action="store_true")
+    requeuing.add_argument("--max-attempts", type=int, default=DEFAULT_MAX_ATTEMPTS,
+                           help="an item at this many attempts is kept failed")
+    resetting = commands.add_parser("reset", help="a dead lane's running items back to pending")
+    resetting.add_argument("queue")
+    resetting.add_argument("--lane", required=True)
     for name in ("pause", "resume"):
         holding = commands.add_parser(name)
         holding.add_argument("queue")
@@ -270,7 +305,10 @@ def main(argv=None):
             item = finish(args.queue, args.instance, args.arm, args.attempt, args.verdict, args.run_dir, args.harness_error)
             print(json.dumps(item))
         elif args.command == "requeue":
-            print(f"requeued {requeue(args.queue, args.harness_only)}")
+            counts = requeue(args.queue, args.harness_only, args.max_attempts)
+            print(f"requeued {counts['requeued']}, kept {counts['kept']} at the cap")
+        elif args.command == "reset":
+            print(f"reset {reset(args.queue, args.lane)}")
         elif args.command in ("pause", "resume"):
             chosen = set(split(args.instances)) if args.instances else None
             count = pause(args.queue, chosen) if args.command == "pause" else resume(args.queue, chosen)

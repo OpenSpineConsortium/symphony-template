@@ -41,7 +41,7 @@
       "kind": "fix",
       "prompt": "prompts/fix.md",
       "needs": "confirmed",
-      "writes": "{flow_dir}/fixed.json"
+      "writes": "{flow_dir}/fixed-{stage}.json"
     }
   ]
 }

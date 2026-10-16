@@ -1,19 +1,19 @@
 """The agent of a fake run: spends nothing and walks every stage's path.
 
 run.py gives it the job as a JSON file (the stage, its kind, the agent's
-name, the prompt's fields and the run's options) and the prompt on
-stdin, which it reads and ignores. It does what the stage is to leave
-behind, by the stage's kind: a work stage edits the workspace (and
-commits on its branch when it is a builder, and makes the claim branch
-claude/1 and commits on it when it is a worker that opens a pull
-request), a stack stage merges the
-builders' branches and writes stack.json, a review stage writes its
-findings file with one finding, a verify stage its verdict (real for the
-correctness lens, not real for the others), a fix stage edits once more
-and writes fixed.json, an answer stage writes answers.json. Then it
-writes a stream-json file shaped as Claude Code's, with an init event, an
-assistant message and a result event, so the record reads it as it reads
-a real agent's.
+name, the prompt's fields, the file the stage is to leave and the run's
+options) and the prompt on stdin, which it reads and ignores. It does
+what the stage is to leave behind, by the stage's kind: a work stage
+edits the workspace (and commits on its branch when it is a builder, and
+makes the claim branch claude/1 and commits on it when it is a worker
+that opens a pull request), a stack stage merges the builders' branches
+and writes stack.json, a review stage writes its findings file with one
+finding, a verify stage its verdict (real for the correctness lens, not
+real for the others), a fix stage edits once more and writes its
+fixed-<stage>.json, an answer stage writes its answers-<stage>.json,
+each at the path the job names. Then it writes a stream-json file shaped
+as Claude Code's, with an init event, an assistant message and a result
+event, so the record reads it as it reads a real agent's.
 
 The options steer the rehearsal: fake_fail=<stage or agent> ends that
 agent in error, fake_limit=<stage or agent> ends it on a usage limit (a
@@ -91,6 +91,12 @@ def work(job):
     return f"edited {changed}"
 
 
+def leaves(job, default_name):
+    """The file the stage is to leave, as the job names it, else the
+    default under the flow directory."""
+    return Path(job.get("writes") or Path(job["fields"]["flow_dir"]) / default_name)
+
+
 def stack(job):
     fields = job["fields"]
     builders = json.loads(fields["builders"] or "[]")
@@ -102,7 +108,7 @@ def stack(job):
         else:
             conflicts.append(builder["branch"])
             git(fields["workspace"], "merge", "--abort", check=False)
-    write_json(Path(fields["flow_dir"]) / "stack.json", {"merged": merged, "conflicts": conflicts, "tests": "not run"})
+    write_json(leaves(job, "stack.json"), {"merged": merged, "conflicts": conflicts, "tests": "not run"})
     return f"merged {len(merged)}, {len(conflicts)} conflict(s)"
 
 
@@ -130,7 +136,7 @@ def fix(job):
     confirmed = json.loads(fields["confirmed_findings"] or "[]")
     for _ in confirmed:
         edit(fields["workspace"], job["agent"])
-    write_json(Path(fields["flow_dir"]) / "fixed.json", {"fixed": [f["id"] for f in confirmed], "not_fixed": []})
+    write_json(leaves(job, f"fixed-{job['stage']}.json"), {"fixed": [f["id"] for f in confirmed], "not_fixed": []})
     return f"fixed {len(confirmed)}"
 
 
@@ -147,7 +153,7 @@ def answer(job):
     if fields.get("branch") or git(fields["workspace"], "rev-parse", "--abbrev-ref", "HEAD").stdout.strip() != "HEAD":
         git(fields["workspace"], "add", "-A")
         git(fields["workspace"], "commit", "-q", "--allow-empty", "-m", f"{job['agent']}: the answers")
-    write_json(Path(fields["flow_dir"]) / "answers.json", {"answers": answers})
+    write_json(leaves(job, f"answers-{job['stage']}.json"), {"answers": answers})
     return f"answered {len(answers)}"
 
 
@@ -162,7 +168,9 @@ def stream(job, text, is_error, tokens):
     usage = {"input_tokens": tokens, "output_tokens": tokens // 10, "cache_read_input_tokens": 0,
              "cache_creation_input_tokens": 0}
     session_id = f"fake-{job['agent']}"
-    lines = [{"type": "system", "subtype": "init", "model": job["model"], "session_id": session_id, "cwd": job["fields"]["workspace"]},
+    lines = [{"type": "system", "subtype": "init", "model": job["model"], "session_id": session_id,
+              "cwd": job["fields"]["workspace"], "tools": ["Bash", "Read", "Edit", "Write", "Glob", "Grep"],
+              "mcp_servers": [], "apiKeySource": "none"},
              {"type": "assistant", "message": {"id": f"msg_{job['agent']}", "role": "assistant", "usage": usage,
                                                "stop_reason": "end_turn", "content": [{"type": "text", "text": text}]}},
              {"type": "result", "subtype": "error_during_execution" if is_error else "success", "is_error": is_error,

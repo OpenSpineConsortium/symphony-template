@@ -8,18 +8,21 @@ the checkout and say whether the repository's tests accept the result.
 The repository {repo} is checked out at {workspace}, your working
 directory, at the commit {base_commit}. The issue to fix is the file
 {problem_file}; read it first. The repository's own tests run in a
-container whose Python environment is the repository's, with your command
-in place of <command>:
+container whose Python environment is the repository's, through the
+script {test_shell}, with your command after it:
 
-    {test_shell}
+    {test_shell} pytest -x path/to/test_x.py
+    {test_shell} bash -c 'python -c "import pkg; print(pkg.thing())"'
 
 The container sees the same files as {workspace}. Nothing else is yours
-to read or change: stay inside {workspace} and {run_dir}, use no web, and
-do not look for the issue's fix, its tests or anyone's patch outside the
-repository; the benchmark keeps them out of reach, and a run that went
-looking is thrown out. Write notes, if any, under {flow_dir}, never into
-the repository, and remove any scratch file you made inside it. When you
-are done, your last message begins with the line
+to read or change: stay inside {workspace}, write under {flow_dir} only
+the file this prompt asks for and notes of your own, never read another
+agent's files there, use no web, and do not look for the issue's fix,
+its tests or anyone's patch outside the repository: the benchmark keeps
+them out of reach, and a run whose transcript shows it went looking is
+thrown out. The repository holds only the change when you stop: remove
+any scratch file you made inside it. When you are done, your last message
+begins with the line
 
 {run_token}
 
@@ -29,9 +32,10 @@ followed by what you did, in a few sentences.
 
 {builders}
 
-A JSON list, one entry per builder with its branch, its worktree and its
-container; an empty list means one builder worked on the checkout itself
-and there is nothing to merge, so only steps 2 and 3 are yours.
+A JSON list, one entry per builder with its number and its branch, each
+branch already fetched into the checkout; an empty list means one builder
+worked on the checkout itself and there is nothing to merge, so only
+steps 2 and 3 are yours.
 
 ## What to do
 

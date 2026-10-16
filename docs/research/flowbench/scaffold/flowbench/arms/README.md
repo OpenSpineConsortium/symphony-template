@@ -17,20 +17,27 @@ same model, the same tools, the same scorer (PARITY.md in the design).
     "writes": "{findings_file}"},
    {"name": "verify", "kind": "verify", "prompt": "prompts/verify.md", "agents": "per_finding",
     "parallel": true, "needs": "raised", "writes": "{verdict_file}"},
-   {"name": "fix", "kind": "fix", "prompt": "prompts/fix.md", "needs": "confirmed", "writes": "{flow_dir}/fixed.json"}
+   {"name": "fix", "kind": "fix", "prompt": "prompts/fix.md", "needs": "confirmed", "writes": "{flow_dir}/fixed-{stage}.json"}
  ]}
 ```
 
-- `name`: the stage's own name, unique in the arm; the agents are named
-  after it (`review-correctness`, `verify-correctness-1`, `build-2`).
+- `name`: the stage's own name, unique in the arm and without a dash,
+  since the files its agents leave are read back by splitting their
+  names on the first dash; the agents are named after it
+  (`review-correctness`, `verify-correctness-1`, `build-2`).
 - `kind`: what the stage is for, one of work, stack, review, verify, fix,
   answer. The fake agent acts by it, and the record counts findings,
   verdicts, fixes and merges by the files those kinds leave.
 - `prompt`: the prompt's file, with placeholders (below).
 - `agents`: a count (default 1), `builders` (one agent per builder, each in
-  a worktree of its own on the branch builder-K with a container of its
-  own, when the run's option builders is above 1) or `per_finding` (one
-  agent per finding the review raised).
+  a copy of the workspace of its own on the branch builder-K with a
+  container of its own, when the run's option builders is above 1; a
+  copy and not a git worktree, since a worktree has none of the image's
+  untracked build products and its .git file names a path no container
+  sees) or `per_finding` (one agent per finding the review raised). Before
+  a stack stage the runner fetches every builder's branch into the
+  workspace, and a builder that left its work uncommitted is the flow's
+  failure.
 - `lenses`: a table of lens name to lens text; one agent per lens, given
   `{lens}` and `{lens_text}`.
 - `parallel`: the stage's agents run at once (up to `--parallel`).
@@ -38,7 +45,9 @@ same model, the same tools, the same scorer (PARITY.md in the design).
   `confirmed` when the verdicts confirmed nothing.
 - `writes`: the file each agent must leave; one missing is an
   orchestration failure of the arm, recorded and counted, never a harness
-  error.
+  error. A fix or answer stage names its file after the stage
+  (`{flow_dir}/fixed-{stage}.json`), so an arm that lists such a stage
+  twice keeps each round's file.
 
 ## The placeholders
 
@@ -49,16 +58,16 @@ The runner fills these in every prompt; any other `{word}` is an error
 | --- | --- |
 | `{instance_id}`, `{repo}` | the instance |
 | `{base_commit}` | the commit the workspace starts at: the instance's base commit under the one commit the image's build adds on top of it, which is what the agent's diff is read against |
-| `{workspace}` | the agent's working directory: the repository at that commit (a builder's worktree for a builder) |
+| `{workspace}` | the agent's working directory: the repository at that commit (a builder's own copy for a builder) |
 | `{container}` | the container that runs the same workspace at /testbed, or empty in a fake run |
-| `{test_shell}` | the one line that runs a command in the container's Python environment |
+| `{test_shell}` | a wrapper script that runs the command after it in the container's Python environment, from /testbed (`{test_shell} pytest -x path/to/test_x.py`); on the host in a fake run |
 | `{problem_file}` | the issue's text, beside the workspace, never inside it |
 | `{run_dir}`, `{flow_dir}` | the run's directory and its flow/ directory, where stages leave their files |
 | `{stage}`, `{agent}` | the stage's and the agent's names |
 | `{lens}`, `{lens_text}`, `{findings_file}` | a review agent's lens and where it writes |
 | `{finding}`, `{finding_id}`, `{verdict_file}` | a verify agent's finding (JSON) and where it writes |
 | `{findings}`, `{confirmed_findings}` | every finding raised, and those the verdicts confirmed (JSON lists) |
-| `{builders}`, `{branch}` | the builders (JSON list of branch, workspace, container) and a builder's own branch |
+| `{builders}`, `{branch}` | the builders (a JSON list of each builder's number and branch, every branch fetched into the workspace before the stack stage) and a builder's own branch, empty with one builder |
 | `{run_token}` | the line the agent's last message begins with, so a transcript can be found by it |
 | `{options}` | the run's options (JSON) |
 
@@ -66,16 +75,21 @@ The runner fills these in every prompt; any other `{word}` is an error
 
 Under the run's flow/ directory:
 
-- a review agent: `findings-<lens>.json`, `{"lens": ..., "findings": [{"id", "file", "line", "claim", "evidence", "severity"}]}`;
-- a verify agent: `verdict-<id>.json`, `{"id", "real", "why"}`;
-- the fix stage: `fixed.json`, `{"fixed": [ids], "not_fixed": [{"id", "why"}]}`;
+- a review agent: `findings-<stage>-<lens>.json`, `{"lens": ..., "findings": [{"id", "file", "line", "claim", "evidence", "severity"}]}`;
+- a verify agent: `verdict-<stage>-<id>.json`, `{"id", "real", "why"}`;
+- a fix stage: `fixed-<stage>.json`, `{"fixed": [ids], "not_fixed": [{"id", "why"}]}`;
 - the stack stage: `stack.json`, `{"merged", "conflicts", "tests", "notes"}`;
 - a worker that opens a pull request: `pull-request.md`;
-- the answer stage: `answers.json`, `{"answers": [{"id", "answer", "changed"}]}`.
+- an answer stage: `answers-<stage>.json`, `{"answers": [{"id", "answer", "changed"}]}`.
+
+Every agent is told to write under the flow directory only the file its
+prompt asks for and notes of its own, and never to read another agent's
+files there.
 
 The record (result.json) reads them into `flow`: findings raised, by
-lens, confirmed, fixed; the merges; the review rounds; and
-`orchestration_failure` with its reasons.
+lens, confirmed, fixed; the merges; the review rounds and the answers;
+the agents that ran out of time or turns; and `orchestration_failure`
+with its reasons.
 
 ## The arms here
 

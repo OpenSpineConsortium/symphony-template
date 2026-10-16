@@ -26,6 +26,15 @@ class ReadingTasks(unittest.TestCase):
         self.assertIn("add(2, 2)", first.problem_statement)
         self.assertEqual(first.fail_to_pass, 1)
         self.assertGreater(first.gold_patch_lines, 0)
+        self.assertEqual(first.hidden_tests, (), "the fixture adds no test, so nothing is hidden")
+
+    def test_the_hidden_tests_are_the_failing_tests_the_test_patch_adds(self):
+        patch = "+++ b/tests/test_core.py\n+def test_add_new(x):\n+    pass\n+    def test_inner():\n"
+        names = tasks.hidden_test_names(["tests/test_core.py::test_add_new[1]", "tests/test_core.py::test_add_new[2]",
+                                         "tests/test_core.py::test_add", "test_inner (tests.Core)"], patch)
+        self.assertEqual(names, ("tests/test_core.py::test_add_new", "test_inner"))
+        self.assertEqual(tasks.test_name_of("a/test_b.py::TestC::test_d[x y]"), ("a/test_b.py::TestC::test_d", "test_d"))
+        self.assertEqual(tasks.hidden_test_names(["a::test_x"], ""), ())
 
     def test_the_default_pool_is_the_instances_in_verified_and_lite(self):
         found = tasks.read_tasks(FIXTURES)
@@ -74,6 +83,13 @@ class DrawingTheOrder(unittest.TestCase):
         again = [t.instance_id for t in tasks.order(found, seed=0)]
         self.assertEqual(first, again)
         self.assertEqual(sorted(first), sorted(t.instance_id for t in found))
+
+    def test_the_strata_come_in_an_order_drawn_from_the_seed_not_by_name(self):
+        found = tasks.pool(tasks.read_tasks(FIXTURES), ("full",))
+        first_named = sorted(tasks.strata(found))[0]
+        firsts = {tasks.stratum_of(tasks.order(found, seed=seed)[0], tasks.DEFAULT_STRATA, (0, 0)) for seed in range(20)}
+        self.assertGreater(len(firsts), 1)
+        self.assertNotEqual(firsts, {first_named})
 
     def test_the_order_interleaves_the_strata(self):
         found = tasks.pool(tasks.read_tasks(FIXTURES), ("full",))
