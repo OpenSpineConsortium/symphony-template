@@ -126,6 +126,7 @@ class ReadingATranscript(ATranscriptOnDisk):
         self.assertEqual(self.record["session"], "abcdef12")
         self.assertEqual(self.record["prompts"], 1)
         self.assertEqual(self.record["attachments"], 1)
+        self.assertEqual(self.record["helpers"], {"transcripts": 0, "calls": 0, "seconds_in_tool": 0, "output_tokens": 0})
 
     def test_the_context_is_read_call_by_call_and_its_growth_shared_out(self):
         context = self.record["context"]
@@ -144,7 +145,7 @@ class ReadingATranscript(ATranscriptOnDisk):
 
     def test_tool_calls_by_tool_with_their_answers(self):
         calls = self.record["calls"]
-        self.assertEqual((calls["total"], calls["failed"], calls["unanswered"]), (4, 1, 0))
+        self.assertEqual((calls["total"], calls["failed"], calls["unanswered"], calls["repeated"]), (4, 1, 0, 0))
         self.assertEqual(calls["by_tool"]["Bash"]["calls"], 2)
         self.assertEqual(calls["by_tool"]["Bash"]["failed"], 1)
         self.assertEqual(calls["by_tool"]["Bash"]["result_bytes"], 600 + 4)
@@ -191,7 +192,7 @@ class ReadingATranscript(ATranscriptOnDisk):
         self.assertIn("Profile of session abcdef12", text)
         self.assertIn("in tools 11 s (35% of active), outside tools 20 s (65%)", text)
         self.assertIn("the harness counted 2 s of thinking", text)
-        self.assertIn("Tool calls: 4, 1 failed, 0 unanswered", text)
+        self.assertIn("Tool calls: 4, 1 failed, 0 unanswered, 0 repeated", text)
         self.assertIn("Reads: 3 calls naming 5 files (3 distinct), 2 re-reads (40%), 2 partial", text)
         self.assertIn("Shell commands: read 3, filter 0, search 1, list 0, git 0, run 1", text)
         self.assertIn("shared out to the tools below (an estimate)", text)
@@ -252,7 +253,7 @@ class HelpersAndCompactions(ATranscriptOnDisk):
             result("h-t1", "a" * 400, 102),
         ])
         record, built = profile.profile(self.transcript)
-        self.assertEqual(record["helpers"], 1)
+        self.assertEqual(record["helpers"], {"transcripts": 1, "calls": 1, "seconds_in_tool": 2, "output_tokens": 5})
         self.assertEqual(record["calls"]["total"], 5)
         self.assertEqual(record["models"]["claude-sonnet-5-5"], [10, 0, 0, 0, 5])
         self.assertEqual(record["context"]["calls"], 3)
@@ -260,6 +261,24 @@ class HelpersAndCompactions(ATranscriptOnDisk):
         self.assertEqual(record["reads"]["rereads"], 2)
         self.assertEqual(record["reads"]["files"], 3)
         self.assertEqual(profile.profile(self.transcript, helpers=False)[0]["calls"]["total"], 4)
+        self.assertIn("Helpers: 1 transcripts added 1 calls, 2 s and 5 output tokens", profile.report(record))
+
+    def test_a_messages_output_count_grows_line_by_line_and_the_largest_is_taken(self):
+        """A helper's transcript writes each line of a message with the
+        output count as far as the message had got; the first line's is
+        the smallest."""
+        lines = assistant("m1", used(2, 500, 0, 7), [
+            {"type": "thinking", "thinking": "..."},
+            {"type": "text", "text": "Reading."},
+            tool_use("t1", "Bash", command="ls"),
+        ], 10, thinking=900)
+        lines[1]["message"]["usage"] = used(2, 500, 0, 8)
+        lines[2]["message"]["usage"] = used(2, 500, 0, 371)
+        record, _ = self.profiled([*lines, result("t1", "x", 14)])
+        self.assertEqual(record["models"], {"claude-opus-5-5": [2, 500, 0, 0, 371]})
+        self.assertEqual(record["tokens"]["output"], 371)
+        self.assertEqual(record["context"]["first"], 502)
+        self.assertEqual(record["seconds"]["thinking"], 1)
 
     def test_a_compaction_is_counted_and_the_drop_is_no_growth(self):
         entries = [
@@ -289,6 +308,26 @@ class HelpersAndCompactions(ATranscriptOnDisk):
         self.assertEqual(record["context"]["calls"], 0)
         self.assertEqual(record["models"], {})
         self.assertEqual(record["calls"]["total"], 1)
+
+    def test_a_call_the_same_as_an_earlier_one_is_repeated(self):
+        """The same tool with the same input again is a repeated call, in
+        its own transcript: a helper's repeat of the session's call is not."""
+        entries = session_entries()
+        entries[7:7] = assistant("m2b", used(0, 10, 2250, 5), [
+            tool_use("t5", "Bash", command="python3 -m unittest\nsed -n '1,5p' b.py"),
+            tool_use("t6", "Bash", command="git status"),
+            tool_use("t7", "Read", file_path="/work/repo/a.py"),
+        ], 27)
+        write_lines(self.transcript, entries)
+        helper = self.folder / "abcdef12-3456-7890" / "subagents" / "agent-1.jsonl"
+        write_lines(helper, assistant("h1", used(10, 0, 0, 5), [tool_use("h-t1", "Bash", command="git status")], 100))
+        record, _ = profile.profile(self.transcript)
+        # t5 repeats t3 and t7 repeats t1; t6 is new, and the helper's git status is its own first.
+        self.assertEqual(record["calls"]["repeated"], 2)
+        self.assertEqual(record["calls"]["by_tool"]["Bash"]["repeated"], 1)
+        self.assertEqual(record["calls"]["by_tool"]["Read"]["repeated"], 1)
+        self.assertEqual(record["calls"]["total"], 8)
+        self.assertIn("2 repeated", profile.report(record))
 
     def test_a_call_whose_usage_says_it_sent_nothing_is_not_measured(self):
         """An error line carries a usage of zeros; it is no context and
@@ -323,6 +362,22 @@ class ReadingShellCommands(unittest.TestCase):
         self.assertEqual(profile.shell_reads("cat a", ""), ["a"])
         self.assertEqual(profile.shell_reads("cat a > out 2>&1 | tee b", "/r"), ["/r/a"])
         self.assertEqual(profile.shell_reads("echo 'unclosed", "/r"), [])
+        self.assertEqual(profile.shell_reads("cat `ls`; less +F x; more +10 y; sed -l 5 -n p f", "/r"),
+                         ["/r/x", "/r/y", "/r/f"])
+
+    def test_the_shells_keywords_and_wrappers_are_no_programs(self):
+        self.assertEqual(profile.shell_uses("for f in a b; do cat $f; done"), {"read": 1})
+        self.assertEqual(profile.shell_reads("if [ -f x ]; then cat x; fi", "/r"), ["/r/x"])
+        self.assertEqual(profile.shell_uses("if [ -f x ]; then cat x; else ls; fi"), {"read": 1, "list": 1})
+        self.assertEqual(profile.shell_reads("{ cat a; cat b; } > out", "/r"), ["/r/a", "/r/b"])
+        self.assertEqual(profile.shell_uses("while read line; do echo $line; done < f"), {})
+        self.assertEqual(profile.shell_uses("until grep -q done log; do sleep 1; done"), {"search": 1, "run": 1})
+        # The case header runs to the ) and names no command; the pattern a goes with it.
+        self.assertEqual(profile.shell_uses("case $x in a) cat f;; esac"), {"read": 1})
+        for command in ("time cat f", "env X=1 cat f", "sudo cat f", "nohup cat f", "! cat f"):
+            self.assertEqual(profile.shell_reads(command, "/r"), ["/r/f"], command)
+        # A wrapper that takes a value first is not seen through.
+        self.assertEqual(profile.shell_uses("timeout 10 cat f"), {"run": 1})
 
     def test_a_readers_options_and_their_values_are_no_files(self):
         for command in ("head --lines 20 x.py", "head --lines=20 x.py", "head -20 x.py", "head -n20 x.py",
@@ -349,11 +404,22 @@ class ReadingShellCommands(unittest.TestCase):
         self.assertEqual(profile.shell_uses("cat <<EOF > f\ncat a\nEOF"), {"filter": 1})
 
     def test_what_only_looks_like_a_here_document_opens_none(self):
-        for line in ('cat <<<"bar"', "grep -rn '<<EOF' x", 'python3 -c "x << y"', "cat a", "a <<", "a << ;"):
+        for line in ('cat <<<"bar"', "grep -rn '<<EOF' x", 'python3 -c "x << y"', "cat a", "a <<", "a << ;",
+                     "# cat <<EOF", "cat f # comment <<EOF", 'echo "<<" x; cat g', 'grep -rn "<<" tools/'):
             self.assertIsNone(profile.heredoc_opener(line), line)
         self.assertEqual(profile.shell_uses("grep -rn '<<EOF' x\ncat y"), {"search": 1, "read": 1})
-        self.assertEqual(profile.heredoc_opener("cat <<-EOF"), "EOF")
+        self.assertEqual(profile.shell_reads("# cat <<EOF\ncat real.py\nls", "/r"), ["/r/real.py"])
+        self.assertEqual(profile.shell_reads("cat f # comment <<EOF\ncat g", "/r"), ["/r/f", "/r/g"])
+        self.assertEqual(profile.shell_reads('echo "<<" x; cat g', "/r"), ["/r/g"])
+        self.assertEqual(profile.heredoc_opener("cat <<-EOF"), "-EOF")
+        self.assertEqual(profile.heredoc_opener("cat <<- EOF"), "-EOF")
         self.assertEqual(profile.heredoc_opener("cat << EOF | sort"), "EOF")
+        for line in ("cat <<'EOF'", 'cat <<"EOF" > f', "cat <<\\EOF"):
+            self.assertEqual(profile.heredoc_opener(line), "EOF", line)
+        # The delimiter closes a here-document only where it stands alone at the
+        # line's start; <<- forgives leading tabs.
+        self.assertEqual(profile.without_heredocs("cat <<EOF\n  EOF  \nls"), "cat <<EOF")
+        self.assertEqual(profile.without_heredocs("cat <<-EOF\n\tEOF\nls"), "cat <<-EOF\nls")
 
     def test_what_each_command_is_for(self):
         self.assertEqual(profile.shell_uses("cd /r && ls -la | grep x; git log; python3 t.py; wc -l a; echo hi"),
@@ -374,7 +440,8 @@ class AnExecutionFile(ATranscriptOnDisk):
         self.assertEqual(record["calls"]["total"], 4)
         self.assertEqual(record["context"]["calls"], 3)
         self.assertEqual(record["seconds"], dict.fromkeys(profile.SECONDS_KEYS, 0))
-        self.assertEqual((record["started_at"], record["ended_at"]), (None, None))
+        self.assertEqual((record["started_at"], record["ended_at"], record["session"]), (None, None, None))
+        self.assertTrue(profile.report(record).startswith("Profile of a run (no clock, 0 helper transcripts"))
         self.assertEqual(record["reads"]["calls"], 3)
         self.assertEqual(built.lines, len(session_entries()))
 

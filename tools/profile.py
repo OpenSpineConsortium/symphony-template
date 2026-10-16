@@ -4,7 +4,7 @@ read again; and where its time went. The first instrument of the research
 programme in docs/research/beyond-cooperation/README.md, which measures a
 way of working before changing it.
 
-  python3 tools/profile.py TRANSCRIPT [--json FILE] [--paths N]
+  python3 tools/profile.py TRANSCRIPT [--json FILE] [--paths N] [--no-helpers]
 
 prints a report and, with --json, writes the record docs/research/
 beyond-cooperation/README.md describes, aggregates only: counts, bytes,
@@ -16,12 +16,17 @@ read most often, which stays on the screen.
 The transcript is the one Claude Code writes under ~/.claude/projects/,
 one JSON object a line, the same file tools/usage.py reads for the usage
 trailer, and its helpers' transcripts (the subagents') are read beside it
-as usage.py reads them; the Agent SDK's execution file of a run in
-Actions, one JSON array of the same messages, is read too, though its
-messages carry no timestamps, so its time measures are empty. Each API
-call is counted once by its message id, since a message written as
-several lines, one per block, carries the same usage on each; a
-third-party counter that sums every line over-counts.
+as usage.py reads them: their calls join the per-tool rows and their
+tokens the totals, with their part given in the record's helpers block,
+while the context, the time and the prompts are the session's own. The
+Agent SDK's execution file of a run in Actions, one JSON array of the
+same messages, is read too, though its messages carry no timestamps, so
+its time measures are empty and it has no session token. Each API call is
+counted once by its message id: a message written as several lines, one
+per block, carries its usage on each, the input and cache counts the same
+on every line and the output count as far as the message had got when
+the line was written, so the largest is taken; a third-party counter that
+sums every line over-counts.
 
 The time measures rest on the transcript's own clock, line by line: the
 active seconds are the gaps between consecutive lines with pauses of more
@@ -37,7 +42,10 @@ tokens each tool brought into the context are an estimate, and the key
 says so: the context's growth from one call to the next, less the call's
 own output, shared among the call's answered tools by the size of their
 answers; a reminder the harness added with the answers is counted with
-them.
+them. A repeated call is one the same as an earlier call in the same
+transcript, the same tool with the same input: MAST's step repetition
+(arXiv:2503.13657) read by code, and an upper bound on waste, since a
+git status after a change is a repeat and no waste.
 
 Standard library only, like every tool here; the shell commands are split
 by the vendored protocol library's reader, the one the push guard uses.
@@ -46,6 +54,7 @@ by the vendored protocol library's reader, the one the push guard uses.
 import argparse
 import json
 import posixpath
+import re
 import shlex
 import sys
 from collections import Counter
@@ -70,13 +79,21 @@ SEARCHERS = ("grep", "rg", "ag", "ack", "egrep", "fgrep")
 LISTERS = ("ls", "find", "tree", "wc", "stat", "du", "file")
 GIT = ("git", "gh")
 # Builtins that read and run nothing worth counting.
-QUIET = ("cd", "echo", "printf", "true", "false", "exit", "export", "set", "test", "[", "pwd")
+QUIET = ("cd", "echo", "printf", "true", "false", "exit", "export", "set", "test", "[", "pwd", "read", "shift",
+         "local", "declare", "unset", "break", "continue", "return", "wait", ":")
+# Words the shell reads before a command and that name none: its reserved
+# words, the guard's and the ones that close a construct, and the wrappers
+# that run the command after them as it is (timeout and nice take a value
+# first and are not read); a loop or case header names no command at all.
+KEYWORDS = guard.RESERVED | {"}", "done", "fi", "esac"}
+WRAPPERS = ("time", "sudo", "nohup", "exec", "command", "builtin", "env", "xargs")
+HEADERS = ("for", "select", "case")
 SHELL_USES = ("read", "filter", "search", "list", "git", "run")
 # The readers' options whose value is the next word, so that it is not
 # taken for a file: head -n 20 FILE, sed -e SCRIPT FILE, nl -w 3 FILE; the
 # short ones by their letter, the long ones by name (a value joined with =
 # is in the same word).
-SHORT_VALUED = {"head": "nc", "tail": "nc", "sed": "ef", "nl": "bdfhilnsvw"}
+SHORT_VALUED = {"head": "nc", "tail": "nc", "sed": "efl", "nl": "bdfhilnsvw"}
 LONG_VALUED = {"head": ("--lines", "--bytes"), "tail": ("--lines", "--bytes"),
                "sed": ("--expression", "--file"),
                "nl": ("--body-numbering", "--footer-numbering", "--header-numbering", "--line-increment",
@@ -87,9 +104,13 @@ SCRIPT_OPTIONS = ("--expression", "--file")
 # A fall of the context between two consecutive calls by more than this
 # share is a drop: a compaction, or the harness trimming what it sends.
 DROP = 0.5
-GLOB = "*?[$~"
-BY_TOOL_KEYS = ("calls", "failed", "input_bytes", "result_bytes", "seconds_in_tool", "context_tokens_estimated")
+GLOB = "*?[$~`"
+# A transcript is named for its session id; any other name is a run's file.
+SESSION_STEM = re.compile(r"[0-9a-f]{8}(-[0-9a-f]+)*")
+BY_TOOL_KEYS = ("calls", "failed", "repeated", "input_bytes", "result_bytes", "seconds_in_tool",
+                "context_tokens_estimated")
 SECONDS_KEYS = ("span", "active", "in_tools", "outside_tools", "thinking")
+HELPERS_KEYS = ("transcripts", "calls", "seconds_in_tool", "output_tokens")
 READS_KEYS = ("calls", "files_named", "files", "rereads", "partial", "bytes", "reread_bytes")
 
 
@@ -136,7 +157,8 @@ def text_bytes(content):
 def api_calls(entries):
     """Each API call of a transcript once, in order of its first line, with
     the tool calls it made: a message's lines share its id, and its
-    tool_use blocks are told apart by theirs."""
+    tool_use blocks are told apart by theirs. Its usage is the largest its
+    lines carry, since a helper's lines carry the output count as it grew."""
     calls, by_id = [], {}
     for entry in entries:
         message = entry.get("message") if entry.get("type") == "assistant" else None
@@ -145,14 +167,19 @@ def api_calls(entries):
         key = message.get("id") or entry.get("requestId") or entry.get("uuid")
         at = usage.moment(entry.get("timestamp"))
         call = by_id.get(key)
+        counts = usage.counts_of(message.get("usage")) if message.get("usage") else None
+        thinking = entry.get("thinkingDurationMs") or 0
         if call is None:
-            counts = usage.counts_of(message.get("usage")) if message.get("usage") else None
             call = {"model": message.get("model") or "unknown", "at": at, "until": at, "counts": counts,
-                    "tools": [], "thinking_ms": entry.get("thinkingDurationMs") or 0}
+                    "tools": [], "thinking_ms": thinking}
             by_id[key] = call
             calls.append(call)
-        elif at is not None and (call["until"] is None or at > call["until"]):
-            call["until"] = at
+        else:
+            if at is not None and (call["until"] is None or at > call["until"]):
+                call["until"] = at
+            if counts:
+                call["counts"] = [max(a, b) for a, b in zip(call["counts"], counts)] if call["counts"] else counts
+            call["thinking_ms"] = max(call["thinking_ms"], thinking)
         seen = {t["id"] for t in call["tools"]}
         for block in blocks(message):
             if block.get("type") == "tool_use" and block.get("id") and block["id"] not in seen:
@@ -216,41 +243,58 @@ def resolve(path, base):
 
 
 def program_of(argv):
-    """The program a simple command runs, after any VAR=value words."""
+    """The program a simple command runs, after any VAR=value words, the
+    shell's keywords and the wrappers that run it as it is; a loop or case
+    header runs none."""
     words = list(argv)
-    while words and guard.ASSIGNMENT.match(words[0]):
+    while words and (guard.ASSIGNMENT.match(words[0]) or words[0] in KEYWORDS or words[0] in WRAPPERS):
         words.pop(0)
-    return (guard.program(words[0]) if words else ""), words[1:]
+    if not words or words[0] in HEADERS:
+        return "", []
+    return guard.program(words[0]), words[1:]
 
 
 def heredoc_opener(line):
-    """The word that closes the here-document a line opens, or None: the
-    << the shell reads as an operator, outside quotes, followed by its
-    word; a quoted << and a <<< here-string open nothing."""
-    lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
+    """The word that closes the here-document a line opens, with a leading
+    - where the shell strips the body's tabs (<<-), or None: the << the
+    shell reads as an operator, outside quotes and not in a comment,
+    followed by its word, whose quotes or backslash mean only that the
+    body is literal; a quoted << and a <<< here-string open nothing. The
+    lexer keeps quotes (posix=False), so a quoted << is told from the
+    operator, and the guard's plain_shell drops a comment first."""
+    lexer = shlex.shlex(guard.plain_shell(line), posix=False, punctuation_chars=True)
     lexer.whitespace_split = True
     lexer.commenters = ""
     try:
         tokens = list(lexer)
     except ValueError:
         return None
-    for token, following in zip(tokens, tokens[1:]):
-        if token == "<<" and following and not all(ch in "();<>|&" for ch in following):
-            return following.lstrip("-") or None
+    for index, token in enumerate(tokens[:-1]):
+        if token != "<<":
+            continue
+        following = tokens[index + 1]
+        dashed = following.startswith("-")
+        if following == "-" and index + 2 < len(tokens):
+            following = tokens[index + 2]
+        word = following.lstrip("-").lstrip("\\").strip("'\"")
+        if word and not all(ch in "();<>|&" for ch in word):
+            return ("-" if dashed else "") + word
     return None
 
 
 def without_heredocs(command):
     """The command with its here-document bodies left out, since they are
     data the command reads, not commands the shell runs."""
-    kept, closing = [], None
+    kept, closing, dashed = [], None, False
     for line in str(command).split("\n"):
         if closing is not None:
-            if line.strip() == closing:
+            if (line.lstrip("\t") if dashed else line) == closing:
                 closing = None
             continue
         kept.append(line)
-        closing = heredoc_opener(line)
+        opener = heredoc_opener(line)
+        dashed = bool(opener) and opener.startswith("-")
+        closing = opener.lstrip("-") if opener else None
     return "\n".join(kept)
 
 
@@ -267,15 +311,15 @@ def is_write(program, arguments):
 
 
 def files_of(program, arguments):
-    """The files a reading command names: its words that are no option,
-    no option's value and not the standard input (-), and for sed, whose
-    script is its first plain word unless an option gave it, the words
-    after the script."""
+    """The files a reading command names: its words that are no option
+    (less and more take +options too), no option's value and not the
+    standard input (-), and for sed, whose script is its first plain word
+    unless an option gave it, the words after the script."""
     files, skip, script_seen = [], False, program != "sed"
     for word in arguments:
         if skip:
             skip = False
-        elif word == "-":
+        elif word == "-" or (word.startswith("+") and program in ("less", "more")):
             continue
         elif word.startswith("--"):
             name, joined, _ = word.partition("=")
@@ -341,6 +385,15 @@ def reads_of(tool):
 
 # --- time -------------------------------------------------------------------------
 
+def tool_seconds(tool):
+    """From the line that asked to the line that answered; nothing when
+    either is missing or the answer came first."""
+    result = tool["result"]
+    if result is None or result["at"] is None or tool["at"] is None or result["at"] < tool["at"]:
+        return 0
+    return result["at"] - tool["at"]
+
+
 def union(intervals):
     """The intervals merged, so time two tools shared counts once."""
     merged = []
@@ -385,7 +438,7 @@ class Profile:
         self.seconds = dict.fromkeys(SECONDS_KEYS, 0)
         self.prompts = 0
         self.attachments = 0
-        self.helpers = 0
+        self.helpers = dict.fromkeys(HELPERS_KEYS, 0)
         self.lines = 0
         self.started = None
         self.ended = None
@@ -398,6 +451,8 @@ class Profile:
             for tool in call["tools"]:
                 tool["result"] = results.get(tool["id"])
         self.add_tools(calls)
+        if not main:
+            self.add_helper(calls)
         if main:
             self.lines = len(entries)
             self.add_context(calls)
@@ -407,13 +462,18 @@ class Profile:
             self.attachments = sum(1 for e in entries if e.get("type") == "attachment")
 
     def add_tools(self, calls):
-        seen = set()
+        seen, made = set(), set()
         for call in calls:
             for tool in call["tools"]:
                 row = self.by_tool.setdefault(tool["name"], empty_tool())
                 row["calls"] += 1
-                row["input_bytes"] += len(json.dumps(tool["input"], sort_keys=True).encode("utf-8"))
+                given = json.dumps(tool["input"], sort_keys=True)
+                row["input_bytes"] += len(given.encode("utf-8"))
                 self.calls["total"] += 1
+                if (tool["name"], given) in made:
+                    row["repeated"] += 1
+                    self.calls["repeated"] += 1
+                made.add((tool["name"], given))
                 result = tool["result"]
                 if result is None:
                     self.calls["unanswered"] += 1
@@ -421,11 +481,18 @@ class Profile:
                     row["result_bytes"] += result["bytes"]
                     row["failed"] += int(result["error"])
                     self.calls["failed"] += int(result["error"])
-                    if result["at"] is not None and tool["at"] is not None and result["at"] >= tool["at"]:
-                        row["seconds_in_tool"] += result["at"] - tool["at"]
+                    row["seconds_in_tool"] += tool_seconds(tool)
                 if tool["name"] == "Bash":
                     self.shell.update(shell_uses(str(tool["input"].get("command") or "")))
                 self.add_reads(tool, seen)
+
+    def add_helper(self, calls):
+        """What a helper's transcript added to the rows and the totals, so
+        that a reader can take it back out."""
+        self.helpers["transcripts"] += 1
+        self.helpers["calls"] += sum(len(c["tools"]) for c in calls)
+        self.helpers["output_tokens"] += sum(c["counts"][4] for c in calls if c["counts"])
+        self.helpers["seconds_in_tool"] += sum(tool_seconds(t) for c in calls for t in c["tools"])
 
     def add_reads(self, tool, seen):
         paths, partial = reads_of(tool)
@@ -493,7 +560,7 @@ class Profile:
         tokens["total"] = sum(tokens.values())
         by_tool = {name: {k: round(v) for k, v in row.items()} for name, row in sorted(self.by_tool.items())}
         return {
-            "schema": SCHEMA, "session": usage.session_token(session), "helpers": self.helpers,
+            "schema": SCHEMA, "session": session, "helpers": {k: round(v) for k, v in self.helpers.items()},
             "started_at": stamp(self.started), "ended_at": stamp(self.ended),
             "prompts": self.prompts, "attachments": self.attachments,
             "seconds": {k: round(self.seconds[k]) for k in SECONDS_KEYS},
@@ -502,7 +569,7 @@ class Profile:
             "prices_as_of": economics.PRICES_AS_OF,
             "context": dict(self.context),
             "calls": {"total": self.calls["total"], "failed": self.calls["failed"],
-                      "unanswered": self.calls["unanswered"], "by_tool": by_tool},
+                      "unanswered": self.calls["unanswered"], "repeated": self.calls["repeated"], "by_tool": by_tool},
             "shell": {k: self.shell[k] for k in SHELL_USES},
             "reads": {k: (len(self.files) if k == "files" else self.reads[k]) for k in READS_KEYS},
         }
@@ -521,9 +588,9 @@ def profile(transcript, helpers=True):
     built.add_transcript(entries_of(transcript), main=True)
     if helpers:
         for helper in usage.helper_transcripts(transcript):
-            built.helpers += 1
             built.add_transcript(entries_of(helper), main=False)
-    return built.record(Path(transcript).stem), built
+    stem = Path(transcript).stem
+    return built.record(usage.session_token(stem) if SESSION_STEM.fullmatch(stem) else None), built
 
 
 # --- the report ---------------------------------------------------------------------
@@ -535,8 +602,11 @@ def share(part, whole):
 def report(record):
     """The record as a person reads it."""
     seconds, context, calls, reads, tokens = (record[k] for k in ("seconds", "context", "calls", "reads", "tokens"))
-    lines = [f"Profile of session {record['session']} ({record['started_at']} to {record['ended_at']}, "
-             f"{record['helpers']} helper{'s' if record['helpers'] != 1 else ''}, {record['prompts']} prompts, "
+    helpers = record["helpers"]
+    who = f"session {record['session']}" if record["session"] else "a run"
+    when = f"{record['started_at']} to {record['ended_at']}" if record["started_at"] else "no clock"
+    lines = [f"Profile of {who} ({when}, {helpers['transcripts']} helper transcript"
+             f"{'s' if helpers['transcripts'] != 1 else ''}, {record['prompts']} prompts, "
              f"{record['attachments']} attachments)",
              f"Time: span {seconds['span']:,} s, active {seconds['active']:,} s; in tools {seconds['in_tools']:,} s "
              f"({share(seconds['in_tools'], seconds['active'])} of active), outside tools "
@@ -550,12 +620,17 @@ def report(record):
              f"{share(context.get('cached_share', 0), 1)} served from cache; {context.get('compactions', 0)} "
              f"compactions, {context.get('drops', 0)} drops; grew by {context.get('growth', 0):,} tokens, "
              f"shared out to the tools below (an estimate)",
-             f"Tool calls: {calls['total']:,}, {calls['failed']:,} failed, {calls['unanswered']:,} unanswered"]
+             f"Tool calls: {calls['total']:,}, {calls['failed']:,} failed, {calls['unanswered']:,} unanswered, "
+             f"{calls['repeated']:,} repeated (the same tool with the same input again)"]
     lines.append(f"  {'tool':34} {'calls':>6} {'failed':>6} {'in KB':>8} {'out KB':>8} {'seconds':>8} {'context':>10}")
     for name, row in calls["by_tool"].items():
         lines.append(f"  {name[:34]:34} {row['calls']:>6,} {row['failed']:>6,} {row['input_bytes'] / 1024:>8.1f} "
                      f"{row['result_bytes'] / 1024:>8.1f} {row['seconds_in_tool']:>8,} "
                      f"{row['context_tokens_estimated']:>10,}")
+    if helpers["transcripts"]:
+        lines.append(f"Helpers: {helpers['transcripts']} transcripts added {helpers['calls']:,} calls, "
+                     f"{helpers['seconds_in_tool']:,} s and {helpers['output_tokens']:,} output tokens to the rows "
+                     f"and totals above; the context and the time are the session's own")
     shell = record["shell"]
     lines.append("Shell commands: " + ", ".join(f"{k} {shell[k]:,}" for k in SHELL_USES))
     lines.append(f"Reads: {reads['calls']:,} calls naming {reads['files_named']:,} files ({reads['files']:,} "
