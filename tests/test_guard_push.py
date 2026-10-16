@@ -159,8 +159,8 @@ class MainTest(unittest.TestCase):
                                        "git push -u origin claude/7"), (0, ""))
 
     def test_the_claim_file_reader_is_handed_to_the_library_when_the_vendored_copy_has_one(self):
-        """The fence on a lease onto another worker's claim (the release after
-        symphony-protocol 0.4.1): main() passes the reader the library makes
+        """The fence on a lease onto another worker's claim (symphony-protocol
+        0.5.0): main() passes the reader the library makes
         for the clone, and until the vendored copy has one, nothing."""
         handed = []
 
