@@ -1,4 +1,4 @@
-# Symphony handoff, 2026-10-16 (paste the block in part 0 as the next session's first message)
+# Symphony handoff, 2026-10-16 (paste the three blocks in paste-into-new-account.md beside this file)
 
 At 18:54 UTC on 2026-10-16 the owner asked to checkpoint every thread at once, wrote "PLEASE CHECKPOINT NOW AND UPDAET HANDOFF" in five threads, and at 18:58 UTC asked for the handoff to be updated "so all threads can continue on another account", with every piece of work, intermediate or final, research and state included, pushed to git. Each thread was told to push every branch, commit its findings under docs/research/, put a section titled "Checkpoint 2026-10-16" at the top of each open pull request's description, reply in its thread with a self-contained checkpoint, unsubscribe from its pull requests and stop. The thread "Checkpointing all threads" wrote this file and folds each thread's checkpoint in as it lands; the threads' own Checkpoint sections and replies are newer than this file where they differ, and where a workstream below says its checkpoint had not landed yet, its branch's last commit and its pull request are the state.
 
@@ -6,26 +6,13 @@ This file replaces docs/checkpoints/2026-10-15b/handoff.md as the place to start
 
 ## 0. The first message to paste
 
-Paste this whole block as the first message in the next Project's chat. If it arrives cut short, the whole of this file is docs/checkpoints/2026-10-16/handoff.md in OpenSpineConsortium/symphony-template.
-
-```
-Pick up Symphony where the last session stopped on 2026-10-16 at about 19:00 UTC. This message is a pointer: before anything else, read docs/checkpoints/2026-10-16/handoff.md in OpenSpineConsortium/symphony-template, and the two files beside it: memory.md (the last Project's memory; save it as this Project's memory if it is not already there) and owner-todo.md (my own steps). Each open pull request begins its description with a "Checkpoint 2026-10-16" section saying exactly where its thread stopped; it is newer than the handoff where they differ.
-
-Start one thread per workstream below, at most three at once, each reading its part of the handoff (part 2) first, starting from the brief given there, and attaching the repositories it needs with push access:
-1. Protocol fixes after 0.5.0 in symphony-protocol (part 2.1): finish what 0.5.1 carries, then vendor main into the template; never the release or its approval gate.
-2. The curse-of-coordination full run in coordbench (part 2.3): finish batch 33-43 from where it stopped, then record the full run by pull request; no bench run beyond what I already chose.
-3. Symphony beyond cooperation in symphony-template (part 2.4): finish step 2, draft #116, then step 3.
-The others wait on me (part 2 says what each needs); start each one's thread when I send what it waits on or ask for it.
-
-Rules
-One pull request per change, from the thread's own branch. Run bash scripts/check.sh first where the repository has it. Run an adversarial review before each substantive pull request. Merge once green, on my standing permission. Never approve, publish or change a symphony-protocol release or its approval gate without my own words. Never push to or force-push a default branch. No API key and no Claude credential anywhere. If something you need is missing, say exactly what in your first message and stop. Ask me before anything marked mine. Every manual step you give me needs its exact link and what to click.
-```
+The first message, brought up to 19:40 UTC after this file merged, is now part 1 of paste-into-new-account.md beside this file, with the Project's instructions (its part 2) and goal (its part 3); paste those, not the block that stood here.
 
 ## 1. Before the paste
 
 ### Continuing in the same Project (symphony, on the same account)
 
-Nothing to set up: the Project memory, the shared folder and the artifacts stay. Paste part 0 in the project chat. Since 04:47 UTC on 2026-10-16 each thread's own model has been at its weekly limit, which resets on 2026-10-22 at 21:00 UTC; sessions go on on their fallback model.
+Nothing to set up: the Project memory, the shared folder and the artifacts stay. Paste part 1 of paste-into-new-account.md in the project chat. Since 04:47 UTC on 2026-10-16 each thread's own model has been at its weekly limit, which resets on 2026-10-22 at 21:00 UTC; sessions go on on their fallback model.
 
 ### Moving to another account or a new Project
 
@@ -33,11 +20,11 @@ Nothing outside GitHub carries over: this Project's memory, threads, shared fold
 
 1. GitHub: signed in to the new Claude account, open https://claude.ai/connect-github, sign in to GitHub as Gregory-Schwing-MD-PhD and press Authorize. The Claude GitHub App is already installed on every repository of OpenSpineConsortium (2026-10-13); if the page asks where to install it anyway, pick OpenSpineConsortium and All repositories.
 2. The Project: open https://claude.ai/code, make a new Project named symphony, pick OpenSpineConsortium/symphony-template as its repository, and set:
-   - Topic, exactly: Finish Symphony, OpenSpineConsortium's coordination product for Claude Code agents, from where the 2026-10-16 handoff left it: land the open pull requests, finish the protocol fixes and the coordination experiment.
-   - Project instructions, exactly (the Rules, verbatim, as this Project has them): One pull request per change, from the thread's own branch. Run bash scripts/check.sh first where the repository has it. Run an adversarial review before each substantive pull request. Merge once green, on my standing permission. Never approve, publish or change a symphony-protocol release or its approval gate without my own words. Never push to or force-push a default branch. No API key and no Claude credential anywhere. If something you need is missing, say exactly what in your first message and stop. Ask me before anything marked mine. Every manual step you give me needs its exact link and what to click.
+   - Goal (or Topic), exactly: part 3 of paste-into-new-account.md.
+   - Project instructions, exactly: part 2 of paste-into-new-account.md (your instructions word for word, with your two conventions of 2026-10-16 on lines of their own).
 3. The cloud environment: the default one is enough. Add no environment variable and no secret: no Claude token, no API key.
 4. Connectors: the grant thread used your Microsoft 365 connector (WSU Outlook) to write e-mail drafts. If a new thread should do that again, connect Microsoft 365 in the new account (https://claude.ai/settings/connectors). No connector can attach a file to an e-mail; you attach and send.
-5. Paste part 0. Allow the repository prompts the threads raise when they attach symphony-protocol, coordbench and the others with push access.
+5. Send part 1 of paste-into-new-account.md as the first message. Allow the repository prompts the threads raise when they attach symphony-protocol, coordbench and the others with push access.
 
 ## 2. Where each workstream stopped
 
