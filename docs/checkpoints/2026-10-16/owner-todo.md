@@ -35,7 +35,7 @@ Open https://github.com/OpenSpineConsortium/symphony-protocol/actions/runs/38889
 3. Open https://github.com/OpenSpineConsortium/symphony-app/blob/main/signin/worker.js and press "Copy raw file"; on the Worker press "Edit code", replace everything with it and press "Deploy".
 4. On the Worker open "Settings", then "Variables and Secrets", press "Add": type Text, name GITHUB_CLIENT_ID, value the Client ID; press "Add" again: type Secret, name GITHUB_CLIENT_SECRET, value the client secret; press "Deploy".
 5. In the same "Settings", under "Observability", turn "Workers Logs" off.
-6. Send the Worker's address (https://symphony-signin.<yours>.workers.dev) and the Client ID to the thread that picks this up (the control website thread, or its successor on the new account), never the secret. One small site pull request then switches the button on.
+6. Send the Worker's address (https://symphony-signin.<yours>.workers.dev) and the Client ID to the thread that picks this up (handoff.md, part 2.6), never the secret. One small site pull request then switches the button on.
 
 Optional: for the panel's four "Run now" buttons to work through the sign-in too, on the same App page open "Permissions & events", set "Actions" to "Read and write" and press "Save changes"; each installation accepts it once.
 
