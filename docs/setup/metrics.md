@@ -113,8 +113,8 @@ PROFILE.json is the second step of the research programme in docs/research/beyon
 | actions_runs | Actions runs whose profiles the sums hold: those that name one of those pull requests, and the coordinator's that count on the parallel side |
 | by_setting.SETTING.pull_requests, merged | The pull requests that ended in the window in each of the eight work settings, sorted as METRICS.json's by_setting sorts them, and of them those merged |
 | by_setting.SETTING.profiled, profiled_merged | Of them, those with a profile, and of those the merged |
-| by_setting.SETTING.calls, failed, repeated | The profiled pull requests' tool calls, those that failed and those that repeated an earlier call of the same session exactly, summed |
-| by_setting.SETTING.reads, rereads, read_bytes, reread_bytes | The files their reads named and those read before, the bytes the reads returned and those returned by reads of files read before, summed |
+| by_setting.SETTING.calls, failed, repeated | The profiled pull requests' tool calls, those that failed and those that repeated an earlier call in the same transcript exactly, summed |
+| by_setting.SETTING.reads, rereads, read_bytes, reread_bytes | The files their reads named and those read before, the bytes the reads returned and those returned by reads that named only files read before, summed |
 | by_setting.SETTING.compactions, drops | Their compactions and the falls of the context by more than half, summed |
 | by_setting.SETTING.tool_seconds | Their seconds in tools, summed; a run in Actions records none, since its execution file has no clock |
 | by_setting.SETTING.peak_median | The median over the profiled pull requests of each one's largest context, in tokens, rounded half up |
