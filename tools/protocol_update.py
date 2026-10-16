@@ -136,7 +136,8 @@ def issue_body(tag, recorded, url):
 
 def closing(recorded):
     return (
-        f"The default branch already carries symphony-protocol {recorded}, the newest release, so this update "
+        f"The default branch already carries symphony-protocol {recorded}, no older than the newest release, so "
+        f"this update "
         f"is no longer needed.\n"
     )
 

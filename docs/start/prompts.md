@@ -4,7 +4,7 @@ Each block is one message for a Claude Code session on the repository: `claude` 
 
 ## Work
 
-**Claim the next issue,** when one session works at a time; it takes what the board's Given to workers section gives you first, an epic excepted, which the coordinator plans, then blockers, then the lowest-numbered unclaimed issue in the Queue, one that fits your area when you registered one:
+**Claim the next issue,** when one session works at a time; it takes what the board's Given to workers section gives you first, then an unclaimed blocker, then the lowest-numbered unclaimed issue in the Queue; of the blockers and the Queue only one that fits your area when you registered one, and never an epic, which the coordinator plans, or an issue labelled blocked:
 
 ```
 Read the board, take the next issue as docs/agents/routines/worker.md's steps 2 to 5 say, claim it with the claim skill and carry it to a ready pull request; work on the branch claude/<issue>, not this session's own branch. If the push of claude/<issue> is refused, another session holds it: take the next one. Do not merge.
