@@ -599,11 +599,16 @@ class State:
         fields = "name,updatedAt,visibility,numSelectedRepos"
         self.secrets = {item["name"]: item for item in gh.json(["secret", "list"] + target.flags + ["--json", fields])}
         self.variables = {item["name"]: item for item in gh.json(["variable", "list"] + target.flags + ["--json", fields + ",value"])}
+        self.reached = {}
 
     def reach(self, kind, name):
-        """The repositories a selected organization secret or variable reaches."""
-        found, text = self.gh.read(["api", f"{self.target.api}/{kind}/{name}/repositories", "--paginate", "--jq", ".repositories[].name"])
-        return sorted(text.split()) if found else []
+        """The repositories a selected organization secret or variable
+        reaches, listed once for the state: a write is always followed by a
+        new state before anything is read from it again."""
+        if (kind, name) not in self.reached:
+            found, text = self.gh.read(["api", f"{self.target.api}/{kind}/{name}/repositories", "--paginate", "--jq", ".repositories[].name"])
+            self.reached[(kind, name)] = sorted(text.split()) if found else []
+        return self.reached[(kind, name)]
 
     def slots_set(self):
         return [slot for slot in SLOTS if slot_secret(slot) in self.secrets]
@@ -692,21 +697,24 @@ def print_repository_own(state):
     what is kept here: a list of slots of a repository's own, made by hand
     before the wizard, would hide from its workflows the list the wizard
     keeps."""
-    for full in repositories_reading(state):
-        print_own_secrets(state, full)
-        print_own_accounts(state, full)
+    for full, names in repositories_reading(state).items():
+        print_own_secrets(state, full, names)
+        print_own_accounts(state, full, names)
 
 
 def repositories_reading(state):
-    """The repositories named, and the ones GitHub lists as seeing the list
-    of slots or a token secret of selected visibility, such as the bench's,
-    which the options need not name."""
-    found = list(state.target.repositories())
-    seen = {full.lower() for full in found}
+    """Each repository that reads what is kept here, with the names it reads
+    from the organization. A repository named reads any of them (None),
+    since the wizard writes each with it; another, found on the listing of
+    a name of selected visibility, such as the bench's on the list's, reads
+    the names whose listing shows it and the ones every repository sees."""
+    reading = {full: None for full in state.target.repositories()}
+    known = {full.lower(): full for full in reading}
     names = [MAIN_SECRET] + [slot_secret(slot) for slot in SLOTS]
-    kept = [("variables", ACCOUNTS_VARIABLE)] + [("secrets", name) for name in names if name in state.secrets]
-    for kind, name in kept:
-        item = (state.secrets if kind == "secrets" else state.variables).get(name)
+    kept = [("variables", ACCOUNTS_VARIABLE, state.variables.get(ACCOUNTS_VARIABLE))]
+    kept += [("secrets", name, state.secrets[name]) for name in names if name in state.secrets]
+    everywhere = {name for _, name, item in kept if (item or {}).get("visibility") in ("all", "private")}
+    for kind, name, item in kept:
         if (item or {}).get("visibility") != "selected":
             continue
         try:
@@ -716,25 +724,33 @@ def repositories_reading(state):
                 print(f"  the repositories that see {name} could not be listed ({error})")
             continue
         for repo in reached:
-            full = f"{state.target.owner}/{repo}"
-            if full.lower() not in seen:
-                seen.add(full.lower())
-                found.append(full)
-    return found
+            full = known.setdefault(f"{state.target.owner}/{repo}".lower(), f"{state.target.owner}/{repo}")
+            if full not in reading:
+                reading[full] = set(everywhere)
+            if reading[full] is not None:
+                reading[full].add(name)
+    return reading
 
 
-def print_own_secrets(state, full):
+def print_own_secrets(state, full, names=None):
+    """A repository's own token secrets that outrank the organization's, of
+    the names it reads from the organization (any, for None)."""
     try:
         own = {item["name"].upper(): item for item in state.gh.json(["secret", "list", "--repo", full, "--json", "name,updatedAt"])}
     except TokensError as error:
         print(f"  {full}: its own secrets could not be read ({error})")
         return
-    mine = [name for name in own if name == MAIN_SECRET or name.startswith(SLOT_PREFIX)]
+    mine = [name for name in own if (name == MAIN_SECRET or name.startswith(SLOT_PREFIX)) and (names is None or name in names)]
     for name in mine:
         print(f"  {full} holds its own {name} ({age_line(own[name])}), which outranks the organization's")
 
 
-def print_own_accounts(state, full):
+def print_own_accounts(state, full, names=None):
+    """A repository's own list of slots, when it would hide the
+    organization's: a repository the organization's list does not reach
+    keeps its own, which is its only list."""
+    if names is not None and ACCOUNTS_VARIABLE not in names:
+        return
     try:
         own = {item["name"].upper(): item for item in state.gh.json(["variable", "list", "--repo", full, "--json", "name,value"])}
     except TokensError as error:
@@ -982,6 +998,7 @@ def wizard(gh, target, ask=input, write=None, stdin_fd=None):
     refuse_crowd(gh, target)
     state = State(gh, target)
     print_status(state)
+    added = False
     while True:
         slot = chosen_slot(state, ask)
         if slot is None:
@@ -993,9 +1010,12 @@ def wizard(gh, target, ask=input, write=None, stdin_fd=None):
         also_main = MAIN_SECRET not in state.secrets and yes(
             ask(f"Store the same token as {MAIN_SECRET} too, the one @claude, the workers in Actions and the coordinator workflow run on? [y/N] "), False)
         state = add(gh, target, slot, label, also_main, write=write, stdin_fd=stdin_fd, noted=True)
+        added = True
         if not yes(ask("Another account? [y/N] "), False):
             break
-    print_status(state)
+    # The list of slots is written after the check's read, so the closing
+    # status reads everything again.
+    print_status(State(gh, target) if added else state)
 
 
 def add_place_options(parser, default):

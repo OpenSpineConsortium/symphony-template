@@ -303,7 +303,11 @@ reader was read from coordbench's bench/cooperbench/actions/plan.py
   or a token secret of selected visibility, so a run from a clone of
   symphony-template that names no repository still reads coordbench's.
   A repository that sees them through "all repositories" is not listed by
-  GitHub and is read only when named.
+  GitHub and is read only when named. A repository found on a listing is
+  told only of its own of the names the organization gives it: one the
+  organization's list does not reach keeps its own list, its only one,
+  and is not told to delete it. Each listing is asked for once per state,
+  since a write is always followed by a new state.
 - The bench splits the list on commas and blanks and refuses a real run
   on any word that is not exactly 1 to 8. The wizard read numbers, so
   `01,02` named slots 1 and 2 to it, the list was left as it was, and the
@@ -318,10 +322,17 @@ reader was read from coordbench's bench/cooperbench/actions/plan.py
   hand on the variables page is printed only when it is a word of the
   label's shape. The label check uses fullmatch, since `$` let a label
   ending in a newline through.
-- The review's mutants (the raw value printed, the failed read not
-  caught, only the named repositories read, the labels raw, the list
-  compared by slots, a reader by int(), match for fullmatch, names
-  compared by case) each fail the tests.
+- The wizard's closing status was printed from the check's read, made
+  before the list was written, so the owner's first run would have
+  printed SYMPHONY_CLAUDE_ACCOUNTS as written and then as not set; the
+  closing status reads everything again.
+- Two review passes; their mutants (the raw value printed, the failed
+  read not caught, only the named repositories read, the labels raw, the
+  list compared by slots, a reader by int(), match for fullmatch, names
+  compared by case, the closing status not read again, every repository
+  told of every name, no listing cache, no rewrite note, the secrets'
+  listings not read, a failed listing silent, repositories told apart by
+  case) each fail the tests.
 
 ## Open items
 

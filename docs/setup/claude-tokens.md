@@ -19,12 +19,13 @@ account you have, without the token ever being shown.
 
 A secret on an organization reaches the repositories on its list (GitHub's
 "Selected repositories"), or all of them; a repository's own secret or
-variable of the same name outranks the organization's. For each repository
-the wizard names, and each one GitHub lists as seeing the list of slots or
-a token, `status` lists such secrets of its own, and a
-SYMPHONY_CLAUDE_ACCOUNTS of its own with the page to delete it on, since a
-list made there by hand would hide the one the wizard keeps from that
-repository's workflows. The slots are the owner's own accounts: the
+variable of the same name outranks the organization's. `status` reads the
+repositories the wizard names and the ones GitHub lists as seeing the list
+of slots or a token. It names each one's own secret of a name the
+organization gives it, and its own SYMPHONY_CLAUDE_ACCOUNTS, with the page
+to delete it on, where the organization's list reaches it or the wizard
+names it: a list made there by hand would hide the one the wizard keeps
+from that repository's workflows. The slots are the owner's own accounts: the
 project never holds anyone else's credential (docs/setup/crowdsourcing.md),
 and the owner decided on 2026-10-13 to run their own several accounts as
 one pool.

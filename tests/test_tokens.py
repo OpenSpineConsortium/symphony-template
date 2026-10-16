@@ -740,6 +740,37 @@ class Status(unittest.TestCase):
         with self.assertRaises(tokens.TokensError):
             tokens.check_label("work\n")
 
+    def test_the_repositories_read_are_the_ones_that_read_what_is_kept(self):
+        # Widgets is named, as Widgets, and listed as WIDGETS, one
+        # repository whatever the case; lab is found on slot 1's listing
+        # alone, so its own slot 1 outranks the organization's, while its own
+        # list, if it held one, would be its only list, so it is not read;
+        # the listing of the list's repositories fails, and status says so.
+        world = World(self, secrets=[secret(tokens.slot_secret(1)), secret(tokens.MAIN_SECRET, OLD, "all", 0)],
+                      variables=[variable(tokens.ACCOUNTS_VARIABLE, "01,02")])
+        routes = read_json(world.routes_file)
+        routes[f"GET orgs/{ORG}/actions/variables/{tokens.ACCOUNTS_VARIABLE}/repositories"] = [answer(403, {"message": "Forbidden"})]
+        routes[f"GET orgs/{ORG}/actions/secrets/{tokens.slot_secret(1)}/repositories"] = [answer(200, f"{REPO.upper()}\nlab\n")]
+        routes["secret list"] = [answer(200, world.secrets), answer(200, []),
+                                 answer(200, [secret(tokens.slot_secret(1).lower(), NEW), secret(tokens.slot_secret(2), NEW)])]
+        routes["variable list"] = [answer(200, world.variables), answer(200, [])]
+        fake_gh.write_routes(world.routes_file, routes)
+        run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+        printed = io.StringIO()
+        with patch.object(tokens.subprocess, "run", run), redirect_stdout(printed):
+            tokens.print_status(tokens.State(tokens.Gh(), target(repos=("Widgets",))))
+        text = printed.getvalue()
+        self.assertIn(f"{tokens.ACCOUNTS_VARIABLE}: no slot, and a word that is not a slot, which stops the bench's real runs; "
+                      "the next add or remove rewrites it", text)
+        self.assertIn(f"the repositories that see {tokens.ACCOUNTS_VARIABLE} could not be listed", text)
+        self.assertIn(f"{ORG}/lab holds its own {tokens.slot_secret(1)} (set 2026-10-16", text)
+        self.assertNotIn(tokens.slot_secret(2) + " (", text)
+        calls = world.calls()
+        self.assertEqual([call["args"][3] for call in find(calls, "secret list") if "--repo" in call["args"]], [f"{ORG}/Widgets", f"{ORG}/lab"])
+        self.assertEqual([call["args"][3] for call in find(calls, "variable list") if "--repo" in call["args"]], [f"{ORG}/Widgets"])
+        # Each listing is asked for once, the slot line's and the reading's alike.
+        self.assertEqual(len(find(calls, f"GET orgs/{ORG}/actions/secrets/{tokens.slot_secret(1)}/repositories")), 1)
+
     def test_a_repository_s_own_secret_is_shown_as_outranking(self):
         world = World(self, secrets=[secret(tokens.MAIN_SECRET, OLD, "all", 0)])
         routes = read_json(world.routes_file)
@@ -893,6 +924,22 @@ class TheWizard(unittest.TestCase):
         self.assertEqual(find(calls, "variable set", tokens.slot_label(1))[0]["args"][-2:], ["--body", "greg"])
         self.assertEqual(printed.count("sign in to claude.ai as the account this slot is for"), 1)
         self.assertFalse(has_token(printed))
+
+    def test_the_closing_status_shows_the_list_the_run_wrote(self):
+        # The list is written after the check's read, so a closing status
+        # printed from that read said "not set" on the owner's first run.
+        world = World(self)
+        world.expect_store(tokens.slot_secret(1))
+        routes = read_json(world.routes_file)
+        written = [variable(tokens.ACCOUNTS_VARIABLE, "1")]
+        routes["variable set"] = [answer(200, "", after={"variable list": [answer(200, written)]})]
+        fake_gh.write_routes(world.routes_file, routes)
+        answers = iter(["", "", "", "n", "n"])
+        _, printed, calls = world.run_in_process(self, tokens.wizard, tokens.Gh(), target(), ask=lambda prompt: next(answers))
+        self.assertEqual(find(calls, "variable set", tokens.ACCOUNTS_VARIABLE)[0]["args"][-2:], ["--body", "1"])
+        lines = [line.strip() for line in printed.splitlines() if line.strip().startswith(tokens.ACCOUNTS_VARIABLE + ":")]
+        self.assertEqual(lines[0], f"{tokens.ACCOUNTS_VARIABLE}: not set")
+        self.assertEqual(lines[-1], f"{tokens.ACCOUNTS_VARIABLE}: 1")
 
     def test_the_slot_question(self):
         world = World(self, secrets=[secret(tokens.slot_secret(1))])
