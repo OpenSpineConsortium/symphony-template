@@ -189,6 +189,34 @@ class AloneAndParallel(unittest.TestCase):
         self.assertEqual(found["parallel"]["pull_requests"], 0)
         self.assertTrue(all(value is None for value in found["ratios"].values()))
 
+    def waited(self, *waits):
+        """The alone side of merged pull requests one a day apart, each
+        merged the given seconds after it opened."""
+        works = []
+        for number, wait in enumerate(waits, start=1):
+            opened = at(24 * number)
+            works.append(economics.Work(number, start=opened, end=opened + timedelta(seconds=abs(wait)),
+                                        merged=opened + timedelta(seconds=wait), opened=opened))
+        return economics.coordination(works, [], self.NOW)["alone"]
+
+    def test_the_median_wait_to_merge_rounds_half_up_as_the_durations_do(self):
+        self.assertEqual(self.waited(1, 2)["open_to_merge_median"], 2)
+        self.assertEqual(self.waited(2, 3)["open_to_merge_median"], 3)
+        self.assertEqual(self.waited(4, 1, 2)["open_to_merge_median"], 2)
+        self.assertEqual(economics.median_seconds([2, 3]), 3)
+        self.assertIsNone(economics.median_seconds([]))
+
+    def test_a_merge_dated_before_its_opening_is_left_out_of_the_median(self):
+        found = self.waited(0, 10, -100)
+        self.assertEqual((found["merged"], found["open_to_merge_median"]), (3, 5))
+
+    def test_a_wait_counts_in_whole_seconds_as_the_durations_do(self):
+        opened = at(24)
+        work = economics.Work(1, start=opened, end=opened + timedelta(seconds=2),
+                              merged=opened + timedelta(seconds=1, milliseconds=600), opened=opened)
+        found = economics.coordination([work], [], self.NOW)["alone"]
+        self.assertEqual(found["open_to_merge_median"], 1)
+
     def test_work_from_before_the_window_counts_as_beside(self):
         works = self.works()[:1]
         earlier = [economics.Work(9, start=at(-5), end=at(2))]

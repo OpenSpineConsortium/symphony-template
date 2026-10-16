@@ -72,7 +72,6 @@ import os
 import re
 import shlex
 import shutil
-import statistics
 import subprocess
 import sys
 import tempfile
@@ -911,9 +910,9 @@ def read_files(api, numbers):
 
 # --- measuring ---------------------------------------------------------------
 
-def median_seconds(values):
-    """The median, rounded half up to whole seconds; None for no values."""
-    return int(math.floor(statistics.median(values) + 0.5)) if values else None
+# The median's one rule lives in economics, which takes the coordination
+# block's medians by it too.
+median_seconds = economics.median_seconds
 
 
 def p90_seconds(values):
