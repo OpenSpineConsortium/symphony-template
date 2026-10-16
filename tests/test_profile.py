@@ -267,8 +267,8 @@ class TheTranscriptsClock(ATranscriptOnDisk):
 
     def test_a_long_sessions_time_outside_tools_is_read_in_one_pass(self):
         """Each gap measured against every tool call took time with the
-        product of the two: 19 seconds for a session of 3,000 calls, before
-        every commit; here 40,000 lines and 20,000 calls."""
+        product of the two: about 10 seconds for a session of 3,000 calls,
+        before every commit; here 40,000 lines and 20,000 calls."""
         times = [index * 0.5 for index in range(40_000)]
         intervals = [(start, start + 0.25) for start in range(20_000)]
         started = time.monotonic()
@@ -446,6 +446,17 @@ class TheTrailer(ATranscriptOnDisk):
         self.assertEqual((spent["calls"], spent["repeated"]), (1, 1), "the second ls repeats the first")
         self.assertEqual(profile.since(self.counts(entries), {})["peak"], 5000)
 
+    def test_only_counts_as_kept_or_none_are_counted_from(self):
+        kept = profile.kept(self.counts(session_entries()))
+        self.assertTrue(profile.known(kept))
+        self.assertTrue(profile.known({}), "after a first commit whose profile was not read")
+        for broken in ({"api_calls": 3}, {"sums": None, "api_calls": 3}, {"sums": kept["sums"], "api_calls": -1},
+                       {"sums": {**kept["sums"], "calls": -1}, "api_calls": 3},
+                       {"sums": {**kept["sums"], "calls": True}, "api_calls": 3},
+                       {"sums": {**kept["sums"], "calls": 1.5}, "api_calls": 3},
+                       {"sums": {k: v for k, v in kept["sums"].items() if k != "drops"}, "api_calls": 3}):
+            self.assertFalse(profile.known(broken), broken)
+
     def test_a_count_never_falls_below_nothing(self):
         """Counts kept from a longer transcript than the one read now, a file
         replaced under the session, give nothing rather than less."""
@@ -490,7 +501,7 @@ class TheTrailer(ATranscriptOnDisk):
         self.assertEqual(profile.parse_trailer(""), [])
         self.assertEqual(profile.parse_trailer(None), [])
 
-    def test_a_key_said_again_counts_once_and_a_session_is_the_tokens_eight_characters(self):
+    def test_a_key_said_again_counts_once_and_a_session_is_at_most_the_tokens_eight_characters(self):
         line = "Symphony-Profile: v1 session=abc calls=2 calls=99 session=zzz peak=x peak=7\n"
         self.assertEqual(profile.parse_trailer(line), [("abc", {"calls": 2})])
         for session in ("a" * 9, "a;b", "٣", ""):
@@ -560,6 +571,15 @@ class ReadingShellCommands(unittest.TestCase):
         self.assertEqual(profile.without_heredocs("cat <<-EOF\n\tx\n\tEOF\nls"), "cat <<-EOF\nls")
         self.assertEqual(profile.without_heredocs("cat << EOF\nx\nEOF\nls"), "cat << EOF\nls")
         self.assertEqual(profile.shell_uses("cat <<EOF > f\ncat a\nEOF"), {"filter": 1})
+
+    def test_a_line_with_no_here_document_is_not_read_for_one(self):
+        """Reading a long line a character at a time for a << it does not
+        hold was most of what a long inline script cost a profile."""
+        with mock.patch.object(profile.guard, "plain_shell", wraps=profile.guard.plain_shell) as reader:
+            self.assertIsNone(profile.heredoc_opener("python3 -c 'x = 1; y = 2'"))
+            self.assertEqual(reader.call_count, 0)
+            self.assertEqual(profile.heredoc_opener("cat <<EOF"), "EOF")
+            self.assertEqual(reader.call_count, 1)
 
     def test_what_only_looks_like_a_here_document_opens_none(self):
         for line in ('cat <<<"bar"', "grep -rn '<<EOF' x", 'python3 -c "x << y"', "cat a", "a <<", "a << ;",

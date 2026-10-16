@@ -381,15 +381,23 @@ def run_hook(payload, environ=None):
     left = {"session": str(session), "at": time.time(), **session_usage(transcript)}
     write_json(pending, left)
     profiled = profile_so_far(transcript)
-    if profiled is not None:
+    # Another session's hook in the same clone may have left its own usage
+    # while this one read the profile; that one's commit comes next.
+    again = read_json(pending) or {}
+    if profiled is not None and (again.get("session"), again.get("at")) == (left["session"], left["at"]):
         write_json(pending, {**left, "profile": profiled})
 
 
 def run_trailer(message_file, cwd=None, environ=None, now=None):
     """The commit-msg hook's step: add to the commit the usage and the
     profile the hook left since the session's last commit, and remember
-    them as written; a commit that carries no line remembers nothing, so
-    what was spent since the last line waits for the next."""
+    them as written. A commit with nothing spent since the last carries no
+    line. It remembers nothing when its hook read nothing at all, a
+    transcript not there for that one hook, so the next line counts from
+    the last; and it remembers the counts read when they fell below those
+    remembered, a transcript replaced under the session, so the lines after
+    it count on from there rather than wait for the session to spend past
+    the old counts."""
     if in_actions(environ):
         return
     folder = state_dir(cwd)
@@ -404,13 +412,15 @@ def run_trailer(message_file, cwd=None, environ=None, now=None):
     written = kept_dir(cwd) / f"{session}.json"
     before = read_json(written) or {}
     spent = since(pending, before)
-    if not spent["models"]:
+    if not spent["models"] and not pending.get("models"):
         return
     profiled, profile_kept = profile_line(session, pending.get("profile"), before)
     state = {"models": pending.get("models") or {}, "seconds": pending.get("seconds") or 0}
     if profile_kept is not None:
         state["profile"] = profile_kept
     write_json(written, state)
+    if not spent["models"]:
+        return
     lines = [f"{TRAILER_KEY}: {trailer(session, spent)}"]
     if profiled:
         lines.append(profiled)
@@ -480,13 +490,11 @@ def profile_line(session, now, before):
     try:
         profile = profiler()
         kept = profile.kept(now)
+        if earlier is None or not profile.known(earlier):
+            return None, kept
+        return f"{profile.TRAILER_KEY}: {profile.trailer(session, profile.since(now, earlier))}", kept
     except Exception:
         return None, earlier
-    try:
-        spent = None if earlier is None else profile.since(now, earlier)
-        return (None if spent is None else f"{profile.TRAILER_KEY}: {profile.trailer(session, spent)}"), kept
-    except Exception:
-        return None, kept
 
 
 def hooks_dir(cwd=None):

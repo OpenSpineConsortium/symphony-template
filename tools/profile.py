@@ -141,7 +141,7 @@ TRAILER_LINE = re.compile(r"(?im)^[ \t]*symphony-profile:[ \t]*v1[ \t]+(.+)$")
 TRAILER_FIELDS = ("calls", "failed", "repeated", "reads", "rereads", "read_bytes", "reread_bytes", "peak",
                   "compactions", "drops", "tool_seconds")
 SUMS = tuple(field for field in TRAILER_FIELDS if field != "peak")
-# The session as the line writes it, usage.session_token's eight characters.
+# The session as the line writes it, at most usage.session_token's eight characters.
 TRAILER_SESSION = re.compile(r"[A-Za-z0-9-]{1,8}")
 # A blank line, which ends a paragraph of a commit's message.
 PARAGRAPH_BREAK = re.compile(r"\n[ \t\r]*\n")
@@ -715,6 +715,23 @@ def kept(now):
     return {"sums": dict(now["sums"]), "api_calls": len(now["sizes"])}
 
 
+def known(before):
+    """Whether counts kept at a commit can be counted from: as kept() keeps
+    them, every sum and the count of calls a whole number, none below
+    nothing; or empty, as kept after a session's first commit whose
+    profile was not read, from which the next line counts everything.
+    Anything else, a file damaged or written by another version, could
+    make a line claim calls an earlier line carried."""
+    if before == {}:
+        return True
+    sums, calls = before.get("sums"), before.get("api_calls")
+    return (isinstance(sums, dict) and all(is_count(sums.get(key)) for key in SUMS) and is_count(calls))
+
+
+def is_count(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
 def since(now, before):
     """The profile since the counts kept() kept at the session's last
     commit, or since its start when before is empty: each sum's rise, and
@@ -736,10 +753,12 @@ def parse_trailer(text):
     """Every Symphony-Profile trailer in a commit message, as (session,
     {field: count}): read in the message's last paragraph alone, where git
     and the hook put a commit's trailers, so that a line quoted in the
-    body counts for nothing. A part that cannot be read is passed over: a
-    count past usage.count_in's bound, as the usage line's are, a session
-    that is not eight characters of the token, and a key said again, of
-    which the first counts."""
+    body counts for nothing. So it is read from the commits the hook
+    wrote, a pull request's own, and never from a squash commit, which
+    moves each commit's trailers into its body. A part that cannot be read
+    is passed over: a count past usage.count_in's bound, as the usage
+    line's are, a session of more than the token's eight characters or of
+    others, and a key said again, of which the first counts."""
     found = []
     for match in TRAILER_LINE.finditer(trailer_block(text)):
         session, counts, said = "", {}, set()

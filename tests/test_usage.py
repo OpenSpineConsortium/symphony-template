@@ -32,6 +32,15 @@ profile = usage.profiler()
 # usage.py's docstring tells them to; a test that wants either sets it itself.
 QUIET = {key: value for key, value in os.environ.items()
          if not key.startswith("GIT_") and key not in ("GITHUB_ACTIONS", usage.SWITCH_VARIABLE)}
+# No git of the commit tests runs gc or maintenance on its own: git 2.55
+# starts it detached after a commit, and it raced the removal of a scratch
+# folder; set in the environment and in each repository's config, as
+# tests/test_claim_skill.py sets them.
+NO_MAINTENANCE = {"gc.auto": "0", "gc.autoDetach": "false", "maintenance.auto": "false",
+                  "maintenance.autoDetach": "false", "receive.autogc": "false"}
+GIT_QUIET = {"GIT_CONFIG_COUNT": str(len(NO_MAINTENANCE)),
+             **{f"GIT_CONFIG_KEY_{i}": key for i, key in enumerate(NO_MAINTENANCE)},
+             **{f"GIT_CONFIG_VALUE_{i}": value for i, value in enumerate(NO_MAINTENANCE.values())}}
 
 
 def assistant(message_id, model, usage_fields, at="2026-10-12T10:00:00Z"):
@@ -140,7 +149,7 @@ class ARepository(unittest.TestCase):
     COPIED = ("usage.py",)
 
     def setUp(self):
-        environment = mock.patch.dict(os.environ, QUIET, clear=True)
+        environment = mock.patch.dict(os.environ, {**QUIET, **GIT_QUIET}, clear=True)
         environment.start()
         self.addCleanup(environment.stop)
         self.folder = Path(tempfile.mkdtemp()).resolve()
@@ -151,6 +160,8 @@ class ARepository(unittest.TestCase):
             shutil.copy(ROOT / "tools" / name, self.repo / "tools" / name)
         shutil.copytree(ROOT / "tools" / "sdlc_protocol", self.repo / "tools" / "sdlc_protocol")
         self.git("init", "-q")
+        for key, value in NO_MAINTENANCE.items():
+            self.git("config", key, value)
         self.transcript = self.folder / "s1.jsonl"
 
     def git(self, *args):
@@ -227,6 +238,10 @@ class Commits(ARepository):
         (hooks / "commit-msg").write_text("#!/bin/sh\nexit 0\n", encoding="ascii")
         self.assertIn("left as it is", usage.install(cwd=self.repo))
         self.assertEqual((hooks / "commit-msg").read_text(), "#!/bin/sh\nexit 0\n")
+
+    def test_the_profiler_is_loaded_once(self):
+        self.assertIs(usage.profiler(), usage.profiler())
+        self.assertIs(usage.profiler(), profile)
 
     def test_the_hook_reads_only_a_git_commit(self):
         for command, commits in (("git commit -m x", True), ("git -C . commit -qm x", True),
@@ -320,6 +335,25 @@ class ProfiledCommits(ARepository):
             "calls": 2, "failed": 0, "repeated": 2, "reads": 1, "rereads": 1, "read_bytes": 50, "reread_bytes": 50,
             "peak": 1301, "compactions": 1, "drops": 1, "tool_seconds": 2})])
 
+    def test_kept_counts_that_cannot_be_read_start_the_count_from_now(self):
+        """Counts kept at the last commit as kept() keeps them, or empty,
+        are counted from; any other shape, a damaged file or another
+        version's, gives no line, so no line claims what one carried."""
+        write_lines(self.transcript, self.FIRST)
+        now = usage.profile_so_far(self.transcript)
+        kept = profile.kept(now)
+        self.assertIn("calls=2 ", usage.profile_line(self.SESSION, now, {"models": {}, "profile": {}})[0])
+        line, keep = usage.profile_line(self.SESSION, now, {"models": {}, "profile": kept})
+        self.assertIn("calls=0 ", line)
+        self.assertEqual(keep, kept)
+        broken = [{"api_calls": 0}, {"sums": None, "api_calls": 0}, {"sums": [], "api_calls": 0},
+                  {"sums": {**kept["sums"], "calls": -1000}, "api_calls": 0}, {"sums": kept["sums"]},
+                  {"sums": {**kept["sums"], "calls": "40"}, "api_calls": 0},
+                  {"sums": kept["sums"], "api_calls": -1}, {"sums": {"calls": 1}, "api_calls": 0}]
+        for earlier in broken:
+            self.assertEqual(usage.profile_line(self.SESSION, now, {"models": {}, "profile": earlier}), (None, kept),
+                             earlier)
+
     def test_the_usage_is_left_before_the_profile_is_read(self):
         """Reading the profile takes longer than reading the usage: a hook
         stopped while it reads the profile, at Claude Code's timeout for a
@@ -336,11 +370,10 @@ class ProfiledCommits(ARepository):
         self.assertEqual(profile.parse_trailer(self.commit("b.txt"))[0][1]["calls"], 3,
                          "the first commit carried no line, so the second counts from the start")
 
-    def test_a_commit_that_carries_no_line_keeps_nothing(self):
-        """A commit with nothing spent since the last carries no line and
-        keeps nothing, so a read that came up short, a transcript not there
-        for one hook, never makes a later line claim again what an earlier
-        one carried."""
+    def test_a_commit_whose_hook_read_nothing_keeps_nothing(self):
+        """A commit whose hook read nothing at all, a transcript not there
+        for that one hook, carries no line and keeps nothing, so the next
+        line counts from the last line and claims nothing it carried."""
         write_lines(self.transcript, self.FIRST)
         self.hook(session=self.SESSION)
         self.commit("a.txt")
@@ -355,6 +388,46 @@ class ProfiledCommits(ARepository):
         third = self.commit("c.txt")
         self.assertEqual(usage.parse_trailer(third)[0][2], {"claude-opus-5-5": [1200, 0, 0, 0, 7]})
         self.assertEqual(profile.parse_trailer(third)[0][1]["calls"], 1)
+
+    def test_counts_that_fall_for_good_are_counted_on_from(self):
+        """A transcript replaced under the session reads below the counts
+        kept: that commit carries no line and keeps the lower counts, so
+        the commits after it carry lines again; keeping the old counts left
+        every later commit without one until the session spent past them."""
+        write_lines(self.transcript, self.FIRST + self.SECOND)
+        self.hook(session=self.SESSION)
+        self.commit("a.txt")
+        replaced = [asking("m4", used(5, 0, 0, 2), "2026-10-12T11:00:00Z", ("Bash", {"command": "pwd"})),
+                    answer("m4-0", "/r", "2026-10-12T11:00:01Z")]
+        write_lines(self.transcript, replaced)
+        self.hook(session=self.SESSION)
+        self.assertEqual(usage.parse_trailer(self.commit("b.txt")), [])
+        more = [asking("m5", used(5, 0, 0, 2), "2026-10-12T11:00:02Z", ("Bash", {"command": "date"})),
+                answer("m5-0", "now", "2026-10-12T11:00:03Z")]
+        write_lines(self.transcript, replaced + more)
+        self.hook(session=self.SESSION)
+        third = self.commit("c.txt")
+        self.assertEqual(usage.parse_trailer(third)[0][2], {"claude-opus-5-5": [5, 0, 0, 0, 2]})
+        self.assertEqual(profile.parse_trailer(third)[0][1]["calls"], 1)
+        self.assertEqual(profile.parse_trailer(third)[0][1]["peak"], 5)
+
+    def test_another_sessions_usage_left_while_the_profile_is_read_stays(self):
+        """Two sessions in one clone: when the second one's hook leaves its
+        usage while the first one's reads the profile, the first one's
+        second write would put its own usage back on the second one's
+        commit, so it writes nothing."""
+        write_lines(self.transcript, self.FIRST)
+        pending = usage.state_dir(self.repo) / "pending.json"
+        other = {"session": "bbbbbbbb-other", "at": time.time(), "models": {"claude-opus-5-5": [1, 0, 0, 0, 1]},
+                 "seconds": 0}
+
+        def read_while_another_hook_runs(transcript):
+            usage.write_json(pending, other)
+            return {"sums": dict.fromkeys(profile.SUMS, 0), "sizes": []}
+
+        with mock.patch.object(usage, "profile_so_far", side_effect=read_while_another_hook_runs):
+            self.hook(session=self.SESSION)
+        self.assertEqual(json.loads(pending.read_text()), other)
 
     def test_a_session_committing_from_two_worktrees_counts_nothing_twice(self):
         """A linked worktree has a git directory of its own, where the hook
