@@ -62,7 +62,7 @@ named "notsorry" was found on GitHub; the spelling is taken as a slip for unsorr
 | OpenSpineConsortium/openspineconsortium.github.io | Sign in with GitHub first: the gate in both body files, assets/js/symphony-panel.js, assets/css/control.css, README.md; every built page, with the site's master merged in | #22, merged 2026-10-16 |
 | OpenSpineConsortium/symphony-app | signin/README.md: the deployment steps as Cloudflare's and GitHub's pages read on 2026-10-16 | #15, merged 2026-10-16 |
 | OpenSpineConsortium/symphony-start | PRIVACY.md, version 9: a sign-in for one tab keeps its refresh token in the page's memory alone, a reopened tab brings its token back, a pasted token is asked about at GitHub first, and a replaced sign-in token is revoked | #45, merged 2026-10-16 |
-| OpenSpineConsortium/symphony-template | this file and the memory fact, for Sign in with GitHub first | SELF, merged last |
+| OpenSpineConsortium/symphony-template | this file and the memory fact, for Sign in with GitHub first | #109, merged last |
 
 They merged in the order symphony-start (the site renders its privacy statement), the site,
 symphony-app, then the template, each with a merge commit once its check was green, on the
