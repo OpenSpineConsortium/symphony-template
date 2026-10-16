@@ -1,6 +1,6 @@
 # Research
 
-This folder holds the project's running research programmes: for each, the question, the instrument that measures it, the measurements taken with it and what they found, kept beside each other so that a reader can go from a claim to the record it rests on and to the command that made it, which reproduces it wherever what it read is kept. One folder per programme, with a README that says where the programme stands. docs/history/ is for what a piece of work found and settled; a programme lives here while its questions are open, and a settled finding goes to docs/history/ or, when every session should know it, to docs/memory/.
+This folder holds the project's running research programmes: for each, the question, the instrument that measures it, the measurements taken with it and what they found, kept beside each other so that a reader can go from a claim to the record it rests on and to the command that made it, which reproduces it wherever what it read is kept. One folder per programme, with a README that says where the programme stands, and one file per finished note. A programme lives here while its questions are open and stays here when they are settled, as a note does; a pull request that settles a finding for good may move it to docs/history/, the longer record, and a fact every session should know becomes a memory in docs/memory/ that points here (.claude/rules/research.md).
 
 Three rules hold in every programme, taken from OpenSpineConsortium/coordbench, where the project measured coordination first:
 
@@ -8,11 +8,7 @@ Three rules hold in every programme, taken from OpenSpineConsortium/coordbench, 
 - A run that spends tokens or money waits for the owner's word and the number: how many runs, of what, at about what cost. Nothing here starts a run by itself; a schedule, where one exists, is a fallback and never the only trigger.
 - A record carries counts, bytes, seconds and tokens, with tool names and model names, and never a path, a command, a prompt, a title or any text of a conversation, so it can be committed and shared. Transcripts and logs stay where they were written.
 
-Programmes:
-
-- [beyond-cooperation](beyond-cooperation/README.md): what one agent spends, context, tool calls, reading and time, and how to spend less, measured with tools/profile.py.
-
-The threads at work on 2026-10-16 (agentic workflow benchmarks, the control website's cost comparison, Symphony on the WSU grid, the Claude token setup wizard, the Beethoven worker opening, the integration of outside code bases) each add their programme or note here in their own pull request as it lands.
+Programmes: none has landed on main yet; each adds its folder and its line here in the pull request that brings it.
 
 ## Notes
 
@@ -26,7 +22,7 @@ A note is one finished piece of research, a study, a comparison, a deep-research
 
 Written before this folder existed and left where its links point:
 
-- docs/checkpoints/2026-10-14/handoff-page/: RESEARCH-scale.md, DESIGN-runtime.md, DESIGN-qa-gate.md, PLAN.md and free-or-paid.md, the files of the handoff page of 2026-10-14.
+- docs/checkpoints/2026-10-14/handoff-page/: the files of the handoff page of 2026-10-14, RESEARCH-scale.md, DESIGN-runtime.md, DESIGN-qa-gate.md, PLAN.md, free-or-paid.md and the patch template-crowd-number-of.patch.
 - docs/checkpoints/2026-10-14b/notes/ (gh-aw against Symphony, read both ways) and docs/checkpoints/2026-10-14b/plans/gh-aw-migration-plan.md.
 - docs/checkpoints/2026-10-14c/notes/readiness-research-2026-10-14.md, with the coordbench review notes under docs/checkpoints/2026-10-14c/notes/, 2026-10-14d/notes/, 2026-10-14e/notes/ and 2026-10-15/notes/.
 - docs/checkpoints/2026-10-14c/deep-lane/ and docs/checkpoints/2026-10-14e/deep-lane/: the validation harness's deep lane, its review findings and the scripts that ran it.

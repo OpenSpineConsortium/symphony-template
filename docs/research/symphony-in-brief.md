@@ -23,7 +23,7 @@ Every rule lives once, in the dependency-free Python library symphony-protocol, 
 5. **Finish.** The pull request deletes the claim file, passes the required check and is marked ready. The owner merges, or GitHub auto-merges for a worker set to; the merge closes the issue ([PROTOCOL.md:59](https://github.com/OpenSpineConsortium/symphony-protocol/blob/b5f098d3851b24e2611bb5474c964c5695e28c86/spec/PROTOCOL.md#L59)).
 6. **Release.** An unfinished claim with no commit for 24 hours is freed. Its claim labels come off and `todo` goes on unless the issue has `todo`, `epic` or `blocker`; then a comment says why, whose it was and what the branch holds; then the branch is renamed to `released/N-<sha>`, so the work is kept and the issue is listed again ([PROTOCOL.md:67-69](https://github.com/OpenSpineConsortium/symphony-protocol/blob/b5f098d3851b24e2611bb5474c964c5695e28c86/spec/PROTOCOL.md#L67-L69)).
 
-[The doc shows a figure here, one issue's claim lifecycle in five states. It does not export to Markdown; the six steps above are what it draws.]
+[The doc shows a figure here, one issue's claim lifecycle in five states. It does not export to Markdown.]
 
 A second worker's push of the same branch is refused, so it picks another issue. The board's run, started by GitHub events and every six hours, is what says "main moved" and makes the 24-hour release.
 
