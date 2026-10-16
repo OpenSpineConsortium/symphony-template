@@ -1383,12 +1383,12 @@ WORLD_RATES = {"merge_rate": 0.9167, "first_check_pass_rate": None}
 # is neither), of which six have usage against them: 301, 304, 307, 308,
 # 309 by its record and 313 by a commit made before the window.
 WORLD_ECONOMICS = {
-    "prices_as_of": "2026-10-06", "pull_requests": 11, "pull_requests_measured": 6, "merged": 10, "sessions": 2,
+    "prices_as_of": "2026-10-16", "pull_requests": 11, "pull_requests_measured": 6, "merged": 10, "sessions": 2,
     "actions_runs": 2, "actions_runs_unread": 0, "tokens_input": 9200, "tokens_cache_write": 219000,
     "tokens_cache_read": 3250000, "tokens_output": 65200, "tokens_total": 3543400, "tokens_unpriced": 0,
-    "estimated_usd": 2.5122, "coordinator_usd": 0.1654, "claude_seconds": 8635, "commits": 16, "check_failures": 0,
+    "estimated_usd": 2.3672, "coordinator_usd": 0.1654, "claude_seconds": 8635, "commits": 16, "check_failures": 0,
     "reverts": 0, "tokens_by_family": {"fable": 0, "opus": 1927300, "sonnet": 1580900, "haiku": 35200, "other": 0},
-    "tokens_per_merge": 354340.0, "usd_per_merge": 0.25122, "claude_seconds_per_merge": 863.5,
+    "tokens_per_merge": 354340.0, "usd_per_merge": 0.23672, "claude_seconds_per_merge": 863.5,
     "commits_per_merge": 1.6,
 }
 # Every pull request of the world had other work beside it, so the alone
@@ -1399,7 +1399,7 @@ WORLD_COORDINATION = {
               "estimated_usd": 0.0, "claude_seconds": 0, "commits": 0, "check_failures": 0, "first_check_passed": 0,
               "first_check_counted": 0, "open_to_merge_median": None, "active_seconds": 0},
     "parallel": {"pull_requests": 11, "merged": 10, "measured": 6, "measured_merged": 6, "tokens": 4504400,
-                 "estimated_usd": 3.4039, "claude_seconds": 10940, "commits": 16, "check_failures": 0,
+                 "estimated_usd": 3.2709, "claude_seconds": 10940, "commits": 16, "check_failures": 0,
                  "first_check_passed": 0, "first_check_counted": 0, "open_to_merge_median": 10800,
                  "active_seconds": 6383400},
     "ratios": {"tokens_per_merge": None, "usd_per_merge": None, "latency": None, "throughput": None,
