@@ -73,7 +73,11 @@ ratios, each over 1 where parallel did better: tokens and dollars per
 measured merge, latency, throughput, first check passed, commits per
 merge, failures per pull request. The switch stops the records at their
 source too, and SDLC_METRICS=off in a person's environment keeps their
-sessions' usage off their commits.
+sessions' usage off their commits. A second line after the usage one,
+Symphony-Profile, carries the session's profile since its last commit,
+and a run's record its profile where the workflow copied profile.py
+beside the recorder (profiling-sessions.md); collect does not read
+either yet.
 
 Two conventions the counts rest on: the coordinator, the board's run or a
 coordinator routine, starts each release comment with

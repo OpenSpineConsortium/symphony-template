@@ -1,21 +1,29 @@
 """tools/profile.py: a session's profile from its transcript, each API call
 counted once, each tool call with its answer, the files read and read
 again, the context's growth shared out to the tools, the time in tools
-and outside them; and a record that carries counts alone."""
+and outside them; a record that carries counts alone; and the line a
+commit carries, the counts since the session's last commit. The module is
+loaded as tools/usage.py loads it, by its path, since the standard library
+has a module of the same name."""
 
 import io
 import json
+import random
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-import profile  # noqa: E402
+import usage  # noqa: E402
+
+profile = usage.profiler()
 
 CWD = "/work/repo"
 SHELL = {"read": 3, "filter": 0, "search": 1, "list": 0, "git": 0, "run": 1}
@@ -74,6 +82,26 @@ def undated(entries):
     """The same messages as a run's execution file carries them: no
     timestamp and no working directory on any."""
     return [{k: v for k, v in e.items() if k not in ("timestamp", "cwd")} for e in entries]
+
+
+def outside_by_definition(times, intervals):
+    """profile.active_outside's measure as its docstring defines it, each
+    gap less its overlap with every interval of the union: slow, and
+    plainly right."""
+    times, merged = sorted(times), profile.union(intervals)
+    total = 0.0
+    for a, b in zip(times, times[1:]):
+        if b - a <= usage.IDLE_GAP:
+            total += (b - a) - sum(max(0.0, min(b, end) - max(a, start)) for start, end in merged)
+    return total
+
+
+def helper_entries():
+    """A helper's work: one call of 9,000 tokens, the helper's own context,
+    that reads a file the session read too."""
+    return [*assistant("h1", used(9000, 0, 0, 5), [tool_use("h-t1", "Read", file_path="/work/repo/a.py")], 100,
+                       model="claude-sonnet-5-5"),
+            result("h-t1", "a" * 400, 102)]
 
 
 def session_entries():
@@ -222,6 +250,31 @@ class TheTranscriptsClock(ATranscriptOnDisk):
         self.assertEqual(profile.union([(2, 6), (1, 4), (8, 9), (9, 10)]), [(1, 6), (8, 10)])
         self.assertEqual(profile.active_outside([0, 10, 20], [(5, 12)]), 10 + 10 - 7)
 
+    def test_the_time_outside_tools_is_what_its_definition_says(self):
+        """The walk side by side gives what each gap less its overlap with
+        every interval gives, on lines and tool calls drawn at random: tools
+        that overlap, that take no time, that outlast the lines, and pauses
+        longer than five minutes."""
+        draw = random.Random(20261016)
+        for _ in range(300):
+            times = sorted(draw.uniform(0, 3000) for _ in range(draw.randint(0, 40)))
+            intervals = []
+            for _ in range(draw.randint(0, 25)):
+                start = draw.uniform(-50, 3050)
+                intervals.append((start, start + draw.choice([0, draw.uniform(0, 5), draw.uniform(0, 400)])))
+            self.assertAlmostEqual(profile.active_outside(times, intervals), outside_by_definition(times, intervals),
+                                   places=6, msg=(times, intervals))
+
+    def test_a_long_sessions_time_outside_tools_is_read_in_one_pass(self):
+        """Each gap measured against every tool call took time with the
+        product of the two: about 10 seconds for a session of 3,000 calls,
+        before every commit; here 40,000 lines and 20,000 calls."""
+        times = [index * 0.5 for index in range(40_000)]
+        intervals = [(start, start + 0.25) for start in range(20_000)]
+        started = time.monotonic()
+        self.assertAlmostEqual(profile.active_outside(times, intervals), 39_999 * 0.5 - 20_000 * 0.25)
+        self.assertLess(time.monotonic() - started, 2.0)
+
     def test_an_attachment_written_as_the_answer_arrives_takes_no_time_from_the_model(self):
         """The harness writes an attachment line the instant a response
         arrives, before the response's own lines; the time before it is
@@ -340,6 +393,122 @@ class HelpersAndCompactions(ATranscriptOnDisk):
         self.assertEqual(record["models"], {"claude-opus-5-5": [100, 2250, 0, 3250, 100]})
 
 
+class TheTrailer(ATranscriptOnDisk):
+    """The line each commit of a session carries beside its usage line, the
+    profile since the session's last commit, as tools/usage.py's hooks
+    write it from these functions."""
+
+    def counts(self, entries):
+        write_lines(self.transcript, entries)
+        return profile.session_counts(self.transcript)
+
+    def test_a_sessions_counts_are_the_records_sums_and_its_calls_contexts(self):
+        now = self.counts(session_entries())
+        self.assertEqual(now["sums"], {"calls": 4, "failed": 1, "repeated": 0, "reads": 5, "rereads": 2,
+                                       "read_bytes": 1004, "reread_bytes": 4, "compactions": 0, "drops": 0,
+                                       "tool_seconds": 11})
+        self.assertEqual(now["sizes"], [1000, 2250, 2350])
+        self.assertEqual(profile.since(now, {}), {**now["sums"], "peak": 2350},
+                         "a session's first commit carries everything so far")
+        self.assertEqual(profile.kept(now), {"sums": now["sums"], "api_calls": 3})
+
+    def test_a_helpers_calls_and_reads_count_and_its_context_and_time_do_not(self):
+        write_lines(self.folder / "abcdef12-3456-7890" / "subagents" / "agent-1.jsonl", helper_entries())
+        now = self.counts(session_entries())
+        self.assertEqual(now["sums"], {"calls": 5, "failed": 1, "repeated": 0, "reads": 6, "rereads": 2,
+                                       "read_bytes": 1404, "reread_bytes": 4, "compactions": 0, "drops": 0,
+                                       "tool_seconds": 11}, "the helper's first read of a.py is its own")
+        self.assertEqual(now["sizes"], [1000, 2250, 2350], "the helper's 9,000 tokens are its own context")
+
+    def test_each_count_is_its_rise_since_the_last_commit(self):
+        entries = session_entries()
+        # The first commit came after the first call's two tools answered.
+        before = profile.kept(self.counts(entries[:6]))
+        self.assertEqual(before["api_calls"], 1)
+        spent = profile.since(self.counts(entries), before)
+        # The second call's two tools: the failing command, whose sed read b.py
+        # again, and the search; their union of time is 20 to 26 s.
+        self.assertEqual(spent, {"calls": 2, "failed": 1, "repeated": 0, "reads": 1, "rereads": 1, "read_bytes": 4,
+                                 "reread_bytes": 4, "peak": 2350, "compactions": 0, "drops": 0, "tool_seconds": 6})
+
+    def test_the_peak_is_of_the_calls_since_the_last_commit_alone(self):
+        """A session's peak before a compaction is no commit's after it."""
+        entries = [
+            *assistant("m1", used(0, 5000, 0, 100), [tool_use("t1", "Bash", command="ls")], 10),
+            result("t1", "x" * 10, 12),
+            {"type": "system", "subtype": "compact_boundary", "timestamp": at(13)},
+            *assistant("m2", used(1200, 0, 0, 10), [tool_use("t2", "Bash", command="ls")], 15),
+            result("t2", "y", 16),
+        ]
+        before = profile.kept(self.counts(entries[:2]))
+        spent = profile.since(self.counts(entries), before)
+        self.assertEqual((spent["peak"], spent["compactions"], spent["drops"]), (1200, 1, 1))
+        self.assertEqual((spent["calls"], spent["repeated"]), (1, 1), "the second ls repeats the first")
+        self.assertEqual(profile.since(self.counts(entries), {})["peak"], 5000)
+
+    def test_only_counts_as_kept_or_none_are_counted_from(self):
+        kept = profile.kept(self.counts(session_entries()))
+        self.assertTrue(profile.known(kept))
+        self.assertTrue(profile.known({}), "after a first commit whose profile was not read")
+        for broken in ({"api_calls": 3}, {"sums": None, "api_calls": 3}, {"sums": kept["sums"], "api_calls": -1},
+                       {"sums": {**kept["sums"], "calls": -1}, "api_calls": 3},
+                       {"sums": {**kept["sums"], "calls": True}, "api_calls": 3},
+                       {"sums": {**kept["sums"], "calls": 1.5}, "api_calls": 3},
+                       {"sums": {k: v for k, v in kept["sums"].items() if k != "drops"}, "api_calls": 3}):
+            self.assertFalse(profile.known(broken), broken)
+
+    def test_a_count_never_falls_below_nothing(self):
+        """Counts kept from a longer transcript than the one read now, a file
+        replaced under the session, give nothing rather than less."""
+        now = self.counts(session_entries()[:6])
+        before = {"sums": dict.fromkeys(profile.SUMS, 10 ** 6), "api_calls": 99}
+        self.assertEqual(profile.since(now, before), dict.fromkeys(profile.TRAILER_FIELDS, 0))
+
+    def test_the_trailer_round_trips_and_carries_counts_alone(self):
+        spent = profile.since(self.counts(session_entries()), {})
+        value = profile.trailer("abcdef12-3456-7890", spent)
+        self.assertEqual(value, "v1 session=abcdef12 calls=4 failed=1 repeated=0 reads=5 rereads=2 read_bytes=1004 "
+                                "reread_bytes=4 peak=2350 compactions=0 drops=0 tool_seconds=11")
+        message = (f"Do it\n\nWhy.\n\nCo-Authored-By: x\nSymphony-Usage: v1 session=abcdef12 seconds=31 m=1,2,3,4,5\n"
+                   f"Symphony-Profile: {value}\n")
+        self.assertEqual(profile.parse_trailer(message), [("abcdef12", spent)])
+        for secret in ("a.py", "b.py", "cat", "Read", "Bash", CWD):
+            self.assertNotIn(secret, value)
+        self.assertEqual(profile.parse_trailer("Symphony-Profile: v2 calls=1\n"), [])
+        self.assertEqual(profile.parse_trailer("Symphony-Usage: v1 session=x seconds=1 m=1,2,3,4,5\n"), [])
+
+    def test_a_count_that_cannot_be_read_is_passed_over(self):
+        # Anyone who can push writes a commit's message, and int() refuses a
+        # string of more than 4,300 digits with ValueError; a count is read as
+        # the usage line's are, a whole number below 2 ** 53 in ASCII digits.
+        huge = "1" * 4301
+        line = f"symphony-profile: v1 session=x calls={huge} failed={2 ** 53} reads=٣ paths=3 peak=7 drops\n"
+        self.assertEqual(profile.parse_trailer(line), [("x", {"peak": 7})])
+
+    def test_a_line_with_a_long_run_of_blanks_is_read_in_one_pass(self):
+        message = "Symphony-Profile: v1 session=x" + " " * 100_000 + "calls=3" + " " * 100_000 + "\n"
+        started = time.monotonic()
+        self.assertEqual(profile.parse_trailer(message), [("x", {"calls": 3})])
+        self.assertLess(time.monotonic() - started, 1.0)
+
+    def test_only_the_messages_last_paragraph_is_read(self):
+        """git and the hook put a commit's trailers in its message's last
+        paragraph, so a line quoted in the body counts for nothing."""
+        message = ("Explain the line\n\nIt reads like this:\nSymphony-Profile: v1 session=quoted calls=99\n \n"
+                   "Co-Authored-By: x\nSymphony-Profile: v1 session=abcdef12 calls=3\n\n")
+        self.assertEqual(profile.parse_trailer(message), [("abcdef12", {"calls": 3})])
+        self.assertEqual(profile.parse_trailer("Symphony-Profile: v1 session=a calls=1"), [("a", {"calls": 1})])
+        self.assertEqual(profile.parse_trailer(""), [])
+        self.assertEqual(profile.parse_trailer(None), [])
+
+    def test_a_key_said_again_counts_once_and_a_session_is_at_most_the_tokens_eight_characters(self):
+        line = "Symphony-Profile: v1 session=abc calls=2 calls=99 session=zzz peak=x peak=7\n"
+        self.assertEqual(profile.parse_trailer(line), [("abc", {"calls": 2})])
+        for session in ("a" * 9, "a;b", "٣", ""):
+            self.assertEqual(profile.parse_trailer(f"Symphony-Profile: v1 session={session} calls=1\n"),
+                             [("", {"calls": 1})], session)
+
+
 class WhatATextIsWorth(unittest.TestCase):
     def test_a_tools_answer_is_measured_as_the_model_saw_it(self):
         self.assertEqual(profile.text_bytes("abc"), 3)
@@ -403,6 +572,15 @@ class ReadingShellCommands(unittest.TestCase):
         self.assertEqual(profile.without_heredocs("cat << EOF\nx\nEOF\nls"), "cat << EOF\nls")
         self.assertEqual(profile.shell_uses("cat <<EOF > f\ncat a\nEOF"), {"filter": 1})
 
+    def test_a_line_with_no_here_document_is_not_read_for_one(self):
+        """Reading a long line a character at a time for a << it does not
+        hold was most of what a long inline script cost a profile."""
+        with mock.patch.object(profile.guard, "plain_shell", wraps=profile.guard.plain_shell) as reader:
+            self.assertIsNone(profile.heredoc_opener("python3 -c 'x = 1; y = 2'"))
+            self.assertEqual(reader.call_count, 0)
+            self.assertEqual(profile.heredoc_opener("cat <<EOF"), "EOF")
+            self.assertEqual(reader.call_count, 1)
+
     def test_what_only_looks_like_a_here_document_opens_none(self):
         for line in ('cat <<<"bar"', "grep -rn '<<EOF' x", 'python3 -c "x << y"', "cat a", "a <<", "a << ;",
                      "# cat <<EOF", "cat f # comment <<EOF", 'echo "<<" x; cat g', 'grep -rn "<<" tools/'):
@@ -452,6 +630,48 @@ class AnExecutionFile(ATranscriptOnDisk):
         self.assertTrue(profile.report(record).startswith("Profile of a run (no clock, 0 helper transcripts"))
         self.assertEqual(record["reads"]["calls"], 3)
         self.assertEqual(built.lines, len(session_entries()))
+
+    def test_an_execution_file_written_over_many_lines_is_read_whole(self):
+        """claude-code-action writes the file indented, a key a line, so an
+        empty message is a line that is a whole object by itself; read a
+        line at a time, it was the file's one entry."""
+        execution = self.folder / "execution.json"
+        execution.write_text(json.dumps(undated(session_entries()) + [{}], indent=2), encoding="utf-8")
+        self.assertEqual(len(profile.entries_of(execution)), len(session_entries()) + 1)
+        self.assertEqual(profile.profile(execution)[0]["calls"]["total"], 4)
+        broken = self.folder / "broken.json"
+        broken.write_text("[\n  {}\n", encoding="utf-8")
+        self.assertEqual(profile.entries_of(broken), [{}], "an array cut short is read a line at a time")
+
+    def test_a_helpers_messages_in_an_execution_file_are_the_helpers(self):
+        """The Agent SDK writes a helper's messages into the run's own
+        array, each naming the tool call that started the helper."""
+        execution = self.folder / "execution.json"
+        entries = undated(session_entries())
+        helper = [dict(entry, parent_tool_use_id="t-agent") for entry in undated(helper_entries())]
+        execution.write_text(json.dumps(entries[:6] + helper + entries[6:], indent=2), encoding="utf-8")
+        record, built = profile.profile(execution)
+        alone, _ = profile.profile(execution, helpers=False)
+        self.assertEqual(record["helpers"], {"transcripts": 1, "calls": 1, "seconds_in_tool": 0, "output_tokens": 5})
+        self.assertEqual((record["calls"]["total"], alone["calls"]["total"]), (5, 4))
+        self.assertEqual(record["context"]["peak"], 2350, "the helper's 9,000 tokens are its own context")
+        self.assertEqual(record["context"], alone["context"])
+        self.assertEqual(record["reads"]["files_named"], alone["reads"]["files_named"] + 1)
+        self.assertEqual(record["reads"]["rereads"], alone["reads"]["rereads"], "the helper's first read is its own")
+        self.assertEqual(record["models"]["claude-sonnet-5-5"], [9000, 0, 0, 0, 5])
+        self.assertNotIn("claude-sonnet-5-5", alone["models"])
+        self.assertEqual(built.lines, len(entries))
+
+    def test_each_shell_command_is_split_once(self):
+        """Three readers ask for each shell call's commands, and splitting a
+        long command is most of what a profile costs."""
+        command = "cat split-once.py && ls -la split-once"
+        profile.commands_of.cache_clear()
+        with mock.patch.object(profile.guard, "simple_commands", wraps=profile.guard.simple_commands) as split:
+            record, _ = self.profiled([*assistant("m1", used(1, 0, 0, 1), [tool_use("t1", "Bash", command=command)], 0),
+                                       result("t1", "x", 1)])
+        self.assertEqual(split.call_count, 1)
+        self.assertEqual((record["reads"]["files_named"], record["shell"]["read"], record["shell"]["list"]), (1, 1, 1))
 
     def test_a_file_with_no_entries_is_no_transcript(self):
         empty = self.folder / "empty.jsonl"

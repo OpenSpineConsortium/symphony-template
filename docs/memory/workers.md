@@ -49,10 +49,13 @@ next blocker or queued issue in its area), so no two legs of one run
 race for one claim or are dealt one issue from looks at different
 moments, and an idle worker spends no Claude usage; a leg that
 waited looks again and keeps only its worker's own work from that look,
-taking a queued or shared issue only as dealt; in a copy whose vendored
-library has no team deal yet, each leg asks for itself until the release
-after 0.4.1 reaches it. The sessions run on the secret
-CLAUDE_CODE_OAUTH_TOKEN; no repository variable switches workers on.
+taking a queued or shared issue only as dealt; in a copy made before
+symphony-template#77 (2026-10-14), whose workers.yml is older, each leg
+asks for itself until the copy takes the template's workers.yml, and in
+one made between #77 and #78 until the release 0.5.0 reaches it, by hand
+with the template's tests/fixtures/board-STATE.md, which its protocol.yml
+does not bring. The sessions run on the secret CLAUDE_CODE_OAUTH_TOKEN;
+no repository variable switches workers on.
 
 The coordinator is two things. A step of the board's own run, on
 GITHUB_TOKEN and with no Claude usage, releases a claim idle for 24 hours
@@ -85,7 +88,7 @@ docs/agents/WORKERS.md has the whole of it.
 Source: docs/agents/WORKERS.md, the workflows named above,
 symphony-protocol 0.4.0 (labels.py, workers.py, coordinator.py, team.py),
 read 2026-10-12, and its F18 (symphony-protocol#32: team.py and
-spec/PROTOCOL.md), vendored 2026-10-15 at 53e232f, ahead of its release; cooperbench/CooperBench at 63b9d44
+spec/PROTOCOL.md), vendored 2026-10-15 at 53e232f ahead of its release and since 2026-10-16 as part of 0.5.0; cooperbench/CooperBench at 63b9d44
 (team_harness/prompt.py, runner/team.py) and anthropics/claude-code-action
 at 2dca132 (src/create-prompt/index.ts, src/entrypoints/run.ts,
 docs/faq.md), read 2026-10-09.

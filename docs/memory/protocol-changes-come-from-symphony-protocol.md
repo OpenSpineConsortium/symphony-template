@@ -1,7 +1,7 @@
 A change to the claim protocol is made in OpenSpineConsortium/symphony-protocol, whose sync pull request brings it to OpenSpineConsortium/symphony-template and whose release tags a repository made from the template takes by its own workflow, protocol.yml; tools/sdlc_protocol is never edited in place.
 
 tools/sdlc_protocol is a vendored copy of the package sdlc_protocol, and
-tools/VENDORED records it: the release and the commit on the first line,
+tools/VENDORED records it: the version and the commit on the first line,
 then the sha256 of every copied file. scripts/check.sh runs
 `python3 tools/sdlc_protocol/vendoring.py verify tools` before the tests, so
 a pull request that edits the copy by hand, adds a file to it or loses one,
@@ -36,18 +36,22 @@ repository takes which modules, and its ECOSYSTEM.md, generated from that
 list, maps all five.
 
 So between such a pull request and the release that carries its change,
-the template runs ahead of the newest release, while the first line of
-tools/VENDORED still names that release's version: since
-symphony-template#78 (2026-10-14), symphony-protocol's fixes after 0.4.1
-are here, recorded as 0.4.1 with their commit, and a copy made from the
-template meanwhile starts on them. Sync, weekly and by hand, knows only
-the newest release, so it opens `symphony-protocol/sync` taking the copy
-back to 0.4.1, with auto-merge armed. That pull request is a downgrade:
-close it each time it comes back, and never turn it green, by
-regenerating a fixture or otherwise, until the release that carries the
-fixes, 0.5.0 by the owner's plan, is published and its sync brings the
-copy level again. The fixture of the board's Given to workers heading
-keeps it red meanwhile.
+the template runs ahead of the newest release. From symphony-template#78
+(2026-10-14) symphony-protocol's fixes after 0.4.1 were here, recorded as
+0.4.1 with their commit; since 2026-10-16 the copy is 0.5.0's, the
+version symphony-protocol's main raised that day, which waits for the
+owner's approval. Its VENDORED names 0.5.0 and a8e0e56, the last commit
+that changed the package before the tag, since symphony-protocol's
+scripts/vendor.py records that commit and not the one it copies from, so
+the sync of the tag v0.5.0 finds the copy level, opens nothing and closes
+a sync pull request still open. A copy made from the template meanwhile
+starts on 0.5.0, and its protocol.yml takes no older tag. Until the
+owner approves 0.5.0, Sync, weekly and by hand, knows only 0.4.1, the
+newest published release, so it opens `symphony-protocol/sync` taking
+the template's copy back to 0.4.1, with auto-merge armed. That pull
+request is a downgrade: close it each time it comes back, and never
+turn it green, by regenerating a fixture or otherwise. The fixture of
+the board's Given to workers heading keeps it red meanwhile.
 
 A repository made from the template is not on that list, so no sync pull
 request reaches it. Its own .github/workflows/protocol.yml takes each
@@ -67,12 +71,19 @@ it is
 `python3 <symphony-protocol>/scripts/vendor.py <this repository> --consumer OpenSpineConsortium/symphony-template`,
 which copies what the template takes, and a pull request; in the template
 the same command needs no `--consumer`, since its remote names it.
+protocol.yml brings only tools/, so a release that changes what a copy's
+tests pin reaches that copy by hand, with the template's answer to the
+change copied in (docs/start/protocol.md, step 7): 0.5.0 changes the
+board's Given to workers heading, which tests/fixtures/board-STATE.md
+pins in a copy made before symphony-template#78.
 
 What is this repository's own changes here as usual: the shims
 tools/board.py, check_protocol.py, team.py, workers.py and guard_push.py,
 the workflows and the hooks. The owner's one-time setup for the sync is
 docs/setup/owner-checklist.md, section 6.
 
-Source: symphony-protocol 0.4.1, its ecosystem.json, its sync.yml and its README's sections
-"How a change reaches the other repositories", "The owner's one-time setup
-for the sync" and "Releases"; this repository's .github/workflows/protocol.yml.
+Source: symphony-protocol 0.5.0, its ecosystem.json, scripts/vendor.py,
+sync.yml and its README's sections "How a change reaches the other
+repositories", "The owner's one-time setup for the sync" and "Releases";
+this repository's .github/workflows/protocol.yml and
+tools/protocol_update.py.

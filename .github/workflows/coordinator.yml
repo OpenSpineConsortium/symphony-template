@@ -135,7 +135,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Keep a copy of the usage recorder, which the run cannot move
         if: steps.due.outputs.phase == 'plan'
-        run: cp tools/usage.py "$RUNNER_TEMP/usage.py"
+        run: |
+          cp tools/usage.py "$RUNNER_TEMP/usage.py"
+          cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
       - uses: anthropics/claude-code-action@v1
         id: plan
         if: steps.due.outputs.phase == 'plan'
@@ -225,7 +227,9 @@ jobs:
           echo "phase=${answer%% *}" >> "$GITHUB_OUTPUT"
       - name: Keep a copy of the usage recorder, which the run cannot move
         if: steps.due.outputs.phase == 'unblock'
-        run: cp tools/usage.py "$RUNNER_TEMP/usage.py"
+        run: |
+          cp tools/usage.py "$RUNNER_TEMP/usage.py"
+          cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
       - uses: anthropics/claude-code-action@v1
         id: settle
         if: steps.due.outputs.phase == 'unblock'
@@ -325,7 +329,9 @@ jobs:
           echo "phase=${answer%% *}" >> "$GITHUB_OUTPUT"
       - name: Keep a copy of the usage recorder, which the run cannot move
         if: steps.due.outputs.phase == 'integrate'
-        run: cp tools/usage.py "$RUNNER_TEMP/usage.py"
+        run: |
+          cp tools/usage.py "$RUNNER_TEMP/usage.py"
+          cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
       - uses: anthropics/claude-code-action@v1
         id: integrate
         if: steps.due.outputs.phase == 'integrate'
@@ -386,7 +392,9 @@ jobs:
           fetch-depth: 0
       - name: Keep a copy of the usage recorder, which the run cannot move
         if: env.HAVE_TOKEN == 'true'
-        run: cp tools/usage.py "$RUNNER_TEMP/usage.py"
+        run: |
+          cp tools/usage.py "$RUNNER_TEMP/usage.py"
+          cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
       - uses: anthropics/claude-code-action@v1
         id: tidy
         if: env.HAVE_TOKEN == 'true'

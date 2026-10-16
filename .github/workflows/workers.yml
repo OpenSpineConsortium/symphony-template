@@ -267,7 +267,9 @@ jobs:
         run: echo "The repository secret CLAUDE_CODE_OAUTH_TOKEN is not set; docs/setup/claude-action.md says how. Doing nothing."
       - name: Keep a copy of the usage recorder, which the run cannot move
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
-        run: cp tools/usage.py "$RUNNER_TEMP/usage.py"
+        run: |
+          cp tools/usage.py "$RUNNER_TEMP/usage.py"
+          cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
       - uses: anthropics/claude-code-action@v1
         id: claude
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
