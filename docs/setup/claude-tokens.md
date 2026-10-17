@@ -258,7 +258,9 @@ GitHub never gives a secret back, so these come from three readings
   accounts: it reads `cswap list --json` and sends each slot's reading,
   by the cswap account the wizard remembered for it. This is the only one
   that sees the Fable limit, since a token from claude setup-token cannot
-  read the usage page cswap reads with a full sign-in.
+  read the usage page cswap reads with a full sign-in. `--also coordbench`
+  sends the same readings to coordbench's branch pool too, which its
+  benchmark's `auto` reads.
 
 `python3 tools/pool.py pick DIR --slots 1,2,3` is the auto mode: the slot
 with the least used five-hour window, then seven-day window, passing over
@@ -283,6 +285,14 @@ run does nothing and says when the first is free; the next run picks
 again. A slot whose secret this repository does not see falls back to
 the main token, and the run says so. The workers still need
 CLAUDE_CODE_OAUTH_TOKEN set, which turns them on at all.
+
+## Seeing it in the control panel
+
+The control panel's Tokens page, https://openspineconsortium.com/symphony/control/tokens.html,
+shows each slot's windows, resets and per-model limits from the branch
+pool, whether it is held, and which slot auto would take now. Its "Read
+every slot now" starts the workflow Pool, and its assignments open a pull
+request that sets .github/symphony/accounts.json.
 
 ## Renewing and removing
 

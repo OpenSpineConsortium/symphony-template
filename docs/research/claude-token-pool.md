@@ -91,14 +91,17 @@ then, as its own pull request in symphony-protocol.
    the workers' registry is the protocol library's and takes no new key
    before 0.5.1; workers.yml records each run's reading on the branch
    pool. @claude and the coordinator stay on the main token.
-3. coordbench's bench.yml takes auto in its accounts box.
-4. The control panel's Tokens page: the slots' windows, resets and model
-   limits, the assignment, auto mode and Refresh.
+3. coordbench's bench.yml takes auto in its accounts box
+   (coordbench#29): coordbench's GITHUB_TOKEN cannot read this
+   repository's branch, so coordbench keeps a pool of its own, from its
+   real jobs' streams through a workflow Pool of its own, Bench itself
+   staying read-only, and from `tokens.py usage --also coordbench`.
+4. The control panel's Tokens page (openspineconsortium.github.io#25):
+   the slots' windows, resets and model limits, which slot auto takes,
+   the assignment as a pull request, and Refresh.
 
 ## Open items
 
 - Whether claude-code-action's execution file carries rate_limit_event.
 - Whether the panel's sign-in token may dispatch pool.yml and write the
   assignment file (the App's user token's permissions).
-- The benchmark runs in coordbench, which cannot read symphony-template's
-  branch with its own GITHUB_TOKEN; step 3 says how it reads the pool.

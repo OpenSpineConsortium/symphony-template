@@ -1857,10 +1857,12 @@ def send_usage(gh, repository, readings, pool, attempts=3):
     raise TokensError(f"the branch {pool.BRANCH} moved under each of {attempts} writes; run usage again")
 
 
-def usage(gh, target, root=ROOT, path=None, run=None):
+def usage(gh, target, root=ROOT, path=None, run=None, also=()):
     """cswap's readings of each remembered account, sent to the branch pool
-    of this clone's repository, where the control panel and the auto mode
-    read them; nothing but the slot, the windows and the per-model limits."""
+    of this clone's repository, and of each repository of the same owner
+    named in also, such as coordbench, whose benchmark's auto reads its own
+    branch; there the control panel and the auto mode read them; nothing
+    but the slot, the windows and the per-model limits."""
     pool = pool_module()
     repository = origin_repository(root)
     if repository is None:
@@ -1871,12 +1873,13 @@ def usage(gh, target, root=ROOT, path=None, run=None):
         print(f"  slot {slot}: cswap account {number} gave no usage; run cswap list to see why")
     if not readings:
         raise TokensError("no slot has a cswap account with usage: the wizard asks for each slot's cswap account when it adds one")
-    commit = send_usage(gh, "/".join(repository), readings, pool)
     for record in readings:
         parts = [f"{name.replace('_', ' ')} {round(each['utilization'] * 100)}%" for name, each in record["windows"].items()]
         parts += [f"{each['name']} {round(each['utilization'] * 100)}%" for each in record.get("scoped", [])]
         print(f"  slot {record['slot']}: " + (", ".join(parts) or "no windows"))
-    print(f"Sent to the branch {pool.BRANCH} of {'/'.join(repository)} ({commit[:7]}).")
+    for name in [repository[1]] + [each for each in also if each != repository[1]]:
+        commit = send_usage(gh, f"{repository[0]}/{name}", readings, pool)
+        print(f"Sent to the branch {pool.BRANCH} of {repository[0]}/{name} ({commit[:7]}).")
 
 
 def chosen_slot(state, ask):
@@ -1988,6 +1991,7 @@ def build_parser():
     showing.add_argument("which", help=f"a slot from 1 to {SLOTS[-1]}, or main")
     showing.add_argument("--copy", action="store_true", help="put it on the clipboard instead of printing it")
     using = commands.add_parser("usage", help="cswap's usage of each slot's account, sent to the branch pool")
+    using.add_argument("--also", default="", help="more repositories of the same owner to send it to, comma-separated, such as coordbench")
     sharing = commands.add_parser("share", help="the slots' secrets seen by more repositories, such as coordbench")
     sharing.add_argument("repos", help="repository names without the owner, comma-separated")
     for command in (status, adding, main_command, removing, ordering, forgetting, profiles, showing, sharing, using):
@@ -2054,7 +2058,7 @@ def main(argv=None):
         elif args.command == "profiles":
             print_remembered(target)
         elif args.command == "usage":
-            usage(gh, target)
+            usage(gh, target, also=parse_repos(args.also) if args.also else ())
         elif args.command == "share":
             share(gh, target, parse_repos(args.repos))
         else:
