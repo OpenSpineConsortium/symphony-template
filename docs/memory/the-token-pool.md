@@ -10,6 +10,8 @@ history, no token, e-mail or text. A probe spends one word of the
 window it reads, so pool.yml probes only on Run workflow or the panel's
 Refresh, never on a schedule (the owner's choice, 2026-10-17). pick takes the least used five-hour, then
 seven-day window, passing over a slot held at 90 percent until its
-reset. The picker moves to the protocol library after 0.5.1 is cut.
+reset. .github/symphony/accounts.json gives each worker in Actions
+main, a slot or auto (no file: main), and workers.yml records each run's
+reading. The picker moves to the protocol library after 0.5.1 is cut.
 docs/research/claude-token-pool.md has the sources and the four steps;
 from the token wizard's thread, 2026-10-17.

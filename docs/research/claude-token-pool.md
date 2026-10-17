@@ -86,9 +86,11 @@ then, as its own pull request in symphony-protocol.
 
 1. tools/pool.py, the branch pool, pool.yml's probe and tokens.py's
    usage (this note's pull request).
-2. A worker in Actions takes a slot, named or auto, from an assignment
-   file of the template's own, and the Claude workflows record a run's
-   reading.
+2. A worker in Actions takes a slot, named or auto, from
+   .github/symphony/accounts.json, a file of the template's own, since
+   the workers' registry is the protocol library's and takes no new key
+   before 0.5.1; workers.yml records each run's reading on the branch
+   pool. @claude and the coordinator stay on the main token.
 3. coordbench's bench.yml takes auto in its accounts box.
 4. The control panel's Tokens page: the slots' windows, resets and model
    limits, the assignment, auto mode and Refresh.

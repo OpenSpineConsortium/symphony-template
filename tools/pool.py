@@ -37,6 +37,14 @@ A window whose reset has passed counts as empty, since it is.
   python3 tools/pool.py publish FILE...        onto the branch pool (Actions)
   python3 tools/pool.py show DIR               the slots as the panel shows them
   python3 tools/pool.py pick DIR --slots 1,2,3 [--threshold 0.9]
+  python3 tools/pool.py choose --worker NAME --pool 1,2,3   the slot a worker's run takes
+
+Which account a worker in Actions runs on is the file
+.github/symphony/accounts.json, {"default": "main", "workers": {"NAME":
+"auto"}}: main is CLAUDE_CODE_OAUTH_TOKEN, a number from 1 to 8 is that
+slot's SYMPHONY_CLAUDE_<slot>, and auto is pick over the pool, the slots
+of SYMPHONY_CLAUDE_ACCOUNTS. With no file, or no line for the worker and
+no default, the worker runs on main, as every worker did before.
 """
 
 import argparse
@@ -44,7 +52,8 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 VERSION = 1
@@ -53,12 +62,15 @@ SOURCES = ("run", "probe", "cswap")
 SLOTS = tuple(str(slot) for slot in range(1, 9)) + ("main",)
 WINDOWS = ("five_hour", "seven_day")
 THRESHOLD = 0.9
+UNKNOWN_HOLD = timedelta(hours=5)
 FILE_NAME = re.compile(r"^slot-(main|[1-8])\.(run|probe|cswap)\.json$")
 NAME_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$")
 PROBE = ("claude", "-p", "Reply with the one word ok.", "--model", "haiku", "--max-turns", "1",
          "--output-format", "stream-json", "--verbose")
 PROBE_TIMEOUT = 120
 PUSH_ATTEMPTS = 5
+ASSIGNMENTS = ".github/symphony/accounts.json"
+CHOICES = SLOTS + ("auto",)
 
 
 class PoolError(Exception):
@@ -269,22 +281,28 @@ def current(records, now):
 def held_until(windows, scoped, threshold, now):
     """When the slot is free again: the latest reset of a window at or past
     the threshold, or None when nothing holds it. A full window with no
-    reset known holds it for good, as far as this reading says."""
+    reset known holds it for the length of a five-hour window from its
+    reading, so a slot is tried again rather than held for good on a
+    reading nobody may renew."""
     until = None
     for each in list(windows.values()) + scoped:
         used = fraction(each.get("utilization"))
         if used is not None and used >= threshold:
             resets = parse_time(each.get("resetsAt"))
             if resets is None:
-                return datetime.max.replace(tzinfo=timezone.utc)
+                read = parse_time(each.get("at")) or now
+                resets = read + UNKNOWN_HOLD
             if resets > now and (until is None or resets > until):
                 until = resets
     return until
 
 
-def pick(found, slots, threshold=THRESHOLD, now=None):
+def pick(found, slots, threshold=THRESHOLD, now=None, spread=0):
     """(slot, None) for the slot with the most room, or (slot, until) for
-    the one whose hold ends first when every slot is held."""
+    the one whose hold ends first when every slot is held. Workers of one
+    run all read the pool before any of them writes it, so spread, each
+    worker's place in the run, deals them the free slots in turn, the
+    one with the most room to the first."""
     now = now or datetime.now(timezone.utc)
     if not slots:
         raise PoolError("the pool names no slot")
@@ -297,7 +315,8 @@ def pick(found, slots, threshold=THRESHOLD, now=None):
         # secret may be unset or revoked, which no reading would show.
         (held if until else free).append((until, (not windows, room), order, slot))
     if free:
-        return min(free, key=lambda each: (each[1], each[2]))[3], None
+        free.sort(key=lambda each: (each[1], each[2]))
+        return free[spread % len(free)][3], None
     until, _, _, slot = min(held, key=lambda each: (each[0], each[2]))
     return slot, until
 
@@ -323,9 +342,68 @@ def summary(found, threshold=THRESHOLD, now=None):
         windows, scoped = current(found[slot], now)
         until = held_until(windows, scoped, threshold, now)
         rows.append({"slot": slot, "windows": windows, "scoped": scoped,
-                     "heldUntil": iso(until) if until and until.year < 9999 else ("unknown" if until else None),
+                     "heldUntil": iso(until) if until else None,
                      "readAt": max(record["at"] for record in found[slot])})
     return {"version": VERSION, "at": iso(now), "threshold": threshold, "slots": rows}
+
+
+# Which account a worker takes.
+
+def assignments(path):
+    """The file's assignments, checked: {worker: choice} and the default."""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {}, "main"
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise PoolError(f"{path} is not JSON ({error.msg}, line {error.lineno})") from None
+    if not isinstance(data, dict) or set(data) - {"default", "workers"}:
+        raise PoolError(f"{path} holds an object with default and workers, and nothing else")
+    default = data.get("default", "main")
+    workers = data.get("workers", {})
+    if default not in CHOICES:
+        raise PoolError(f"{path}: the default is main, auto or a slot from 1 to 8")
+    if not isinstance(workers, dict) or not all(isinstance(name, str) and choice in CHOICES for name, choice in workers.items()):
+        raise PoolError(f"{path}: each worker takes main, auto or a slot from 1 to 8")
+    return workers, default
+
+
+def branch_readings(folder, cwd=None):
+    """The readings on origin's branch pool, read into the folder given,
+    which stays empty where the branch is not there yet."""
+    folder = Path(folder)
+    fetched = subprocess.run(["git", "fetch", "--quiet", "--no-tags", "origin",
+                              f"+refs/heads/{BRANCH}:refs/remotes/origin/{BRANCH}"], cwd=cwd, capture_output=True)
+    if fetched.returncode != 0:
+        return folder
+    for name in git("ls-tree", "--name-only", f"refs/remotes/origin/{BRANCH}", cwd=cwd).splitlines():
+        if FILE_NAME.match(name):
+            shown = subprocess.run(["git", "show", f"refs/remotes/origin/{BRANCH}:{name}"], cwd=cwd, capture_output=True)
+            if shown.returncode == 0:
+                (folder / name).write_bytes(shown.stdout)
+    return folder
+
+
+def choose(worker, pool_text, path=ASSIGNMENTS, folder=None, now=None, spread=0):
+    """(slot, how, until): the slot a worker's run takes, how it was
+    chosen, and, for auto with every slot held, when the first is free."""
+    workers, default = assignments(path)
+    choice = workers.get(worker, default)
+    how = "assigned" if worker in workers else "default"
+    if choice != "auto":
+        return choice, how, None
+    slots = [slot for slot in parse_slots(pool_text) if slot != "main"]
+    if not slots:
+        return "main", "auto, with no slot in SYMPHONY_CLAUDE_ACCOUNTS", None
+    if folder is None:
+        with tempfile.TemporaryDirectory(prefix="pool-") as scratch:
+            found = load(branch_readings(scratch))
+    else:
+        found = load(folder)
+    slot, until = pick(found, slots, now=now, spread=spread)
+    return slot, "auto", until
 
 
 # Probing and publishing, in Actions.
@@ -416,6 +494,11 @@ def build_parser():
     picking.add_argument("folder")
     picking.add_argument("--slots", required=True)
     picking.add_argument("--threshold", type=float, default=THRESHOLD)
+    choosing = commands.add_parser("choose", help="the slot a worker's run takes, as step outputs")
+    choosing.add_argument("--worker", required=True)
+    choosing.add_argument("--pool", default="")
+    choosing.add_argument("--assignments", default=ASSIGNMENTS)
+    choosing.add_argument("--spread", type=int, default=0, help="the worker's place in its run, from 0")
     return parser
 
 
@@ -445,7 +528,15 @@ def main(argv=None):
             print(slot)
             if until:
                 print(f"pool: every slot is held; slot {slot} is free first, at "
-                      f"{iso(until) if until.year < 9999 else 'a time no reading gives'}", file=sys.stderr)
+                      f"{iso(until)}", file=sys.stderr)
+        elif args.command == "choose":
+            slot, how, until = choose(args.worker, args.pool, args.assignments, spread=max(args.spread, 0))
+            print(f"slot={slot}")
+            if until:
+                print("wait=true")
+                print(f"until={iso(until)}")
+            print(f"pool: {args.worker} runs on {'slot ' + slot if slot != 'main' else 'the main token'} ({how})"
+                  + (", though every slot of the pool is held" if until else ""), file=sys.stderr)
     except PoolError as error:
         print(f"pool: {error}", file=sys.stderr)
         return 1
