@@ -39,7 +39,8 @@ original's, frozen.
 The branch metrics is written like board: one commit from the files alone,
 pushed with --force-with-lease naming the commit the run fetched, so the
 JUDGE.json a maintainer pushed meanwhile is kept, never lost; a branch
-metrics that holds any other file is the project's own, and the run prints
+metrics that holds any file but METRICS.json, PROFILE.json and JUDGE.json
+is the project's own, and the run prints
 those files, says to rename the branch and pushes nothing; a ruleset must
 leave the branch out, and CI's push trigger leaves it out. The judge
 (`python3 tools/metrics.py judge`) runs only on a maintainer's machine, with
@@ -76,8 +77,14 @@ source too, and SDLC_METRICS=off in a person's environment keeps their
 sessions' usage off their commits. A second line after the usage one,
 Symphony-Profile, carries the session's profile since its last commit,
 and a run's record its profile where the workflow copied profile.py
-beside the recorder (profiling-sessions.md); collect does not read
-either yet.
+beside the recorder (profiling-sessions.md); collect --profile-out sums
+both per pull request into PROFILE.json, by work setting and alone against
+parallel, which the workflow writes beside METRICS.json and the collector
+does not read until the Apps' privacy statement lists its keys. The usage
+cache's version 2 keeps each run's profile; a record a version 1 cache
+kept still counts, marked old, and is downloaded again for its profile
+after the new ones, within the 200, while its artifact lasts, so no run
+drops out of the economics when the cache's form changes.
 
 Two conventions the counts rest on: the coordinator, the board's run or a
 coordinator routine, starts each release comment with

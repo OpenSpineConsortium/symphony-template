@@ -17,7 +17,9 @@ merge and fewer failed checks.
 It is pure: the caller reads GitHub and hands in plain values, and every
 answer is a dict of numbers with fixed keys, so the record says what the
 work cost and nothing about what was built or by whom. Standard library
-only, like every tool here.
+only, like every tool here. The same records carry each run's profile,
+which tools/profile.py sums for PROFILE.json over the same two sides
+(sides, overhead).
 """
 
 import math
@@ -149,10 +151,11 @@ def number(value, whole=True):
 def actions_record(data):
     """An Actions run's record as the economics read it, or None when it is
     not one: its counts by model whole numbers, under a name a model can
-    have (usage.MODEL_KEY), its seconds a number, and its words the
-    workflows' own. Any workflow run of the repository can upload a record,
-    so each part of it is read as anyone's JSON: a part of the wrong kind or
-    past the bound is passed over, and nothing in it is ever raised on."""
+    have (usage.MODEL_KEY), its seconds a number, its words the workflows'
+    own, and its profile the counts profile_counts reads. Any workflow run
+    of the repository can upload a record, so each part of it is read as
+    anyone's JSON: a part of the wrong kind or past the bound is passed
+    over, and nothing in it is ever raised on."""
     if not isinstance(data, dict) or data.get("v") != 1 or data.get("source") != "actions":
         return None
     listed = data.get("models") if isinstance(data.get("models"), dict) else {}
@@ -166,7 +169,22 @@ def actions_record(data):
         "pull": data.get("pull") if number(data.get("pull")) else None,
         "seconds": float(seconds) if number(seconds, whole=False) else 0.0,
         "models": models,
+        "profile": profile_counts(data.get("profile")),
     }
+
+
+def profile_counts(block):
+    """A run's profile as the record carries it: the counts of a commit's
+    Symphony-Profile line (tools/profile.py, TRAILER_FIELDS), each a whole
+    number below the bound, the rest passed over; None where the record
+    has none of them, as a record from a workflow that copied no profile.py
+    beside the recorder has none, or a run that made no call, whose counts
+    are all 0 (profile.measured)."""
+    if not isinstance(block, dict):
+        return None
+    profiler = usage.profiler()
+    counts = {key: block[key] for key in profiler.TRAILER_FIELDS if number(block.get(key))}
+    return counts if profiler.measured(counts) else None
 
 
 def kept_record(data):
@@ -255,6 +273,13 @@ def unattributed(works, records):
     neither number nor claim: the coordinator's planning and tidying, and
     any run whose pull request did not end in the window."""
     return [r for r in records if not any(names(r, w) for w in works)]
+
+
+def overhead(works, window_records):
+    """The coordinator's runs recorded in the window that name none of the
+    window's pull requests (works): its planning of epics and its weekly
+    tidy, the cost of working in parallel."""
+    return [r for r in unattributed(works, window_records) if r["workflow"] == "coordinator"]
 
 
 # --- the window -------------------------------------------------------------------
@@ -394,19 +419,25 @@ def ratios(alone, parallel):
     )))
 
 
-def coordination(works, records, now, others=(), window_records=()):
-    """The comparison: the window's pull requests of people and of the
-    repository's Claude workflows that ended in it, split by whether other
-    such work was at work beside them, the window's or work that did not
-    end in it (others), and the ratios. The coordinator's runs recorded in
-    the window that name none of them are the cost of working in parallel,
-    so they count on that side."""
+def sides(works, now, others=()):
+    """The window's pull requests of people and of the repository's Claude
+    workflows that ended in it, split in two: alone, with no other such
+    work at work beside them, the window's or work that did not end in it
+    (others), and parallel, the rest."""
     working = [w for w in works if w.kind in WORKING_KINDS and w.start is not None]
     everyone = working + [o for o in others if o.kind in WORKING_KINDS and o.start is not None]
     alone = [w for w in working if not any(beside(w, o, now) for o in everyone)]
-    parallel = [w for w in working if w not in alone]
-    spent = {w.number: spent_on(w, records) for w in working}
-    overhead = coordinator_models(unattributed(works, window_records))
+    return alone, [w for w in working if w not in alone]
+
+
+def coordination(works, records, now, others=(), window_records=()):
+    """The comparison: the two sides of the window's pull requests (sides)
+    and the ratios. The coordinator's runs recorded in the window that name
+    none of them are the cost of working in parallel, so they count on that
+    side."""
+    alone, parallel = sides(works, now, others)
+    spent = {w.number: spent_on(w, records) for w in alone + parallel}
+    extra = coordinator_models(overhead(works, window_records))
     alone_side = group(alone, spent, now)
-    parallel_side = group(parallel, spent, now, priced(overhead)[0], sum(sum(c) for c in overhead.values()))
+    parallel_side = group(parallel, spent, now, priced(extra)[0], sum(sum(c) for c in extra.values()))
     return {"alone": alone_side, "parallel": parallel_side, "ratios": ratios(alone_side, parallel_side)}

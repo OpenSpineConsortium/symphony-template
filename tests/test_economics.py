@@ -96,9 +96,38 @@ class Attribution(unittest.TestCase):
                     "seconds": 95, "models": {"m": [1, 2, 3, 4, 5]}, "worker": "", "turns": 12, "deep": [[[]]]}
         kept = economics.kept_record(uploaded)
         self.assertEqual(kept, {"v": 1, "source": "actions", "workflow": "coordinator", "job": "plan", "issue": 9,
-                                "pull": None, "seconds": 95.0, "models": {"m": [1, 2, 3, 4, 5]}})
+                                "pull": None, "seconds": 95.0, "models": {"m": [1, 2, 3, 4, 5]}, "profile": None})
         self.assertEqual(economics.kept_record(kept), kept)
+        profiled = economics.kept_record({**uploaded, "profile": {"calls": 18, "peak": 80000, "paths": ["a.py"],
+                                                                  "mcp__crm__lookup": 3}})
+        self.assertEqual(profiled["profile"], {"calls": 18, "peak": 80000})
+        self.assertEqual(economics.kept_record(profiled), profiled)
         self.assertIsNone(economics.kept_record({"v": 1, "source": "elsewhere"}))
+
+    def test_a_runs_profile_is_its_counts_alone(self):
+        # The block tools/usage.py writes from tools/profile.py: a commit's
+        # Symphony-Profile counts over the whole run. Anyone's JSON again,
+        # so a count of the wrong kind or past the bound is passed over, and
+        # any other key, a path or a tool's name, never reaches the cache.
+        base = {"v": 1, "source": "actions"}
+        block = {"calls": 18, "failed": 0, "peak": 80000, "tool_seconds": 0, "rereads": True, "reads": -1,
+                 "read_bytes": 2 ** 53, "drops": 1.5, "repeated": "2", "compactions": None, "paths": ["secret.py"],
+                 "mcp__crm__lookup": 3}
+        self.assertEqual(economics.actions_record({**base, "profile": block})["profile"],
+                         {"calls": 18, "failed": 0, "peak": 80000, "tool_seconds": 0})
+        for block in (None, [1, 2], "calls=1", 5, {}, {"paths": ["x"]}, {"calls": float("inf")}):
+            self.assertIsNone(economics.actions_record({**base, "profile": block})["profile"], block)
+        self.assertIsNone(economics.actions_record(base)["profile"])
+
+    def test_a_run_that_made_no_call_has_no_profile(self):
+        # usage.run_profile writes every count 0 for a run whose execution
+        # file holds no call; read as a profile, it would pull the median
+        # peak down and dilute the per-merge ratios.
+        base = {"v": 1, "source": "actions"}
+        zeros = dict.fromkeys(economics.usage.profiler().TRAILER_FIELDS, 0)
+        self.assertIsNone(economics.actions_record({**base, "profile": zeros})["profile"])
+        for kept in ({**zeros, "calls": 1}, {**zeros, "peak": 1}):
+            self.assertEqual(economics.actions_record({**base, "profile": kept})["profile"], kept)
 
 
 class Window(unittest.TestCase):
@@ -176,6 +205,16 @@ class AloneAndParallel(unittest.TestCase):
         found = economics.coordination(self.works(), records, self.NOW, window_records=records)
         self.assertEqual(found["parallel"]["tokens"], 2500 + 1_000_000)
         self.assertAlmostEqual(found["parallel"]["estimated_usd"], 2.0 + 2500 * 2 / 1e6, places=4)
+
+    def test_the_sides_and_the_overhead_are_what_the_profiles_sums_take_too(self):
+        # tools/profile.py splits the same pull requests and charges the same
+        # runs, so the two blocks always compare the same work.
+        alone, parallel = economics.sides(self.works(), self.NOW)
+        self.assertEqual(([w.number for w in alone], [w.number for w in parallel]), ([1, 2], [3, 4, 5]))
+        records = [record({}, workflow="coordinator", job="plan", issue=77),
+                   record({}, workflow="coordinator", job="settle", pull=3),
+                   record({}, workflow="workers", job="worker", issue=78)]
+        self.assertEqual(economics.overhead(self.works(), records), records[:1])
 
     def test_only_measured_merges_divide_the_tokens(self):
         works = self.works()

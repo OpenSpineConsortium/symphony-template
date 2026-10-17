@@ -4,14 +4,16 @@ read again; and where its time went. The first instrument of the research
 programme in docs/research/beyond-cooperation/README.md, which measures a
 way of working before changing it.
 
-  python3 tools/profile.py TRANSCRIPT [--json FILE] [--paths N] [--no-helpers]
+  python3 tools/profile.py TRANSCRIPT [--json FILE] [--paths N] [--tools N] [--no-helpers]
 
 prints a report and, with --json, writes the record docs/research/
 beyond-cooperation/README.md describes, aggregates only: counts, bytes,
-seconds and tokens, with tool names and model names, and never a path, a
-command, a prompt or any text of the conversation, so a record can be
-committed beside the question it answers. --paths N prints the N files
-read most often, which stays on the screen.
+seconds and tokens, with model names and the names of the harness's own
+tools, every MCP tool folded into one row and any other tool into another,
+and never a path, a command, a prompt or any text of the conversation, so
+a record can be committed beside the question it answers. --paths N
+prints the N files read most often and --tools N the N tools called most
+often by their own names, which stay on the screen.
 
 The transcript is the one Claude Code writes under ~/.claude/projects/,
 one JSON object a line, the same file tools/usage.py reads for the usage
@@ -62,8 +64,11 @@ seconds in tools the session's own, and peak the largest context of the
 session's own calls made since; the session is the usage line's, so the
 two lines pair up. It carries counts alone, no tool's name, since an MCP
 server names its tools, so it stands on a public commit as the usage line
-does, and the metrics switch that stops the one stops the other. Nothing
-sums it yet; the research programme's step 2 is to, with parse_trailer.
+does, and the metrics switch that stops the one stops the other.
+tools/metrics.py sums it per pull request (pull_profile), with the
+profile the record of each Actions run carries, per work setting and in
+the coordination block's two sides (group, coordination), into
+PROFILE.json, which stays on the repository's own branch metrics.
 
 Standard library only, like every tool here; the shell commands are split
 by the vendored protocol library's reader, the one the push guard uses.
@@ -127,6 +132,24 @@ GLOB = "*?[$~`"
 SESSION_STEM = re.compile(r"[0-9a-f]{8}(-[0-9a-f]+)*")
 BY_TOOL_KEYS = ("calls", "failed", "repeated", "input_bytes", "result_bytes", "seconds_in_tool",
                 "context_tokens_estimated")
+# The record names the harness's own tools, these, and folds every other:
+# each MCP tool into MCP_TOOLS, since an MCP server names its tools and a
+# server's name can say what a person uses, and any other name, a tool an
+# Agent SDK program defines for itself, into OTHER_TOOLS. --tools shows the
+# names on the screen alone.
+HARNESS_TOOLS = frozenset({
+    "Agent", "Task", "Bash", "BashOutput", "KillBash", "KillShell", "Read", "Write", "Edit", "MultiEdit", "Glob",
+    "Grep", "LS", "NotebookEdit", "NotebookRead", "WebFetch", "WebSearch", "TodoRead", "TodoWrite", "ExitPlanMode",
+    "EnterPlanMode", "AskUserQuestion", "SlashCommand", "Skill", "ToolSearch", "TaskCreate", "TaskGet", "TaskList",
+    "TaskUpdate", "TaskStop", "TaskOutput", "SendMessage", "ListAgents", "ReadNotifications", "SubagentHandback",
+    "Monitor", "Workflow", "ScheduleWakeup", "CronCreate", "CronDelete", "CronList", "EnterWorktree", "ExitWorktree",
+    "ListMcpResourcesTool", "ReadMcpResourceTool", "ReadMcpResourceDirTool", "PushNotification", "Artifact",
+    "ArtifactComments", "ArtifactData", "ReportFindings", "ListSkills", "SearchSkills", "SuggestSkills",
+    "ListPlugins", "SearchPlugins", "SuggestPluginInstall", "ListConnectors", "SuggestConnectors",
+    "SearchMcpRegistry", "DesignSync",
+})
+MCP_TOOLS = "mcp"
+OTHER_TOOLS = "other"
 SECONDS_KEYS = ("span", "active", "in_tools", "outside_tools", "thinking")
 HELPERS_KEYS = ("transcripts", "calls", "seconds_in_tool", "output_tokens")
 READS_KEYS = ("calls", "files_named", "files", "rereads", "partial", "bytes", "reread_bytes")
@@ -140,6 +163,11 @@ TRAILER_LINE = re.compile(r"(?im)^[ \t]*symphony-profile:[ \t]*v1[ \t]+(.+)$")
 TRAILER_FIELDS = ("calls", "failed", "repeated", "reads", "rereads", "read_bytes", "reread_bytes", "peak",
                   "compactions", "drops", "tool_seconds")
 SUMS = tuple(field for field in TRAILER_FIELDS if field != "peak")
+# What PROFILE.json (tools/metrics.py) gives for each work setting and each
+# side of the comparison, and the ratios, over 1 where working in parallel
+# did better, as the coordination block's are (tools/economics.py).
+GROUP_KEYS = ("pull_requests", "merged", "profiled", "profiled_merged", *SUMS, "peak_median")
+RATIO_KEYS = ("calls_per_merge", "reads_per_merge", "rereads_per_merge", "peak")
 # The session as the line writes it, at most usage.session_token's eight characters.
 TRAILER_SESSION = re.compile(r"[A-Za-z0-9-]{1,8}")
 # A blank line, which ends a paragraph of a commit's message.
@@ -457,6 +485,14 @@ def empty_tool():
     return dict.fromkeys(BY_TOOL_KEYS, 0)
 
 
+def tool_kind(name):
+    """The name a tool's row has in the record: its own for the harness's
+    tools, else one name for every MCP tool and one for every other."""
+    if name in HARNESS_TOOLS:
+        return name
+    return MCP_TOOLS if name.startswith("mcp__") else OTHER_TOOLS
+
+
 class Profile:
     """The record as it is built, one transcript at a time."""
 
@@ -594,7 +630,12 @@ class Profile:
         usd, unpriced = economics.priced(self.models)
         tokens = economics.by_kind(self.models)
         tokens["total"] = sum(tokens.values())
-        by_tool = {name: {k: round(v) for k, v in row.items()} for name, row in sorted(self.by_tool.items())}
+        folded = {}
+        for name, row in self.by_tool.items():
+            into = folded.setdefault(tool_kind(name), empty_tool())
+            for key, value in row.items():
+                into[key] += value
+        by_tool = {name: {k: round(v) for k, v in row.items()} for name, row in sorted(folded.items())}
         return {
             "schema": SCHEMA, "session": session, "helpers": {k: round(v) for k, v in self.helpers.items()},
             "started_at": stamp(self.started), "ended_at": stamp(self.ended),
@@ -719,6 +760,84 @@ def trailer_block(text):
     return PARAGRAPH_BREAK.split((text or "").strip())[-1]
 
 
+# --- the sums over pull requests ----------------------------------------------------
+
+def measured(counts):
+    """Whether a line's or a run's counts are a profile: any call made or
+    any context held. A run that made no API call records every count 0,
+    and a line or a run of zeros counted as profiled would pull the median
+    peak down and the per-merge ratios with it, where the economics count
+    a pull request as measured only with tokens above 0."""
+    return bool(counts) and bool(counts.get("calls") or counts.get("peak"))
+
+
+def commit_lines(commit):
+    """The Symphony-Profile lines of a commit as GitHub lists it, those
+    that are a profile (measured)."""
+    message = ((commit or {}).get("commit") or {}).get("message") or ""
+    return [(session, counts) for session, counts in parse_trailer(message) if measured(counts)]
+
+
+def pull_profile(work, records):
+    """What one pull request's profile adds up to (an economics.Work): the
+    lines on its commits and the profiles of the Actions runs that name it
+    or its claim's issue, as economics.spent_on takes their usage; each sum
+    added up and peak the largest; None where none of them has a profile."""
+    found = [counts for commit in work.commits for _, counts in commit_lines(commit)]
+    found += [record["profile"] for record in records if record.get("profile") and economics.names(record, work)]
+    if not found:
+        return None
+    total = {key: sum(counts.get(key, 0) for counts in found) for key in SUMS}
+    total["peak"] = max(counts.get("peak", 0) for counts in found)
+    return total
+
+
+def run_sums(records):
+    """The sums of the profiles of some Actions runs."""
+    found = [record["profile"] for record in records if record.get("profile")]
+    return {key: sum(counts.get(key, 0) for counts in found) for key in SUMS}
+
+
+def group(works, profiles, extra=None):
+    """One work setting, or one side of the comparison, as GROUP_KEYS: its
+    sums are its profiled pull requests' (those with any profile) and what
+    it spends beside them (extra), so they are divided by its profiled
+    merges and never by merges whose profile is unknown; peak_median is the
+    median of its profiled pull requests' peaks, rounded half up as every
+    median of the field metrics is (economics.median_seconds)."""
+    profiled = [w for w in works if profiles.get(w.number) is not None]
+    row = {"pull_requests": len(works), "merged": sum(1 for w in works if w.merged is not None),
+           "profiled": len(profiled), "profiled_merged": sum(1 for w in profiled if w.merged is not None)}
+    row.update({key: sum(profiles[w.number][key] for w in profiled) + (extra or {}).get(key, 0) for key in SUMS})
+    row["peak_median"] = economics.median_seconds([profiles[w.number]["peak"] for w in profiled])
+    return row
+
+
+def ratios(alone, parallel):
+    """Each comparison as a ratio over 1 where working in parallel did
+    better: fewer calls, reads and re-reads per profiled merge, and a
+    smaller median peak; None where either side has nothing to compare."""
+    def per_merge(side, key):
+        return economics.per(side[key], side["profiled_merged"])
+
+    per_merges = [economics.inverse(per_merge(alone, key), per_merge(parallel, key))
+                  for key in ("calls", "reads", "rereads")]
+    return dict(zip(RATIO_KEYS, (*per_merges, economics.inverse(alone["peak_median"], parallel["peak_median"]))))
+
+
+def coordination(works, profiles, now, others=(), window_records=()):
+    """The coordination block's siblings: the window's pull requests split
+    into the same two sides as economics.coordination splits them, alone
+    and parallel (economics.sides), each as group gives it, with the
+    profiles of the coordinator's runs that name none of them on the
+    parallel side (economics.overhead), as the price of coordinating, and
+    the ratios."""
+    alone, parallel = economics.sides(works, now, others)
+    alone_side = group(alone, profiles)
+    parallel_side = group(parallel, profiles, run_sums(economics.overhead(works, window_records)))
+    return {"alone": alone_side, "parallel": parallel_side, "ratios": ratios(alone_side, parallel_side)}
+
+
 # --- the report ---------------------------------------------------------------------
 
 def share(part, whole):
@@ -771,11 +890,17 @@ def most_read(built, count):
     return "".join(f"{n:>5}  {path}\n" for path, n in rows)
 
 
+def most_called(built, count):
+    rows = sorted(built.by_tool.items(), key=lambda item: (-item[1]["calls"], item[0]))[:count]
+    return "".join(f"{row['calls']:>5}  {name}\n" for name, row in rows)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="python3 tools/profile.py", description=__doc__.split("\n\n")[0])
     parser.add_argument("transcript", help="a session's transcript (.jsonl), or a run's execution file")
     parser.add_argument("--json", help="write the record here, aggregates only")
     parser.add_argument("--paths", type=int, default=0, help="also print the N files read most often")
+    parser.add_argument("--tools", type=int, default=0, help="also print the N tools called most often, by name")
     parser.add_argument("--no-helpers", action="store_true", help="leave the helpers' transcripts out")
     args = parser.parse_args(argv)
     if not Path(args.transcript).is_file():
@@ -788,6 +913,8 @@ def main(argv=None):
     sys.stdout.write(report(record))
     if args.paths:
         sys.stdout.write(f"Files read most often (not in the record):\n{most_read(built, args.paths)}")
+    if args.tools:
+        sys.stdout.write(f"Tools called most often, by name (not in the record):\n{most_called(built, args.tools)}")
     if args.json:
         out = Path(args.json)
         out.parent.mkdir(parents=True, exist_ok=True)
