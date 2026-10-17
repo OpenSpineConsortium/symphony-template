@@ -1,0 +1,33 @@
+name: Probe blocked-by
+
+# A one-off probe, never merged: whether GITHUB_TOKEN under issues: write
+# can add, read and remove a "blocked by" relation between two issues from
+# a workflow, which the Dependencies section of the board will need.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write, read and remove one blocked-by relation with GITHUB_TOKEN
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          blocker=$(gh api "repos/$REPO/issues/131" --jq .id)
+          echo "blocker id $blocker"
+          echo "--- add"
+          gh api -X POST "repos/$REPO/issues/132/dependencies/blocked_by" -F issue_id="$blocker" --jq '{number, title}' || echo "add failed"
+          echo "--- read back"
+          gh api "repos/$REPO/issues/132/dependencies/blocked_by" --jq '[.[] | .number]' || echo "read failed"
+          echo "--- summary on the issue"
+          gh api "repos/$REPO/issues/132" --jq .issue_dependencies_summary || true
+          echo "--- remove"
+          gh api -X DELETE "repos/$REPO/issues/132/dependencies/blocked_by/$blocker" --jq '{number}' || echo "remove failed"
+          echo "--- read back after removal"
+          gh api "repos/$REPO/issues/132/dependencies/blocked_by" --jq '[.[] | .number]' || echo "read failed"
