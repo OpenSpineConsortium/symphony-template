@@ -322,11 +322,23 @@ environment secret, with the password nowhere.
   replacing that repository's earlier line and keeping every other, under browser-key's own lock;
   `--gate-off` takes it out; both run only for a person at a terminal (no agent's variable, no job, no
   forced command), and refuse a home, ~/.ssh or authorized_keys that sshd would ignore or that is a
-  link. tools/tests/test_grid_gate.sh, 86 checks, runs at the end of test_grid_runner.sh, so CI's
-  existing step runs it; it passes on Ubuntu and in centos:7 under bash 4.2.46. Thirteen checks were
+  link. tools/tests/test_grid_gate.sh, 98 checks, runs at the end of test_grid_runner.sh, so CI's
+  existing step runs it; it passes on Ubuntu and in centos:7 under bash 4.2.46. Twenty-two checks were
   each undone in a copy and the tests failed on every one; three lines the mutations showed to be
   redundant were removed instead (a word-length test the exact word list covers, a key-length test
   base64 -d covers under pipefail, a newline fix grep already makes).
+- The adversarial review, which ran the line against a real sshd, found one blocker and seven
+  should-fixes, all fixed before the pull requests: grid.yml must pass the environment's secret to
+  grid-gate.yml by name, or GitHub hands the called workflow an empty string; a key already on another
+  authorized_keys line, which sshd uses first, could have run a shell, so --gate-key refuses it; the
+  runner's folder, its bin/ and the chain's folder were not judged, so someone who could write there
+  could have turned a start into their own code or the gate's write into a planted link's; folders are
+  judged through links (stat -L), which the lab volume's own link needs; a start on a chain told to stop
+  reported it running; the gate's log had no bound; grid_runner.sh now makes its folders with umask 022,
+  and the owner's steps chmod go-w after each pull, since a login node's umask of 002 would leave them
+  group-writable; the host key is taken as GitHub's machine sees it, by ssh-keyscan from outside, and
+  checked against the grid's own file. Left as they are: a folder above the clone that another account
+  owns and only it may write is accepted, as browser-key's check accepts it.
 - In this repository: .github/workflows/grid-gate.yml, on workflow_dispatch with the word to choose
   and on workflow_call, runs on GitHub's machine in the environment grid, which only main may deploy
   to; it writes the key from the secret GRID_GATE_KEY to a mode-0600 file under $RUNNER_TEMP (carriage

@@ -46,6 +46,10 @@ on:
         description: "The artifact's name before -<run>-<attempt>; a caller that runs this job twice in one run gives each its own"
         type: string
         default: grid
+    secrets:
+      # only for start: a caller passes it by name, GRID_GATE_KEY: ${{ secrets.GRID_GATE_KEY }}
+      GRID_GATE_KEY:
+        required: false
 permissions:
   contents: read
 jobs:
@@ -54,6 +58,9 @@ jobs:
     uses: ./.github/workflows/grid-gate.yml
     with:
       word: start
+    # the environment's secret, passed by name (grid-gate.yml's header says why)
+    secrets:
+      GRID_GATE_KEY: ${{ secrets.GRID_GATE_KEY }}
   grid:
     needs: start
     # never a public repository, whose forks could run their pull requests on the grid, never a
