@@ -24,6 +24,9 @@ and only a subscription token has the shape claude setup-token prints.
   python3 scripts/tokens.py add [--slot N] [--label WORD] [--also-main] [--paste]
   python3 scripts/tokens.py main [--paste]    CLAUDE_CODE_OAUTH_TOKEN alone, from one more sign-in
   python3 scripts/tokens.py remove N          a slot's secret and its label, off the list of slots
+  python3 scripts/tokens.py order 3,1,2       the order the bench deals its jobs to the slots
+  python3 scripts/tokens.py profiles          what this machine remembers for each slot
+  python3 scripts/tokens.py forget N          a slot's browser profile and cswap account, forgotten here
 
 Where the secrets go: --org ORG puts them on the organization, seen by the
 repositories --repos names (gh's "selected" visibility; --visibility all or
@@ -35,8 +38,7 @@ its list, and the list grows by what --repos names; nothing is taken off a
 list here. Needs the GitHub CLI signed in (gh auth login) as an admin of the
 organization, or of the repository, and Claude Code (claude) on this
 machine; `add --paste` and `main --paste` take the token from a hidden
-prompt instead, for a machine without claude, or a Windows shell, which has
-no pseudo-terminal. A label is
+prompt instead, for a machine without claude. A label is
 a word of your own so that status can say which account a slot is; it is
 stored as the variable SYMPHONY_CLAUDE_<slot>_LABEL, which anyone who reads
 the repository's workflows can see, so never an e-mail address. Refuses to
@@ -52,9 +54,10 @@ accounts, the wizard shows it and takes an account by its number, its
 alias offered as the label. It remembers the profile and the cswap number per
 slot in tokens.json in this machine's own settings folder, never in the
 repository; cswap's credentials are never opened, since a token minted for
-Actions is a separate, inference-only one. In a Windows shell the wizard
-opens the profile, then starts claude setup-token in a window of its own,
-and takes the token at a hidden prompt.
+Actions is a separate, inference-only one. A Windows shell has no
+pseudo-terminal, so there claude keeps the console's keyboard and its
+output comes to the wizard on a pipe, through the same mask; the profile
+is opened first, on a blank page.
 Exit 0 when done, 1 on a refusal, 2 on a usage error made before any call.
 """
 
@@ -94,8 +97,6 @@ CROWD_VARIABLE = "CLAUDE_CROWD"
 TOKEN_LIFE = timedelta(days=365)
 RENEW_SOON = timedelta(days=30)
 SETUP_TOKEN = ("claude", "setup-token")
-CLAUDE_HOME = "https://claude.ai/"
-PASTE_TRIES = 3
 VISIBILITIES = ("selected", "all", "private")
 # Rows and columns of the terminal claude gets: wide, so it never wraps the
 # token over two lines, where no pattern would find it.
@@ -144,10 +145,6 @@ ORIGIN = re.compile(r"github\.com[:/]([A-Za-z0-9][A-Za-z0-9-]*)/([A-Za-z0-9._-]+
 class TokensError(Exception):
     """Something the wizard could not do, or refuses to do; the message says
     what to do instead, and never holds a token."""
-
-
-class NothingPasted(TokensError):
-    """An empty paste: in a run where claude waits in another window, asked again."""
 
 
 class UsageError(TokensError):
@@ -475,13 +472,13 @@ def mint(stdin_fd=None, write=None, command=SETUP_TOKEN, env=None):
             write(TERMINAL_RESET)
         write("\n")
         _, status = os.waitpid(pid, 0)
-    return masker.tokens, status, masker.cut_over_lines
+    return masker.tokens, os.waitstatus_to_exitcode(status), masker.cut_over_lines
 
 
-def minted_token(**options):
+def minted_token(mint_with=None, **options):
     """One token from claude setup-token, or why there is none."""
     try:
-        tokens, status, cut = mint(**options)
+        tokens, code, cut = (mint_with or mint)(**options)
     except KeyboardInterrupt:
         raise TokensError("stopped; nothing was stored") from None
     if cut:
@@ -492,8 +489,7 @@ def minted_token(**options):
         return whole_token(tokens[0])
     if tokens:
         raise TokensError("claude printed more than one token, so none was stored; run it again")
-    code = os.waitstatus_to_exitcode(status) if hasattr(os, "waitstatus_to_exitcode") else status
-    if code == 127:
+    if code is None or code == 127:
         raise TokensError("claude could not be started: install Claude Code (https://code.claude.com/docs/en/setup), or use --paste")
     raise TokensError(f"claude setup-token ended (exit {code}) without printing a token: the sign-in did not finish, or claude prints it "
                       "in a form this wizard does not know; run it again, or run claude setup-token yourself and use --paste")
@@ -544,19 +540,11 @@ def drop_typed_ahead():
         msvcrt.getwch()
 
 
-def check_hidden_input():
-    """Where getpass could not hide a paste, as in an IDE's console,
-    better found before claude mints a token than after."""
-    if sys.stdin is not sys.__stdin__ or not (sys.stdin and sys.stdin.isatty()):
-        raise TokensError("this window cannot hide what you type, so claude was not started: run the wizard from a terminal "
-                          "(cmd, PowerShell or Windows Terminal)")
-
-
 def check_token(text):
     """The token in what was pasted: claude's own line around it, such as
     its export line, is let through; an API key, or anything else, is not."""
     if not text:
-        raise NothingPasted("nothing was pasted; nothing was stored")
+        raise TokensError("nothing was pasted; nothing was stored")
     if API_KEY_HEAD in text:
         raise TokensError("that is an API key, which this project never uses (docs/project.md): make a subscription token with claude setup-token")
     found = TOKEN_SHAPE.findall(text)
@@ -583,8 +571,18 @@ def get_token(args, write=None, stdin_fd=None, ask=None, opener=None):
         return pasted_token(ask)
     claude = claude_command()
     if not pty_available():
+        if claude is not None and sys.platform == "win32" and not console_keyboard():
+            print("This window is no console claude can read its keyboard from (Git Bash's own window, or an IDE), so the "
+                  "token is pasted: run the wizard from cmd, PowerShell or Windows Terminal to have it caught by itself.")
+            return pasted_token(ask)
         if claude is not None and sys.platform == "win32":
-            return windowed_token(claude, ask, opener)
+            if opener is not None:
+                open_profile(opener)
+            show_terminal_codes()
+            print("Starting claude setup-token. Approve the sign-in in your browser; the token stays out of sight.")
+            if opener is not None:
+                print(f"  If the sign-in opens in another profile, copy the link claude shows into {opener.browser.name}'s profile {opener.profile}.")
+            return minted_token(mint_with=piped_mint, write=write, command=(claude,) + SETUP_TOKEN[1:])
         print("This shell has no pseudo-terminal, so the token is pasted: run claude setup-token in another window first.")
         return pasted_token(ask)
     if claude is None:
@@ -595,36 +593,116 @@ def get_token(args, write=None, stdin_fd=None, ask=None, opener=None):
         return minted_token(write=write, stdin_fd=stdin_fd, command=(claude,) + SETUP_TOKEN[1:], env=env)
 
 
-def windowed_token(claude, ask, opener, settle=2.0):
-    """A Windows shell has no pseudo-terminal to hide the token behind, so
-    claude setup-token runs in a window of its own, as a person would run
-    it by hand, and the token is pasted here at a hidden prompt. No
-    launcher goes through BROWSER here: Claude Code hands a batch file its
-    link through cmd.exe, which splits it at its = and & signs. The
-    profile is opened first instead, and Chrome sends the link claude
-    opens next to the profile used last."""
-    if ask is None:
-        check_hidden_input()
-    if opener is not None:
-        try:
-            subprocess.Popen([opener.browser.path, f"--profile-directory={opener.profile}", CLAUDE_HOME])
-        except OSError as error:
-            raise TokensError(f"{opener.browser.name} could not be started ({error.strerror or error}); answer n at the profile question") from None
-        time.sleep(settle)
+def piped_mint(command, write=None, env=None, stdin=None, grace=0.5):
+    """claude setup-token where there is no pseudo-terminal, as in a Windows
+    shell: its keyboard is this console, which it shares, and its output
+    comes here on a pipe and goes to the screen through the same mask, so
+    the token is caught as behind a terminal. Measured on Linux with
+    Claude Code 2.1.302: claude writes to a pipe as to a terminal, with its
+    link opened and no line wrapped. The pipe is read in a thread and the
+    run ends a moment after claude does, since a program claude started,
+    such as a browser, may hold the pipe open long after."""
+    if write is None:
+        def write(text):
+            sys.stdout.write(text)
+            sys.stdout.flush()
     try:
-        subprocess.Popen([claude] + list(SETUP_TOKEN[1:]), creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
+        process = subprocess.Popen(list(command), stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   env={**os.environ, **(env or {})})
+    except OSError:
+        return [], None, False
+    import queue
+    import threading
+    chunks = queue.Queue()
+
+    def read_pipe():
+        while True:
+            try:
+                data = os.read(process.stdout.fileno(), 4096)
+            except OSError:
+                data = b""
+            chunks.put(data)
+            if not data:
+                return
+
+    threading.Thread(target=read_pipe, daemon=True).start()
+    masker = Masker()
+    decoder = codecs.getincrementaldecoder("utf-8")("replace")
+    ended = None
+    try:
+        while True:
+            try:
+                data = chunks.get(timeout=0.1)
+            except queue.Empty:
+                data = None
+            if data == b"":
+                break
+            if data:
+                write(masker.feed(decoder.decode(data)))
+            if process.poll() is not None:
+                ended = ended or time.monotonic()
+                if time.monotonic() - ended > grace:
+                    break
+    except KeyboardInterrupt:
+        process.kill()
+        raise
+    finally:
+        write(masker.feed(decoder.decode(b"", final=True), final=True))
+        if sys.stdout.isatty():
+            # Modes claude turns on stay on in the console if it dies
+            # mid-screen, and keys typed meanwhile would answer the
+            # wizard's next question.
+            write(TERMINAL_RESET)
+        write("\n")
+        drop_typed_ahead()
+        code = process.wait()
+    return masker.tokens, code, masker.cut_over_lines
+
+
+def console_keyboard():
+    """Whether this process reads a Windows console, which claude can take
+    for its keyboard; a pipe, as in Git Bash's own window or an IDE, it
+    cannot, and better found before the sign-in than in it."""
+    if not (sys.stdin and sys.stdin.isatty()):
+        return False
+    try:
+        import ctypes
+        kernel = ctypes.windll.kernel32
+        kernel.GetStdHandle.restype = ctypes.c_void_p
+        mode = ctypes.c_uint32()
+        return bool(kernel.GetConsoleMode(ctypes.c_void_p(kernel.GetStdHandle(-10)), ctypes.byref(mode)))
+    except (AttributeError, OSError):
+        return False
+
+
+def show_terminal_codes():
+    """A Windows console shows claude's colours and redraws only once asked
+    to read terminal codes, as Windows Terminal does by itself."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        kernel = ctypes.windll.kernel32
+        kernel.GetStdHandle.restype = ctypes.c_void_p
+        handle = ctypes.c_void_p(kernel.GetStdHandle(-11))
+        mode = ctypes.c_uint32()
+        if kernel.GetConsoleMode(handle, ctypes.byref(mode)):
+            kernel.SetConsoleMode(handle, mode.value | 0x0004)
+    except (AttributeError, OSError):
+        pass
+
+
+def open_profile(opener, settle=2.0):
+    """In a Windows shell no launcher goes through BROWSER: Claude Code
+    hands a batch file its link through cmd.exe, which cuts it at its =
+    and & signs. The profile is opened first instead, on a blank page so
+    no second sign-in shows, and the browser sends the link claude opens
+    next to the profile used last."""
+    try:
+        subprocess.Popen([opener.browser.path, f"--profile-directory={opener.profile}", "about:blank"])
     except OSError as error:
-        raise TokensError(f"claude setup-token could not be started ({error.strerror or error}); run it yourself and use --paste") from None
-    print("claude setup-token opened in a window of its own. Approve the sign-in in the browser, copy the token that window")
-    print("  prints, paste it here, then close that window: the token is on its screen until you do.")
-    if opener is not None:
-        print(f"  If the sign-in opened in another profile, copy the link from that window into {opener.browser.name}'s profile {opener.profile}.")
-    for _ in range(PASTE_TRIES - 1):
-        try:
-            return pasted_token(ask)
-        except NothingPasted:
-            print("Nothing was pasted; the sign-in is still open in the other window.")
-    return pasted_token(ask)
+        raise TokensError(f"{opener.browser.name} could not be started ({error.strerror or error}); answer n at the profile question") from None
+    time.sleep(settle)
 
 
 # The browser profile and cswap's accounts, remembered on this machine alone.
@@ -794,7 +872,7 @@ def launcher(opener):
     of the run's own that is gone when the sign-in is over; none without
     an opener, so claude opens the default browser as it does by itself.
     Linux, macOS and WSL only: Windows opens the profile first instead
-    (windowed_token)."""
+    (open_profile)."""
     if opener is None:
         yield {}
         return
@@ -1002,8 +1080,9 @@ def slot_number(text):
 
 
 def parse_slots(text):
-    """The slots a list names, each once, in order."""
-    return sorted({slot for slot in map(slot_number, list_words(text)) if slot is not None})
+    """The slots a list names, each once, in the list's own order, which is
+    the order the bench deals its jobs to them."""
+    return list(dict.fromkeys(slot for slot in map(slot_number, list_words(text)) if slot is not None))
 
 
 def holds_other_words(text):
@@ -1018,6 +1097,8 @@ def slots_text(text):
     shown = ",".join(str(slot) for slot in parse_slots(text)) or "no slot"
     if holds_other_words(text):
         shown += ", and a word that is not a slot, which stops the bench's real runs"
+    elif len(parse_slots(text)) != len(list_words(text)):
+        shown += ", with a slot named twice, which gives it more of the bench's jobs; the next add, remove or order rewrites it"
     return shown
 
 
@@ -1220,7 +1301,7 @@ def store_secret(state, name, token, scope):
     scope found before the token was."""
     args = ["secret", "set", name] + state.target.flags + scope
     state.gh.must(args, stdin=token)
-    print(f"  {name}: stored")
+    print(f"  {name}: stored on {state.target.describe()}")
 
 
 def set_variable(state, name, value, scope=None):
@@ -1255,11 +1336,21 @@ def verify(state, names):
     return fresh
 
 
+def ordered_slots(state, order=None):
+    """Every slot whose secret exists, in the order given, else in the
+    list's own order, a slot new to it after the rest."""
+    have = state.variables.get(ACCOUNTS_VARIABLE)
+    listed = order if order is not None else parse_slots(have.get("value", "") if have else "")
+    present = state.slots_set()
+    kept = [slot for slot in listed if slot in present]
+    return kept + [slot for slot in present if slot not in kept]
+
+
 def update_accounts(state, scope=None):
     """The variable names every slot whose secret exists, as the bench reads
     it, and is written only when that changed: a list with any other word,
     which the bench refuses, is written again."""
-    words = [str(slot) for slot in state.slots_set()]
+    words = [str(slot) for slot in ordered_slots(state)]
     wanted = ",".join(words)
     have = state.variables.get(ACCOUNTS_VARIABLE)
     if have is not None and list_words(have.get("value", "")) == words:
@@ -1406,6 +1497,51 @@ def profile_opener(profile, browser=None):
     return Opener(browser, profile)
 
 
+def reorder(gh, target, text):
+    """The list of slots in the order given: every slot that is set, each
+    once. The bench deals its jobs to the slots in this order, one job to
+    each in turn, so the first gets the first job and, when the jobs do
+    not divide evenly, one more than the last."""
+    state = State(gh, target)
+    order = parse_slots(text)
+    present = state.slots_set()
+    if not present:
+        raise TokensError("no slot is set, so there is nothing to order")
+    if holds_other_words(text) or len(order) != len(list_words(text)) or sorted(order) != present:
+        raise TokensError("the order names every slot that is set, each once: "
+                          + (",".join(str(slot) for slot in present) or "none is set") + " in the order you want")
+    scope = scope_args(state, "variables", ACCOUNTS_VARIABLE)
+    set_variable(state, ACCOUNTS_VARIABLE, ",".join(str(slot) for slot in order), scope)
+    print_status(State(gh, target))
+
+
+def print_remembered(target, path=None):
+    """What this machine remembers for each slot of this place."""
+    path = path or settings_path()
+    settings = read_settings(path)
+    print(f"Remembered on this machine, in {path}:")
+    shown = False
+    for slot in SLOTS:
+        known = remembered(settings, target, slot)
+        if known["profile"] or known["cswap"]:
+            shown = True
+            parts = [f"browser profile {known['profile']}" if known["profile"] else "the default browser"]
+            if known["cswap"]:
+                parts.append(f"cswap account {known['cswap']}")
+            print(f"  slot {slot}: " + ", ".join(parts))
+    if not shown:
+        print("  nothing")
+
+
+def forget(target, slot, path=None):
+    """The slot's browser profile and cswap account, forgotten here; the
+    browser's profile itself is the browser's to delete."""
+    path = path or settings_path()
+    settings = read_settings(path)
+    remember(path, settings, target, slot, None, None)
+    print(f"Slot {slot}: forgotten on this machine. Delete the browser profile itself in the browser, if you want it gone.")
+
+
 def remove(gh, target, slot):
     state = State(gh, target)
     name = slot_secret(slot)
@@ -1416,6 +1552,7 @@ def remove(gh, target, slot):
     if slot_label(slot) in state.variables:
         delete_variable(state, slot_label(slot))
     update_accounts(State(gh, target))
+    forget(target, slot)
 
 
 def chosen_slot(state, ask):
@@ -1514,9 +1651,14 @@ def build_parser():
     adding.add_argument("--profile", help="open the sign-in in this profile of Chrome, Edge or Brave (its folder name, such as \"Profile 2\")")
     main_command = commands.add_parser("main", help=f"{MAIN_SECRET} alone, the token the Claude workflows run on")
     main_command.add_argument("--paste", action="store_true", help="take the token from a hidden prompt instead of running claude setup-token")
-    removing = commands.add_parser("remove", help="a slot's secret and its label")
+    removing = commands.add_parser("remove", help="a slot's secret and its label, and what this machine remembers of it")
     removing.add_argument("slot", type=int, choices=SLOTS)
-    for command in (status, adding, main_command, removing):
+    ordering = commands.add_parser("order", help="the order the bench deals its jobs to the slots, such as 3,1,2")
+    ordering.add_argument("slots")
+    forgetting = commands.add_parser("forget", help="a slot's browser profile and cswap account, on this machine only")
+    forgetting.add_argument("slot", type=int, choices=SLOTS)
+    profiles = commands.add_parser("profiles", help="what this machine remembers for each slot")
+    for command in (status, adding, main_command, removing, ordering, forgetting, profiles):
         add_place_options(command, argparse.SUPPRESS)
     return parser
 
@@ -1536,7 +1678,8 @@ def main(argv=None):
     try:
         status = check_signed_in(gh)
         target = target_from(args, gh)
-        check_scopes(status, target)
+        if args.command not in ("forget", "profiles"):
+            check_scopes(status, target)
         if args.command == "status":
             print_status(State(gh, target))
         elif args.command == "add":
@@ -1545,6 +1688,12 @@ def main(argv=None):
             main_token(gh, target, args.paste)
         elif args.command == "remove":
             remove(gh, target, args.slot)
+        elif args.command == "order":
+            reorder(gh, target, args.slots)
+        elif args.command == "forget":
+            forget(target, args.slot)
+        elif args.command == "profiles":
+            print_remembered(target)
         else:
             wizard(gh, target)
     except TokensError as error:

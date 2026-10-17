@@ -94,6 +94,9 @@ python3 scripts/tokens.py add --slot 2 --label work
 python3 scripts/tokens.py add --also-main
 python3 scripts/tokens.py main
 python3 scripts/tokens.py remove 2
+python3 scripts/tokens.py order 3,1,2
+python3 scripts/tokens.py profiles
+python3 scripts/tokens.py forget 2
 ```
 
 Where the secrets go is read from the clone's origin: a repository of an
@@ -120,9 +123,9 @@ gives each slot a browser profile of its own. On Linux, macOS and WSL it
 hands claude a small launcher through BROWSER, the variable claude opens
 its sign-in link with, and the launcher opens the link in that profile;
 the launcher lives in a folder of the run's own and is gone when the
-sign-in ends. In a Windows shell it opens the profile first, at
-claude.ai, and then starts claude, whose link Chrome and Edge send to the
-profile used last; if it lands in another profile, copy the link claude
+sign-in ends. In a Windows shell it opens the profile first, on a blank
+page so that no second sign-in shows, and then starts claude, whose link
+Chrome and Edge send to the profile used last; if it lands in another profile, copy the link claude
 prints into the right one.
 The first time, a new profile shows claude.ai's sign-in page: sign in
 there as the slot's account, then Approve. The profile keeps that
@@ -151,11 +154,15 @@ sequence.json, and opens none of its credentials.
 Linux, macOS and WSL have the pseudo-terminal the sign-in runs behind;
 claude opens the browser where it can and prints the link otherwise, and
 in WSL the link is opened in the Windows browser. A Windows shell has no
-pseudo-terminal to hide the token behind: there the wizard starts
-`claude setup-token` in a window of its own, after opening the slot's
-profile, and takes the token you copy from that window at a hidden
-prompt that echoes nothing, as gh's own prompt would; close that window
-afterwards, since the token stays on its screen until you do. A machine
+pseudo-terminal: there claude runs in the same window, keeping its
+keyboard, and its output reaches the screen through the wizard on a pipe,
+masked as behind a terminal, so the token should be caught and stored by
+itself there too: claude 2.1.302 writes to a pipe as to a terminal, its
+link opened and no line wrapped, as measured on Linux; the owner's first
+Windows run is the test. That needs a console claude can read its
+keyboard from (cmd, PowerShell or Windows Terminal); in Git Bash's own
+window or an IDE the wizard says so and takes a pasted token instead. A
+machine
 may have gh but not claude: there, run `claude setup-token` wherever
 claude is and give the wizard the token with `add --paste` or
 `main --paste`; the wizard takes the paste path by itself when it cannot
@@ -195,7 +202,13 @@ Then `python3 scripts/tokens.py status` says what GitHub lists.
 A token lasts about a year. `status` says "renew soon" within a month of
 that and "renew now" past it; `add --slot N` for that slot replaces the
 token in place, with the slot's label and list kept. `remove N` deletes
-the slot's secret and its label and takes it off the list; delete
+the slot's secret and its label, takes it off the list and forgets the
+slot's profile and cswap account on this machine; `forget N` does only
+the last. `order 3,1,2` rewrites the list of slots in that order, every
+slot that is set once: the bench deals its jobs to the slots in the
+list's order, one to each in turn (coordbench's plan.py), so the order
+says which account takes the first job, not which is used up first; a
+slot added later joins the end, and the order stays; delete
 CLAUDE_CODE_OAUTH_TOKEN on its page to turn @claude, the workers in
 Actions and the coordinator workflow off (docs/setup/claude-action.md).
 Deleting or replacing a secret takes the old token out of Actions and

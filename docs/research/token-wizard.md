@@ -409,8 +409,24 @@ the same loop then failed none in 100 under load; a real browser started
 as claude exits had the same exposure, so the fix is in the launcher,
 not the test.
 
+The owner's first run on Windows (2026-10-17): the window claude ran in
+closed when claude ended, before the token could be copied, and the
+profile opened at claude.ai showed a second sign-in beside claude's own.
+Read with claude 2.1.302's output on a pipe and its keyboard a terminal:
+it starts, opens its link and prints the sign-in screens with no line
+wrapped. So a Windows shell now runs claude in the same window with its
+output on a pipe through the mask, and the token is caught as behind a
+pseudo-terminal, with no copying; the profile opens on a blank page. The
+owner asked to keep a copy of each token to show again later and chose
+Windows Credential Manager on a card; the session's permission check
+refused writing that code, so it waits on the owner. The list of slots now
+keeps its order, which the bench deals jobs in (coordbench's plan.py, one
+job to each slot in turn), and `order`, `profiles` and `forget` came with
+it.
+
 Not measured, since no session runs Windows or a real browser: whether
-Chrome on Windows sends claude's link to the profile just opened, as it
+claude's keyboard works in a Windows console while its output is piped;
+whether Chrome on Windows sends claude's link to the profile just opened, as it
 sends external links to the profile used last; whether Chrome makes a new profile for a --profile-directory folder that
 does not exist yet, as it is documented to; and the callback from a
 Windows browser into WSL, which depends on WSL's localhost forwarding.
