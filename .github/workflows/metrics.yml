@@ -56,7 +56,10 @@ name: Metrics
 # three files is the project's own, there before this workflow came (a
 # repository that adopted the template, or an owner who started one), and
 # replacing it would lose it: the run says so, says to rename it, and pushes
-# nothing. It writes only when METRICS.json or PROFILE.json changed apart
+# nothing. A copy of this workflow from before PROFILE.json counts it as
+# such a file, so a metrics.yml rolled back past the profile's sums stops
+# with that advice: delete PROFILE.json from the branch metrics instead of
+# renaming the branch, and the older workflow writes again. It writes only when METRICS.json or PROFILE.json changed apart
 # from its generated_at, and a push made with GITHUB_TOKEN starts no
 # workflow. The job is skipped in the template repository itself, scheduled
 # runs included; in a fork, whose branch metrics is a frozen copy of the

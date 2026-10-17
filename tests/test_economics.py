@@ -119,6 +119,16 @@ class Attribution(unittest.TestCase):
             self.assertIsNone(economics.actions_record({**base, "profile": block})["profile"], block)
         self.assertIsNone(economics.actions_record(base)["profile"])
 
+    def test_a_run_that_made_no_call_has_no_profile(self):
+        # usage.run_profile writes every count 0 for a run whose execution
+        # file holds no call; read as a profile, it would pull the median
+        # peak down and dilute the per-merge ratios.
+        base = {"v": 1, "source": "actions"}
+        zeros = dict.fromkeys(economics.usage.profiler().TRAILER_FIELDS, 0)
+        self.assertIsNone(economics.actions_record({**base, "profile": zeros})["profile"])
+        for kept in ({**zeros, "calls": 1}, {**zeros, "peak": 1}):
+            self.assertEqual(economics.actions_record({**base, "profile": kept})["profile"], kept)
+
 
 class Window(unittest.TestCase):
     def test_the_bill_is_the_windows_trailers_and_runs_and_the_delivery_its_pull_requests(self):

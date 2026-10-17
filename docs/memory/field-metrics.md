@@ -81,8 +81,10 @@ beside the recorder (profiling-sessions.md); collect --profile-out sums
 both per pull request into PROFILE.json, by work setting and alone against
 parallel, which the workflow writes beside METRICS.json and the collector
 does not read until the Apps' privacy statement lists its keys. The usage
-cache's version 2 keeps each run's profile, so a cache kept before it is
-read again from the artifacts.
+cache's version 2 keeps each run's profile; a record a version 1 cache
+kept still counts, marked old, and is downloaded again for its profile
+after the new ones, within the 200, while its artifact lasts, so no run
+drops out of the economics when the cache's form changes.
 
 Two conventions the counts rest on: the coordinator, the board's run or a
 coordinator routine, starts each release comment with

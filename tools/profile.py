@@ -762,11 +762,20 @@ def trailer_block(text):
 
 # --- the sums over pull requests ----------------------------------------------------
 
+def measured(counts):
+    """Whether a line's or a run's counts are a profile: any call made or
+    any context held. A run that made no API call records every count 0,
+    and a line or a run of zeros counted as profiled would pull the median
+    peak down and the per-merge ratios with it, where the economics count
+    a pull request as measured only with tokens above 0."""
+    return bool(counts) and bool(counts.get("calls") or counts.get("peak"))
+
+
 def commit_lines(commit):
     """The Symphony-Profile lines of a commit as GitHub lists it, those
-    that carry any count."""
+    that are a profile (measured)."""
     message = ((commit or {}).get("commit") or {}).get("message") or ""
-    return [(session, counts) for session, counts in parse_trailer(message) if counts]
+    return [(session, counts) for session, counts in parse_trailer(message) if measured(counts)]
 
 
 def pull_profile(work, records):

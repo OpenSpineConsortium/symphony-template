@@ -610,6 +610,19 @@ class SumsOverPullRequests(unittest.TestCase):
         self.assertEqual(profile.commit_lines(work.commits[3]), [], "a line with no count is no profile")
         self.assertIsNone(profile.pull_profile(economics.Work(41, commits=work.commits[2:]), records))
 
+    def test_a_line_or_a_run_of_zeros_is_no_profile(self):
+        # A session or a run that made no call writes every count 0: no
+        # profile, so it neither counts a pull request as profiled nor
+        # pulls the median peak down.
+        zeros = profile_line("dddd", **dict.fromkeys(profile.TRAILER_FIELDS, 0))
+        work = economics.Work(42, commits=[commit_of(zeros)])
+        self.assertEqual(profile.commit_lines(work.commits[0]), [])
+        self.assertIsNone(profile.pull_profile(work, []))
+        self.assertTrue(profile.measured({"calls": 0, "peak": 5}))
+        self.assertTrue(profile.measured({"calls": 3, "peak": 0}))
+        for counts in ({}, None, {"calls": 0, "peak": 0, "reads": 4}):
+            self.assertFalse(profile.measured(counts), counts)
+
     def works(self):
         """economics' own two sides: 1 and 2 alone, 3 to 5 at work together,
         and the automation's 6 beside them all, which counts on no side."""

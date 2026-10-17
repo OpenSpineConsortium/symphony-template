@@ -178,11 +178,13 @@ def profile_counts(block):
     Symphony-Profile line (tools/profile.py, TRAILER_FIELDS), each a whole
     number below the bound, the rest passed over; None where the record
     has none of them, as a record from a workflow that copied no profile.py
-    beside the recorder has none."""
+    beside the recorder has none, or a run that made no call, whose counts
+    are all 0 (profile.measured)."""
     if not isinstance(block, dict):
         return None
-    counts = {key: block[key] for key in usage.profiler().TRAILER_FIELDS if number(block.get(key))}
-    return counts or None
+    profiler = usage.profiler()
+    counts = {key: block[key] for key in profiler.TRAILER_FIELDS if number(block.get(key))}
+    return counts if profiler.measured(counts) else None
 
 
 def kept_record(data):

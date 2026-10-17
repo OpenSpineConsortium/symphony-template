@@ -167,8 +167,8 @@ RECORD_KEYS = ("schema", "generated_at", "window_days", "sharing", "protocol_ver
 BREAKDOWN_KEYS = RECORD_KEYS[-5:]
 # The keys of PROFILE.json, in order; the last four are measured with the
 # breakdown and left out with it.
-PROFILE_KEYS = ("schema", "generated_at", "window_days", "sharing", "sessions", "actions_runs", "by_setting",
-                "coordination")
+PROFILE_KEYS = ("schema", "generated_at", "window_days", "sharing", "sessions", "actions_runs",
+                "actions_runs_unread", "by_setting", "coordination")
 
 # A check run counts as passed or failed by its conclusion; neutral,
 # skipped, cancelled, stale and action_required say neither, and a run
@@ -237,12 +237,18 @@ RESET_HEADER = "X-RateLimit-Reset"
 # workflow carries from one run to the next, so the next run reads only
 # what is new; an artifact or a file bigger than USAGE_MAX_BYTES is no
 # record of ours and is left unread. The cache's version rises when the
-# kept form keeps more, as version 2 keeps each run's profile, so a cache
-# an older run wrote, which dropped it, is read again from the artifacts.
+# kept form keeps more, as version 2 keeps each run's profile. A record an
+# older version kept is still read, without what that version dropped, and
+# is marked old: its artifact is downloaded again once the new ones are
+# read, within the same USAGE_LIMIT, while it is listed and unexpired, and
+# the old record stays where that download fails or the artifact has gone,
+# so no run drops out of the economics because the cache's form changed.
 USAGE_PREFIX = "symphony-usage-"
 USAGE_LIMIT = 200
 USAGE_MAX_BYTES = 65536
 USAGE_CACHE_VERSION = 2
+# The versions whose records a run still reads (read_usage_cache).
+USAGE_CACHE_VERSIONS = (1, 2)
 REDIRECTS = (301, 302, 303, 307, 308)
 # GitHub's revert button opens a pull request whose title starts so.
 REVERT_TITLE = 'Revert "'
@@ -1409,16 +1415,23 @@ def read_usage_cache(path):
     """The records an earlier run kept, by artifact id, each with when its
     artifact was made and in the form the cache keeps, which a cache an
     older run wrote, holding records as they were uploaded, is brought to;
-    an unreadable file is an empty one."""
+    a record an older version of the cache kept is marked old and read
+    with no profile, which that version dropped; an unreadable file is an
+    empty one."""
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8")) if path else None
     except (OSError, ValueError):
         return {}
-    entries = data.get("records") if isinstance(data, dict) and data.get("v") == USAGE_CACHE_VERSION else None
+    version = data.get("v") if isinstance(data, dict) else None
+    entries = data.get("records") if version in USAGE_CACHE_VERSIONS else None
     kept = {}
     for key, entry in (entries if isinstance(entries, dict) else {}).items():
         record = economics.kept_record(entry.get("record")) if isinstance(entry, dict) else None
-        if record is not None and isinstance(entry.get("at"), str) and parse_time(entry["at"]) is not None:
+        if record is None or not isinstance(entry.get("at"), str) or parse_time(entry["at"]) is None:
+            continue
+        if version != USAGE_CACHE_VERSION or entry.get("old") is True:
+            kept[key] = {"at": entry["at"], "record": {**record, "profile": None}, "old": True}
+        else:
             kept[key] = {"at": entry["at"], "record": record}
     return kept
 
@@ -1430,20 +1443,22 @@ def write_usage_cache(path, kept):
 
 def read_usage(api, since, cached):
     """The usage records of the Actions runs made since since, by artifact
-    id, the cached ones taken as they are and new ones downloaded, at most
-    USAGE_LIMIT, newest first; and how many were left unread, None when the
-    artifacts could not be listed at all (a workflow without actions: read,
-    or the board's reserve reached), when only the cached ones are kept."""
+    id, the cached ones taken as they are and new ones downloaded, then the
+    old ones (read_usage_cache) downloaded again, at most USAGE_LIMIT
+    downloads in all, newest first; and how many new ones were left unread,
+    None when the artifacts could not be listed at all (a workflow without
+    actions: read, or the board's reserve reached), when only the cached
+    ones are kept. An old record whose download fails, or is left for a
+    later run, is kept as it was."""
     kept = {key: entry for key, entry in cached.items() if parse_time(entry["at"]) >= since}
     try:
         listed = usage_artifacts(api, since)
     except GitHubError:
         return kept, None
+    fresh = [(artifact, when) for artifact, when in listed if str(artifact["id"]) not in kept]
+    old = [(artifact, when) for artifact, when in listed if kept.get(str(artifact["id"]), {}).get("old")]
     unread = fetched = 0
-    for artifact, when in listed:
-        key = str(artifact["id"])
-        if key in kept:
-            continue
+    for artifact, when in fresh:
         if fetched >= USAGE_LIMIT:
             unread += 1
             continue
@@ -1457,7 +1472,19 @@ def read_usage(api, since, cached):
             continue
         fetched += 1
         if record is not None:
-            kept[key] = {"at": iso(when), "record": record}
+            kept[str(artifact["id"])] = {"at": iso(when), "record": record}
+    for artifact, when in old:
+        if fetched >= USAGE_LIMIT:
+            break
+        try:
+            record = artifact_record(api, artifact)
+        except OutOfBudget:
+            break
+        except GitHubError:
+            continue
+        fetched += 1
+        if record is not None:
+            kept[str(artifact["id"])] = {"at": iso(when), "record": record}
     return kept, unread
 
 
@@ -1508,12 +1535,14 @@ def reverts(facts, window):
 
 class Records(NamedTuple):
     """The Actions runs' usage records since the look-back began, oldest
-    first, those of them made in the window, and how many were left unread
-    (read_usage)."""
+    first, those of them made in the window, how many were left unread
+    (read_usage), and how many of those read are kept from an older cache
+    without their profile, not yet downloaded again (read_usage_cache)."""
 
     all: list
     in_window: list
     unread: object
+    unprofiled: int = 0
 
 
 def usage_records(api, window, cache_path=None):
@@ -1524,7 +1553,7 @@ def usage_records(api, window, cache_path=None):
     entries = sorted(kept.values(), key=lambda entry: entry["at"])
     records = [economics.actions_record(entry["record"]) for entry in entries]
     in_window = [record for entry, record in zip(entries, records) if window.holds(parse_time(entry["at"]))]
-    return Records(records, in_window, unread)
+    return Records(records, in_window, unread, sum(1 for entry in entries if entry.get("old")))
 
 
 def economic_keys(facts, units, window, records):
@@ -1542,9 +1571,11 @@ def profile_keys(facts, units, window, records):
     Actions runs that name it (profile.pull_profile), summed per work
     setting over the pull requests that ended in the window, each counted
     once in its setting as the breakdown counts it, and in the coordination
-    block's two sides (profile.coordination); and how many sessions' lines
-    and runs' profiles the sums hold, the coordinator's runs that count on
-    the parallel side among them."""
+    block's two sides (profile.coordination); how many sessions' lines and
+    runs' profiles the sums hold, the coordinator's runs that count on the
+    parallel side among them; and how many runs' profiles are not read
+    yet, those left unread and those an older cache kept without one, None
+    where the runs could not be listed."""
     by_number = {f.pull["number"]: f for f in facts}
     partners = partners_of(units, window.end)
     ended = finished(units, window)
@@ -1552,11 +1583,13 @@ def profile_keys(facts, units, window, records):
     profiles = {work.number: profile.pull_profile(work, records.all) for work in works}
     settings = {unit.number: setting_of(unit, partners[unit.number]) for unit in ended}
     working, others = works_and_others(units, facts, window)
-    overhead = economics.overhead(working, records.in_window)
+    overhead = {id(run) for run in economics.overhead(working, records.in_window)}
     summed = [record for record in records.all if record["profile"] and (
-        any(record is run for run in overhead) or any(economics.names(record, w) for w in works))]
-    sessions = {session for work in works for commit in work.commits for session, _ in profile.commit_lines(commit)}
-    return {"sessions": len(sessions - {""}), "actions_runs": len(summed),
+        id(record) in overhead or any(economics.names(record, w) for w in works))]
+    lines = [profile.commit_lines(commit) for work in works for commit in work.commits]
+    sessions = {session for found in lines for session, _ in found}
+    unread = None if records.unread is None else records.unread + records.unprofiled
+    return {"sessions": len(sessions - {""}), "actions_runs": len(summed), "actions_runs_unread": unread,
             "by_setting": {name: profile.group([w for w in works if settings[w.number] == name], profiles)
                            for name in SETTINGS},
             "coordination": profile.coordination(working, profiles, window.end, others, records.in_window)}
@@ -2225,7 +2258,7 @@ def collect(args, environ, opener=None, sleep=time.sleep):
     window = Window.ending(now, args.window_days)
     api = Budgeted(environ.get("GITHUB_TOKEN"), args.repo, opener=opener, sleep=sleep)
     facts, extra_claims, comments, rest = read_repository(api, window)
-    measured, profiled = measures(facts, extra_claims, comments, window), {}
+    measured, records = measures(facts, extra_claims, comments, window), None
     # The breakdown never costs a key measured before it: when its reads
     # would reach the board's reserve, or GitHub fails one of them, the
     # record is written without it, the record a copy of the template from
@@ -2243,7 +2276,6 @@ def collect(args, environ, opener=None, sleep=time.sleep):
         records = usage_records(api, window, args.usage_cache)
         measured.update(broken_out)
         measured.update(economic_keys(facts, units, window, records))
-        profiled = profile_keys(facts, units, window, records)
         left = (f"; the changed files of {unread} pull requests were left unread to keep the board's reserve, so "
                 "the counts that need them are null") if unread else ""
         if records.unread is None:
@@ -2253,8 +2285,17 @@ def collect(args, environ, opener=None, sleep=time.sleep):
     write_json(args.out, metrics_record(measured, window, protocol_version()))
     written = args.out
     if args.profile_out:
-        write_json(args.profile_out, profile_record(profiled, window))
-        written = f"{args.out} and {args.profile_out}"
+        # PROFILE.json is summed only once METRICS.json is written, from
+        # what collect already read, so that no fault in its sums can stop
+        # the record the collector reads; a run that writes no PROFILE.json
+        # leaves the branch's own in place (metrics.yml).
+        try:
+            profiled = profile_keys(facts, units, window, records) if records is not None else {}
+        except Exception as fault:
+            left += f"; {PROFILE_FILE} was not written: {type(fault).__name__}: {fault}"
+        else:
+            write_json(args.profile_out, profile_record(profiled, window))
+            written = f"{args.out} and {args.profile_out}"
     print(f"metrics: {written} written over {args.window_days} days, in {api.calls} calls{left}")
     return 0
 

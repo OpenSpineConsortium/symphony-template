@@ -911,19 +911,64 @@ class Economics(unittest.TestCase):
             self.assertEqual(metrics.read_usage_cache(cache), {})
 
     def test_a_cache_kept_before_the_profile_is_read_again_from_the_artifacts(self):
-        # Version 1 kept no run's profile, so its records are downloaded
-        # again rather than read without one.
+        # Version 1 kept no run's profile: its records still count, marked
+        # old, and are downloaded again for the profile.
         with tempfile.TemporaryDirectory() as folder:
             cache = Path(folder) / "usage.json"
-            older = {"9001": {"at": "2026-10-07T10:28:00Z", "record": json.loads(record_text(profile="null"))},
-                     "9002": {"at": "2026-10-06T08:00:00Z", "record": json.loads(record_text())}}
-            cache.write_text(json.dumps({"v": 1, "records": older}))
-            self.assertEqual(metrics.read_usage_cache(cache), {})
-            _, _, opener = self.collect(folder, cache=cache)
+            cache.write_text(json.dumps({"v": 1, "records": OLDER_CACHE}))
+            read = metrics.read_usage_cache(cache)
+            self.assertEqual(sorted(read), ["9001", "9002"])
+            self.assertEqual({(entry["old"], entry["record"]["profile"]) for entry in read.values()}, {(True, None)})
+            record, _, opener = self.collect(folder, cache=cache)
             kept = json.loads(cache.read_text())
         self.assertEqual(sum(path.endswith("/zip") for path in opener.calls), 2)
+        self.assertEqual(record["economics"], WORLD_ECONOMICS)
         self.assertEqual((kept["v"], kept["records"]["9001"]["record"]["profile"]),
                          (metrics.USAGE_CACHE_VERSION, RUN_9001_PROFILE))
+        self.assertFalse(any("old" in entry for entry in kept["records"].values()))
+
+    def test_an_old_record_whose_artifact_has_expired_still_counts(self):
+        # A repository whose artifacts live less than the 60 days a run
+        # reads back: the old records cannot be downloaded again, and the
+        # economics keep them as they were.
+        routes = world_routes()
+        routes[f"{API}/actions/artifacts"] = {"total_count": 4, "artifacts": [
+            dict(item, expired=True) for item in WORLD_ARTIFACTS["artifacts"]]}
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / "usage.json"
+            cache.write_text(json.dumps({"v": 1, "records": OLDER_CACHE}))
+            record, _, opener = self.collect(folder, routes=routes, cache=cache)
+            kept = json.loads(cache.read_text())
+        self.assertEqual(sum(path.endswith("/zip") for path in opener.calls), 0)
+        self.assertEqual(record["economics"], WORLD_ECONOMICS)
+        self.assertEqual(record["coordination"], WORLD_COORDINATION)
+        self.assertEqual({key: entry.get("old") for key, entry in kept["records"].items()},
+                         {"9001": True, "9002": True}, "still old, so a later run may read them again")
+
+    def test_an_old_record_whose_download_fails_is_kept_as_it_was(self):
+        routes = world_routes()
+        del routes[f"{API}/actions/artifacts/9001/zip"]
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / "usage.json"
+            cache.write_text(json.dumps({"v": 1, "records": OLDER_CACHE}))
+            record, _, _ = self.collect(folder, routes=routes, cache=cache)
+            kept = json.loads(cache.read_text())["records"]
+        self.assertEqual(record["economics"], WORLD_ECONOMICS)
+        self.assertEqual((kept["9001"].get("old"), kept["9001"]["record"]["profile"]), (True, None))
+        self.assertEqual((kept["9002"].get("old"), kept["9002"]["record"]["profile"]), (None, RUN_9002_PROFILE))
+
+    def test_old_records_are_read_again_only_after_the_new_ones_within_the_limit(self):
+        with tempfile.TemporaryDirectory() as folder, mock.patch.object(metrics, "USAGE_LIMIT", 1):
+            cache = Path(folder) / "usage.json"
+            cache.write_text(json.dumps({"v": metrics.USAGE_CACHE_VERSION, "records": {
+                "9002": dict(OLDER_CACHE["9002"], old=True)}}))
+            record, shown, opener = self.collect(folder, cache=cache)
+            kept = json.loads(cache.read_text())["records"]
+        self.assertEqual([path for path in opener.calls if path.endswith("/zip")],
+                         [f"{API}/actions/artifacts/9001/zip"])
+        self.assertEqual((record["economics"]["actions_runs"], record["economics"]["actions_runs_unread"]), (2, 0))
+        self.assertNotIn("left for the next run", shown)
+        self.assertEqual((kept["9002"].get("old"), "old" in kept["9001"]), (True, False))
 
     def test_a_listing_or_a_breakdown_read_cut_short_or_not_http_is_one_line_of_the_record(self):
         # The library's request lets http.client's own errors through, which
@@ -1034,12 +1079,13 @@ class Economics(unittest.TestCase):
         self.assertEqual(metrics.reverts(facts, window), 1)
 
 
-def collect_profile(folder, routes=None, environ=None, remaining=None):
+def collect_profile(folder, routes=None, environ=None, remaining=None, cache=None):
     """collect with --profile-out over the world: METRICS.json, PROFILE.json
     and what the run printed."""
     out, profile_out = Path(folder) / "METRICS.json", Path(folder) / "PROFILE.json"
+    extra = ["--usage-cache", str(cache)] if cache else []
     args = metrics.parse_args(["collect", "--repo", REPO, "--out", str(out), "--root", str(folder), "--now", NOW,
-                               "--profile-out", str(profile_out)])
+                               "--profile-out", str(profile_out), *extra])
     opener = FakeGitHub(routes or world_routes(), remaining=remaining)
     with redirect_stdout(io.StringIO()) as shown:
         code = metrics.collect(args, {"GITHUB_TOKEN": "t"} if environ is None else environ, opener=opener,
@@ -1099,11 +1145,62 @@ class ProfileSums(unittest.TestCase):
         self.assertEqual(tuple(json.loads(text)), metrics.PROFILE_KEYS[:4])
 
     def test_without_its_option_no_profile_is_written(self):
-        with tempfile.TemporaryDirectory() as folder:
+        with tempfile.TemporaryDirectory() as folder, \
+                mock.patch.object(metrics, "profile_keys", side_effect=AssertionError("summed")) as summed:
             code, record, _, shown, _, _ = collect_world(folder)
             self.assertEqual(sorted(path.name for path in Path(folder).iterdir()), ["METRICS.json"])
         self.assertEqual(code, 0)
         self.assertNotIn("PROFILE", shown)
+        summed.assert_not_called()
+
+    def test_a_fault_in_the_sums_never_stops_metrics_json(self):
+        with tempfile.TemporaryDirectory() as folder, \
+                mock.patch.object(metrics, "profile_keys", side_effect=ZeroDivisionError("a slip")):
+            out, profile_out = Path(folder) / "METRICS.json", Path(folder) / "PROFILE.json"
+            args = metrics.parse_args(["collect", "--repo", REPO, "--out", str(out), "--root", folder, "--now", NOW,
+                                       "--profile-out", str(profile_out)])
+            with redirect_stdout(io.StringIO()) as shown:
+                code = metrics.collect(args, {"GITHUB_TOKEN": "t"}, opener=FakeGitHub(world_routes()),
+                                       sleep=lambda seconds: None)
+            record, written = json.loads(out.read_text()), profile_out.exists()
+        self.assertEqual(code, 0)
+        self.assertEqual(record["economics"], WORLD_ECONOMICS)
+        self.assertFalse(written, "the write step keeps the branch's PROFILE.json")
+        self.assertIn("; PROFILE.json was not written: ZeroDivisionError: a slip", shown.getvalue())
+
+    def test_runs_not_read_again_yet_are_counted_as_unread(self):
+        routes = world_routes()
+        del routes[f"{API}/actions/artifacts/9001/zip"]
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / "usage.json"
+            cache.write_text(json.dumps({"v": 1, "records": OLDER_CACHE}))
+            _, record, text, _ = collect_profile(folder, routes=routes, cache=cache)
+        found = json.loads(text)
+        self.assertEqual((record["economics"]["actions_runs_unread"], found["actions_runs_unread"]), (0, 1))
+        self.assertEqual(found["by_setting"]["workflow_agents"]["profiled"], 0, "9001 is read without its profile")
+        unlisted = world_routes()
+        del unlisted[f"{API}/actions/artifacts"]
+        with tempfile.TemporaryDirectory() as folder:
+            _, _, text, _ = collect_profile(folder, routes=unlisted)
+        self.assertIsNone(json.loads(text)["actions_runs_unread"])
+
+    def test_beyond_the_world_each_run_and_line_counts_where_it_belongs(self):
+        # The world and five things more: a run from the look-back naming
+        # 309, which ended in the window; a run in the window naming
+        # nothing, not the coordinator's; a coordinator's run from the
+        # look-back; 330, which only open work (331) is beside; and on 330
+        # a line of a session seen nowhere else, made before the window.
+        with tempfile.TemporaryDirectory() as folder:
+            code, _, text, _ = collect_profile(folder, routes=beyond_the_world_routes())
+        found = json.loads(text)
+        self.assertEqual(code, 0)
+        self.assertEqual(found["sessions"], 3, "the line made before the window names its session")
+        self.assertEqual(found["actions_runs"], 3, "9001, 9002 and the look-back's run on 309")
+        self.assertEqual(found["by_setting"]["workflow_agents"]["calls"], 18 + 7, "the look-back's run on 309")
+        self.assertEqual((found["coordination"]["alone"]["pull_requests"],
+                          found["coordination"]["parallel"]["pull_requests"]), (0, 12), "331 is beside 330")
+        self.assertEqual(found["coordination"]["parallel"]["calls"], 236 + 7 + 4,
+                         "neither the run naming nothing nor the look-back's coordinator run")
 
 
 class ProtocolVersion(unittest.TestCase):
@@ -1463,6 +1560,63 @@ WORLD_RECORDS = {
 }
 
 
+# A version 1 cache of the world's two records, as an older run kept them,
+# with no profile.
+OLDER_CACHE = {
+    "9001": {"at": "2026-10-07T10:28:00Z", "record": json.loads(record_text(profile="null"))},
+    "9002": {"at": "2026-10-06T08:00:00Z", "record": {
+        "v": 1, "source": "actions", "workflow": "coordinator", "job": "plan", "issue": 900, "pull": None,
+        "seconds": 95.0, "models": {"claude-opus-5-5": [600, 15000, 0, 90000, 3500]}}},
+}
+
+
+def beyond_the_world_routes():
+    """The world with the runs, the pull requests and the line that
+    ProfileSums.test_beyond_the_world_each_run_and_line_counts_where_it_belongs
+    names."""
+    routes = world_routes()
+    extra = {
+        9004: ("symphony-usage-40-1-claude", "2026-09-01T08:00:00Z",
+               usage_record("claude", "claude", {"claude-sonnet-5-5": [10, 0, 0, 0, 10]}, 30.0, pull=309,
+                            profile=run_profile(7, 0, 0, 1, 0, 100, 0, 90000, 0, 0, 0))),
+        9005: ("symphony-usage-80-1-claude", "2026-10-08T06:00:00Z",
+               usage_record("claude", "claude", {"claude-sonnet-5-5": [10, 0, 0, 0, 10]}, 30.0, issue=999,
+                            profile=run_profile(5, 0, 0, 1, 0, 100, 0, 30000, 0, 0, 0))),
+        9006: ("symphony-usage-41-1-plan", "2026-09-02T08:00:00Z",
+               usage_record("coordinator", "plan", {"claude-opus-5-5": [10, 0, 0, 0, 10]}, 30.0, issue=901,
+                            profile=run_profile(9, 0, 0, 1, 0, 100, 0, 50000, 0, 0, 0))),
+    }
+    listed = WORLD_ARTIFACTS["artifacts"] + [artifact(number, name, made) for number, (name, made, _) in extra.items()]
+    routes[f"{API}/actions/artifacts"] = {"total_count": len(listed), "artifacts": sorted(
+        listed, key=lambda item: item["created_at"], reverse=True)}
+    for number, (_, _, record) in extra.items():
+        routes[f"{API}/actions/artifacts/{number}/zip"] = Redirect(f"{STORAGE}/usage/{number}.zip?sig=x")
+        routes[f"/usage/{number}.zip"] = record
+    pulls = list(WORLD_PULLS)
+    at = next(index for index, item in enumerate(pulls) if item["number"] == 313)
+    pulls[at:at] = [
+        world_pull(330, "zed-secret", "2026-09-15T00:30:00Z", "2026-09-15T02:00:00Z", "claude/530",
+                   merged="2026-09-15T02:00:00Z"),
+        world_pull(331, "yan-secret", "2026-09-15T00:00:00Z", "2026-09-15T01:00:00Z", "claude/531", state="open")]
+    routes[f"{API}/pulls"] = pulls
+    commits = {330: [world_commit(330, 1, "2026-09-07T00:00:00Z", "Work.\n\nSymphony-Profile: v1 " + profiled(
+                         "c1c1c1c1", 4, 0, 0, 1, 0, 100, 0, 1000, 0, 0, 5)),
+                     world_commit(330, 2, "2026-09-15T01:00:00Z")],
+               331: [world_commit(331, 1, "2026-09-15T00:10:00Z")]}
+    for number, listed_commits in commits.items():
+        routes[f"{API}/pulls/{number}/commits"] = listed_commits
+        routes[f"{API}/pulls/{number}/reviews"] = []
+        routes[f"{API}/pulls/{number}/files"] = [{"filename": f"src/secret_{number}.py"}]
+        for item in listed_commits:
+            routes[f"{API}/commits/{item['sha']}/check-runs"] = runs()
+    routes[f"{API}/pulls/331"] = {"number": 331, "mergeable": True, "mergeable_state": "clean"}
+    # 331, open since Sept 15, is beside the world's work since, whose files
+    # are read for it.
+    for item in pulls:
+        routes.setdefault(f"{API}/pulls/{item['number']}/files", [])
+    return routes
+
+
 def world_routes():
     routes = {f"{API}/pulls": WORLD_PULLS, f"{API}/branches": [], f"{API}/issues/comments": WORLD_COMMENTS,
               f"{API}/actions/artifacts": WORLD_ARTIFACTS}
@@ -1546,7 +1700,7 @@ def profile_row(*values):
 NOTHING_PROFILED = (0,) * 10
 WORLD_PROFILE = {
     "schema": "symphony-profile-sums/1", "generated_at": NOW, "window_days": 30, "sharing": "on", "sessions": 2,
-    "actions_runs": 2,
+    "actions_runs": 2, "actions_runs_unread": 0,
     "by_setting": {
         "solo": profile_row(1, 1, 1, 1, 50, 4, 3, 15, 6, 70000, 20000, 0, 0, 400, 200000),
         "one_session": profile_row(2, 2, 1, 1, 30, 0, 2, 10, 4, 40000, 12000, 0, 0, 150, 120000),
