@@ -39,7 +39,7 @@ and how the protocol feeds whoever draws it without depending on them".
 - Nobody draws it natively for GitHub issues. GitHub holds every datum the ask names, on every
   plan for free (sub-issues for the epic hierarchy, "blocked by" relations for the
   preconditions, issue types for epic and task and goal, a per-parent sub-issue progress count,
-  a Blocked icon on project boards), and draws no graph of them. Linear has no issue-level
+  blocked issues filtered in projects and the Issues tab), and draws no graph of them. Linear has no issue-level
   dependency graph at all: relations are flags in a sidebar, and its Timeline draws dependency
   lines only between projects. Jira draws the graph the owner described, a map with arrows,
   dependency lines that turn red, progress rolled up the hierarchy and a level above epic, but
@@ -78,13 +78,13 @@ and how the protocol feeds whoever draws it without depending on them".
 | What the ask names | GitHub (Free and up) | Linear | Jira Cloud |
 |---|---|---|---|
 | Epic hierarchy | Sub-issues, 100 per parent, 8 levels, GA 2025-04-09; issue types per organization (25), Free and up | Parent and sub-issues, no stated depth, nested lists since 2026-02-05; projects and initiatives above them (sub-initiatives Enterprise) | Epic, Story, Subtask; a level above Epic (Initiative) is Premium |
-| Dependencies between tasks | "Blocked by" and "blocking", GA 2025-08-21, 50 per type, in the sidebar; Blocked icon on project boards and the Issues page; filters is:blocked, blocked-by: | Relations blocked by, blocks, related, duplicate, as flags in the sidebar; once the blocker is done the relation becomes "Related" | Issue links (blocks, is blocked by) listed in the issue view; a Jira admin turns linking on |
-| A graph of tasks | None in any view; the Projects roadmap draws no lines (79 docs pages, none mentions one); Mermaid in Markdown is rendered natively since 2022 | None anywhere ("Individual issues can't be shown on the timeline"); project-to-project lines on the Timeline since 2024-08-08 | Dependency lines between dated bars on the basic timeline (Free and up, both items need start and due dates); the Dependencies view, "work items in a map layout with arrows", the Program board and badges or lines on the plan timeline are Premium |
+| Dependencies between tasks | "Blocked by" and "blocking", GA 2025-08-21, 50 per type, in the sidebar; blocked issues shown in projects and the Issues tab through the filters is:blocked, is:blocking, blocked-by: and blocking: | Relations blocked by, blocks, related, duplicate, as flags in the sidebar; once the blocker is done the relation becomes "Related" | Issue links (blocks, is blocked by) listed in the issue view; a Jira admin turns linking on |
+| A graph of tasks | None in any view; the Projects roadmap draws no lines (its layout page names none); Mermaid in Markdown is rendered natively since 2022 | None anywhere ("Individual issues cannot be viewed on the timeline"); project-to-project lines on the Timeline since 2024-08-08 | Dependency lines between dated bars on the basic timeline (Free and up, both items need start and due dates); the Dependencies view, "work items in a map layout with arrows", the Program board and badges or lines on the plan timeline are Premium |
 | Preconditions met, k of n | Readable from the API (issueDependenciesSummary: blockedBy against totalBlockedBy; GraphQL), not shown anywhere | Not shown; lists only | Not shown; progress rolls up by resolved children, points or time (Premium plans) |
 | Per-node progress | Sub-issue progress field (done of total) in Projects tables; the issue's Development section links its pull request and checks | Project graph (scope, started, completed, predicted finish), milestone percentages, initiative health; nothing on a sub-issue's parent | Progress bar per parent on the timeline; roll-ups in Premium plans |
 | An agent's live state | Only what the agent writes: comments, the claude[bot] progress comment, commits, the Actions run log | Agent sessions per issue (states pending, active, awaitingInput, error, complete, stale; thought, action, response, elicitation activities; a plan checklist; an Open button) for an agent that posts through the Agents API | Agents as assignees (GA May 2026, Standard and up with Rovo); updates as comments |
-| An assistant in the page | @claude through claude.yml on the repository's own token; Copilot's sidebar is a paid Copilot plan | Linear Agent chat, included in every plan since 2026-03-24; coding sessions on prepaid AI credits (paid plans) | Rovo on credits (Standard and up); Claude Agent for Jira on an Anthropic API key |
-| Cost | $0 | Free: 250 issues, 2 teams; Basic $10 per user per month billed yearly; Business $16; Enterprise custom | Free: 10 users; Standard $8.48 per user per month; Premium $15.56 |
+| An assistant in the page | @claude through claude.yml on the repository's own token; Copilot's chat exists on Copilot Free with monthly limits and more on paid plans (not re-read this session) | Linear Agent chat, included in every plan since 2026-03-24; coding sessions on prepaid AI credits (paid plans) | Rovo on credits (Standard and up); Claude Agent for Jira on an Anthropic API key |
+| Cost | $0 | Free: 250 issues, 2 teams; Basic $10 per user per month billed yearly; Business $16; Enterprise custom | Free: 10 users; Standard $8.48 per user per month and Premium $15.56 as read on 2026-10-17 (the page renders nothing to the session's tools; secondary pages of 2026 quote $7.91 and $14.54 billed yearly, so the owner confirms on the page) |
 | Credential it needs of ours | None beyond the person's login and GITHUB_TOKEN in Actions | Its GitHub App holds the GitHub grant on Linear's side (read and write on code, issues, pull requests, actions and workflows); anything of ours writing to Linear from Actions needs a Linear token as a secret | GitHub for Atlassian holds the GitHub grant on Atlassian's side; a mirror of ours needs a Jira token as a secret |
 
 Sources: GitHub's docs in the github/docs repository (creating-issue-dependencies.md,
@@ -113,9 +113,10 @@ blocked and forgets it fifteen minutes after the last heartbeat; an eighteen-too
 a session walk the blocks chain, claim the next unblocked member of a workstream and record
 progress, writing only issue-graph's own tables. What it cannot show: GitHub issues, labels,
 branches or the board (a GitHub backend is an unbuilt "Later, likely" roadmap item), CI checks
-(a hand-attached field), Actions jobs, a session's log. What it costs to run: a Docker host, the
-Linear key on that host, an authenticating layer in front (the app ships none and binds
-127.0.0.1), a tunnel for the webhook and the hooks, and a change to its branch resolver, which
+(a field declared automatic that nothing fetches yet, so only hand-attached ones appear),
+Actions jobs, a session's log. What it costs to run: a Docker host, the
+Linear key on that host, an authenticating layer in front (the app ships none and its server
+listens on 0.0.0.0; only its Compose file publishes the port on 127.0.0.1), a tunnel for the webhook and the hooks, and a change to its branch resolver, which
 finds an issue only through a Linear team key in the branch name.
 
 Other Linear tools: Linear's integration directory lists no roadmap, Gantt or dependency-graph
@@ -141,9 +142,10 @@ is a paid connector (Unito, Exalate) or a mirror of ours.
 GitHub-side tools: Zenhub (Marketplace app; Free for 2 repositories, 250 issues and 50 users;
 Teams $4.99 per user per month yearly) draws dependency lines between epics on its roadmap and
 blocked icons on its board from relations of its own, not GitHub's.
-maxim-lobanov/build-issue-dependencies-graph (MIT, 8 stars, no releases) is an Action that writes
-a Mermaid graph into an epic's body from task lists and "Depends on:" lines, not from native
-blocked_by. k-nasa/gid (last release 2022) and moul/depviz (2023) predate GitHub's native
+maxim-lobanov/build-issue-dependencies-graph (MIT, 8 stars) is an Action that writes a Mermaid
+graph into an epic's body from the issues the epic lists, not from native blocked_by (that it
+reads task lists and "Depends on:" lines, and has no releases, was read once and not
+re-verified; its README confirms the rest). k-nasa/gid (last release 2022) and moul/depviz (2023) predate GitHub's native
 dependencies. steveyegge/beads (MIT, 28,000 stars) is a tracker of its own with a dependency
 graph and no GitHub Issues sync. The GitHub Marketplace search for "issue dependency graph"
 returned nothing. GitHub's own MCP server has an issue_graph tool in an open pull request
@@ -214,7 +216,7 @@ and the graph, so the epic's own page carries its graph. Issue types Goal, Epic 
 the copy is an organization's, are display only, made once at the organization and never read
 by the board. All of it is GitHub's data, so Linear's sync carries the hierarchy, GitHub's
 Projects show the progress
-and the Blocked icon, and any later tool (Linear, issue-graph once it has its GitHub backend, the
+and the blocked filters, and any later tool (Linear, issue-graph once it has its GitHub backend, the
 MCP server's issue_graph tool) reads the same edges.
 
 Tier 1, Linear as a read view, the owner's clicks and no code. A Linear workspace admin who is a
@@ -262,8 +264,9 @@ application with actor=app, installed by a workspace admin, and Linear's docs as
 endpoint of the agent's that answers within 5 seconds, a server of ours; whether a worker in
 Actions could instead open its own session by mutation (agentSessionCreateOnIssue exists) and
 post activities on a client-credentials app token valid 30 days, with no webhook, is untested;
-(b) Loops and Linear Agent automations (Business and up) over the synced issues, which cannot be
-triggered by GitHub events; (c) Linear's coding sessions, Claude Code in Linear's cloud on
+(b) Loops and Linear Agent automations over the synced issues (Business and up by the changelog
+and the pricing cards, Basic and up by the AI credits page; Linear's own pages disagree), which
+cannot be triggered by GitHub events; (c) Linear's coding sessions, Claude Code in Linear's cloud on
 prepaid AI credits at provider token rates, which the house rules exclude. Of these, only (a) is
 worth a test, after 0.5.1, and only if the owner wants an OAuth client secret of a Linear app in
 a repository secret.
@@ -366,8 +369,13 @@ reaches Linear.
   Marketplace API answers 403 through the proxy; they need a browser.
 - GitHub's GraphQL is refused from a cloud session (403, 2026-10-17: "GitHub GraphQL is not
   available from Claude Code sessions; use the REST API"), so issueDependenciesSummary was not
-  probed live; REST's blocked_by and sub_issues were, and the relates_to endpoint announced
-  2026-08-20 answered 404 on symphony-template#1.
+  probed live; REST's blocked_by and sub_issues were, and a relates_to endpoint, which a reader
+  reported and neither the docs, the August 2026 changelog listing nor the REST description
+  names, answered 404 on symphony-template#1, so only blocked_by and blocking exist.
+- Read once by a reader of the survey and not re-read: the Atlassian Marketplace install counts
+  of the graph apps, Jira's issue-type hierarchy page and the basic timeline's rule that both
+  items need dates, github/github-mcp-server#1511, Conductor's GitHub releases list, and the
+  release dates of gid and depviz; github.com's own pages answer 403 through the proxy.
 
 ## The owner's choices
 
@@ -381,7 +389,7 @@ answers, except the writing of docs/setup pages, which is harmless.
    the run's page under https://github.com/OpenSpineConsortium/symphony-protocol/actions,
    "Review deployments", tick release, "Approve and deploy".
 2. Issue types and a Projects v2 project, free, the owner's clicks (steps below). Recommended
-   yes: GitHub then shows the hierarchy, the sub-issue progress and the Blocked icon today,
+   yes: GitHub then shows the hierarchy, the sub-issue progress and the blocked filters today,
    before any release.
 3. Linear at all, and on which plan: Free stops at 250 issues and 2 teams (symphony-template
    has 27 issues in all, open and closed, though its numbers run to 148, since pull requests
@@ -435,7 +443,7 @@ The owner's steps, if 2 and 3 are yes:
 Read 2026-10-17 unless said otherwise. GitHub: the github/docs repository's content files on
 raw.githubusercontent.com (the pages named above, the GraphQL schema, the REST index for issue
 dependencies, projects and sub-issues), github.blog's changelog of 2025-04-09, 2025-08-21,
-2025-09-11, 2026-06-10 and 2026-08-20, github.com/pricing; probes of this session's token
+2025-09-11 and 2026-06-10 (a reader's entry of 2026-08-20 was not found again), github.com/pricing; probes of this session's token
 against OpenSpineConsortium/symphony-template (REST sub_issues and dependencies/blocked_by answer,
 GraphQL 403). Linear: linear.app/docs (github, github-to-linear, issue-property, timeline,
 project-dependencies, project-graph, project-milestones, initiatives, sub-initiatives,

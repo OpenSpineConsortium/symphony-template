@@ -14,29 +14,34 @@ MIT-licensed Python 3.12 command line that runs a multi-agent workflow written i
 agents with a prompt, a model and an output schema; routes as Jinja2 conditions evaluated by
 code, first match wins, with loop-backs; parallel groups and for_each fan-outs; sub-workflows;
 script, MCP, wait, set and terminate steps; human gates and questions. It is version 0.1.42,
-"Beta", with 33 releases from 2026-04-30 to 2026-10-06, roughly weekly, about 10,500 test
-functions in 350 test files, CI on three platforms, and a large dependency surface (typer, rich,
-pydantic, jinja2, fastapi, uvicorn, websockets, httpx, opentelemetry, the Copilot SDK, the
-Anthropic and OpenAI clients; React 19, React Flow 12 and dagre in the dashboard). Everything
-runs as one local process on the operator's machine; the dashboard is a per-run FastAPI server
+"Beta", with 33 changelog entries from 0.1.10 (2026-04-30) to 0.1.42 (2026-10-06), roughly
+weekly (its GitHub releases list is unreachable from here, so the count of releases is the
+changelog's), about 10,500 test functions in 350 test files, CI on Ubuntu (Python 3.12 and
+3.13) and Windows (3.13), and a large dependency surface (typer, rich, pydantic, jinja2,
+fastapi, uvicorn, websockets, httpx, opentelemetry, the Copilot SDK, the Anthropic and OpenAI
+clients; React 19, React Flow 12 and dagre in the dashboard). The engine is one local process
+on the operator's machine, with script steps in Docker and, experimentally, an agent's loop in
+an Azure Container Apps session; the dashboard is a per-run FastAPI server
 on 127.0.0.1 that keeps the run's whole event history in memory, serves it to a late joiner and
 streams it over a WebSocket, drawn by dagre and React Flow with a status border, an elapsed
 timer, tokens and cost on every node, a right pane with the rendered prompt, the activity stream
 and the structured output, a bottom pane with Log, Activity and Output, deep links into a node,
-Stop, Resume, Kill and mid-run guidance. Providers: Copilot (gh auth), OpenAI (a key), Claude's
-Messages API (a key), and an experimental Claude Agent SDK provider that drives the claude CLI
-and in subscription mode blanks ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN and
-CLAUDE_CODE_OAUTH_TOKEN in the child and confirms the login with claude auth status, labelling
-its cost "API-equivalent estimate". Nothing in its source reads GitHub issues or pull requests;
-GitHub is reached for workflow registries and the Copilot credential. (Verified.)
+Stop, Resume, Kill and mid-run guidance. Providers: Copilot (gh auth), OpenAI (a key, in the
+source and not in the README's list), Claude's Messages API (a key), and three experimental
+ones, a Claude Agent SDK provider that drives the claude CLI and in subscription mode blanks
+ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN and the three cloud backend
+selectors in the child and confirms the login with claude auth status, labelling its cost
+"API-equivalent estimate", NousResearch Hermes, and Azure Container Apps. Nothing in its source
+reads GitHub issues or pull requests; GitHub is reached for workflow registries, plugin sources
+cloned by owner/repo, the daily update check and the Copilot credential. (Verified.)
 
 Agentastic (agentastic.dev, read 2026-10-17: the release notes from v0.10.0 of 2026-09-01 to
 v0.14.0 of 2026-10-16, the home page, the docs for Manager Agents, Kanban, Tasks, Chat, Issue
 Tracking, Providers, Cloud Agents and the dev CLI) is a free, closed-source native macOS IDE
 (macOS 14 and up, an iPhone companion, a CLI on macOS, Linux and WSL) that runs any terminal
 coding agent (55 definitions, Claude Code among them) in parallel, one git worktree, container,
-SSH host or cloud VM each. Progress per agent is a status word (Running, Needs input, Stopped,
-Thinking), a pinned plan with a completed/total count, a sub-agent panel with one line per
+SSH host or cloud VM each. Progress per agent is a status word (Running, Stopped or Not Running on a
+task, Input Needed and a Thinking step in a chat), a pinned plan with a completed/total count, a sub-agent panel with one line per
 sub-agent, an edited-files card per turn, and a Kanban board that turns worktrees into cards
 grouped by label, each card with branch, status, live diff counts, the pull request number and
 relationship badges. Manager Agents (v0.12.0, 2026-09-24) are a persistent agent that writes no
@@ -45,15 +50,17 @@ idle or failing, mail or a manual run, with events within 45 seconds coalesced i
 since v0.14.0 a Manager's feed carries sandboxed HTML cards (charts, tables, checklists, forms)
 and it can publish pages that update in place. Its "Provider Pass" (v0.14.0) is a wallet of the
 agent's subscriptions and API keys; the cloud-VM path copies the Mac's signed-in Claude Code and
-Codex credentials onto a VM the user pays for ("Treat the VM as an authenticated device"). The
+Codex credentials onto a VM at Modal, Fly.io or Vercel Sandbox ("Treat the VM as an
+authenticated device"; that the user pays the provider is inferred, the page does not say). The
 "Conductor" Agentastic compares itself with is conductor.build, a Mac app at $50 a month, not
 microsoft/conductor. (Verified.)
 
-Neither coordinates a repository's issues. Conductor's graph is a workflow definition and its
-multi-run view is a flat table, deliberately "not a DAG"; Agentastic has no dependency graph of
-tasks, only manual worktree links (Depends On, Blocks, Reviews, Conflicts With, Supersedes)
-shown as badge counts, no epics, no parent and child issues, and issue intake from Linear and
-Sentry only. Symphony's unit is an issue claimed by a branch, on GitHub, by any number of people
+Neither coordinates a repository's issues. Conductor's graph is a workflow definition; its
+fleet view lists runs as a table and shows a run's detail as a topology that is deliberately
+"not a DAG"; Agentastic has no dependency graph of tasks, only manual worktree links (Depends
+On, Blocks, Reviews, Conflicts With, Supersedes) shown as badge counts, no epics, no parent and
+child issues, issue tracking built in for Linear and Sentry, and GitHub, GitLab and Forgejo
+issues and Notion pages attached to a prompt. Symphony's unit is an issue claimed by a branch, on GitHub, by any number of people
 and agents; the three overlap in the dashboard the owner pointed at and nowhere else in their
 shape. (Verified for both products; the overlap is Inferred.)
 
@@ -62,18 +69,18 @@ shape. (Verified for both products; the overlap is Inferred.)
 | | Symphony | Conductor | Agentastic |
 |---|---|---|---|
 | Unit of work | One issue, one branch claude/<N>, one pull request, by any worker | One run of one YAML workflow, one process | One agent in one worktree, container or VM, on one Mac |
-| Where state lives | GitHub: issues, labels, claim branches, the board on branch `board`, pull requests; nothing of ours is served but the control panel's stateless sign-in Worker, which keeps no state and no Claude credential (the Apps' webhook server is to be deleted) | In the run's process and its events JSONL; checkpoints and run records under ~/.conductor | On the Mac: worktrees, a Manager's Home as a git repository, a SQLite index; optional relay through Agentastic's servers |
+| Where state lives | GitHub: issues, labels, claim branches, the board on branch `board`, pull requests; nothing of ours is served but the control panel's stateless sign-in Worker, which keeps no state and no Claude credential (the Apps' webhook server is to be deleted) | In the run's process; the events JSONL and the checkpoints under $TMPDIR/conductor; PID files, dashboard tokens, environments and the bundle cache under ~/.conductor | On the Mac: worktrees, a Manager's Home as a git repository, a SQLite index; optional relay through Agentastic's servers |
 | Several people | Yes, by design: every account's sessions, routines and workers in Actions share one repository and one board | No: single user, one machine; "multi-user or team visibility" is a stated non-goal of its fleet view | No: one Mac, one person; sharing is a tunnel or their relay |
 | A graph of the work | None drawn today; GitHub holds the hierarchy and can hold the dependencies, which nothing of ours writes yet; the board lists neither (docs/research/control-board-graph.md) | The workflow's own DAG, live, with containers for parallel groups and sub-workflows | None; relationship badges on Kanban cards |
 | Live per-node progress | Labels and comments on the issue, the draft pull request and its checks, the Actions run log for a worker in Actions, commit trailers; polled through GitHub's API | Status, elapsed, tokens, cost, context-window bar, the activity stream and the log, streamed over a WebSocket from the process | Status word, plan count, sub-agent lines, diff counts, a Manager's feed and cards |
-| Preconditions and gates | A claim is refused by git itself; the required check holds the merge (the QA gate is decided and not built); a blocker label stops everyone; blocked tasks wait on the coordinator | Human gates and questions in the YAML, answered in the terminal or the dashboard; routes decided by code | A Manager's objectives, verified by a command, a plugin query, a report or a model judgment; status claims stay proposals until a person confirms |
+| Preconditions and gates | A claim is refused by git itself; the required check holds the merge (the QA gate is decided and not built); a blocker label stops everyone; blocked tasks wait on the coordinator | Human gates and questions in the YAML, answered in the terminal or the dashboard; routes decided by code | A Manager's objectives, verified by a command, a plugin query, a report or a model judgment; status claims stay proposals until verified by one of those or confirmed by a person |
 | Credentials | In a copy, one secret, the repository's CLAUDE_CODE_OAUTH_TOKEN (the owner's own pool of accounts adds SYMPHONY_CLAUDE_1 to 8); never an API key; each person on their own account | A key per provider in the environment, or gh auth for Copilot, or the claude CLI's own login in subscription mode | A wallet of subscriptions and API keys; signed-in credentials copied to cloud VMs |
 | Cost to run | $0: GitHub's free features and Actions minutes, Claude on the subscription | $0 software; the model bills, or the subscription; a machine | $0 app; the model bills; cloud VMs at the user's provider |
-| Budget | What the work cost is recorded beside it (Symphony-Usage trailers, usage artifacts, the metrics' ratios); no cap per run; a cap of 10 Claude runs a day per repository is decided (2026-10-13) and not built | budget_usd per run, audit or enforce, with a budget_exceeded event; a priced table per model | A Usage panel at list rates; 100 free messages a day on its own free tier |
-| Failure and resume | A claim idle 24 hours is released with its work kept under released/<N>-<sha>; a run in Actions is not resumable; a session checkpoints itself (cswap) | A checkpoint on every failure and on a schedule; conductor resume continues the same run; replay of any recorded run | "Keep my worker running" restarts; a Manager wakes on a failing worker |
+| Budget | What the work cost is recorded beside it (Symphony-Usage trailers, usage artifacts, the metrics' ratios); no cap in dollars; a run is bounded by claude.yml's --max-turns 50 and 45-minute timeout; a cap of 10 Claude runs a day per repository is decided (2026-10-13) and not built | budget_usd per run, audit or enforce, with a budget_exceeded event; a priced table per model | A Usage panel at list rates; 100 free messages a day on its own free tier |
+| Failure and resume | A claim idle 24 hours is released with its work kept under released/<N>-<sha>; a run in Actions is not resumable; a session checkpoints itself (cswap) | A checkpoint on failure by default, periodic ones when the workflow turns them on; conductor resume continues the same run; replay of any recorded run | Remote and cloud agents keep running on their hosts when the app closes; a Manager wakes when a worker fails or goes idle |
 | Assistant in the UI | @claude on the repository's token; a person's own Claude in a browser can drive the panel | Mid-run guidance to the running agent; an MCP server that exposes workflows as tools | Chat with any agent; the Agentastic agent; Managers draw cards and pages |
 | Measurement | coordbench on CooperBench's pairs, the field metrics, the profiling programme; results pending the full run | Performance test markers; no benchmark of coordination published in the repository | None published |
-| Maturity | Private template, no release yet, one maintainer, tests per tool and a required check; symphony-protocol 0.5.0 awaiting approval | 33 releases, 10,500 tests, CI on three platforms, towncrier changelog, Microsoft's security process | Closed source, weekly releases, no public tests |
+| Maturity | Private template, no release yet, one maintainer, tests per tool and a required check; symphony-protocol 0.5.0 awaiting approval | 33 changelog entries, 10,500 tests, CI on Ubuntu and Windows, towncrier changelog, Microsoft's security process | Closed source, weekly releases, no public tests |
 | Licence | MIT for the protocol and the plugin; the runtime may take a source-available licence; the hosted parts paid | MIT | The app closed; MIT shown for bundled components |
 
 Every row is Verified against the sources named at the end except the Symphony column's
@@ -122,7 +129,7 @@ which were not counted for this note.
 
 ## Where Symphony is weaker, today
 
-1. No live view. Conductor streams every event of the run into one screen within the second,
+1. No live view. Conductor streams every event of the run into one screen as it happens,
    with the prompt, the activity and the log beside the node; Agentastic shows a plan count, the
    sub-agents and the diff on every card. Symphony's control panel polls GitHub's API as the
    signed-in person, so what a worker is doing is read from its labels, comments, pushes and
@@ -151,7 +158,7 @@ which were not counted for this note.
    template's own runs the whole; Conductor's AGENTS.md is 114 lines and under 7 KB under a
    12 KiB cap and routes to guides from it, and the Claude Code docs advise a concise CLAUDE.md
    for cost. (Verified for both; the cost of ours is not measured.)
-6. Maturity and hands. Conductor has 33 releases, about 10,500 tests and Microsoft's processes
+6. Maturity and hands. Conductor has 33 changelog entries, about 10,500 tests and Microsoft's processes
    behind it; Agentastic ships weekly to a store. Symphony is one maintainer's template with no
    public release yet, whose protocol library awaits its 0.5.0 approval, and whose control
    panel is one script of 1,700 lines with a browser check suite in another repository.
@@ -173,7 +180,8 @@ elapsed and tokens with a hover tooltip; deep links by query string; a status vo
 from explicit markers and never from timing; and the label "estimate" on every cost figure that
 is not a bill, which Symphony's cost page should adopt, since today it says the work is priced
 at Anthropic's API list prices. Its subscription mode for the Claude
-Agent SDK, which blanks the three key variables in the child and checks claude auth status, is
+Agent SDK, which blanks the key, token and cloud-backend variables in the child and checks
+claude auth status, is
 the same rule Beethoven enforces and is worth citing as a precedent from Microsoft. (Inferred.)
 
 From Agentastic, under the rules: the priority-sorted feed headings (Needs you, Problems,
