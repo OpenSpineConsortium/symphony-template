@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -1022,6 +1023,28 @@ class TheProfile(unittest.TestCase):
         self.assertEqual(read_json(report)["browser"], launcher_path)
         self.assertFalse(os.path.exists(launcher_path), "the launcher is gone once the sign-in is over")
         self.assertFalse(has_token(collector.text))
+
+    def test_the_browser_outlives_the_hangup_of_claude_s_terminal(self):
+        # When claude ends, its terminal closes and the kernel sends a
+        # hangup to the processes on it, the browser the launcher started
+        # among them; nohup ignored it only once it had run, so a browser
+        # still starting was killed, one run in three under load.
+        folder = tempfile.mkdtemp(prefix="tokens-hangup-")
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        program = Path(folder) / "chrome"
+        pid_file, report = Path(folder) / "pid", Path(folder) / "report.json"
+        program.write_text(f"#!{sys.executable} -IS\nimport json, os, sys, time\n"
+                           f"open({str(pid_file)!r}, 'w').write(str(os.getpid()))\ntime.sleep(1)\n"
+                           f"open({str(report)!r}, 'w').write(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
+        program.chmod(0o755)
+        with tokens.launcher(tokens.Opener(tokens.Browser("Chrome", program), "Default")) as env:
+            started = subprocess.run([env["BROWSER"], SIGN_IN_LINK], timeout=30)
+        self.assertEqual(started.returncode, 0)
+        deadline = time.monotonic() + 10
+        while not (pid_file.exists() and pid_file.read_text()) and time.monotonic() < deadline:
+            time.sleep(0.02)
+        os.kill(int(pid_file.read_text()), signal.SIGHUP)
+        self.assertEqual(wait_for(str(report)), ["--profile-directory=Default", SIGN_IN_LINK])
 
     def test_without_a_profile_claude_keeps_its_own_browser(self):
         with tokens.launcher(None) as env:

@@ -778,10 +778,14 @@ def check_program(path):
 
 def launcher_text(opener):
     """A launcher that hands the link it is given to the profile and returns
-    at once, since claude waits on the program it starts."""
+    at once, since claude waits on the program it starts. The hangup is
+    ignored before the browser is forked, not by nohup after: the browser
+    shares claude's terminal, and a hangup sent as that terminal closes
+    reached it in the moment before nohup could ignore it."""
     import shlex
     flag = f"--profile-directory={opener.profile}"
-    return f'#!/bin/sh\nnohup {shlex.quote(opener.browser.path)} {shlex.quote(flag)} "$1" >/dev/null 2>&1 &\n'
+    return (f"#!/bin/sh\ntrap '' HUP\n"
+            f'{shlex.quote(opener.browser.path)} {shlex.quote(flag)} "$1" </dev/null >/dev/null 2>&1 &\n')
 
 
 @contextmanager
