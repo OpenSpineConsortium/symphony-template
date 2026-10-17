@@ -360,6 +360,19 @@ class TheWizardSendsCswapUsage(unittest.TestCase):
         self.assertEqual([each["path"] for each in tree_body["tree"]], ["slot-1.cswap.json"])
         self.assertIn("force=false", calls[-1])
 
+    def test_usage_goes_to_this_repository_and_each_one_also_names(self):
+        from unittest import mock
+        sent = []
+        record_ = record("1", 0.12, 0.1, source="cswap")
+        with mock.patch.object(tokens, "origin_repository", return_value=("octo", "widgets")), \
+                mock.patch.object(tokens, "cswap_rows", return_value=[]), \
+                mock.patch.object(tokens, "usage_readings", return_value=([record_], [])), \
+                mock.patch.object(tokens, "send_usage", side_effect=lambda gh, repo, readings, pool: sent.append(repo) or "abcdef1"), \
+                redirect_stdout(io.StringIO()):
+            tokens.usage(None, self.target(), path=Path(tempfile.gettempdir()) / "no-such-tokens.json",
+                         also=["coordbench", "widgets"])
+        self.assertEqual(sent, ["octo/widgets", "octo/coordbench"])
+
 
 if __name__ == "__main__":
     unittest.main()

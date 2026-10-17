@@ -12,6 +12,10 @@ Refresh, never on a schedule (the owner's choice, 2026-10-17). pick takes the le
 seven-day window, passing over a slot held at 90 percent until its
 reset. .github/symphony/accounts.json gives each worker in Actions
 main, a slot or auto (no file: main), and workers.yml records each run's
-reading. The picker moves to the protocol library after 0.5.1 is cut.
+reading. coordbench's bench.yml takes auto in its accounts box from its
+own branch pool (a copy of pool.py there), fed by its real jobs and by
+`tokens.py usage --also coordbench`. The site's
+/symphony/control/tokens.html shows the slots and proposes
+assignments by pull request. The picker moves to the protocol library after 0.5.1 is cut.
 docs/research/claude-token-pool.md has the sources and the four steps;
 from the token wizard's thread, 2026-10-17.
