@@ -50,10 +50,11 @@ python3 scripts/tokens.py
 3. It asks which slot to fill (the first free one by default; a set
    slot's number replaces its token). Where claude-swap (cswap) keeps a
    list of accounts on this machine, it shows that list and asks which
-   account the slot is for, by cswap's number; the account's cswap alias
-   is then offered as the label, unless it looks like an address. Then
-   it asks for a label.
-4. Where this machine has Chrome, Edge or Brave, it asks which browser
+   account the slot is for, by cswap's number. Then it asks for a label;
+   `y` takes the account's cswap alias where it has a label's shape, and
+   Enter leaves the slot with none, since a label is public.
+4. Where this machine has Chrome, Edge or Brave (Chrome or Edge under
+   C:\Program Files in WSL), it asks which browser
    profile the slot's sign-in opens in: a new profile named "Symphony"
    and the slot's number by default, one of the browser's own by its
    number in the list it shows, or `n` for the default browser (see
@@ -115,10 +116,14 @@ run for a repository in crowd mode, which holds no Claude token
 
 `claude setup-token` cannot be told which Claude account to approve: the
 browser's signed-in account decides. With several accounts, the wizard
-gives each slot a browser profile of its own. It hands claude a small
-launcher through BROWSER, the variable claude opens its sign-in link
-with, and the launcher opens the link in that profile; the launcher
-lives in a folder of the run's own and is gone when the sign-in ends.
+gives each slot a browser profile of its own. On Linux, macOS and WSL it
+hands claude a small launcher through BROWSER, the variable claude opens
+its sign-in link with, and the launcher opens the link in that profile;
+the launcher lives in a folder of the run's own and is gone when the
+sign-in ends. In a Windows shell it opens the profile first, at
+claude.ai, and then starts claude, whose link Chrome and Edge send to the
+profile used last; if it lands in another profile, copy the link claude
+prints into the right one.
 The first time, a new profile shows claude.ai's sign-in page: sign in
 there as the slot's account, then Approve. The profile keeps that
 sign-in, so every later token for the slot, a year on, is one Approve.
@@ -131,8 +136,8 @@ never with an address in it, and offers them as the defaults next time.
 questions. Set SYMPHONY_BROWSER to a Chromium browser's program to use
 one the wizard does not find by itself. In WSL the wizard finds Chrome
 or Edge under C:\Program Files and names a profile by its folder; the
-Windows browser reaches the sign-in's callback in WSL through WSL's
-localhost forwarding.
+Windows browser should reach the sign-in's callback in WSL through WSL's
+localhost forwarding, which is not yet tried.
 
 cswap's accounts cannot stand in for a sign-in. cswap keeps each
 account's interactive login, whose refresh token changes each time it is
@@ -147,8 +152,8 @@ Linux, macOS and WSL have the pseudo-terminal the sign-in runs behind;
 claude opens the browser where it can and prints the link otherwise, and
 in WSL the link is opened in the Windows browser. A Windows shell has no
 pseudo-terminal to hide the token behind: there the wizard starts
-`claude setup-token` in a window of its own, opening the sign-in in the
-slot's profile, and takes the token you copy from that window at a hidden
+`claude setup-token` in a window of its own, after opening the slot's
+profile, and takes the token you copy from that window at a hidden
 prompt that echoes nothing, as gh's own prompt would; close that window
 afterwards, since the token stays on its screen until you do. A machine
 may have gh but not claude: there, run `claude setup-token` wherever

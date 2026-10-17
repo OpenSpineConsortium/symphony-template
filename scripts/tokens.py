@@ -49,12 +49,12 @@ sign-in in a browser profile of the slot's own (add --profile NAME does
 the same), so a profile signed in to claude.ai as that account once makes
 each later token one Approve; where claude-swap (cswap) keeps a list of
 accounts, the wizard shows it and takes an account by its number, its
-alias as the label. It remembers the profile and the cswap number per
+alias offered as the label. It remembers the profile and the cswap number per
 slot in tokens.json in this machine's own settings folder, never in the
 repository; cswap's credentials are never opened, since a token minted for
 Actions is a separate, inference-only one. In a Windows shell the wizard
-starts claude setup-token in a window of its own and takes the token at a
-hidden prompt.
+opens the profile, then starts claude setup-token in a window of its own,
+and takes the token at a hidden prompt.
 Exit 0 when done, 1 on a refusal, 2 on a usage error made before any call.
 """
 
@@ -70,6 +70,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -93,6 +94,8 @@ CROWD_VARIABLE = "CLAUDE_CROWD"
 TOKEN_LIFE = timedelta(days=365)
 RENEW_SOON = timedelta(days=30)
 SETUP_TOKEN = ("claude", "setup-token")
+CLAUDE_HOME = "https://claude.ai/"
+PASTE_TRIES = 3
 VISIBILITIES = ("selected", "all", "private")
 # Rows and columns of the terminal claude gets: wide, so it never wraps the
 # token over two lines, where no pattern would find it.
@@ -141,6 +144,10 @@ ORIGIN = re.compile(r"github\.com[:/]([A-Za-z0-9][A-Za-z0-9-]*)/([A-Za-z0-9._-]+
 class TokensError(Exception):
     """Something the wizard could not do, or refuses to do; the message says
     what to do instead, and never holds a token."""
+
+
+class NothingPasted(TokensError):
+    """An empty paste: in a run where claude waits in another window, asked again."""
 
 
 class UsageError(TokensError):
@@ -521,14 +528,35 @@ def hidden_input(prompt):
 def pasted_token(ask=None):
     """The token from a hidden prompt, as gh's own prompt would take it."""
     ask = ask or hidden_input
-    return check_token((ask("Paste the token claude setup-token printed, then Enter (nothing is shown): ") or "").strip())
+    text = (ask("Paste the token claude setup-token printed, then Enter (nothing is shown): ") or "").strip()
+    drop_typed_ahead()
+    return check_token(text)
+
+
+def drop_typed_ahead():
+    """A paste with a line break in it leaves the rest in a Windows
+    console's input, where the next question would read and echo it."""
+    try:
+        import msvcrt
+    except ImportError:
+        return
+    while msvcrt.kbhit():
+        msvcrt.getwch()
+
+
+def check_hidden_input():
+    """Where getpass could not hide a paste, as in an IDE's console,
+    better found before claude mints a token than after."""
+    if sys.stdin is not sys.__stdin__ or not (sys.stdin and sys.stdin.isatty()):
+        raise TokensError("this window cannot hide what you type, so claude was not started: run the wizard from a terminal "
+                          "(cmd, PowerShell or Windows Terminal)")
 
 
 def check_token(text):
     """The token in what was pasted: claude's own line around it, such as
     its export line, is let through; an API key, or anything else, is not."""
     if not text:
-        raise TokensError("nothing was pasted; nothing was stored")
+        raise NothingPasted("nothing was pasted; nothing was stored")
     if API_KEY_HEAD in text:
         raise TokensError("that is an API key, which this project never uses (docs/project.md): make a subscription token with claude setup-token")
     found = TOKEN_SHAPE.findall(text)
@@ -567,19 +595,36 @@ def get_token(args, write=None, stdin_fd=None, ask=None, opener=None):
         return minted_token(write=write, stdin_fd=stdin_fd, command=(claude,) + SETUP_TOKEN[1:], env=env)
 
 
-def windowed_token(claude, ask, opener):
+def windowed_token(claude, ask, opener, settle=2.0):
     """A Windows shell has no pseudo-terminal to hide the token behind, so
     claude setup-token runs in a window of its own, as a person would run
-    it by hand, and the token is pasted here at a hidden prompt."""
-    with launcher(opener) as env:
+    it by hand, and the token is pasted here at a hidden prompt. No
+    launcher goes through BROWSER here: Claude Code hands a batch file its
+    link through cmd.exe, which splits it at its = and & signs. The
+    profile is opened first instead, and Chrome sends the link claude
+    opens next to the profile used last."""
+    if ask is None:
+        check_hidden_input()
+    if opener is not None:
         try:
-            subprocess.Popen([claude] + list(SETUP_TOKEN[1:]), env={**os.environ, **env},
-                             creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
+            subprocess.Popen([opener.browser.path, f"--profile-directory={opener.profile}", CLAUDE_HOME])
         except OSError as error:
-            raise TokensError(f"claude setup-token could not be started ({error.strerror or error}); run it yourself and use --paste") from None
-        print("claude setup-token opened in a window of its own. Approve the sign-in in the browser, copy the token that window")
-        print("  prints, paste it here, then close that window: the token is on its screen until you do.")
-        return pasted_token(ask)
+            raise TokensError(f"{opener.browser.name} could not be started ({error.strerror or error}); answer n at the profile question") from None
+        time.sleep(settle)
+    try:
+        subprocess.Popen([claude] + list(SETUP_TOKEN[1:]), creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
+    except OSError as error:
+        raise TokensError(f"claude setup-token could not be started ({error.strerror or error}); run it yourself and use --paste") from None
+    print("claude setup-token opened in a window of its own. Approve the sign-in in the browser, copy the token that window")
+    print("  prints, paste it here, then close that window: the token is on its screen until you do.")
+    if opener is not None:
+        print(f"  If the sign-in opened in another profile, copy the link from that window into {opener.browser.name}'s profile {opener.profile}.")
+    for _ in range(PASTE_TRIES - 1):
+        try:
+            return pasted_token(ask)
+        except NothingPasted:
+            print("Nothing was pasted; the sign-in is still open in the other window.")
+    return pasted_token(ask)
 
 
 # The browser profile and cswap's accounts, remembered on this machine alone.
@@ -726,34 +771,33 @@ def check_profile(profile):
 def check_program(path):
     """A program path goes into a launcher between double quotes, so one
     that could end the quotes or expand in a batch file is refused."""
-    if not path or any(mark in path for mark in ('"', "%", "\n", "\r", "!", "`", "$")):
-        raise TokensError("the browser's path holds a quote, %, !, $ or a backquote, which the launcher cannot carry; "
-                          "set SYMPHONY_BROWSER to a path without them")
+    if not path or not path.isascii() or any(mark in path for mark in ('"', "%", "\n", "\r", "!", "`", "$")):
+        raise TokensError("the browser's path holds a letter outside ASCII, a quote, %, !, $ or a backquote, which the launcher "
+                          "cannot carry; set SYMPHONY_BROWSER to a path without them, or answer n at the profile question")
 
 
-def launcher_text(opener, windows):
+def launcher_text(opener):
     """A launcher that hands the link it is given to the profile and returns
     at once, since claude waits on the program it starts."""
-    flag = f"--profile-directory={opener.profile}"
-    if windows:
-        return f'@echo off\r\nstart "" "{opener.browser.path}" "{flag}" "%~1"\r\n'
     import shlex
+    flag = f"--profile-directory={opener.profile}"
     return f'#!/bin/sh\nnohup {shlex.quote(opener.browser.path)} {shlex.quote(flag)} "$1" >/dev/null 2>&1 &\n'
 
 
 @contextmanager
-def launcher(opener, windows=None):
+def launcher(opener):
     """BROWSER for claude's environment, pointing at a launcher in a folder
     of the run's own that is gone when the sign-in is over; none without
-    an opener, so claude opens the default browser as it does by itself."""
+    an opener, so claude opens the default browser as it does by itself.
+    Linux, macOS and WSL only: Windows opens the profile first instead
+    (windowed_token)."""
     if opener is None:
         yield {}
         return
-    windows = sys.platform == "win32" if windows is None else windows
     folder = tempfile.mkdtemp(prefix="symphony-browser-")
     try:
-        path = Path(folder) / ("open.cmd" if windows else "open")
-        path.write_bytes(launcher_text(opener, windows).encode("ascii", "strict"))
+        path = Path(folder) / "open"
+        path.write_bytes(launcher_text(opener).encode("ascii", "strict"))
         path.chmod(0o700)
         yield {"BROWSER": str(path)}
     finally:
@@ -847,7 +891,8 @@ def cswap_accounts(system=None, env=None, home=None):
             continue
         records = data.get("accounts") if isinstance(data.get("accounts"), dict) else {}
         found, seen = [], set()
-        for number in data.get("sequence") or []:
+        listed = data.get("sequence")
+        for number in listed if isinstance(listed, list) else []:
             record = records.get(str(number))
             if type(number) is not int or number not in CSWAP_NUMBER or not isinstance(record, dict) or number in seen:
                 continue
@@ -875,7 +920,8 @@ def chosen_account(accounts, known, ask):
     for account in accounts:
         print(account_line(account))
     default = known if known in numbers else None
-    answer = (ask(f"Which of them is this slot for? [{default if default else 'Enter to skip'}; its number] ") or "").strip()
+    shown = f"{default}, {numbers[default].alias or numbers[default].email}, as last time" if default else "Enter to skip"
+    answer = (ask(f"Which of them is this slot for? [{shown}; its number] ") or "").strip()
     if not answer:
         return numbers.get(default)
     if answer.isascii() and answer.isdigit() and len(answer) <= 3 and int(answer) in numbers:
@@ -1395,8 +1441,9 @@ def chosen_label(account, ask):
     """The slot's label: a word typed, else the cswap alias where it is one."""
     offered = label_from(account)
     if offered:
-        answer = (ask(f"A word of your own for this slot, so status says which account it is [{offered}; - for none; never an e-mail]: ") or "").strip()
-        label = "" if answer == "-" else answer or offered
+        answer = (ask(f"A word of your own for this slot, so status says which account it is; anyone who reads the repository's "
+                      f"workflows sees it (never an e-mail; y for cswap's {offered}; Enter for none): ") or "").strip()
+        label = offered if answer.lower() in ("y", "yes") else answer
     else:
         label = (ask("A word of your own for this slot, so status says which account it is (never an e-mail; Enter for none): ") or "").strip()
     check_label(label)

@@ -1012,7 +1012,7 @@ class TheProfile(unittest.TestCase):
         opener = tokens.Opener(browser, "Symphony 1")
         with patch.dict(os.environ, {"FAKE_CLAUDE_REPORT": report, "FAKE_BROWSER_REPORT": browser_report}):
             try:
-                with tokens.launcher(opener, windows=False) as env:
+                with tokens.launcher(opener) as env:
                     found = tokens.minted_token(stdin_fd=reader, write=collector, command=(str(bin_dir / "claude"), "setup-token"), env=env)
                     launcher_path = env["BROWSER"]
             finally:
@@ -1027,15 +1027,8 @@ class TheProfile(unittest.TestCase):
         with tokens.launcher(None) as env:
             self.assertEqual(env, {})
 
-    def test_the_windows_launcher_quotes_the_program_and_the_link(self):
-        opener = tokens.Opener(tokens.Browser("Chrome", r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"), "Profile 2")
-        text = tokens.launcher_text(opener, windows=True)
-        self.assertEqual(text, '@echo off\r\nstart "" "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" '
-                               '"--profile-directory=Profile 2" "%~1"\r\n')
-        self.assertTrue(text.isascii())
-
     def test_a_program_or_profile_the_launcher_cannot_carry_is_refused(self):
-        for path in ('C:\\a"b\\chrome.exe', "C:\\%TEMP%\\chrome.exe", "/opt/$HOME/chrome", "/opt/a`b`", "/opt/a!b", "/opt/a\nb", ""):
+        for path in ("C:\\Users\\Zo\u00eb\\chrome.exe", 'C:\\a"b\\chrome.exe', "C:\\%TEMP%\\chrome.exe", "/opt/$HOME/chrome", "/opt/a`b`", "/opt/a!b", "/opt/a\nb", ""):
             with self.assertRaises(tokens.TokensError):
                 tokens.Opener(tokens.Browser("Chrome", path), "Default")
         for profile in ("", "../x", "a\"b", "Profile & 2", "a" * 41, "\u00e9t\u00e9", " Lead"):
@@ -1093,28 +1086,48 @@ class TheProfile(unittest.TestCase):
         self.assertIsNone(tokens.profile_opener(None))
         self.assertEqual(tokens.profile_opener("Default", tokens.Browser("Edge", "/usr/bin/edge")).profile, "Default")
 
-    def test_a_windows_shell_runs_claude_in_its_own_window_and_takes_the_paste(self):
+    def windowed(self, opener, answers):
+        """get_token as a Windows shell runs it: what was started, what was
+        printed, and the token."""
         started = []
 
         def popen(command, env=None, creationflags=0):
-            started.append((command, env.get("BROWSER"), os.path.exists(env.get("BROWSER", "")), creationflags))
+            started.append((command, env, creationflags))
             return None
 
-        browser = tokens.Browser("Chrome", r"C:\Program Files\Google\Chrome\Application\chrome.exe")
-        opener = tokens.Opener(browser, "Symphony 2")
+        answers = iter(answers)
         printed = io.StringIO()
         with patch.object(tokens, "pty_available", lambda: False), patch.object(tokens, "claude_command", lambda: r"C:\bin\claude.exe"), \
                 patch.object(tokens.sys, "platform", "win32"), patch.object(tokens.subprocess, "Popen", popen), \
+                patch.object(tokens.time, "sleep", lambda seconds: None), \
                 patch.object(tokens.subprocess, "CREATE_NEW_CONSOLE", 16, create=True), redirect_stdout(printed):
-            token = tokens.get_token(argparse_namespace(), ask=lambda prompt: TOKEN, opener=opener)
+            token = tokens.get_token(argparse_namespace(), ask=lambda prompt: next(answers), opener=opener)
+        return token, started, printed.getvalue()
+
+    def test_a_windows_shell_opens_the_profile_then_claude_in_its_own_window(self):
+        # Claude Code hands a batch file its link through cmd.exe, which
+        # cuts it at = and &, so Windows takes no launcher: the profile is
+        # opened first, and claude's link goes to the profile used last.
+        browser = tokens.Browser("Chrome", r"C:\Program Files\Google\Chrome\Application\chrome.exe")
+        token, started, printed = self.windowed(tokens.Opener(browser, "Symphony 2"), ["", TOKEN])
         self.assertEqual(token, TOKEN)
-        (command, launcher_path, existed, flags), = started
-        self.assertEqual(command, [r"C:\bin\claude.exe", "setup-token"])
-        self.assertTrue(launcher_path.endswith("open.cmd") and existed)
-        self.assertEqual(flags, 16)
-        self.assertFalse(os.path.exists(launcher_path), "the launcher is gone once the token is pasted")
-        self.assertIn("close that window", printed.getvalue())
-        self.assertFalse(has_token(printed.getvalue()))
+        self.assertEqual(started, [([browser.path, "--profile-directory=Symphony 2", tokens.CLAUDE_HOME], None, 0),
+                                   ([r"C:\bin\claude.exe", "setup-token"], None, 16)])
+        self.assertIn("close that window", printed)
+        self.assertIn("Nothing was pasted; the sign-in is still open", printed, "an early Enter asks again")
+        self.assertFalse(has_token(printed))
+
+    def test_without_a_profile_only_claude_is_started_and_empty_pastes_end_it(self):
+        with self.assertRaises(tokens.TokensError):
+            self.windowed(None, [""] * tokens.PASTE_TRIES)
+        token, started, _ = self.windowed(None, [TOKEN])
+        self.assertEqual([command for command, _, _ in started], [[r"C:\bin\claude.exe", "setup-token"]])
+
+    def test_a_window_that_cannot_hide_the_paste_starts_no_claude(self):
+        with patch.object(tokens.sys, "stdin", io.StringIO()), patch.object(tokens.subprocess, "Popen", lambda *a, **k: self.fail("started")):
+            with self.assertRaises(tokens.TokensError) as caught:
+                tokens.windowed_token(r"C:\bin\claude.exe", None, None)
+        self.assertIn("claude was not started", str(caught.exception))
 
 
 def argparse_namespace(paste=False):
@@ -1150,7 +1163,8 @@ class Cswap(unittest.TestCase):
     def test_what_does_not_hold_together_is_skipped(self):
         home = self.home()
         root = home / ".claude-swap-backup"
-        for data in ("{", "[]", json.dumps({"sequence": "12"}), json.dumps({"sequence": [1], "accounts": []})):
+        for data in ("{", "[]", json.dumps({"sequence": "12"}), json.dumps({"sequence": 5, "accounts": {}}),
+                     json.dumps({"sequence": True}), json.dumps({"sequence": [1], "accounts": []})):
             self.write(root, data)
             self.assertEqual(tokens.cswap_accounts("win32", {}, home), [])
         odd = sequence(ACCOUNTS, [1, "2", True, 0, 5000, 9, 2, 1])
@@ -1229,7 +1243,7 @@ class TheWizardOnAMachine(unittest.TestCase):
         settings = Path(world.folder) / "settings" / "tokens.json"
         local = tokens.Local(browser, accounts, settings)
         prompts = []
-        answers = iter(["", "2", "", "", "n", "n"])
+        answers = iter(["", "2", "y", "", "n", "n"])
 
         def ask(prompt):
             prompts.append(prompt)
@@ -1248,12 +1262,12 @@ class TheWizardOnAMachine(unittest.TestCase):
 
         # The next run offers what was remembered.
         prompts.clear()
-        answers = iter(["1", "", "-", "n", "", "n", "n"])
+        answers = iter(["1", "", "", "n", "", "n", "n"])
         world.stored = "2026-10-17T01:00:00Z"
         world.expect_store(tokens.slot_secret(1))
         world.run_in_process(self, tokens.wizard, tokens.Gh(), target(), ask=ask, local=local)
-        self.assertIn("[2;", prompts[1])
-        self.assertIn("[bench2;", prompts[2])
+        self.assertIn("[2, bench2, as last time;", prompts[1])
+        self.assertIn("y for cswap's bench2; Enter for none", prompts[2])
         self.assertIn("Press Enter once the browser is signed in to that account ", prompts)
         self.assertEqual(tokens.remembered(tokens.read_settings(settings), target(), 1), {"profile": None, "cswap": 2})
 
