@@ -54,6 +54,59 @@ By hand, where neither is at hand:
   there; an account working in this repository pushes claim branches, not
   forks (docs/agents/PROTOCOL.md).
 
+## The assistant issue
+
+The control panel, the site's page that drives a Symphony repository as
+the signed-in person (docs/memory/the-control-panel.md), asks through an
+issue: once per repository and person it opens "Assistant: <login>",
+labelled assistant, whose body says what the page is, and each question
+is a comment on it with the page's state in a fenced block, which the
+page polls for the answer. A person can open the same issue by hand. The
+label is not one template-init makes: the six it makes are the claim
+protocol's own list, held to the vendored library by the checks, so the
+page makes the label before it puts it on the issue, or a person makes
+it once at https://github.com/{{REPO}}/labels, any colour, since the
+workflow reads only the name.
+
+claude.yml tells the issue apart by that label alone, read from the
+event's issue, so a comment on it, or its opening, runs the same job on
+the same token, in the same five-hour window, with three settings
+changed: ten turns in place of fifty; a tool list that only reads (Read,
+Glob, Grep, and the git and gh commands that read), with Edit, Write,
+MultiEdit, NotebookEdit, git add, git commit and git rm denied as well,
+since the action's own tag mode would otherwise allow edits and commits
+whatever the allow list says, and no push allowed at all; and the file
+.github/symphony/assistant.md appended to the system prompt through the
+CLI's --append-system-prompt-file, which the action passes through
+untouched. The file says what the page is, what to read, how to answer
+and the few lines of a reply the page acts on (focus, open, filter,
+show). The job's permissions stay as they are: the tools list, not the
+token, is what keeps the assistant read-only. A question that asks for a
+change is answered with what the person would do and where, never done.
+No run has been made with the file yet, so the first answer should show
+it followed it; if not, the flag is the first thing to check.
+
+A question costs one Actions run, tens of seconds to a few minutes, on
+the main account's usage like any mention. The workflow sets no
+concurrency group, so two people asking at once are two runs on the same
+window, and ten turns reached is a failed run, which the comment says
+("Claude encountered an error"), not a shorter answer. On a public
+repository the issue and its answers are public.
+
+Who may ask: the action answers only a GitHub user whose permission on
+the repository is admin or write (checkActorWritePermissions in its
+src/github/validation/permissions.ts, read on 2026-10-17; the maintain
+role passes by the API's legacy permission field, which is not verified).
+Anyone else, read or triage access among them, gets a failed run and no
+reply, since the check runs before any comment is posted, and a bot is
+refused unless the workflow's allowed_bots names it, which this one does
+not. The page should check the person's permission before it offers the
+assistant.
+
+To change the vocabulary, edit .github/symphony/assistant.md; the page's
+side, in the site repository, must match it, since the page executes
+only the lines it knows. Nothing here needs a new secret or variable.
+
 ## Workers in Actions, optional
 
 A worker in Actions is one file under .github/symphony/workers/ that says

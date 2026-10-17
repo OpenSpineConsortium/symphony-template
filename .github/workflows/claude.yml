@@ -18,6 +18,19 @@ name: Claude
 # condition is exactly the one before it. After the session the job records
 # what it spent, as workers.yml does, as an artifact the metrics workflow
 # reads (docs/setup/metrics.md, What the work cost).
+#
+# An issue labelled assistant is the control panel's assistant (docs/setup/
+# claude-action.md, The assistant issue): the job reads the label from the
+# event's issue, and the same step then runs with ten turns, tools that
+# only read, and the file .github/symphony/assistant.md appended to the
+# system prompt. A question needs no write, ten turns bound what it costs,
+# and the file tells the session what the page is and how to answer it.
+# The job's permissions stay the same, since the tools list, not the
+# token, is what keeps the assistant read-only: the action's tag mode
+# allows edits and git commits of its own, so the assistant denies them.
+# The action answers only an actor with write access on the repository
+# (checkActorWritePermissions in its src/github/validation/permissions.ts)
+# and fails the run for anyone else before it posts anything.
 
 on:
   issue_comment:
@@ -47,6 +60,7 @@ jobs:
       id-token: write
     env:
       HAVE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      ASSISTANT: ${{ contains(github.event.issue.labels.*.name, 'assistant') }}
     steps:
       - name: Point at the setup when the token is not there
         if: env.HAVE_TOKEN != 'true'
@@ -66,8 +80,10 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
-            --max-turns 50
-            --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
+            --max-turns ${{ env.ASSISTANT == 'true' && '10' || '50' }}
+            --allowedTools "${{ env.ASSISTANT == 'true' && 'Read,Glob,Grep,Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git fetch:*),Bash(git branch:*),Bash(git ls-files:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr checks:*),Bash(gh run list:*),Bash(gh run view:*),Bash(cat:*),Bash(sed -n:*)' || (vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)') }}"
+            ${{ env.ASSISTANT == 'true' && '--disallowedTools "Edit,Write,MultiEdit,NotebookEdit,Bash(git add:*),Bash(git commit:*),Bash(git rm:*)"' || '' }}
+            ${{ env.ASSISTANT == 'true' && '--append-system-prompt-file .github/symphony/assistant.md' || '' }}
       - name: Record what the run spent, for the field metrics
         if: always() && steps.claude.outcome != 'skipped'
         continue-on-error: true
