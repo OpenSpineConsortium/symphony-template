@@ -398,6 +398,17 @@ renumbering in cswap shows); and a paste with a line break left the rest
 of the token in a Windows console's input, where the next question would
 echo it (now drained).
 
+After the merge, the template's filled copy failed one run in two on
+"browser-report.json was never written" (found by the thread on the
+protocol fixes toward 0.5.1). The launcher started the browser in the
+background under nohup, on claude's terminal; when claude ended, the
+terminal's hangup reached the browser in the moment before nohup could
+ignore it. Under load it failed 11 runs in 30. The launcher now ignores
+the hangup itself before it forks the browser, which inherits that, and
+the same loop then failed none in 100 under load; a real browser started
+as claude exits had the same exposure, so the fix is in the launcher,
+not the test.
+
 Not measured, since no session runs Windows or a real browser: whether
 Chrome on Windows sends claude's link to the profile just opened, as it
 sends external links to the profile used last; whether Chrome makes a new profile for a --profile-directory folder that
