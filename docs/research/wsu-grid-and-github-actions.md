@@ -273,45 +273,74 @@ each printed: the install job's log, the output of `--status`, the page of the f
 step 3's one line. A fault the grid shows is fixed in hpcworker by a pull request whose fix a
 mutation proves (below); step 3's answer starts the ssh gate (next).
 
-## The ssh gate, planned
+## Where it stands on 2026-10-17
 
-The second pull request, chosen on the card of 2026-10-16 00:24 UTC, waits on step 3 above. What was
-decided: a key on the grid that accepts one forced command and nothing else, through hpcworker, used
-by a workflow from an environment secret, with the password nowhere. The rest of this section is
-the thread's plan for it and not yet the owner's decision: which commands the gate takes, and
-whether each run waits for his approval, are his to settle on the pull request.
+The owner answered on 2026-10-17, in the thread "Grid ssh gate" of the symphony2 project, with
+step 3's output. The restricted test key signed in from his PC with the public key alone and printed
+"key-only sign-in works" (the line before it, "PTY allocation request failed", is restrict refusing
+a terminal, as it should), so a key alone gets in to grid.wayne.edu from outside the VPN; the thread
+takes the test as run with the VPN off, as the step asked. Two things were not as the step said: he
+ran it from Git Bash on Windows rather than WSL, which changes nothing about the answer; and the
+cleanup `sed` ran on his PC, where there is no authorized_keys, so the test key, which can only print
+that one line, stays on the grid until he runs the same `sed` in the grid's shell. C&IT's word on
+such a key is still not on record.
 
-- If step 3 shows that a key alone does not get in from outside the VPN, GitHub's runners cannot
-  reach the gate and it is not built: the runner chain stays the one direction, and this note says so.
+Step 1 is done: the owner committed the two CI lines to hpcworker's main as 12e34b2, and its ci run
+(https://github.com/OpenSpineConsortium/hpcworker/actions/runs/39057118601) passed. Step 2 is not
+yet shown to have worked: the first grid.yml run
+(https://github.com/OpenSpineConsortium/symphony-template/actions/runs/39063579109), started
+2026-10-17 19:41 UTC, was still queued at 21:11 UTC, which means no runner of the chain had
+registered, whether the install job, the chain's start or the chain's job in Slurm's queue is where
+it stopped; the install job's log and `--status` say which.
+
+## The ssh gate, built
+
+Planned on 2026-10-16 (the card of 00:24 UTC chose both directions, the runner first) and built on
+2026-10-17 once step 3 showed that a key alone signs in: OpenSpineConsortium/hpcworker's pull request
+from claude/grid-ssh-gate-4wx0ul and this repository's from the branch of the same name. A key on the
+grid that accepts one forced command and nothing else, through hpcworker, used by a workflow from an
+environment secret, with the password nowhere.
+
 - What it is for: a step on GitHub's own runner that starts the chain only when a job needs it, in
-  place of a chain kept waiting in Slurm's queue, and reads the chain's state into the run's log. A
-  gate that queued a job of the workflow's own would run the workflow's code under the account
-  outside the runner's container, beside the account's gh sign-in and Claude login, which the runner
-  was built to rule out; so the gate starts, reads and stops a chain, and every command of a
-  workflow's still runs on the runner.
-- In hpcworker: tools/grid_gate.sh, the forced command. It reads SSH_ORIGINAL_COMMAND without a
-  shell evaluating it and runs exactly one of a fixed list, start, status or stop
-  (`grid_runner.sh --start`, `--status`, `--stop`), for a repository named as owner/name in
-  [A-Za-z0-9_.-] and the site its profile names, each making on the login node the calls it makes
-  when a person types it: one squeue and one sbatch to start, one squeue to read, one squeue and one
-  scancel to stop. It refuses any other word or argument, an input longer than a
-  fixed bound or holding a newline, and a second call within 60 seconds of the last, and it writes
-  one line per call, never the key, to the runner's folder. A subcommand, say
-  `grid_runner.sh --gate-key <public key file>`, writes the one line
-  `restrict,command="<the gate's path>" <the key>` to ~/.ssh/authorized_keys, replacing an earlier
-  gate line and touching no other. Its tests, tools/tests/test_grid_gate.sh, run against stand-ins:
-  each command, each refusal, an injected `;`, `$(...)`, backquote and newline, an overlong
-  argument, the 60-second floor and the line the subcommand writes; and each fix is proven by a
-  mutation, as below.
-- In this repository: grid.yml, or a workflow beside it, gains a job on GitHub's runner, in an
-  environment named grid that only main may deploy to
-  (https://github.com/OpenSpineConsortium/symphony-template/settings/environments), which writes the
-  private key from the environment's secret to a mode-0600 file under $RUNNER_TEMP, runs
-  `ssh -i <that file> -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=<the grid's host key, from a repository variable> <AccessID, from a variable>@grid.wayne.edu start <owner/name>`,
-  and removes the file; the key is never in an argument, a log or the environment of another step.
-- The owner's steps for it go in docs/setup/grid.md, each with its link: make the key on his own
-  machine, put its public half on the grid with the subcommand, its private half in the
-  environment's secret, and the grid's host key and his AccessID in the repository's variables.
+  place of a chain kept waiting in Slurm's queue, reads the chain's state into the run's log, and
+  ends it. A gate that queued a job of the workflow's own would run the workflow's code under the
+  account outside the runner's container, beside the account's gh sign-in and Claude login, which
+  the runner was built to rule out; so the gate starts, reads and stops a chain, and every command of
+  a workflow's still runs on the runner.
+- In hpcworker: tools/grid_gate.sh is the forced command. One change from the plan: the line, not
+  the client, names the repository, the site, the runner's folder and the chain's size, so a client
+  says one word, start, status or stop, read from SSH_ORIGINAL_COMMAND with no shell evaluating it,
+  and a stolen key reaches one chain at the size the owner chose. It refuses any other word or byte, a
+  second call for the same repository within 60 seconds (the grid's polling floor), a line --gate-key
+  did not write, and, as browser-key's gate does, a clone whose tools/, framework/lib/ or
+  framework/profiles/ others may change, or any folder above it that others may change and that is
+  not sticky. It runs grid_runner.sh with HPCW_GATE set and the client's GH_TOKEN, GITHUB_TOKEN and
+  shell start-up variables gone, takes a chain already queued or running as started, and writes one
+  line per call to the chain's gate.log: the time, the word, the address and how it ended, never the
+  key. `grid_runner.sh --gate-key '<ed25519 public key>' --repo OWNER/NAME --site S` writes
+  `restrict,command="<clone>/tools/grid_gate.sh --site S --runner-dir D --repo OWNER/NAME [size]" ssh-ed25519 <key> hpcw-grid-gate:OWNER/NAME`,
+  replacing that repository's earlier line and keeping every other, under browser-key's own lock;
+  `--gate-off` takes it out; both run only for a person at a terminal (no agent's variable, no job, no
+  forced command), and refuse a home, ~/.ssh or authorized_keys that sshd would ignore or that is a
+  link. tools/tests/test_grid_gate.sh, 86 checks, runs at the end of test_grid_runner.sh, so CI's
+  existing step runs it; it passes on Ubuntu and in centos:7 under bash 4.2.46. Thirteen checks were
+  each undone in a copy and the tests failed on every one; three lines the mutations showed to be
+  redundant were removed instead (a word-length test the exact word list covers, a key-length test
+  base64 -d covers under pipefail, a newline fix grep already makes).
+- In this repository: .github/workflows/grid-gate.yml, on workflow_dispatch with the word to choose
+  and on workflow_call, runs on GitHub's machine in the environment grid, which only main may deploy
+  to; it writes the key from the secret GRID_GATE_KEY to a mode-0600 file under $RUNNER_TEMP (carriage
+  returns dropped), runs `ssh -T -i <that file> -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=<GRID_HOST_KEY> <GRID_ACCESS_ID>@grid.wayne.edu <word>`,
+  tries once more after 61 seconds when the gate answers with its one-a-minute code, writes the
+  gate's words to the run's summary and removes the file. grid.yml gains a start box that runs it with
+  start before its job.
+- The owner's steps are docs/setup/grid.md, "The ssh gate". Whether each run waits for his approval
+  is his to choose there: the environment's required reviewers, left off by default so a run need not
+  wait.
+- Not yet measured: whether GitHub's machines reach the grid's ssh port as his home connection did,
+  whether the forced command's non-login shell finds sbatch and gh (the gate reads /etc/profile's
+  PATH when sbatch is missing), and whether every login node behind grid.wayne.edu shows the same
+  host key; hpcworker's docs/OPEN_QUESTIONS.md holds each with its first test.
 
 ## How the fixes were proven, and how to prove the next
 
