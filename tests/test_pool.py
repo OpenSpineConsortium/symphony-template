@@ -151,6 +151,19 @@ class ThePick(unittest.TestCase):
         found = {"1": [held], "2": [record("2", 0.5, 0.5)]}
         self.assertEqual(pool.pick(found, ["1", "2"], now=NOW), ("2", None))
 
+    def test_workers_of_one_run_are_dealt_different_free_slots(self):
+        found = {"1": [record("1", 0.6, 0.1)], "2": [record("2", 0.2, 0.1)], "3": [record("3", 0.95, 0.1)]}
+        dealt = [pool.pick(found, ["1", "2", "3"], now=NOW, spread=place)[0] for place in range(3)]
+        self.assertEqual(dealt, ["2", "1", "2"])
+
+    def test_a_full_window_with_no_reset_holds_for_five_hours_from_its_reading(self):
+        held = record("1", 0.1, 0.1)
+        held["windows"]["five_hour"] = {"utilization": 1.0}
+        found = {"1": [held], "2": [record("2", 0.97, 0.1, resets=LATER)]}
+        slot, until = pool.pick(found, ["1", "2"], now=NOW)
+        self.assertEqual((slot, until), ("1", NOW + pool.UNKNOWN_HOLD))
+        self.assertEqual(pool.pick(found, ["1"], now=NOW + timedelta(hours=6)), ("1", None))
+
     def test_the_list_of_slots(self):
         self.assertEqual(pool.parse_slots("3, 1,3 main"), ["3", "1", "main"])
         for text in ("9", "01", "x"):
@@ -216,6 +229,62 @@ class StrayFiles(unittest.TestCase):
         (folder / "slot-7.run.json").write_text("not json")
         self.assertEqual(list(pool.load(folder)), ["1"])
         self.assertEqual(pool.pick(pool.load(folder), ["1", "2"], now=NOW), ("1", None))
+
+
+class TheAssignments(unittest.TestCase):
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp(prefix="pool-assign-"))
+        self.addCleanup(shutil.rmtree, self.folder, ignore_errors=True)
+        self.path = self.folder / "accounts.json"
+        self.readings = self.folder / "readings"
+        self.readings.mkdir()
+        pool.write(self.readings / "slot-1.run.json", record("1", 0.8, 0.1))
+        pool.write(self.readings / "slot-2.run.json", record("2", 0.1, 0.1))
+
+    def choose(self, worker, text="1,2"):
+        return pool.choose(worker, text, self.path, self.readings, now=NOW)
+
+    def test_no_file_runs_every_worker_on_main(self):
+        self.assertEqual(self.choose("runner"), ("main", "default", None))
+
+    def test_a_named_slot_auto_and_the_default(self):
+        self.path.write_text(json.dumps({"default": "auto", "workers": {"docs": "3", "lead": "main"}}))
+        self.assertEqual(self.choose("docs"), ("3", "assigned", None))
+        self.assertEqual(self.choose("lead"), ("main", "assigned", None))
+        self.assertEqual(self.choose("runner"), ("2", "auto", None))
+        self.assertEqual(self.choose("runner", "")[0], "main")
+
+    def test_auto_with_every_slot_held_says_until_when(self):
+        self.path.write_text(json.dumps({"workers": {"runner": "auto"}}))
+        pool.write(self.readings / "slot-2.run.json", record("2", 0.95, 0.1))
+        self.assertEqual(self.choose("runner"), ("1", "auto", None))
+        pool.write(self.readings / "slot-1.run.json", record("1", 0.99, 0.1))
+        self.assertIsNotNone(self.choose("runner")[2])
+
+    def test_auto_spreads_the_workers_of_one_run(self):
+        self.path.write_text(json.dumps({"default": "auto"}))
+        dealt = [pool.choose("runner", "1,2", self.path, self.readings, now=NOW, spread=place)[0] for place in (0, 1)]
+        self.assertEqual(dealt, ["2", "1"])
+
+    def test_a_file_that_does_not_hold_together_is_refused(self):
+        for body in ("[]", '{"workers": {"a": "9"}}', '{"default": "x"}', '{"extra": 1}', "not json"):
+            self.path.write_text(body)
+            with self.assertRaises(pool.PoolError):
+                self.choose("a")
+
+    def test_the_repositorys_own_file_holds_together_where_there_is_one(self):
+        pool.assignments(ROOT / pool.ASSIGNMENTS)
+
+    def test_choose_prints_step_outputs(self):
+        self.path.write_text(json.dumps({"workers": {"runner": "4"}}))
+        with redirect_stdout(io.StringIO()) as printed, patch_stderr():
+            self.assertEqual(pool.main(["choose", "--worker", "runner", "--pool", "1", "--assignments", str(self.path)]), 0)
+        self.assertEqual(printed.getvalue(), "slot=4\n")
+
+
+def patch_stderr():
+    from unittest.mock import patch
+    return patch("sys.stderr", io.StringIO())
 
 
 class TheCommandLine(unittest.TestCase):
