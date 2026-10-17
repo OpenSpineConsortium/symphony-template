@@ -293,6 +293,17 @@ yet shown to have worked: the first grid.yml run
 registered, whether the install job, the chain's start or the chain's job in Slurm's queue is where
 it stopped; the install job's log and `--status` say which.
 
+The gate's first `--gate-key` on the grid (22:54 UTC) refused: two folders on the physical path to
+the runner's folder, `/.rs/volumes/rs_grp_oschome` (`drwxrwxrwx`, owned by another account,
+ay6621) and `/.rs/volumes/rs_grp_oschome/rs_vol_oschome` (`drwxrwxrwx`, root's), are writable by
+everyone, not sticky, and only the university can change them. They are the CephFS scaffold folders
+hpcworker's docs/guides/LAB_LEAD.md describes, which `browser-key check` has reported as a note
+rather than a refusal since 2026-10-02, because the lab's code already runs from under them. The
+owner chose the same for the gate ("Match students' key", 2026-10-17): hpcworker#15 reports a folder
+above that root or another account owns as a note for the university and refuses nothing for it,
+while a folder of the account's own that others may change is still refused. Asking C&IT for
+`chmod +t` on the two folders would close the gap for both keys.
+
 ## The ssh gate, built
 
 Planned on 2026-10-16 (the card of 00:24 UTC chose both directions, the runner first) and built on
