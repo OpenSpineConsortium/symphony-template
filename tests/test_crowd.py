@@ -1797,7 +1797,9 @@ class PublishTemplate(unittest.TestCase):
         run = Run(world, "publish-template", self.SRC, self.DEST, "--yes", extra_env=self.env)
         self.assertEqual((run.code, run.writes), (1, []))
         self.assertIn("nothing is overwritten", run.err)
-        self.assertNotIn("409", run.err)
+        # The status code alone, not 409 inside the short sha the message
+        # names, which a run's own commit can happen to contain.
+        self.assertNotRegex(run.err, r"(?<![0-9a-fA-F])409(?![0-9a-fA-F])")
 
     def test_a_managed_user_is_refused(self):
         run = Run(self.world(login="ann_spine"), "publish-template", self.SRC, self.DEST, "--yes", extra_env=self.env)
