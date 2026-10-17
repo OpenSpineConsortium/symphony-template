@@ -2292,7 +2292,11 @@ def collect(args, environ, opener=None, sleep=time.sleep):
         try:
             profiled = profile_keys(facts, units, window, records) if records is not None else {}
         except Exception as fault:
+            # A run that exits 0 would leave the branch's older PROFILE.json
+            # in place unnoticed, so the fault is an annotation on the run.
             left += f"; {PROFILE_FILE} was not written: {type(fault).__name__}: {fault}"
+            print(f"::warning::{PROFILE_FILE} was not written, so the branch keeps its older one: "
+                  f"{type(fault).__name__}")
         else:
             write_json(args.profile_out, profile_record(profiled, window))
             written = f"{args.out} and {args.profile_out}"
