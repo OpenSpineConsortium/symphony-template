@@ -12,6 +12,7 @@ Programmes:
 
 - [beyond-cooperation](beyond-cooperation/README.md): what one agent spends, context, tool calls, reading and time, and how to spend less, measured with tools/profile.py, with MAST's failure taxonomy as the outcome side.
 - [flowbench](flowbench/README.md): the workflow as a plug-in, on SWE-bench Verified: whether Symphony's flow (an issue claimed by its branch, a draft pull request, a review by three lenses, an answer to every finding) resolves as many issues as the owner's map-reduce script and as one agent alone, and at what cost in tokens and time; these notes say where it stands, and the benchmark itself, the design, the pre-registered plan, the parity with SWE-bench row by row and a tested harness that scores through SWE-bench's own harness in the published images, rehearsed end to end, is its own repository, OpenSpineConsortium/flowbench; no agent has run on the owner's tokens yet, and the pilot waits for the owner's word.
+- [protocol-fixes-after-0-5-0](protocol-fixes-after-0-5-0/README.md): where the protocol fixes stand after 0.5.0, checkpointed on 2026-10-16 in the thread "Protocol fixes toward 0.5.0": the owner's ask part by part, the four open symphony-protocol drafts (F22, F23, F25, F26) and their next steps, F24 and F27 with no pull request yet, the template's follow-up for 0.5.1 and why it waits for 0.5.0's publication, and the reviews, draft messages and probes the next thread builds on.
 
 ## Notes
 
