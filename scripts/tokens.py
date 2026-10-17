@@ -27,6 +27,8 @@ and only a subscription token has the shape claude setup-token prints.
   python3 scripts/tokens.py order 3,1,2       the order the bench deals its jobs to the slots
   python3 scripts/tokens.py profiles          what this machine remembers for each slot
   python3 scripts/tokens.py forget N          a slot's browser profile and cswap account, forgotten here
+  python3 scripts/tokens.py show N|main [--copy]  a token back from this machine's copy, on Windows
+  python3 scripts/tokens.py share coordbench    the slots seen by more repositories, with no new sign-in
 
 Where the secrets go: --org ORG puts them on the organization, seen by the
 repositories --repos names (gh's "selected" visibility; --visibility all or
@@ -58,6 +60,12 @@ Actions is a separate, inference-only one. A Windows shell has no
 pseudo-terminal, so there claude keeps the console's keyboard and its
 output comes to the wizard on a pipe, through the same mask; the profile
 is opened first, on a blank page.
+
+On Windows each token stored is also kept in Windows Credential Manager,
+under symphony/<place>/<secret>, encrypted under your Windows sign-in, so
+that `show N` gives it back on demand, printed or with --copy on the
+clipboard; GitHub never gives a secret back. remove deletes the copy with
+the secret, --no-copy keeps none, and elsewhere no copy is kept.
 Exit 0 when done, 1 on a refusal, 2 on a usage error made before any call.
 """
 
@@ -1056,6 +1064,153 @@ class Local:
         return cls(find_browser(), cswap_accounts(), settings_path())
 
 
+# The copy on this machine.
+
+# Credential Manager's kind for a credential a program finds by its name,
+# the persistence that keeps it on this machine alone, never roaming with
+# the Windows profile to another, and the error a missing name gives.
+CRED_TYPE_GENERIC = 1
+CRED_PERSIST_LOCAL_MACHINE = 2
+ERROR_NOT_FOUND = 1168
+
+
+def copy_name(target, name):
+    """The name a copy goes under: the place and the secret, so one slot
+    of two places never meets the other."""
+    return f"symphony/{place_key(target)}/{name}"
+
+
+def credential_type():
+    """Windows' CREDENTIALW, field for field; DWORD is 32 bits and every
+    string a pointer to UTF-16, on Windows as anywhere ctypes builds it."""
+    import ctypes
+
+    class FileTime(ctypes.Structure):
+        _fields_ = [("low", ctypes.c_uint32), ("high", ctypes.c_uint32)]
+
+    class Credential(ctypes.Structure):
+        _fields_ = [("Flags", ctypes.c_uint32), ("Type", ctypes.c_uint32),
+                    ("TargetName", ctypes.c_wchar_p), ("Comment", ctypes.c_wchar_p),
+                    ("LastWritten", FileTime), ("CredentialBlobSize", ctypes.c_uint32),
+                    ("CredentialBlob", ctypes.POINTER(ctypes.c_ubyte)), ("Persist", ctypes.c_uint32),
+                    ("AttributeCount", ctypes.c_uint32), ("Attributes", ctypes.c_void_p),
+                    ("TargetAlias", ctypes.c_wchar_p), ("UserName", ctypes.c_wchar_p)]
+
+    return Credential
+
+
+class CredentialManager:
+    """Windows Credential Manager, the user's own vault: Windows encrypts
+    each entry under the user's sign-in, only a program running as that
+    user reads one back, and the Control Panel's Credential Manager (under
+    Windows Credentials) lists and deletes them by name. The value is
+    UTF-16, as cmdkey and PowerShell write and read a generic credential."""
+
+    def __init__(self, advapi=None, last_error=None):
+        import ctypes
+        self.ctypes = ctypes
+        self.Credential = credential_type()
+        self.advapi = advapi or ctypes.WinDLL("advapi32", use_last_error=True)
+        self.last_error = last_error or ctypes.get_last_error
+        pointer = ctypes.POINTER(self.Credential)
+        self.advapi.CredWriteW.argtypes = [pointer, ctypes.c_uint32]
+        self.advapi.CredReadW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(pointer)]
+        self.advapi.CredDeleteW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32]
+        self.advapi.CredFree.argtypes = [ctypes.c_void_p]
+        for name in ("CredWriteW", "CredReadW", "CredDeleteW"):
+            getattr(self.advapi, name).restype = ctypes.c_int
+
+    def put(self, name, value, user, comment):
+        ctypes = self.ctypes
+        blob = value.encode("utf-16-le")
+        buffer = (ctypes.c_ubyte * len(blob)).from_buffer_copy(blob)
+        credential = self.Credential()
+        credential.Type = CRED_TYPE_GENERIC
+        credential.TargetName = name
+        credential.Comment = comment
+        credential.CredentialBlobSize = len(blob)
+        credential.CredentialBlob = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte))
+        credential.Persist = CRED_PERSIST_LOCAL_MACHINE
+        credential.UserName = user
+        if not self.advapi.CredWriteW(ctypes.byref(credential), 0):
+            raise TokensError(f"Credential Manager refused the copy (Windows error {self.last_error()})")
+
+    def get(self, name):
+        """The value kept under the name, or None where none is."""
+        ctypes = self.ctypes
+        found = ctypes.POINTER(self.Credential)()
+        if not self.advapi.CredReadW(name, CRED_TYPE_GENERIC, 0, ctypes.byref(found)):
+            error = self.last_error()
+            if error == ERROR_NOT_FOUND:
+                return None
+            raise TokensError(f"Credential Manager could not read {name} (Windows error {error})")
+        try:
+            credential = found.contents
+            blob = ctypes.string_at(credential.CredentialBlob, credential.CredentialBlobSize)
+        finally:
+            self.advapi.CredFree(found)
+        try:
+            return blob.decode("utf-16-le")
+        except UnicodeDecodeError:
+            raise TokensError(f"the copy under {name} is not UTF-16 text; delete it in Credential Manager") from None
+
+    def drop(self, name):
+        """True where a copy was there to delete."""
+        if self.advapi.CredDeleteW(name, CRED_TYPE_GENERIC, 0):
+            return True
+        error = self.last_error()
+        if error == ERROR_NOT_FOUND:
+            return False
+        raise TokensError(f"Credential Manager could not delete {name} (Windows error {error})")
+
+
+def local_copies():
+    """Where this machine keeps copies: Credential Manager on Windows, and
+    nowhere elsewhere, where the token is only on GitHub."""
+    if sys.platform != "win32":
+        return None
+    try:
+        return CredentialManager()
+    except (OSError, AttributeError):
+        return None
+
+
+def machine_copies(copies):
+    """None asks this machine; False, --no-copy, keeps none."""
+    return local_copies() if copies is None else (copies or None)
+
+
+def keep_copy(copies, target, name, token):
+    """The token, once on GitHub, kept on this machine too, so show can
+    give it back. A copy that fails costs only the copy: the secret is
+    stored already."""
+    if copies is None:
+        return
+    try:
+        copies.put(copy_name(target, name), token, name,
+                   f"Claude token {name} of {place_key(target)}; python3 scripts/tokens.py show reads it")
+        print(f"  {name}: a copy kept in Windows Credential Manager on this machine (show reads it back)")
+    except (TokensError, OSError) as error:
+        print(f"  {name}: no copy kept on this machine ({error}); the secret on GitHub is stored all the same")
+
+
+def drop_copy(copies, target, name):
+    if copies is None:
+        return
+    try:
+        if copies.drop(copy_name(target, name)):
+            print(f"  {name}: its copy on this machine deleted")
+    except (TokensError, OSError) as error:
+        print(f"  {name}: its copy on this machine could not be deleted ({error}); delete {copy_name(target, name)} in Credential Manager")
+
+
+def has_copy(copies, target, name):
+    try:
+        return copies is not None and copies.get(copy_name(target, name)) is not None
+    except (TokensError, OSError):
+        return False
+
+
 # What is there.
 
 def slot_secret(slot):
@@ -1440,11 +1595,13 @@ def sign_in_note(slot, opener=None):
     print("  The page that opens names the account it will approve; approve it there and the token is stored.")
 
 
-def add(gh, target, slot=None, label="", also_main=False, paste=False, write=None, stdin_fd=None, ask=None, noted=False, opener=None):
+def add(gh, target, slot=None, label="", also_main=False, paste=False, write=None, stdin_fd=None, ask=None, noted=False, opener=None,
+        copies=None):
     """One account into a slot. Every read and every scope is settled before
     the sign-in: a token minted and then not stored is a year's token lost
     with the process, so what can fail fails first."""
     refuse_crowd(gh, target)
+    copies = machine_copies(copies)
     check_label(label)
     state = State(gh, target)
     slot = slot or first_free(state)
@@ -1460,6 +1617,7 @@ def add(gh, target, slot=None, label="", also_main=False, paste=False, write=Non
     token = get_token(argparse.Namespace(paste=paste), write=write, stdin_fd=stdin_fd, ask=ask, opener=opener)
     for each in names:
         store_secret(state, each, token, scopes[each])
+        keep_copy(copies, target, each, token)
     token = None
     try:
         if label:
@@ -1472,8 +1630,9 @@ def add(gh, target, slot=None, label="", also_main=False, paste=False, write=Non
     return state
 
 
-def main_token(gh, target, paste=False, write=None, stdin_fd=None, ask=None):
+def main_token(gh, target, paste=False, write=None, stdin_fd=None, ask=None, copies=None):
     refuse_crowd(gh, target)
+    copies = machine_copies(copies)
     state = State(gh, target)
     scope = scope_args(state, "secrets", MAIN_SECRET)
     if MAIN_SECRET in state.secrets:
@@ -1481,6 +1640,7 @@ def main_token(gh, target, paste=False, write=None, stdin_fd=None, ask=None):
     print(f"{MAIN_SECRET}: in your browser, sign in to claude.ai as the account whose plan @claude, the workers in Actions and the coordinator workflow should draw on.")
     token = get_token(argparse.Namespace(paste=paste), write=write, stdin_fd=stdin_fd, ask=ask)
     store_secret(state, MAIN_SECRET, token, scope)
+    keep_copy(copies, target, MAIN_SECRET, token)
     token = None
     return verify(state, [MAIN_SECRET])
 
@@ -1515,20 +1675,28 @@ def reorder(gh, target, text):
     print_status(State(gh, target))
 
 
-def print_remembered(target, path=None):
-    """What this machine remembers for each slot of this place."""
+def print_remembered(target, path=None, copies=None):
+    """What this machine remembers for each slot of this place, and which
+    tokens it keeps a copy of."""
     path = path or settings_path()
+    copies = machine_copies(copies)
     settings = read_settings(path)
     print(f"Remembered on this machine, in {path}:")
     shown = False
     for slot in SLOTS:
         known = remembered(settings, target, slot)
-        if known["profile"] or known["cswap"]:
+        copied = has_copy(copies, target, slot_secret(slot))
+        if known["profile"] or known["cswap"] or copied:
             shown = True
             parts = [f"browser profile {known['profile']}" if known["profile"] else "the default browser"]
             if known["cswap"]:
                 parts.append(f"cswap account {known['cswap']}")
+            if copied:
+                parts.append("a copy of its token (show " + str(slot) + ")")
             print(f"  slot {slot}: " + ", ".join(parts))
+    if has_copy(copies, target, MAIN_SECRET):
+        shown = True
+        print(f"  {MAIN_SECRET}: a copy of its token (show main)")
     if not shown:
         print("  nothing")
 
@@ -1542,17 +1710,84 @@ def forget(target, slot, path=None):
     print(f"Slot {slot}: forgotten on this machine. Delete the browser profile itself in the browser, if you want it gone.")
 
 
-def remove(gh, target, slot):
+def remove(gh, target, slot, copies=None):
     state = State(gh, target)
     name = slot_secret(slot)
     if name in state.secrets:
         delete_secret(state, name)
     else:
         print(f"  {name}: not set")
+    drop_copy(machine_copies(copies), target, name)
     if slot_label(slot) in state.variables:
         delete_variable(state, slot_label(slot))
     update_accounts(State(gh, target))
     forget(target, slot)
+
+
+def show(target, which, copies=None, clipboard=False):
+    """A token back from this machine's copy: printed, or put on the
+    clipboard, where it never reaches the screen or the terminal's
+    scrollback."""
+    slot = slot_number(which)
+    if which != "main" and slot is None:
+        raise UsageError(f"show takes a slot from 1 to {SLOTS[-1]}, or main")
+    name = MAIN_SECRET if slot is None else slot_secret(slot)
+    copies = machine_copies(copies)
+    if copies is None:
+        raise TokensError("copies are kept in Windows Credential Manager, and this machine is not Windows: "
+                          "GitHub never gives a secret back, so mint a new token with add or main")
+    token = copies.get(copy_name(target, name))
+    if token is None:
+        raise TokensError(f"this machine keeps no copy of {name} for {target.describe()}: a token stored before copies were kept "
+                          "(2026-10-17), on another machine or with --no-copy has none; add --slot N, or main, mints one that keeps a copy")
+    if clipboard:
+        copy_to_clipboard(token)
+        print(f"{name}: on the clipboard; paste it where you need it")
+    else:
+        print(token)
+    token = None
+
+
+def copy_to_clipboard(text):
+    """Windows' clip reads what it puts on the clipboard from its standard input."""
+    try:
+        done = subprocess.run(["clip"], input=text, text=True, capture_output=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise TokensError(f"clip could not be run ({error})") from None
+    if done.returncode != 0:
+        raise TokensError("clip did not take the token; run show without --copy to print it")
+
+
+def share(gh, target, repos):
+    """The slots' secrets, their labels and the list of slots seen by more
+    repositories, such as a benchmark's, with no new sign-in: each is added
+    to the selected list it already has. CLAUDE_CODE_OAUTH_TOKEN stays
+    where it is, since no benchmark reads it."""
+    if target.level != "org":
+        raise TokensError("share adds repositories to an organization's secrets; a repository's own secrets are seen by it alone")
+    refuse_crowd(gh, Target("org", target.owner, repos))
+    state = State(gh, target)
+    present = state.slots_set()
+    if not present:
+        raise TokensError("no slot is set, so there is nothing to share")
+    ids = {}
+    for repo in repos:
+        found, text = gh.read(["api", f"repos/{target.owner}/{repo}", "--jq", ".id"])
+        if not found or not re.fullmatch(r"[0-9]{1,20}", text.strip()):
+            raise TokensError(f"GitHub lists no repository {target.owner}/{repo} for this login")
+        ids[repo] = text.strip()
+    names = [("secrets", slot_secret(slot), state.secrets[slot_secret(slot)]) for slot in present]
+    names += [("variables", slot_label(slot), state.variables[slot_label(slot)]) for slot in present if slot_label(slot) in state.variables]
+    if ACCOUNTS_VARIABLE in state.variables:
+        names.append(("variables", ACCOUNTS_VARIABLE, state.variables[ACCOUNTS_VARIABLE]))
+    for kind, name, item in names:
+        if item.get("visibility") != "selected":
+            print(f"  {name}: seen by every {'private ' if item.get('visibility') == 'private' else ''}repository already")
+            continue
+        for repo in repos:
+            gh.must(["api", "-X", "PUT", f"{target.api}/{kind}/{name}/repositories/{ids[repo]}"])
+        print(f"  {name}: now seen by {', '.join(repos)} too")
+    print_status(State(gh, target))
 
 
 def chosen_slot(state, ask):
@@ -1651,6 +1886,8 @@ def build_parser():
     adding.add_argument("--profile", help="open the sign-in in this profile of Chrome, Edge or Brave (its folder name, such as \"Profile 2\")")
     main_command = commands.add_parser("main", help=f"{MAIN_SECRET} alone, the token the Claude workflows run on")
     main_command.add_argument("--paste", action="store_true", help="take the token from a hidden prompt instead of running claude setup-token")
+    for command in (adding, main_command):
+        command.add_argument("--no-copy", action="store_true", help="keep no copy in Windows Credential Manager on this machine")
     removing = commands.add_parser("remove", help="a slot's secret and its label, and what this machine remembers of it")
     removing.add_argument("slot", type=int, choices=SLOTS)
     ordering = commands.add_parser("order", help="the order the bench deals its jobs to the slots, such as 3,1,2")
@@ -1658,9 +1895,38 @@ def build_parser():
     forgetting = commands.add_parser("forget", help="a slot's browser profile and cswap account, on this machine only")
     forgetting.add_argument("slot", type=int, choices=SLOTS)
     profiles = commands.add_parser("profiles", help="what this machine remembers for each slot")
-    for command in (status, adding, main_command, removing, ordering, forgetting, profiles):
+    showing = commands.add_parser("show", help="a token back from this machine's copy in Windows Credential Manager")
+    showing.add_argument("which", help=f"a slot from 1 to {SLOTS[-1]}, or main")
+    showing.add_argument("--copy", action="store_true", help="put it on the clipboard instead of printing it")
+    sharing = commands.add_parser("share", help="the slots' secrets seen by more repositories, such as coordbench")
+    sharing.add_argument("repos", help="repository names without the owner, comma-separated")
+    for command in (status, adding, main_command, removing, ordering, forgetting, profiles, showing, sharing):
         add_place_options(command, argparse.SUPPRESS)
     return parser
+
+
+def show_target(args, gh):
+    """The place a copy is kept under, with nothing asked of GitHub that the
+    options already say: a copy is named by the organization alone, so show
+    needs neither --repos nor a signed-in gh for it."""
+    if args.org:
+        return Target("org", args.org)
+    if args.repo:
+        owner, name = args.repo.split("/", 1)
+        return Target("repo", owner, name=name)
+    return target_from(args, gh)
+
+
+def main_show(args):
+    try:
+        show(show_target(args, Gh()), args.which, clipboard=args.copy)
+    except UsageError as error:
+        print(f"tokens: {error}", file=sys.stderr)
+        return 2
+    except TokensError as error:
+        print(f"tokens: {error}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def main(argv=None):
@@ -1670,6 +1936,8 @@ def main(argv=None):
         parser.error("--repo takes OWNER/NAME")
     if args.repo and args.org:
         parser.error("--org or --repo, not both")
+    if args.command == "show":
+        return main_show(args)
     try:
         check_options(args)
     except UsageError as error:
@@ -1678,14 +1946,15 @@ def main(argv=None):
     try:
         status = check_signed_in(gh)
         target = target_from(args, gh)
-        if args.command not in ("forget", "profiles"):
+        if args.command not in ("forget", "profiles", "show"):
             check_scopes(status, target)
         if args.command == "status":
             print_status(State(gh, target))
         elif args.command == "add":
-            add(gh, target, args.slot, args.label, args.also_main, args.paste, opener=profile_opener(args.profile))
+            add(gh, target, args.slot, args.label, args.also_main, args.paste, opener=profile_opener(args.profile),
+                copies=False if args.no_copy else None)
         elif args.command == "main":
-            main_token(gh, target, args.paste)
+            main_token(gh, target, args.paste, copies=False if args.no_copy else None)
         elif args.command == "remove":
             remove(gh, target, args.slot)
         elif args.command == "order":
@@ -1694,6 +1963,8 @@ def main(argv=None):
             forget(target, args.slot)
         elif args.command == "profiles":
             print_remembered(target)
+        elif args.command == "share":
+            share(gh, target, parse_repos(args.repos))
         else:
             wizard(gh, target)
     except TokensError as error:
