@@ -29,6 +29,7 @@ and only a subscription token has the shape claude setup-token prints.
   python3 scripts/tokens.py forget N          a slot's browser profile and cswap account, forgotten here
   python3 scripts/tokens.py show N|main [--copy]  a token back from this machine's copy, on Windows
   python3 scripts/tokens.py share coordbench    the slots seen by more repositories, with no new sign-in
+  python3 scripts/tokens.py usage             cswap's usage of each slot's account, for the control panel
 
 Where the secrets go: --org ORG puts them on the organization, seen by the
 repositories --repos names (gh's "selected" visibility; --visibility all or
@@ -1790,6 +1791,94 @@ def share(gh, target, repos):
     print_status(State(gh, target))
 
 
+def pool_module():
+    """tools/pool.py, which keeps the readings' shape for the workflows too."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import pool
+    return pool
+
+
+def cswap_rows(run=None):
+    """The accounts `cswap list --json` reports, each with its usage."""
+    run = run or subprocess.run
+    try:
+        done = run(["cswap", "list", "--json"], capture_output=True, text=True, encoding="utf-8", timeout=120)
+    except FileNotFoundError:
+        raise TokensError("cswap is not installed here: usage reads its accounts' usage, which only cswap can") from None
+    except subprocess.TimeoutExpired:
+        raise TokensError("cswap list gave no answer in 120 seconds") from None
+    try:
+        data = json.loads(done.stdout or "")
+    except json.JSONDecodeError:
+        raise TokensError(f"cswap list --json printed no JSON (exit {done.returncode}); run it by hand to see why") from None
+    rows = data.get("accounts") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        raise TokensError("cswap list --json gave no list of accounts")
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def usage_readings(target, rows, settings, pool):
+    """One reading per slot whose cswap account the wizard remembers."""
+    by_number = {row.get("number"): row for row in rows if type(row.get("number")) is int}
+    readings, missing = [], []
+    for slot in SLOTS:
+        number = remembered(settings, target, slot)["cswap"]
+        if number is None:
+            continue
+        record = pool.from_cswap(by_number.get(number, {}), str(slot))
+        (readings if record else missing).append(record or (slot, number))
+    return readings, missing
+
+
+def send_usage(gh, repository, readings, pool, attempts=3):
+    """The readings onto the branch pool through GitHub's git API, one
+    commit on the branch's head, which fails and is tried again when a
+    workflow wrote the branch in between."""
+    files = [{"path": pool.file_name(record), "mode": "100644", "type": "blob",
+              "content": json.dumps(record, indent=2, sort_keys=True) + "\n"} for record in readings]
+    base = f"repos/{repository}/git"
+    for _ in range(attempts):
+        found, head = gh.read(["api", f"{base}/ref/heads/{pool.BRANCH}", "--jq", ".object.sha"])
+        head = head.strip() if found else ""
+        tree_body = {"tree": files}
+        if head:
+            tree_body["base_tree"] = gh.must(["api", f"{base}/commits/{head}", "--jq", ".tree.sha"]).strip()
+        tree = gh.must(["api", "-X", "POST", f"{base}/trees", "--input", "-", "--jq", ".sha"], stdin=json.dumps(tree_body)).strip()
+        commit_body = {"message": "Usage of the pool's slots, from cswap", "tree": tree, "parents": [head] if head else []}
+        commit = gh.must(["api", "-X", "POST", f"{base}/commits", "--input", "-", "--jq", ".sha"], stdin=json.dumps(commit_body)).strip()
+        if head:
+            done = gh.run(["api", "-X", "PATCH", f"{base}/refs/heads/{pool.BRANCH}", "-f", f"sha={commit}", "-F", "force=false"])
+        else:
+            done = gh.run(["api", "-X", "POST", f"{base}/refs", "-f", f"ref=refs/heads/{pool.BRANCH}", "-f", f"sha={commit}"])
+        if done.returncode == 0:
+            return commit
+        if "(HTTP 422)" not in (done.stderr or ""):
+            raise TokensError(f"GitHub refused the write to the branch {pool.BRANCH}: {first_line(done.stderr) or 'no reason given'}")
+    raise TokensError(f"the branch {pool.BRANCH} moved under each of {attempts} writes; run usage again")
+
+
+def usage(gh, target, root=ROOT, path=None, run=None):
+    """cswap's readings of each remembered account, sent to the branch pool
+    of this clone's repository, where the control panel and the auto mode
+    read them; nothing but the slot, the windows and the per-model limits."""
+    pool = pool_module()
+    repository = origin_repository(root)
+    if repository is None:
+        raise TokensError("this clone has no GitHub origin, whose branch pool takes the readings")
+    settings = read_settings(path or settings_path())
+    readings, missing = usage_readings(target, cswap_rows(run), settings, pool)
+    for slot, number in missing:
+        print(f"  slot {slot}: cswap account {number} gave no usage; run cswap list to see why")
+    if not readings:
+        raise TokensError("no slot has a cswap account with usage: the wizard asks for each slot's cswap account when it adds one")
+    commit = send_usage(gh, "/".join(repository), readings, pool)
+    for record in readings:
+        parts = [f"{name.replace('_', ' ')} {round(each['utilization'] * 100)}%" for name, each in record["windows"].items()]
+        parts += [f"{each['name']} {round(each['utilization'] * 100)}%" for each in record.get("scoped", [])]
+        print(f"  slot {record['slot']}: " + (", ".join(parts) or "no windows"))
+    print(f"Sent to the branch {pool.BRANCH} of {'/'.join(repository)} ({commit[:7]}).")
+
+
 def chosen_slot(state, ask):
     """The slot to fill: the first free one by default, a set one to
     replace by its number, none to stop."""
@@ -1898,9 +1987,10 @@ def build_parser():
     showing = commands.add_parser("show", help="a token back from this machine's copy in Windows Credential Manager")
     showing.add_argument("which", help=f"a slot from 1 to {SLOTS[-1]}, or main")
     showing.add_argument("--copy", action="store_true", help="put it on the clipboard instead of printing it")
+    using = commands.add_parser("usage", help="cswap's usage of each slot's account, sent to the branch pool")
     sharing = commands.add_parser("share", help="the slots' secrets seen by more repositories, such as coordbench")
     sharing.add_argument("repos", help="repository names without the owner, comma-separated")
-    for command in (status, adding, main_command, removing, ordering, forgetting, profiles, showing, sharing):
+    for command in (status, adding, main_command, removing, ordering, forgetting, profiles, showing, sharing, using):
         add_place_options(command, argparse.SUPPRESS)
     return parser
 
@@ -1946,7 +2036,7 @@ def main(argv=None):
     try:
         status = check_signed_in(gh)
         target = target_from(args, gh)
-        if args.command not in ("forget", "profiles", "show"):
+        if args.command not in ("forget", "profiles", "show", "usage"):
             check_scopes(status, target)
         if args.command == "status":
             print_status(State(gh, target))
@@ -1963,6 +2053,8 @@ def main(argv=None):
             forget(target, args.slot)
         elif args.command == "profiles":
             print_remembered(target)
+        elif args.command == "usage":
+            usage(gh, target)
         elif args.command == "share":
             share(gh, target, parse_repos(args.repos))
         else:
