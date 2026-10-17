@@ -727,7 +727,7 @@ class Status(unittest.TestCase):
         # refuses a real run on any word that is not 1 to 8. A superscript
         # two passes isdigit() and fails int(), and int() refuses more than
         # 4,300 digits: neither may stop status.
-        self.assertEqual(tokens.parse_slots("3, 1 1,2"), [1, 2, 3])
+        self.assertEqual(tokens.parse_slots("3, 1 1,2"), [3, 1, 2], "in the order the bench deals its jobs")
         self.assertEqual(tokens.parse_slots("01,02,9,0,08"), [])
         self.assertEqual(tokens.parse_slots("\u00b2,2"), [2])
         self.assertEqual(tokens.parse_slots("1" * 5000 + ",4"), [4])
@@ -804,12 +804,74 @@ class Removing(unittest.TestCase):
         routes["secret delete"] = [answer(200, "", after={"secret list": [answer(200, [secret(tokens.slot_secret(1))])]})]
         fake_gh.write_routes(world.routes_file, routes)
         run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
-        with patch.object(tokens.subprocess, "run", run), redirect_stdout(io.StringIO()):
+        settings = Path(world.folder) / "settings.json"
+        with patch.object(tokens.subprocess, "run", run), patch.object(tokens, "settings_path", lambda: settings), \
+                redirect_stdout(io.StringIO()):
             tokens.remove(tokens.Gh(), target(), 2)
         calls = world.calls()
         self.assertEqual(find(calls, "secret delete")[0]["args"], ["secret", "delete", tokens.slot_secret(2), "--org", ORG])
         self.assertEqual(find(calls, "variable delete")[0]["args"][2], tokens.slot_label(2))
         self.assertEqual(find(calls, "variable set", tokens.ACCOUNTS_VARIABLE)[0]["args"][-2:], ["--body", "1"])
+
+
+class TheOrder(unittest.TestCase):
+    """The list of slots keeps the order it was given, which is the order
+    the bench deals its jobs to the slots."""
+
+    def run_with(self, world, function, *args):
+        run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+        with patch.object(tokens.subprocess, "run", run), redirect_stdout(io.StringIO()) as printed:
+            function(*args)
+        return printed.getvalue()
+
+    def test_order_writes_the_list_as_given(self):
+        world = World(self, secrets=[secret(tokens.slot_secret(slot)) for slot in (1, 2, 3)],
+                      variables=[variable(tokens.ACCOUNTS_VARIABLE, "1,2,3")])
+        self.run_with(world, tokens.reorder, tokens.Gh(), target(), "3,1,2")
+        self.assertEqual(find(world.calls(), "variable set", tokens.ACCOUNTS_VARIABLE)[0]["args"][-2:], ["--body", "3,1,2"])
+
+    def test_an_order_that_is_not_every_set_slot_once_is_refused(self):
+        world = World(self, secrets=[secret(tokens.slot_secret(slot)) for slot in (1, 2, 3)])
+        for text in ("3,1", "3,1,2,4", "3,1,1,2", "3,1,x,2", "03,1,2"):
+            with self.assertRaises(tokens.TokensError) as caught:
+                self.run_with(world, tokens.reorder, tokens.Gh(), target(), text)
+            self.assertIn("1,2,3", str(caught.exception))
+        self.assertEqual(find(world.calls(), "variable set"), [])
+
+    def test_nothing_to_order_is_refused(self):
+        world = World(self)
+        with self.assertRaises(tokens.TokensError):
+            self.run_with(world, tokens.reorder, tokens.Gh(), target(), "")
+
+    def test_status_names_a_slot_listed_twice(self):
+        self.assertIn("named twice", tokens.slots_text("1,1,2"))
+        self.assertEqual(tokens.slots_text("3,1"), "3,1")
+
+    def test_a_new_slot_joins_the_end_and_the_order_stays(self):
+        world = World(self, secrets=[secret(tokens.slot_secret(slot)) for slot in (1, 2, 3)],
+                      variables=[variable(tokens.ACCOUNTS_VARIABLE, "3,1")])
+        run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+        with patch.object(tokens.subprocess, "run", run), redirect_stdout(io.StringIO()):
+            state = tokens.State(tokens.Gh(), target())
+            self.assertEqual(tokens.ordered_slots(state), [3, 1, 2])
+            tokens.update_accounts(state)
+        self.assertEqual(find(world.calls(), "variable set", tokens.ACCOUNTS_VARIABLE)[0]["args"][-2:], ["--body", "3,1,2"])
+
+
+class Forgetting(unittest.TestCase):
+    def test_forget_and_profiles(self):
+        folder = Path(tempfile.mkdtemp(prefix="tokens-forget-"))
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        path = folder / "tokens.json"
+        tokens.remember(path, tokens.read_settings(path), target(), 2, "Symphony 2", 4)
+        with redirect_stdout(io.StringIO()) as printed:
+            tokens.print_remembered(target(), path)
+        self.assertIn("slot 2: browser profile Symphony 2, cswap account 4", printed.getvalue())
+        with redirect_stdout(io.StringIO()) as printed:
+            tokens.forget(target(), 2, path)
+            tokens.print_remembered(target(), path)
+        self.assertIn("forgotten", printed.getvalue())
+        self.assertTrue(printed.getvalue().rstrip().endswith("nothing"))
 
 
 class ThePlace(unittest.TestCase):
@@ -1109,48 +1171,95 @@ class TheProfile(unittest.TestCase):
         self.assertIsNone(tokens.profile_opener(None))
         self.assertEqual(tokens.profile_opener("Default", tokens.Browser("Edge", "/usr/bin/edge")).profile, "Default")
 
-    def windowed(self, opener, answers):
-        """get_token as a Windows shell runs it: what was started, what was
-        printed, and the token."""
-        started = []
+    def test_a_windows_shell_reads_claude_through_a_pipe_and_catches_the_token(self):
+        # No pseudo-terminal: claude keeps this console's keyboard and its
+        # output comes on a pipe, through the same mask.
+        folder = tempfile.mkdtemp(prefix="tokens-pipe-")
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        bin_dir = install_claude(folder)
+        report = str(Path(folder) / "report.json")
+        collector = Collector()
+        reader = code_pipe()
+        with patch.dict(os.environ, {"FAKE_CLAUDE_REPORT": report}):
+            try:
+                found = tokens.minted_token(mint_with=tokens.piped_mint, write=collector,
+                                            command=(str(bin_dir / "claude"), "setup-token"), stdin=reader)
+            finally:
+                os.close(reader)
+        self.assertEqual(found, TOKEN)
+        seen = read_json(report)
+        self.assertEqual(seen["code"], "thecode", "the keyboard reached claude")
+        self.assertFalse(seen["tty"])
+        self.assertNotIn(TOKEN, collector.text)
+        self.assertFalse(has_token(collector.text))
+        self.assertIn(tokens.MASK, collector.text)
 
-        def popen(command, env=None, creationflags=0):
-            started.append((command, env, creationflags))
-            return None
+    def test_a_claude_that_will_not_start_through_a_pipe_is_named(self):
+        with self.assertRaises(tokens.TokensError) as caught:
+            tokens.minted_token(mint_with=tokens.piped_mint, write=Collector(), command=("/nonexistent/claude", "setup-token"))
+        self.assertIn("could not be started", str(caught.exception))
 
-        answers = iter(answers)
+    def test_a_program_claude_left_holding_the_pipe_does_not_hold_the_wizard(self):
+        # A browser claude started may keep the pipe open long after claude
+        # ends; the run ends a moment after claude, with the token.
+        folder = tempfile.mkdtemp(prefix="tokens-pipe-")
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        claude = Path(folder) / "claude"
+        claude.write_text(f"#!/bin/sh\nsleep 30 &\nprintf 'Your token:\\n%s\\n' {TOKEN}\n", encoding="utf-8")
+        claude.chmod(0o755)
+        collector = Collector()
+        began = time.monotonic()
+        found = tokens.minted_token(mint_with=tokens.piped_mint, write=collector, command=(str(claude), "setup-token"),
+                                    stdin=subprocess.DEVNULL)
+        self.assertEqual(found, TOKEN)
+        self.assertLess(time.monotonic() - began, 10)
+        self.assertFalse(has_token(collector.text))
+
+    def test_a_claude_ended_by_a_signal_is_reported_as_such(self):
+        folder = tempfile.mkdtemp(prefix="tokens-pipe-")
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        claude = Path(folder) / "claude"
+        claude.write_text("#!/bin/sh\nkill -9 $$\n", encoding="utf-8")
+        claude.chmod(0o755)
+        with self.assertRaises(tokens.TokensError) as caught:
+            tokens.minted_token(mint_with=tokens.piped_mint, write=Collector(), command=(str(claude), "setup-token"),
+                                stdin=subprocess.DEVNULL)
+        self.assertIn("exit -9", str(caught.exception))
+
+    def test_a_window_claude_cannot_read_the_keyboard_from_takes_the_paste(self):
+        printed = io.StringIO()
+        with patch.object(tokens, "pty_available", lambda: False), patch.object(tokens, "claude_command", lambda: r"C:\bin\claude.exe"), \
+                patch.object(tokens.sys, "platform", "win32"), patch.object(tokens, "console_keyboard", lambda: False), \
+                patch.object(tokens.subprocess, "Popen", lambda *a, **k: self.fail("nothing is started")), redirect_stdout(printed):
+            token = tokens.get_token(argparse_namespace(), ask=lambda prompt: TOKEN,
+                                     opener=tokens.Opener(tokens.Browser("Chrome", r"C:\chrome.exe"), "Default"))
+        self.assertEqual(token, TOKEN)
+        self.assertIn("Windows Terminal", printed.getvalue())
+
+    def test_a_windows_shell_opens_the_profile_blank_then_mints(self):
+        # A batch launcher would get a link cut at its = and &, so the
+        # profile is opened first, on a blank page, so no second sign-in shows.
+        started, minted = [], []
+
+        def popen(command, **options):
+            started.append(command)
+
+        def fake_mint(**options):
+            minted.append(options["command"])
+            return [TOKEN], 0, False
+
+        browser = tokens.Browser("Chrome", r"C:\Program Files\Google\Chrome\Application\chrome.exe")
         printed = io.StringIO()
         with patch.object(tokens, "pty_available", lambda: False), patch.object(tokens, "claude_command", lambda: r"C:\bin\claude.exe"), \
                 patch.object(tokens.sys, "platform", "win32"), patch.object(tokens.subprocess, "Popen", popen), \
-                patch.object(tokens.time, "sleep", lambda seconds: None), \
-                patch.object(tokens.subprocess, "CREATE_NEW_CONSOLE", 16, create=True), redirect_stdout(printed):
-            token = tokens.get_token(argparse_namespace(), ask=lambda prompt: next(answers), opener=opener)
-        return token, started, printed.getvalue()
-
-    def test_a_windows_shell_opens_the_profile_then_claude_in_its_own_window(self):
-        # Claude Code hands a batch file its link through cmd.exe, which
-        # cuts it at = and &, so Windows takes no launcher: the profile is
-        # opened first, and claude's link goes to the profile used last.
-        browser = tokens.Browser("Chrome", r"C:\Program Files\Google\Chrome\Application\chrome.exe")
-        token, started, printed = self.windowed(tokens.Opener(browser, "Symphony 2"), ["", TOKEN])
+                patch.object(tokens.time, "sleep", lambda seconds: None), patch.object(tokens, "piped_mint", fake_mint), \
+                patch.object(tokens, "console_keyboard", lambda: True), \
+                redirect_stdout(printed):
+            token = tokens.get_token(argparse_namespace(), opener=tokens.Opener(browser, "Symphony 2"))
         self.assertEqual(token, TOKEN)
-        self.assertEqual(started, [([browser.path, "--profile-directory=Symphony 2", tokens.CLAUDE_HOME], None, 0),
-                                   ([r"C:\bin\claude.exe", "setup-token"], None, 16)])
-        self.assertIn("close that window", printed)
-        self.assertIn("Nothing was pasted; the sign-in is still open", printed, "an early Enter asks again")
-        self.assertFalse(has_token(printed))
-
-    def test_without_a_profile_only_claude_is_started_and_empty_pastes_end_it(self):
-        with self.assertRaises(tokens.TokensError):
-            self.windowed(None, [""] * tokens.PASTE_TRIES)
-        token, started, _ = self.windowed(None, [TOKEN])
-        self.assertEqual([command for command, _, _ in started], [[r"C:\bin\claude.exe", "setup-token"]])
-
-    def test_a_window_that_cannot_hide_the_paste_starts_no_claude(self):
-        with patch.object(tokens.sys, "stdin", io.StringIO()), patch.object(tokens.subprocess, "Popen", lambda *a, **k: self.fail("started")):
-            with self.assertRaises(tokens.TokensError) as caught:
-                tokens.windowed_token(r"C:\bin\claude.exe", None, None)
-        self.assertIn("claude was not started", str(caught.exception))
+        self.assertEqual(started, [[browser.path, "--profile-directory=Symphony 2", "about:blank"]])
+        self.assertEqual(minted, [(r"C:\bin\claude.exe", "setup-token")])
+        self.assertFalse(has_token(printed.getvalue()))
 
 
 def argparse_namespace(paste=False):
