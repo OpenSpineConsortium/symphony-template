@@ -111,7 +111,7 @@ PROFILE.json is the second step of the research programme in docs/research/beyon
 | --- | --- |
 | sessions | Claude Code sessions whose profile lines are on the commits of the pull requests that ended in the window, told apart by the eight characters each line carries |
 | actions_runs | Actions runs whose profiles the sums hold: those that name one of those pull requests, and the coordinator's that count on the parallel side |
-| actions_runs_unread | Actions runs whose profiles the sums may be short of: METRICS.json's economics.actions_runs_unread, and the runs a cache from before the profile kept without theirs, not yet downloaded again; null when the records could not be listed at all |
+| actions_runs_unread | Actions runs whose profiles the sums may be short of, over the whole look-back: METRICS.json's economics.actions_runs_unread, and the runs a cache from before the profile kept without theirs, which are downloaded again only while their artifact is listed and unexpired, so one whose artifact has gone counts here until it leaves the look-back; null when the records could not be listed at all |
 | by_setting.SETTING.pull_requests, merged | The pull requests that ended in the window in each of the eight work settings, sorted as METRICS.json's by_setting sorts them, and of them those merged |
 | by_setting.SETTING.profiled, profiled_merged | Of them, those with a profile, and of those the merged |
 | by_setting.SETTING.calls, failed, repeated | The profiled pull requests' tool calls, those that failed and those that repeated an earlier call in the same transcript exactly, summed |

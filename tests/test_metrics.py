@@ -1167,6 +1167,8 @@ class ProfileSums(unittest.TestCase):
         self.assertEqual(record["economics"], WORLD_ECONOMICS)
         self.assertFalse(written, "the write step keeps the branch's PROFILE.json")
         self.assertIn("; PROFILE.json was not written: ZeroDivisionError: a slip", shown.getvalue())
+        self.assertIn("::warning::PROFILE.json was not written, so the branch keeps its older one: ZeroDivisionError",
+                      shown.getvalue())
 
     def test_runs_not_read_again_yet_are_counted_as_unread(self):
         routes = world_routes()
