@@ -97,6 +97,9 @@ python3 scripts/tokens.py remove 2
 python3 scripts/tokens.py order 3,1,2
 python3 scripts/tokens.py profiles
 python3 scripts/tokens.py forget 2
+python3 scripts/tokens.py show 2
+python3 scripts/tokens.py show main --copy
+python3 scripts/tokens.py share coordbench
 ```
 
 Where the secrets go is read from the clone's origin: a repository of an
@@ -108,8 +111,9 @@ list, a personal repository its own level. Say it instead with
 list, which grows by what `--repos` names; the wizard takes nothing off
 a list.
 
-What it never does: show a token, write one to disk, put one on a command
-line, keep one after the run, or read one back (GitHub cannot). It refuses
+What it never does: show a token unasked, write one to a file, put one on
+a command line, or read one back from GitHub (GitHub cannot); on Windows
+it keeps a copy in Credential Manager, which only `show` reads (below). It refuses
 an API key on sight, since runs bill nothing here (docs/project.md), and
 anything else that is not a token from `claude setup-token`. It refuses to
 run for a repository in crowd mode, which holds no Claude token
@@ -196,6 +200,89 @@ while signed in to the account the secret is for.
   as `1,2,3`, the same repositories as the secrets, "Add variable".
 
 Then `python3 scripts/tokens.py status` says what GitHub lists.
+
+## A copy on your PC
+
+GitHub never gives a secret back, so on Windows the wizard keeps a copy
+of each token it stores in Windows Credential Manager, under
+`symphony/org:<organization>/<secret>` (or `symphony/repo:<owner>/<name>/<secret>`).
+Windows encrypts it under your own Windows sign-in, and only a program
+running as you reads it back. `python3 scripts/tokens.py show N` prints
+slot N's token, `show main` the workflows' token, and `--copy` puts it on
+the clipboard instead, so it never reaches the screen or the terminal's
+scrollback; Windows' clipboard history (Win+V) keeps it after you paste,
+so clear it there (Clear all), and a clipboard synced across devices sends
+it to them. `profiles` says which slots have a copy. `remove N` deletes a
+slot's copy along with its secret, and the copy of CLAUDE_CODE_OAUTH_TOKEN
+is deleted by hand, as below; `add --no-copy` and `main --no-copy` keep
+none. To see or delete a copy by hand: Control Panel, Credential Manager,
+Windows Credentials, the entries that start with `symphony/`. A token
+stored before 2026-10-17, or on another machine, has no copy: `add --slot N`
+mints a new one that does. Elsewhere than Windows no copy is kept.
+
+## Which secrets a benchmark uses
+
+A benchmark in Actions reads only the slots, never CLAUDE_CODE_OAUTH_TOKEN:
+coordbench's bench.yml takes `SYMPHONY_CLAUDE_<slot>` for each slot in the
+dispatch's "accounts" box, or in SYMPHONY_CLAUDE_ACCOUNTS when the box is
+empty, and refuses a real run when one of them is unset or unseen by
+coordbench. So:
+
+- To pick the accounts for one run, type the slots in the "accounts" box
+  when you press Run workflow, such as `2,3`; only those are used.
+- To keep an account away from the benchmarks, give it no slot: an
+  account only in CLAUDE_CODE_OAUTH_TOKEN (`main`) serves @claude and the
+  workers alone.
+- The benchmark's repository must see the slots. A secret on the
+  organization reaches only the repositories on its list, so
+  `python3 scripts/tokens.py share coordbench` adds coordbench to every
+  slot's secret, its label and the list of slots, with no sign-in, and
+  `status` then lists it under "seen by". A benchmark run by a cloud
+  session itself, as flowbench's pilot is, uses that session's own
+  subscription and reads no secret.
+
+## How much each slot has used
+
+The control panel's Tokens page, and the auto mode that picks a slot for
+a run, read the branch pool: each slot's latest five-hour and seven-day
+use with their resets, and its per-model weekly limits such as Fable.
+GitHub never gives a secret back, so these come from three readings
+(docs/research/claude-token-pool.md):
+
+- a worker's run in Actions, which reads its own token's windows from
+  Claude's answers at no cost;
+- the workflow Pool (.github/workflows/pool.yml): Run workflow asks each
+  slot for one word and keeps the reading, which spends that one word of
+  the window, so it runs only when you ask, never on a schedule;
+- `python3 scripts/tokens.py usage` on the machine where cswap keeps your
+  accounts: it reads `cswap list --json` and sends each slot's reading,
+  by the cswap account the wizard remembered for it. This is the only one
+  that sees the Fable limit, since a token from claude setup-token cannot
+  read the usage page cswap reads with a full sign-in.
+
+`python3 tools/pool.py pick DIR --slots 1,2,3` is the auto mode: the slot
+with the least used five-hour window, then seven-day window, passing over
+any slot a window holds at 90 percent or more until it resets.
+
+## Which account each worker runs on
+
+A worker in Actions runs on CLAUDE_CODE_OAUTH_TOKEN unless the file
+.github/symphony/accounts.json says otherwise:
+
+```
+{"default": "main", "workers": {"runner": "auto", "docs": "2"}}
+```
+
+`main` is CLAUDE_CODE_OAUTH_TOKEN, a number from 1 to 8 is that slot's
+SYMPHONY_CLAUDE_<slot>, and `auto` takes, at the start of each run, the
+slot of SYMPHONY_CLAUDE_ACCOUNTS with the most room, so a worker moves to
+the next account before the one it was on runs out. A run already going
+finishes on its account. Workers of one run are dealt different free
+slots, the first the one with the most room. When every slot of the pool is at its limit the
+run does nothing and says when the first is free; the next run picks
+again. A slot whose secret this repository does not see falls back to
+the main token, and the run says so. The workers still need
+CLAUDE_CODE_OAUTH_TOKEN set, which turns them on at all.
 
 ## Renewing and removing
 

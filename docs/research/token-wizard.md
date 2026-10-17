@@ -432,6 +432,34 @@ does not exist yet, as it is documented to; and the callback from a
 Windows browser into WSL, which depends on WSL's localhost forwarding.
 The owner's first run on Windows is the test.
 
+## The copy in Credential Manager and the benchmarks (2026-10-17)
+
+The owner's first Windows run stored slot 1 (runners) and
+CLAUDE_CODE_OAUTH_TOKEN on the organization, seen by symphony-template,
+renew by 2027-10-17. Asked to get a token back on demand, the owner chose
+on a decision card to keep a copy in Windows Credential Manager, and then
+said in their own words to build it and the show command. The copy is
+written through advapi32's CredWriteW from ctypes (no new dependency), a
+generic credential with CRED_PERSIST_LOCAL_MACHINE, so it never roams to
+another machine with the Windows profile, and the value in UTF-16, as
+cmdkey and PowerShell write one. The structure's layout is tested against
+Windows' 64-bit CREDENTIALW (80 bytes, the blob pointer at 40, UserName
+at 72), and the calls against a fake advapi32; no Windows machine ran it
+in this thread, so the owner's next run is the test. A copy that fails
+costs only the copy, since it is written after the secret is stored.
+
+The same message asked that the benchmarks get these tokens. coordbench's
+bench.yml reads SYMPHONY_CLAUDE_<slot> for the slots in its "accounts"
+input, else SYMPHONY_CLAUDE_ACCOUNTS, and its plan job refuses a slot
+whose secret is unset or unseen; it never reads CLAUDE_CODE_OAUTH_TOKEN.
+The status showed slot 1 seen by symphony-template alone, so coordbench
+could not use it. `share` adds repositories to the selected lists of
+every slot, label and the list through the organization's
+secrets/{name}/repositories/{id} endpoint, with no new sign-in. flowbench's
+pilot runs inside a cloud session on that session's subscription and
+reads no secret; a later benchmark run in Actions, such as the standalone
+agents the grant's figures need, reads the slots the same way.
+
 ## Open items
 
 - tools/crowd_check.py's SECRET_NAMES does not name SYMPHONY_CLAUDE_1 to

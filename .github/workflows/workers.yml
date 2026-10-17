@@ -262,6 +262,51 @@ jobs:
           for setting in model max_turns rounds; do
             echo "$setting=$(python3 tools/workers.py --dir "$REGISTRY" get "$WORKER" "$setting")" >> "$GITHUB_OUTPUT"
           done
+      - name: Choose the Claude account the worker runs on
+        id: account
+        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
+        env:
+          POOL: ${{ vars.SYMPHONY_CLAUDE_ACCOUNTS }}
+          SPREAD: ${{ strategy.job-index }}
+        run: |
+          # .github/symphony/accounts.json names a slot, main or auto for the
+          # worker (tools/pool.py); auto takes the pool's slot with the most
+          # room, read from the branch pool. A file that does not hold
+          # together leaves the worker on the main token, as before.
+          if ! python3 tools/pool.py choose --worker "$WORKER" --pool "$POOL" --spread "$SPREAD" >> "$GITHUB_OUTPUT"; then
+            echo "slot=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Whether the chosen account's secret is seen here
+        id: secret
+        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
+        env:
+          CHOSEN: ${{ steps.account.outputs.slot }}
+          # Each slot's secret by a fixed name, as coordbench's bench.yml
+          # takes it: a computed name would hand the runner every secret it
+          # can see. Only this step and Claude's own have it.
+          SLOT_TOKEN: >-
+            ${{
+            (steps.account.outputs.slot == '1' && secrets.SYMPHONY_CLAUDE_1) ||
+            (steps.account.outputs.slot == '2' && secrets.SYMPHONY_CLAUDE_2) ||
+            (steps.account.outputs.slot == '3' && secrets.SYMPHONY_CLAUDE_3) ||
+            (steps.account.outputs.slot == '4' && secrets.SYMPHONY_CLAUDE_4) ||
+            (steps.account.outputs.slot == '5' && secrets.SYMPHONY_CLAUDE_5) ||
+            (steps.account.outputs.slot == '6' && secrets.SYMPHONY_CLAUDE_6) ||
+            (steps.account.outputs.slot == '7' && secrets.SYMPHONY_CLAUDE_7) ||
+            (steps.account.outputs.slot == '8' && secrets.SYMPHONY_CLAUDE_8) ||
+            ''
+            }}
+        run: |
+          if [ "$CHOSEN" != main ] && [ -z "$SLOT_TOKEN" ]; then
+            echo "SYMPHONY_CLAUDE_$CHOSEN is unset or not seen by this repository; this run takes CLAUDE_CODE_OAUTH_TOKEN"
+            CHOSEN=main
+          fi
+          echo "slot=${CHOSEN:-main}" >> "$GITHUB_OUTPUT"
+      - name: Say when every slot of the pool is held
+        if: steps.account.outputs.wait == 'true'
+        env:
+          UNTIL: ${{ steps.account.outputs.until }}
+        run: echo "Every slot of SYMPHONY_CLAUDE_ACCOUNTS is at its limit; the first is free at $UNTIL, and the next run picks again (Run workflow on Pool reads them afresh). Doing nothing."
       - name: Point at the setup when the token is not there
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN != 'true'
         run: echo "The repository secret CLAUDE_CODE_OAUTH_TOKEN is not set; docs/setup/claude-action.md says how. Doing nothing."
@@ -269,12 +314,24 @@ jobs:
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
         run: |
           cp tools/usage.py "$RUNNER_TEMP/usage.py"
+          cp tools/pool.py "$RUNNER_TEMP/pool.py"
           cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
       - uses: anthropics/claude-code-action@v1
         id: claude
-        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
+        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true' && steps.account.outputs.wait != 'true'
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_code_oauth_token: >-
+            ${{
+            (steps.secret.outputs.slot == '1' && secrets.SYMPHONY_CLAUDE_1) ||
+            (steps.secret.outputs.slot == '2' && secrets.SYMPHONY_CLAUDE_2) ||
+            (steps.secret.outputs.slot == '3' && secrets.SYMPHONY_CLAUDE_3) ||
+            (steps.secret.outputs.slot == '4' && secrets.SYMPHONY_CLAUDE_4) ||
+            (steps.secret.outputs.slot == '5' && secrets.SYMPHONY_CLAUDE_5) ||
+            (steps.secret.outputs.slot == '6' && secrets.SYMPHONY_CLAUDE_6) ||
+            (steps.secret.outputs.slot == '7' && secrets.SYMPHONY_CLAUDE_7) ||
+            (steps.secret.outputs.slot == '8' && secrets.SYMPHONY_CLAUDE_8) ||
+            secrets.CLAUDE_CODE_OAUTH_TOKEN
+            }}
           allowed_bots: "github-actions,claude"
           claude_args: |
             --max-turns ${{ steps.next.outputs.max_turns }}
@@ -301,6 +358,27 @@ jobs:
           name: symphony-usage-${{ github.run_id }}-${{ github.run_attempt }}-work-${{ matrix.worker }}
           path: ${{ runner.temp }}/symphony-usage/record.json
           if-no-files-found: ignore
+      # The reading goes to the job pool-publish as an artifact: Claude's
+      # action points origin at its own token and revokes it when it ends,
+      # so this job's checkout can no longer push.
+      - name: Read the run's use of its account, for the pool
+        if: always() && steps.claude.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+          SLOT: ${{ steps.secret.outputs.slot }}
+        run: >-
+          python3 "$RUNNER_TEMP/pool.py" observe --slot "${SLOT:-main}" --out "$RUNNER_TEMP/pool-readings"
+          --execution-file "${EXECUTION_FILE:-$RUNNER_TEMP/claude-execution-output.json}"
+      - name: Keep the reading for the job that writes the pool
+        if: always() && steps.claude.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: pool-reading-${{ github.run_attempt }}-${{ matrix.worker }}
+          path: ${{ runner.temp }}/pool-readings/
+          if-no-files-found: ignore
+          retention-days: 1
       - name: Go another round while this worker has work
         if: steps.claude.outcome == 'success'
         env:
@@ -321,3 +399,35 @@ jobs:
           fi
           gh workflow run workers.yml --repo "$GITHUB_REPOSITORY" -f worker="$WORKER" -f round="$((ROUND + 1))"
           echo "$WORKER: round $((ROUND + 1)) dispatched for '$answer'"
+
+  pool-publish:
+    needs: work
+    if: vars.CLAUDE_CROWD != 'true' && always() && needs.work.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: pool-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: pool-reading-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/readings
+      - name: Write the runs' readings to the branch pool
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          shopt -s nullglob
+          readings=("$RUNNER_TEMP"/readings/slot-*.json)
+          if [ "${#readings[@]}" -eq 0 ]; then
+            echo "no run gave a reading"
+            exit 0
+          fi
+          python3 tools/pool.py publish "${readings[@]}"
