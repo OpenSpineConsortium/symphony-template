@@ -35,11 +35,10 @@ named "notsorry" was found on GitHub; the spelling is taken as a slip for unsorr
   instead" as the fallback. Either way the person drives any repository of theirs that carries
   the topic symphony from the browser, as themselves. A Claude driving a browser reads the same
   page: every state is a sentence under the summary line and every action is a named button.
-- Waits on the owner: deploying the sign-in service (a Cloudflare Worker), giving the App a
-  client secret and two callback URLs, and sending a session the Worker's address and the App's
-  Client ID, neither of which is a secret; one more pull request on the site then sets the two
-  constants and the button can be pressed. The steps, each with its link and what to click, are
-  in symphony-app's signin/README.md and under What waits on the owner below.
+- Switched on 2026-10-17: the owner deployed the sign-in service at
+  https://symphony-signin.openspineconsortium.workers.dev and sent SymphonyBoard's Client ID,
+  and site pull request #24 set the two constants, so the button can be pressed. What is left is
+  the owner's first real sign-in (What waits on the owner, below).
 - The money: a Symphony repository pays one flat Claude plan for its workers in Actions ($20,
   $100 or $200 a month) and, on a public repository, nothing for the compute, since standard
   runners are free there and the coordination makes no model call. The other ways of running
@@ -65,6 +64,9 @@ named "notsorry" was found on GitHub; the spelling is taken as a slip for unsorr
 | OpenSpineConsortium/symphony-template | this file and the memory fact, for Sign in with GitHub first | #109, merged last |
 | OpenSpineConsortium/openspineconsortium.github.io | assets/js/symphony-panel.js: the fifth review's fixes | #23, merged 2026-10-16 |
 | OpenSpineConsortium/symphony-template | this file and the memory fact, for the fifth review | the pull request after #109, merged last |
+| OpenSpineConsortium/openspineconsortium.github.io | assets/js/symphony-panel.js: SIGNIN_SERVICE and CLIENT_ID set; every built page restamped ?v=202610171418 | #24, merged 2026-10-17 |
+| OpenSpineConsortium/symphony-app | signin/panel-checks/: the checks set the two constants themselves, empty or mocked, whatever the shipped script holds, and SITE names the site's checkout | #17, merged 2026-10-17 |
+| OpenSpineConsortium/symphony-template | this file and the memory fact, for the switch-on | the pull request after #17, merged last |
 
 They merged in the order symphony-start (the site renders its privacy statement), the site,
 symphony-app, then the template, each with a merge commit once its check was green, on the
@@ -509,31 +511,27 @@ Follow-ups).
 
 ## What waits on the owner
 
-Each step is in symphony-app's signin/README.md with its link and what to click; in short:
+The setup is done (2026-10-17, thread "Finish control panel sign-in"): the Worker answers
+`{"service":"symphony-signin","routes":["/exchange","/refresh","/revoke"],"keeps":"nothing"}` at
+https://symphony-signin.openspineconsortium.workers.dev, the owner sent the Client ID
+Iv23liTkIRov2FYN83wD (public, as every GitHub App's is; the client secret was never sent and is
+only in the Worker's GITHUB_CLIENT_SECRET), and site #24 set SIGNIN_SERVICE and CLIENT_ID. The
+earlier steps, each with its link and what to click, stay in symphony-app's signin/README.md for
+a new deployment. A cloud session cannot reach workers.dev or openspineconsortium.com through its
+proxy (403); the Worker was read through the web-fetch tool, and no session can sign in as the
+owner, so two steps are the owner's:
 
-1. Make the Worker on Cloudflare: https://dash.cloudflare.com/, Workers & Pages, Create
-   application (or Create), Start with Hello World! (or Create Worker), name symphony-signin,
-   Deploy; open https://github.com/OpenSpineConsortium/symphony-app/blob/main/signin/worker.js
-   and press Copy raw file; on the Worker's page press Edit code, replace everything with it and
-   Deploy; copy the Worker's address (https://symphony-signin.<account>.workers.dev).
-2. On the Worker's page, Settings, Observability: turn Workers Logs off.
-3. On https://github.com/organizations/OpenSpineConsortium/settings/apps/symphonyboard: note
-   the Client ID; Generate a new client secret; add the two callback URLs
-   https://openspineconsortium.com/symphony/control/ and
-   https://openspineconsortium.com/symphony/cost.html; leave the wildcard box unticked, "Expire
-   user authorization tokens" ticked, "Request user authorization (OAuth) during installation"
-   unticked and the Setup URL as it is; Save changes.
-4. On the Worker's page, Settings, Variables and Secrets: GITHUB_CLIENT_ID (Text) and
-   GITHUB_CLIENT_SECRET (Secret); Deploy. ALLOWED_ORIGIN needs no setting: unset, it is
-   https://openspineconsortium.com. The client secret goes into that field and nowhere else.
-5. Give a session the Worker's address and the Client ID, neither of which is a secret: one pull
-   request on the site sets SIGNIN_SERVICE and CLIENT_ID, and "Sign in with GitHub", already the
-   pages' first button, can be pressed.
-6. Optional: add "Actions: Read and write" to the App's permissions, so that a signed-in token
+1. The first sign-in: open https://openspineconsortium.com/symphony/control/ , press "Sign in
+   with GitHub", then "Authorize" on GitHub's page; the panel comes back signed in and lists the
+   repositories with the topic symphony. A failure says what GitHub or the service answered: a
+   redirect_uri error means a callback URL is missing on the App's page, and an
+   incorrect_client_credentials error means the Worker's GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET
+   is wrong.
+2. Optional: add "Actions: Read and write" to the App's permissions, so that a signed-in token
    lists runs and starts workflows; without it the panel falls back to the default branch's
    check runs and says so, and a fine-grained token needs nothing from the App.
 
-Until then the pages work with a fine-grained token, under "Use a fine-grained token instead":
+The fine-grained token stays the fallback, under "Use a fine-grained token instead":
 https://github.com/settings/personal-access-tokens/new,
 the repositories Symphony runs in, and under Repository permissions Actions Read and write,
 Checks Read-only, Contents Read and write, Issues Read and write, Pull requests Read and write.
