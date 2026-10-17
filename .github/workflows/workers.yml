@@ -415,7 +415,6 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           pattern: pool-reading-*
-          merge-multiple: true
           path: ${{ runner.temp }}/readings
       - name: Write the runs' readings to the branch pool
         env:
@@ -425,7 +424,7 @@ jobs:
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
           shopt -s nullglob
-          readings=("$RUNNER_TEMP"/readings/slot-*.json)
+          readings=("$RUNNER_TEMP"/readings/*/slot-*.json)
           if [ "${#readings[@]}" -eq 0 ]; then
             echo "no run gave a reading"
             exit 0
