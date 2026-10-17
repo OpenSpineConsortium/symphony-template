@@ -62,7 +62,7 @@ shape. (Verified for both products; the overlap is Inferred.)
 | | Symphony | Conductor | Agentastic |
 |---|---|---|---|
 | Unit of work | One issue, one branch claude/<N>, one pull request, by any worker | One run of one YAML workflow, one process | One agent in one worktree, container or VM, on one Mac |
-| Where state lives | GitHub: issues, labels, claim branches, the board on branch `board`, pull requests; nothing of ours is served | In the run's process and its events JSONL; checkpoints and run records under ~/.conductor | On the Mac: worktrees, a Manager's Home as a git repository, a SQLite index; optional relay through Agentastic's servers |
+| Where state lives | GitHub: issues, labels, claim branches, the board on branch `board`, pull requests; nothing of ours is served but the control panel's stateless sign-in Worker, which keeps no state and no Claude credential (the Apps' webhook server is to be deleted) | In the run's process and its events JSONL; checkpoints and run records under ~/.conductor | On the Mac: worktrees, a Manager's Home as a git repository, a SQLite index; optional relay through Agentastic's servers |
 | Several people | Yes, by design: every account's sessions, routines and workers in Actions share one repository and one board | No: single user, one machine; "multi-user or team visibility" is a stated non-goal of its fleet view | No: one Mac, one person; sharing is a tunnel or their relay |
 | A graph of the work | None drawn today; GitHub holds the hierarchy and can hold the dependencies, which nothing of ours writes yet; the board lists neither (docs/research/control-board-graph.md) | The workflow's own DAG, live, with containers for parallel groups and sub-workflows | None; relationship badges on Kanban cards |
 | Live per-node progress | Labels and comments on the issue, the draft pull request and its checks, the Actions run log for a worker in Actions, commit trailers; polled through GitHub's API | Status, elapsed, tokens, cost, context-window bar, the activity stream and the log, streamed over a WebSocket from the process | Status word, plan count, sub-agent lines, diff counts, a Manager's feed and cards |
@@ -88,11 +88,15 @@ which were not counted for this note.
    nothing depends on one machine staying up. Conductor's own fleet design names team
    visibility as a non-goal, and Agentastic's Manager lives in one Mac's Application Support
    folder. (Verified.)
-2. Nothing of ours is served and no credential of a person is ever copied. Conductor's dashboard
-   is a server per run on the operator's machine; Agentastic copies a signed-in Claude Code
-   login onto a cloud VM and keeps a wallet of API keys. Symphony holds one secret, the
-   repository's own subscription token, and refuses API keys by rule; crowd mode makes each
-   contributor work on their own account and the project hold nobody's credential. (Verified.)
+2. No credential of a person is ever copied, and the one thing of ours that is served, the
+   control panel's stateless sign-in Worker, holds none. Conductor's dashboard is a server per
+   run on the operator's machine; Agentastic copies a signed-in Claude Code login onto a cloud
+   VM and keeps a wallet of API keys. A copy of Symphony holds one secret, the repository's own
+   subscription token (the owner's own pool of accounts, SYMPHONY_CLAUDE_1 to 8, is more, by
+   the owner's decision), and refuses API keys by rule, the checks refusing the shapes of
+   secrets, while the advice that the token be an account nobody uses by hand is not enforced;
+   crowd mode makes each contributor work on their own account and the project hold nobody's
+   credential. (Verified.)
 3. The gate is GitHub's, not the tool's word. A pull request lands only when the required check
    is green (the QA gate with a readable report is decided and not built); a worker's claim that
    it is finished is a comment, not a merge. Agentastic states the same principle, status claims
@@ -107,8 +111,10 @@ which were not counted for this note.
    publishes a measurement of coordination. The results are pending the full run and nothing
    is claimed from them yet. (Verified that none is published; Symphony's numbers are
    pending.)
-6. The adoption is one press and a merge, with no install on anyone's machine beyond Claude
-   Code itself, and the protocol library in a copy never falls behind, since each release comes
+6. The adoption of a repository is one press and a merge, with no install on anyone's machine
+   beyond Claude Code itself, though running Claude in it then takes the owner's clicks (the
+   token secret, the Claude GitHub App, the repository settings) and no adoption by a user is
+   measured yet; and the protocol library in a copy never falls behind, since each release comes
    through the copy's own workflow; the rest of a copy's files do fall behind, since the update
    route is parked and the runtime that would replace it is not built. Conductor is a
    curl-and-uv install with a daily update check; Agentastic is a
@@ -123,23 +129,28 @@ which were not counted for this note.
    checks, with the Actions log one click away for a worker in Actions and no log at all for a
    claude.ai session, whose transcript no API exposes. (Verified.)
 2. No graph drawn. GitHub holds the hierarchy (the coordinator writes tasks as native
-   sub-issues) and can hold the dependencies, but no view of ours or GitHub's draws them; the
-   board lists overlaps as text. The companion note's recommendation is a Mermaid section drawn
+   sub-issues, a convenience whose failure it ignores and which nothing of ours reads back; the
+   protocol's own link is the "Epic: #N" line in a task's body and the tasks marker on the
+   epic, team.py) and can hold the dependencies, which nothing of ours writes; no view of ours
+   or GitHub's draws them, and the board lists overlaps as text. The companion note's recommendation is a Mermaid section drawn
    by the board's run, a static picture, where Conductor has a pannable canvas with containers,
    a minimap and deep links. (Verified.)
 3. No budget enforcement and no resume. Conductor caps a run in dollars and stops it, checkpoints
-   on every failure and resumes the same run; Symphony records what a run cost after the fact,
+   on every failure and resumes the same run; Symphony records what the work cost beside it, on each push
+   for a session's trailer and at the run's end for a worker in Actions, shows it on no node,
    caps nothing yet (a cap of 10 runs a day is decided and not built), and a worker's run in
    Actions that dies is started over from its branch. (Verified.)
 4. Latency is unmeasured. A Claude run in Actions answers in tens of seconds to minutes, a figure
    no repository of the project has recorded (docs/checkpoints/2026-10-14c/handoff.md); the
    other two answer in the time the model takes, on the machine in front of the person.
    (Verified that it is unmeasured.)
-5. The instructions a run loads are long. Every Claude run in Actions reads CLAUDE.md whole, and
-   the template's carries a checkpoint block of decisions and constraints that grows with each
-   handoff; Conductor caps its AGENTS.md at 12 KiB and routes to guides from it, and the Claude
-   Code docs advise a concise CLAUDE.md for cost. (Verified for both; the cost of ours is not
-   measured.)
+5. The instructions a run loads are long in the template itself. Every Claude run in Actions
+   reads CLAUDE.md whole; the template's is 143 lines and 36 KB, most of it the checkpoint
+   block of decisions and constraints that grows with each handoff, which template_init empties
+   in a copy (reset_checkpoint_block), so a copy's runs load the short form and only the
+   template's own runs the whole; Conductor's AGENTS.md is 114 lines and under 7 KB under a
+   12 KiB cap and routes to guides from it, and the Claude Code docs advise a concise CLAUDE.md
+   for cost. (Verified for both; the cost of ours is not measured.)
 6. Maturity and hands. Conductor has 33 releases, about 10,500 tests and Microsoft's processes
    behind it; Agentastic ships weekly to a store. Symphony is one maintainer's template with no
    public release yet, whose protocol library awaits its 0.5.0 approval, and whose control
@@ -148,8 +159,8 @@ which were not counted for this note.
 7. No in-page assistant beyond a box that posts @claude. Conductor takes guidance mid-run and
    exposes workflows as MCP tools; Agentastic has chat with every agent and Managers that draw
    cards. Symphony's assistant design (the companion note) is an issue thread answered by an
-   Actions run, bounded by that run's latency and the daily cap, because the rules allow no
-   model call from the page. (Verified for the products; the design is a proposal.)
+   Actions run, bounded by that run's latency and by the daily cap once it is built, because
+   the rules allow no model call from the page. (Verified for the products; the design is a proposal.)
 
 ## What to borrow and what not to
 
