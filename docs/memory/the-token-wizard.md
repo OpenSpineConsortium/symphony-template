@@ -24,6 +24,6 @@ gh's token carries admin:org, which an organization's secrets need. A
 repository's own SYMPHONY_CLAUDE_ACCOUNTS hides the organization's list
 the wizard keeps, so none is made by hand; status names one, with the
 page to delete it on, and reads the list as the bench does, only the
-words 1 to 8. docs/setup/claude-tokens.md is the page, with the by-hand links;
+words 1 to 8. Each slot's sign-in can open in a browser profile of its own: claude opens its link with the program BROWSER names, so the wizard hands it a launcher for the one run, and remembers the profile and the slot's cswap account number in tokens.json in the user's settings folder; cswap's logins are never reused, since they rotate and are full logins. docs/setup/claude-tokens.md is the page, with the by-hand links;
 tests/test_tokens.py proves the token never reaches the screen at any
 chunk size. From symphony-template's token wizard thread, 2026-10-16.
