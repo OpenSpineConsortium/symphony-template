@@ -128,18 +128,18 @@ which were not counted for this note.
    signed-in person, so what a worker is doing is read from its labels, comments, pushes and
    checks, with the Actions log one click away for a worker in Actions and no log at all for a
    claude.ai session, whose transcript no API exposes. (Verified.)
-2. No graph drawn. GitHub holds the hierarchy (the coordinator writes tasks as native
-   sub-issues, a convenience whose failure it ignores and which nothing of ours reads back; the
-   protocol's own link is the "Epic: #N" line in a task's body and the tasks marker on the
-   epic, team.py) and can hold the dependencies, which nothing of ours writes; no view of ours
-   or GitHub's draws them, and the board lists overlaps as text. The companion note's recommendation is a Mermaid section drawn
-   by the board's run, a static picture, where Conductor has a pannable canvas with containers,
-   a minimap and deep links. (Verified.)
+2. No graph drawn. GitHub holds the hierarchy (the coordinator writes tasks as native sub-issues,
+   a convenience whose failure it ignores and which nothing of ours reads back; the protocol's
+   own link is the "Epic: #N" line in a task's body and the tasks marker on the epic, team.py)
+   and can hold the dependencies, which nothing of ours writes; no view of ours or GitHub's
+   draws them, and the board lists overlaps as text. The companion note's recommendation is a
+   Mermaid section drawn by the board's run, a static picture, where Conductor has a pannable
+   canvas with containers, a minimap and deep links. (Verified.)
 3. No budget enforcement and no resume. Conductor caps a run in dollars and stops it, checkpoints
-   on every failure and resumes the same run; Symphony records what the work cost beside it, on each push
-   for a session's trailer and at the run's end for a worker in Actions, shows it on no node,
-   caps nothing yet (a cap of 10 runs a day is decided and not built), and a worker's run in
-   Actions that dies is started over from its branch. (Verified.)
+   on every failure and resumes the same run; Symphony records what the work cost beside it, on
+   each push for a session's trailer and at the run's end for a worker in Actions, shows it on
+   no node, caps nothing yet (a cap of 10 runs a day is decided and not built), and a worker's
+   run in Actions that dies is started over from its branch. (Verified.)
 4. Latency is unmeasured. A Claude run in Actions answers in tens of seconds to minutes, a figure
    no repository of the project has recorded (docs/checkpoints/2026-10-14c/handoff.md); the
    other two answer in the time the model takes, on the machine in front of the person.
@@ -160,7 +160,8 @@ which were not counted for this note.
    exposes workflows as MCP tools; Agentastic has chat with every agent and Managers that draw
    cards. Symphony's assistant design (the companion note) is an issue thread answered by an
    Actions run, bounded by that run's latency and by the daily cap once it is built, because
-   the rules allow no model call from the page. (Verified for the products; the design is a proposal.)
+   the rules allow no model call from the page. (Verified for the products; the design is a
+   proposal.)
 
 ## What to borrow and what not to
 
