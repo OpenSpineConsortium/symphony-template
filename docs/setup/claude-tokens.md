@@ -241,6 +241,30 @@ coordbench. So:
   session itself, as flowbench's pilot is, uses that session's own
   subscription and reads no secret.
 
+## How much each slot has used
+
+The control panel's Tokens page, and the auto mode that picks a slot for
+a run, read the branch pool: each slot's latest five-hour and seven-day
+use with their resets, and its per-model weekly limits such as Fable.
+GitHub never gives a secret back, so these come from three readings
+(docs/research/claude-token-pool.md):
+
+- a Claude run in Actions, which reads its own token's windows from
+  Claude's answers at no cost, once the workers record it (the next
+  step of docs/research/claude-token-pool.md);
+- the workflow Pool (.github/workflows/pool.yml): Run workflow asks each
+  slot for one word and keeps the reading, which spends that one word of
+  the window, so it runs only when you ask, never on a schedule;
+- `python3 scripts/tokens.py usage` on the machine where cswap keeps your
+  accounts: it reads `cswap list --json` and sends each slot's reading,
+  by the cswap account the wizard remembered for it. This is the only one
+  that sees the Fable limit, since a token from claude setup-token cannot
+  read the usage page cswap reads with a full sign-in.
+
+`python3 tools/pool.py pick DIR --slots 1,2,3` is the auto mode: the slot
+with the least used five-hour window, then seven-day window, passing over
+any slot a window holds at 90 percent or more until it resets.
+
 ## Renewing and removing
 
 A token lasts about a year. `status` says "renew soon" within a month of
