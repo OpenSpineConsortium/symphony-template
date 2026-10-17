@@ -208,6 +208,13 @@ class TheBranch(unittest.TestCase):
         self.assertEqual(kept["windows"]["five_hour"]["utilization"], 0.6)
         self.assertEqual(self.git("-C", str(self.origin), "rev-list", "--count", "pool").strip(), "1")
 
+    def test_two_jobs_on_one_slot_leave_the_newest_reading(self):
+        older, newer = self.folder / "a" / "slot-1.run.json", self.folder / "b" / "slot-1.run.json"
+        pool.write(newer, record("1", 0.7, 0.1, at=NOW))
+        pool.write(older, record("1", 0.2, 0.1, at=NOW - timedelta(hours=1)))
+        self.assertEqual(pool.newest_by_name([newer, older]), {"slot-1.run.json": newer})
+        self.assertEqual(pool.newest_by_name([older, newer]), {"slot-1.run.json": newer})
+
     def test_a_name_that_is_not_a_reading_is_refused(self):
         stray = self.folder / "notes.json"
         stray.write_text("{}")

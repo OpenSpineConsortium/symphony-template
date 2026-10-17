@@ -429,16 +429,32 @@ def git(*args, cwd=None, stdin=None):
     return done.stdout.strip()
 
 
+def newest_by_name(paths):
+    """One path per reading's name, the newest by its own time: jobs of
+    one run that took the same slot each leave a reading of that name,
+    and the last to finish says most."""
+    chosen = {}
+    for path in paths:
+        name = Path(path).name
+        if not FILE_NAME.match(name):
+            raise PoolError(f"{name} is not a reading's name")
+        try:
+            at = parse_time(json.loads(Path(path).read_text(encoding="utf-8")).get("at"))
+        except (OSError, ValueError, AttributeError):
+            at = None
+        at = at or datetime.min.replace(tzinfo=timezone.utc)
+        if name not in chosen or at > chosen[name][0]:
+            chosen[name] = (at, path)
+    return {name: path for name, (_, path) in chosen.items()}
+
+
 def publish(paths, cwd=None):
     """The readings onto the branch pool, beside the ones there: one commit
     with no parent, as the branches board and metrics are kept, pushed
     with a lease on the commit read, and tried again when another run
     pushed first."""
     entries = {}
-    for path in paths:
-        name = Path(path).name
-        if not FILE_NAME.match(name):
-            raise PoolError(f"{name} is not a reading's name")
+    for name, path in newest_by_name(paths).items():
         entries[name] = git("hash-object", "-w", str(path), cwd=cwd)
     for _ in range(PUSH_ATTEMPTS):
         previous = ""
