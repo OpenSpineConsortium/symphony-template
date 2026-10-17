@@ -387,6 +387,21 @@ reaches Linear.
 Each is a yes or no; the recommendation is marked. Nothing below is started until the owner
 answers, except the writing of docs/setup pages, which is harmless.
 
+The owner answered on 2026-10-17: 1 yes, the Mermaid section; 2 yes; 3 open, asking what Linear
+would buy beyond its Slack integration; 4, 5 and 9 depend on 3; 6 not settled, but nobody is to be
+asked to host a session of their own, so the middle way is the panel's own graph page, drawn in the
+browser from GitHub's sub-issues and blocked-by as the signed-in person, which nobody hosts; 7 no to
+both; 8 A. What Linear buys beyond Slack is its own views (cycles, projects, a list and a board
+over the synced issues) and Linear Agent chat over them; the Slack part alone GitHub's own Slack
+app gives without Linear (https://github.com/integrations/slack#readme: a channel subscribes to a
+repository's issues, pull requests, commits, releases, deployments, workflow runs, reviews,
+comments, branches and discussions, opens an issue with /github open, comments and closes from
+the card, and reminds about open pull requests on a schedule; its price is not stated there). So
+the recommendation stands at no Linear for now. What follows: choice 1 is a draft pull request in
+symphony-protocol held until 0.5.1 is cut, choice 2 is docs/setup/github.md's section 9, choice 8
+is one template pull request (claude.yml and .github/symphony/assistant.md) and one site pull
+request (the panel's section), and choice 6 comes after 8 as the panel's graph page.
+
 1. The protocol extension (tier 0): depends_on in the coordinator's plan written as native
    blocked_by, Pick reading open blockers, the board's Dependencies section as Mermaid with
    k of n, the epic's marked section. Recommended yes. It is a symphony-protocol release after
