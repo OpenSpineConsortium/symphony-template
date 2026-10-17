@@ -47,6 +47,11 @@ reaches GitHub.
 | followup_second_review_mutate.py | 37142b0 | Five new behaviours had no test. |
 | run_mutants.py | 3675c99, main's scripts/tokens.py | The base passes and all sixteen mutants of the follow-up fail the tests. |
 
+Run again in their committed form on 2026-10-17, from this folder on main
+as of 172520d with Python 3.12: wrap_fuzz.py printed "bad: 0" (6,404 stored
+right, 3,196 refused), and run_mutants.py passed the base and caught all
+sixteen mutants.
+
 ## What was left out, and why
 
 - The thread's patch scripts and diffs, the check logs and the pull
