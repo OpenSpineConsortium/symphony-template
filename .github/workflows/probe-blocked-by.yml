@@ -5,7 +5,8 @@ name: Probe blocked-by
 # a workflow, which the Dependencies section of the board will need.
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [claude/graph-setup]
 
 permissions:
   issues: write
