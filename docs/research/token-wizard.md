@@ -169,6 +169,9 @@ wizard runs on the owner's own computer.
 - `bash scripts/check.sh` passes, the filled copies included: a crowd
   copy runs these tests with its own mode line saying on, so the tests
   read a project file of their own.
+- The probes, the wrap fuzz and the mutants that the thread and its
+  reviewers ran are kept in docs/research/token-wizard-checks/, each with
+  the commit it was written against and what it showed there.
 
 ## The adversarial review (2026-10-16) and what changed for it
 
