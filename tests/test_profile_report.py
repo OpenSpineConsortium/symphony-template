@@ -83,20 +83,21 @@ class Page(unittest.TestCase):
             text = profile_report.page(Path(folder))
         for title in profile_report.QUESTIONS.values():
             labels = [row.split(" | ")[0][2:] for row in rows_of(text, title)]
-            arm = ["Batched calls (2026-10-05)"] if title == "Decreased tool usage" else []
+            arm = ["Batched calls (2026-10-05-batched-calls)"] if title == "Decreased tool usage" else []
             self.assertEqual(labels, ["baseline 2026-10-01", "baseline 2026-10-02", *arm], title)
         tools = rows_of(text, "Decreased tool usage")
         self.assertEqual(tools[0], "| baseline 2026-10-01 | 1 | 1 of 1 | not judged | 10.0 | 1.0 | 0 | 2 | 0 |")
         self.assertEqual(tools[1], "| baseline 2026-10-02 | 1 | not recorded | not recorded | - | - | 0 | 2 | 0 |",
                          "no outcome, so no cost per landed task")
-        self.assertEqual(tools[2], "| Batched calls (2026-10-05) | 2 | 1 of 2 | FM-1.3 x2 | 40.0 | 4.0 | 0 | 1 | 3 |",
+        self.assertEqual(tools[2], "| Batched calls (2026-10-05-batched-calls) | 2 | 1 of 2 | FM-1.3 x2 "
+                                   "| 40.0 | 4.0 | 0 | 1 | 3 |",
                          "two transcripts summed over the one task that landed")
         context = rows_of(text, "Context compression")
         self.assertNotIn("Batched", "".join(context))
         self.assertIn("No arm has run for this question yet", section(text, "Profiling"))
         self.assertNotIn("No arm has run", section(text, "Decreased tool usage"))
         self.assertTrue(text.endswith("- baseline 2026-10-01: #1 merged\n- baseline 2026-10-02: no outcome recorded\n"
-                                      "- Batched calls (2026-10-05): a test\n"))
+                                      "- Batched calls (2026-10-05-batched-calls): a test\n"))
 
     def test_every_table_carries_the_repeated_calls_and_the_compactions(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -114,7 +115,8 @@ class Page(unittest.TestCase):
             write(run / "b.profile.json", record(first=200, peak=500, mean=250, cached=0.7, drops=0))
             text = profile_report.page(Path(folder))
         self.assertEqual(rows_of(text, "Context compression"),
-                         ["| Batched calls (2026-10-05) | 2 | 0 of 2 | none | 150 | 400 | 200 | 80% | 1 | 4 | 0 |"])
+                         ["| Batched calls (2026-10-05-trimmed) | 2 | 0 of 2 | none "
+                          "| 150 | 400 | 200 | 80% | 1 | 4 | 0 |"])
         self.assertIn("No record yet.", section(text, "Profiling"))
 
     def test_a_page_that_differs_fails_the_check_and_is_not_rewritten(self):
@@ -146,12 +148,34 @@ class Page(unittest.TestCase):
             "a mode counted below 0": outcome(modes={"FM-1.3": -1}),
             "an arm named by markup": outcome(arm="| a | b"),
             "no source": dict(outcome(), source=" "),
+            "no modes, not even null": {key: value for key, value in outcome().items() if key != "modes"},
         }
         for name, data in cases.items():
             with self.subTest(name), tempfile.TemporaryDirectory() as folder:
                 run = Path(folder) / "runs" / "2026-10-05-x"
                 write(run / "outcome.json", data)
                 write(run / "a.profile.json", record())
+                with self.assertRaises(profile_report.ReportError):
+                    profile_report.page(Path(folder))
+        bad_records = {"a count given as text": {"tokens": {"total": "12"}},
+                       "a count below 0": {"calls": {"total": -5}},
+                       "infinity": {"estimated_usd": float("inf")},
+                       "not a number": {"context": {"peak": float("nan")}},
+                       "true for a count": {"reads": {"bytes": True}},
+                       "a block that is a number": {"seconds": 5}}
+        for name, bad in bad_records.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as folder:
+                write(Path(folder) / "baseline-2026-10-01.json", {**record(), **bad})
+                with self.assertRaises(profile_report.ReportError):
+                    profile_report.page(Path(folder))
+        with tempfile.TemporaryDirectory() as folder:
+            write(Path(folder) / "baseline-2026-10-01.json", dict(record(), context={}))
+            self.assertIn("| baseline 2026-10-01 | 1 | not recorded |", profile_report.page(Path(folder)),
+                          "a record with no main transcript has an empty context block")
+        for name, path in {"an outcome with no record": "baseline-2026-10-01.outcome.json",
+                           "a baseline named otherwise": "baseline-2026-1-1.json"}.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as folder:
+                write(Path(folder) / path, outcome(question="baseline") if "outcome" in path else record())
                 with self.assertRaises(profile_report.ReportError):
                     profile_report.page(Path(folder))
         for name, build in {"a run with no record": lambda run: None,

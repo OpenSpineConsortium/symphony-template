@@ -17,8 +17,9 @@ An outcome (schema symphony-arm-outcome/1) says which question the arm
 answers, how many tasks it ran and how many landed (the pull request
 merged with its check green and no revert, or the task's tests passed),
 how the rest failed, as counts of MAST's failure modes, or null where
-nobody judged them, and in a line of its own where it comes from. Costs are read per landed task, since fewer tokens is
-trivially reached by doing nothing; every table carries the repeated calls
+nobody judged them, and in a line of its own where it comes from. Costs
+are read per landed task, since fewer tokens is trivially reached by
+doing nothing; every table carries the repeated calls
 and the compactions beside its costs, the two MAST modes the records
 measure (FM-1.3 and FM-1.4), so an arm that moves its cost into them shows
 it.
@@ -29,6 +30,7 @@ differs from what the records give."""
 
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -74,10 +76,33 @@ def whole(value, least=0):
     return isinstance(value, int) and not isinstance(value, bool) and value >= least
 
 
+# The counts the report reads from a record, by their path in it. A record
+# with no main transcript has an empty context block (tools/profile.py), so
+# a count may be absent, and is then 0.
+READ = (("calls", "total"), ("calls", "failed"), ("calls", "unanswered"), ("calls", "repeated"),
+        ("tokens", "total"), ("estimated_usd",), ("seconds", "active"), ("seconds", "in_tools"),
+        ("context", "first"), ("context", "peak"), ("context", "mean"), ("context", "cached_share"),
+        ("context", "compactions"), ("context", "drops"), ("reads", "bytes"), ("reads", "reread_bytes"),
+        ("reads", "rereads"), ("reads", "files_named"), ("reads", "partial"))
+
+
+def count(value):
+    """Whether a value is a count the page can print: a finite number not
+    below 0, never JSON's true or false, nor the NaN and Infinity json
+    reads."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+
+
 def profile_record(path):
     record = read_json(path)
     if not isinstance(record, dict) or record.get("schema") != PROFILE_SCHEMA:
         raise ReportError(f"{path}: not a record of tools/profile.py ({PROFILE_SCHEMA})")
+    for keys in READ:
+        value = record
+        for key in keys:
+            value = value.get(key) if isinstance(value, dict) else "not a block"
+        if value is not None and not count(value):
+            raise ReportError(f"{path}: {'.'.join(keys)} must be a number not below 0")
     return record
 
 
@@ -94,7 +119,9 @@ def outcome_of(path, question=None):
         raise ReportError(f"{path}: question must be {question or ' or '.join(QUESTIONS)}")
     if not isinstance(outcome.get("arm"), str) or not ARM_NAME.fullmatch(outcome["arm"]):
         raise ReportError(f"{path}: arm must be a name of 1 to 80 letters, digits and plain punctuation")
-    tasks, landed, modes = outcome.get("tasks"), outcome.get("landed"), outcome.get("modes")
+    if "modes" not in outcome:
+        raise ReportError(f"{path}: modes must be given, null where they were not judged")
+    tasks, landed, modes = outcome.get("tasks"), outcome.get("landed"), outcome["modes"]
     if not whole(tasks, 1) or not whole(landed) or landed > tasks:
         raise ReportError(f"{path}: tasks must be 1 or more and landed from 0 to tasks")
     if modes is not None and not (isinstance(modes, dict) and set(modes) <= set(MODES)
@@ -109,8 +136,12 @@ def baselines(folder):
     rows = []
     for path in sorted(folder.glob("baseline-*.json")):
         found = BASELINE.fullmatch(path.name)
-        if not found:
+        if path.name.endswith(".outcome.json"):
+            if not path.with_name(path.name.replace(".outcome.json", ".json")).exists():
+                raise ReportError(f"{path}: an outcome with no record beside it")
             continue
+        if not found:
+            raise ReportError(f"{path}: a baseline's record is named baseline-YYYY-MM-DD.json")
         beside = path.with_name(f"baseline-{found[1]}.outcome.json")
         outcome = outcome_of(beside, "baseline") if beside.exists() else None
         rows.append(Row(f"baseline {found[1]}", "baseline", [profile_record(path)], outcome))
@@ -126,7 +157,7 @@ def arm_runs(folder):
         records = [profile_record(path) for path in sorted(run.glob("*.profile.json"))]
         if not records:
             raise ReportError(f"{run}: no *.profile.json record")
-        rows.append(Row(f"{outcome['arm']} ({run.name[:10]})", outcome["question"], records, outcome))
+        rows.append(Row(f"{outcome['arm']} ({run.name})", outcome["question"], records, outcome))
     return rows
 
 
@@ -179,12 +210,14 @@ def outcome_cells(row):
 
 
 def mast_cells(row):
-    return [number(total(row.records, "calls", "repeated")), number(total(row.records, "context", "compactions"))]
+    repeated, compactions = total(row.records, "calls", "repeated"), total(row.records, "context", "compactions")
+    return [number(repeated), number(compactions)]
 
 
 # Each question's own columns, after the outcome's and before MAST's.
 COLUMNS = {
-    "profiling": (("Tokens per landed task", lambda row: number(per_landed(row, total(row.records, "tokens", "total")))),
+    "profiling": (("Tokens per landed task",
+                   lambda row: number(per_landed(row, total(row.records, "tokens", "total")))),
                   ("USD per landed task", lambda row: number(per_landed(row, total(row.records, "estimated_usd")), 2)),
                   ("Active seconds per landed task",
                    lambda row: number(per_landed(row, total(row.records, "seconds", "active")))),
