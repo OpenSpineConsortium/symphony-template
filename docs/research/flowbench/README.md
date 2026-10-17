@@ -85,6 +85,41 @@ a path is that repository's.
   astropy-12907, django-12708 and pylint-7080: eight strata, seven
   repositories.
 
+## What the pilot found
+
+The pilot ran on 2026-10-17 from 21:54 to 22:53 UTC on the owner's word
+("can you run the pilot?"), exactly as PLAN.md pre-registered it: the
+first 8 instances of the order under symphony, script and solo, 24 runs,
+one lane, Sonnet 5.5 at medium effort, on the host route inside one cloud
+session of this project, whose own subscription the `claude -p` agents
+drew on with the billing variables dropped. Before it, the gold patch of
+each of the 8 resolved through the same scorer (the survey step for the
+pilot's instances). The records, the report and the notes are flowbench's
+results/pilot/ (README.md there says what to read with them).
+
+- Resolved: symphony 8/8, script 8/8, solo 7/8 (pylint-7080); no harness
+  error, exclusion, orchestration failure, timeout or turn limit, every
+  run on its first attempt. At n = 8 no gap in resolved can be
+  significant, and none is (symphony against script, no discordant
+  instance; against solo, 1 to 0).
+- Cost: tokens per instance, mean, symphony 1.01M, script 1.34M, solo
+  0.21M; symphony used 0.75 of the script's tokens on the same
+  instances (bootstrap over repositories 0.67 to 0.82); wall clock per
+  run, median, 91 s, 120 s and 51 s. The pilot took 59 minutes and about
+  7.86 USD at list price (Claude Code's estimate, not a bill), far under
+  the one to two five-hour windows guessed.
+- In a cloud session a child `claude -p` is offered the session's own
+  tools (Workflow, Artifact, Monitor, messaging) beside Claude Code's
+  built-in ones; every arm was offered the same list and the agents
+  called only Bash, Read and Write (flowbench's bundle counts each
+  agent's calls in tools.json), but the step of 32 should either drop
+  those tools or record the offer as a deviation from PLAN.md's
+  "built-in local tools".
+- The symphony arm still runs its shape only, with no gate between the
+  stages (PARITY.md row 15), and these 8 instances are easy for the
+  model; the step of 32, which waits for the owner's word, is where the
+  flows can disagree.
+
 ## What runs today
 
 - The harness: tasks (the pool and the order), backlog (the work list the
@@ -127,7 +162,8 @@ Nothing below runs or is created without the owner's word.
    README", since a session's push guard refuses a push to main in any
    repository; the harness and the design documents came in by
    flowbench#1.
-2. The pilot. PLAN.md's first paid step is 8 instances under three arms,
+2. The pilot: done on the owner's word of 2026-10-17 (below, What the
+   pilot found). The record of the ask: PLAN.md's first paid step is 8 instances under three arms,
    24 runs, estimated at one to two five-hour windows of one account (a
    guess until measured; DESIGN.md, Routes), on the host route from a
    machine where claude is logged in on the owner's subscription, or on
@@ -189,3 +225,6 @@ cloned, the harness in a virtualenv, the dataset compiled with
   until then only in the session that ran it, written down with each
   answer and the scorer's check on a gold patch
   (docs/research/flowbench/scaffold-review.md).
+- 2026-10-17: the pilot ran on the owner's word, 24 runs in 59 minutes,
+  every one scored; flowbench's bundle.py written to commit the records;
+  results in flowbench's results/pilot/.
