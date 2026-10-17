@@ -64,12 +64,12 @@ shape. (Verified for both products; the overlap is Inferred.)
 | Unit of work | One issue, one branch claude/<N>, one pull request, by any worker | One run of one YAML workflow, one process | One agent in one worktree, container or VM, on one Mac |
 | Where state lives | GitHub: issues, labels, claim branches, the board on branch `board`, pull requests; nothing of ours is served | In the run's process and its events JSONL; checkpoints and run records under ~/.conductor | On the Mac: worktrees, a Manager's Home as a git repository, a SQLite index; optional relay through Agentastic's servers |
 | Several people | Yes, by design: every account's sessions, routines and workers in Actions share one repository and one board | No: single user, one machine; "multi-user or team visibility" is a stated non-goal of its fleet view | No: one Mac, one person; sharing is a tunnel or their relay |
-| A graph of the work | None drawn today; GitHub holds the hierarchy and the dependencies, the board lists them (docs/research/control-board-graph.md) | The workflow's own DAG, live, with containers for parallel groups and sub-workflows | None; relationship badges on Kanban cards |
+| A graph of the work | None drawn today; GitHub holds the hierarchy and can hold the dependencies, which nothing of ours writes yet; the board lists neither (docs/research/control-board-graph.md) | The workflow's own DAG, live, with containers for parallel groups and sub-workflows | None; relationship badges on Kanban cards |
 | Live per-node progress | Labels and comments on the issue, the draft pull request and its checks, the Actions run log for a worker in Actions, commit trailers; polled through GitHub's API | Status, elapsed, tokens, cost, context-window bar, the activity stream and the log, streamed over a WebSocket from the process | Status word, plan count, sub-agent lines, diff counts, a Manager's feed and cards |
-| Preconditions and gates | A claim is refused by git itself; the required check and the QA gate hold the merge; a blocker label stops everyone; blocked tasks wait on the coordinator | Human gates and questions in the YAML, answered in the terminal or the dashboard; routes decided by code | A Manager's objectives, verified by a command, a plugin query, a report or a model judgment; status claims stay proposals until a person confirms |
-| Credentials | One secret, the repository's CLAUDE_CODE_OAUTH_TOKEN; never an API key; each person on their own account | A key per provider in the environment, or gh auth for Copilot, or the claude CLI's own login in subscription mode | A wallet of subscriptions and API keys; signed-in credentials copied to cloud VMs |
+| Preconditions and gates | A claim is refused by git itself; the required check holds the merge (the QA gate is decided and not built); a blocker label stops everyone; blocked tasks wait on the coordinator | Human gates and questions in the YAML, answered in the terminal or the dashboard; routes decided by code | A Manager's objectives, verified by a command, a plugin query, a report or a model judgment; status claims stay proposals until a person confirms |
+| Credentials | In a copy, one secret, the repository's CLAUDE_CODE_OAUTH_TOKEN (the owner's own pool of accounts adds SYMPHONY_CLAUDE_1 to 8); never an API key; each person on their own account | A key per provider in the environment, or gh auth for Copilot, or the claude CLI's own login in subscription mode | A wallet of subscriptions and API keys; signed-in credentials copied to cloud VMs |
 | Cost to run | $0: GitHub's free features and Actions minutes, Claude on the subscription | $0 software; the model bills, or the subscription; a machine | $0 app; the model bills; cloud VMs at the user's provider |
-| Budget | What the work cost is recorded beside it (Symphony-Usage trailers, usage artifacts, the metrics' ratios); no cap per run; at most 10 Claude runs a day per repository | budget_usd per run, audit or enforce, with a budget_exceeded event; a priced table per model | A Usage panel at list rates; 100 free messages a day on its own free tier |
+| Budget | What the work cost is recorded beside it (Symphony-Usage trailers, usage artifacts, the metrics' ratios); no cap per run; a cap of 10 Claude runs a day per repository is decided (2026-10-13) and not built | budget_usd per run, audit or enforce, with a budget_exceeded event; a priced table per model | A Usage panel at list rates; 100 free messages a day on its own free tier |
 | Failure and resume | A claim idle 24 hours is released with its work kept under released/<N>-<sha>; a run in Actions is not resumable; a session checkpoints itself (cswap) | A checkpoint on every failure and on a schedule; conductor resume continues the same run; replay of any recorded run | "Keep my worker running" restarts; a Manager wakes on a failing worker |
 | Assistant in the UI | @claude on the repository's token; a person's own Claude in a browser can drive the panel | Mid-run guidance to the running agent; an MCP server that exposes workflows as tools | Chat with any agent; the Agentastic agent; Managers draw cards and pages |
 | Measurement | coordbench on CooperBench's pairs, the field metrics, the profiling programme; results pending the full run | Performance test markers; no benchmark of coordination published in the repository | None published |
@@ -94,7 +94,7 @@ which were not counted for this note.
    repository's own subscription token, and refuses API keys by rule; crowd mode makes each
    contributor work on their own account and the project hold nobody's credential. (Verified.)
 3. The gate is GitHub's, not the tool's word. A pull request lands only when the required check
-   is green and, where the plan has it, the QA gate's report is readable; a worker's claim that
+   is green (the QA gate with a readable report is decided and not built); a worker's claim that
    it is finished is a comment, not a merge. Agentastic states the same principle, status claims
    are proposals until confirmed, but confirms them by a person on one Mac; Conductor's human
    gate is a step in the YAML. (Verified.)
@@ -108,8 +108,10 @@ which were not counted for this note.
    is claimed from them yet. (Verified that none is published; Symphony's numbers are
    pending.)
 6. The adoption is one press and a merge, with no install on anyone's machine beyond Claude
-   Code itself, and a copy never falls behind because the protocol comes by release through its
-   own workflow. Conductor is a curl-and-uv install with a daily update check; Agentastic is a
+   Code itself, and the protocol library in a copy never falls behind, since each release comes
+   through the copy's own workflow; the rest of a copy's files do fall behind, since the update
+   route is parked and the runtime that would replace it is not built. Conductor is a
+   curl-and-uv install with a daily update check; Agentastic is a
    Mac app from the store. (Verified.)
 
 ## Where Symphony is weaker, today
@@ -127,8 +129,8 @@ which were not counted for this note.
    a minimap and deep links. (Verified.)
 3. No budget enforcement and no resume. Conductor caps a run in dollars and stops it, checkpoints
    on every failure and resumes the same run; Symphony records what a run cost after the fact,
-   caps runs per day by count, and a worker's run in Actions that dies is started over from its
-   branch. (Verified.)
+   caps nothing yet (a cap of 10 runs a day is decided and not built), and a worker's run in
+   Actions that dies is started over from its branch. (Verified.)
 4. Latency is unmeasured. A Claude run in Actions answers in tens of seconds to minutes, a figure
    no repository of the project has recorded (docs/checkpoints/2026-10-14c/handoff.md); the
    other two answer in the time the model takes, on the machine in front of the person.
@@ -157,7 +159,8 @@ requests and replaying into one store; dagre's top-to-bottom layout with contain
 and inline-expandable sub-graphs, if a canvas of ours is ever built; node chips of status,
 elapsed and tokens with a hover tooltip; deep links by query string; a status vocabulary derived
 from explicit markers and never from timing; and the label "estimate" on every cost figure that
-is not a bill, which Symphony's cost page already does. Its subscription mode for the Claude
+is not a bill, which Symphony's cost page should adopt, since today it says the work is priced
+at Anthropic's API list prices. Its subscription mode for the Claude
 Agent SDK, which blanks the three key variables in the child and checks claude auth status, is
 the same rule Beethoven enforces and is worth citing as a precedent from Microsoft. (Inferred.)
 

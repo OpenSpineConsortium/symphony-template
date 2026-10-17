@@ -55,7 +55,8 @@ and how the protocol feeds whoever draws it without depending on them".
   the always-on picture, and make Linear an optional tier on top. One protocol extension serves
   every tier: the coordinator already opens an epic's tasks as native sub-issues; it gains a
   depends_on list per task written as GitHub's native blocked_by, Pick treats a task with an
-  open blocker as not free, and the board's run computes "preconditions met k of n" and writes
+  open issue it is blocked by as not free, and the board's run computes "preconditions met k
+  of n" and writes
   a Dependencies section as Mermaid into STATE.md and into each epic's body, which GitHub
   renders on every plan with no server, no extension and no credential beyond GITHUB_TOKEN. It
   is a static picture redrawn each run, not a pannable canvas, and it is about a hundred lines
@@ -68,8 +69,8 @@ and how the protocol feeds whoever draws it without depending on them".
   that person's own Linear OAuth grant. Every other assistant on offer (Linear's coding
   sessions on prepaid credits, Claude Agent for Jira on an Anthropic API key, a Linear agent of
   ours behind a webhook server) is outside the rules.
-- What waits on the owner is a list of choices at the end, each with its exact link and what to
-  click. The protocol change is a symphony-protocol release, so it waits for 0.5.1 to be cut and
+- What waits on the owner is a list of choices at the end, with the exact link and what to
+  click for each step a choice opens. The protocol change is a symphony-protocol release, so it waits for 0.5.1 to be cut and
   for the owner's approval of its release; nothing in this note changes symphony-protocol.
 
 ## What each product draws natively, read 2026-10-17
@@ -179,26 +180,40 @@ The principle: GitHub is the truth and the protocol reads and writes GitHub only
 today. Linear reads GitHub through Linear's own integration, which holds its grant on Linear's
 side. Anything of ours that writes to Linear is a step behind a variable and a secret, off by
 default, and the core never imports it: an optional module, held out of symphony-protocol's main
-until 0.5.1 is cut (the thread "Protocol fixes toward 0.5.1" is changing main now), and a core
-hook, where one is needed, on a branch of its own. The tiers, each usable without the next:
+until 0.5.1 is cut (the thread that carries the protocol fixes toward 0.5.1 is changing main
+now), and a core hook, where one is needed, on a branch of its own. The tiers, each usable without the next:
 
 Tier 0, GitHub-native data, the one change the protocol needs. The coordinator's plan schema
 (tools/sdlc_protocol/team.py, plan_schema) gains a depends_on list per task, and open_task, which
 already links each task under its epic as a native sub-issue (team.py line 589,
 adapters/github.py add_sub_issue), writes each dependency as native blocked_by through POST
-/repos/{r}/issues/{n}/dependencies/blocked_by, which GITHUB_TOKEN with issues: write may call
-(this session's token answered that endpoint and sub_issues on 2026-10-17; GraphQL is refused
-from a cloud session, 403, but not from Actions). Pick treats a task with an open blocker as not
-free, which the clerk's deal approximates today with the blocked label and would now read from
-the relation. The board's run reads each open issue's sub_issues and blocked_by (two REST calls
-per issue, skipped as the metrics breakdown is skipped when the run's reserve is near), computes
-preconditions met as blockers closed or merged against blockers in all, and writes a
-Dependencies section to STATE.md: one Mermaid block per open epic, its tasks as nodes colored by
-label with "k/n" in the label and blocked_by as arrows, and one block of goals to epics, where a
-goal is an issue of type Goal that the epics are sub-issues of. The same per-epic block goes into
-a marked section of the epic's body (tools/marked_section.py exists for this), so the epic's own
-page carries its graph. Issue types Goal, Epic and Task are made once at the organization. All of
-it is GitHub's data, so Linear's sync carries the hierarchy, GitHub's Projects show the progress
+/repos/{r}/issues/{n}/dependencies/blocked_by, which GITHUB_TOKEN under issues: write should be
+able to call (this session's own token, which is not GITHUB_TOKEN, answered that endpoint and
+sub_issues on 2026-10-17; the write from a board run was not probed, nor was GraphQL from
+Actions, only its refusal from a cloud session, 403; both are listed below and are probed once
+from board.yml before the protocol pull request). Pick treats a task with an open issue it is
+blocked by as not free: GitHub's relation is a third thing beside the label blocker, which
+stops everyone, and the label blocked, a holder waiting on a peer, and the clerk's deal
+approximates it today with the blocked label and would now read the relation; that changes the
+spec's Pick, so spec/PROTOCOL.md and the validation oracle written from its text change with
+it. The board's run reads each open issue's sub_issues and blocked_by, two REST calls per open
+issue (36 for the 18 open here) against GITHUB_TOKEN's 1,000 an hour and the count
+symphony-protocol#38 measured for a board run; the board's run keeps no reserve today, the one
+that skips the metrics breakdown is tools/metrics.py's own, so the section is skipped by the
+same accounting once the board's run has it. It computes preconditions met as blockers closed or
+merged against blockers in all, and writes a Dependencies section to STATE.md: one Mermaid
+block per open epic, its tasks as nodes colored by label with "k/n" in the label and blocked_by
+as arrows, and one block of goals to epics, where a goal is an issue labelled goal, a new label
+beside epic, that the epics are sub-issues of; the board keys on labels, as the protocol does
+(labels.py EPIC), because issue types exist only on an organization and a copy on a personal
+account has none, and two spellings of one fact would need a rule for their disagreement. The
+same per-epic block goes into a marked section of the epic's body through the library's own
+body writer (team.py's plan_section between its PLAN_MARKER, written by Client.set_body in
+adapters/github.py), with one read-modify-write rule for the two writers of one body, the plan
+and the graph, so the epic's own page carries its graph. Issue types Goal, Epic and Task, where
+the copy is an organization's, are display only, made once at the organization and never read
+by the board. All of it is GitHub's data, so Linear's sync carries the hierarchy, GitHub's
+Projects show the progress
 and the Blocked icon, and any later tool (Linear, issue-graph once it has its GitHub backend, the
 MCP server's issue_graph tool) reads the same edges.
 
@@ -260,12 +275,13 @@ Premium per user, its agent needs an Anthropic API key, and its issue sync is a 
 Zenhub, which keeps relations of its own and would have every dependency entered twice.
 
 Where the code goes and when. Tier 0 is a symphony-protocol change (team.py, adapters/github.py,
-board.py, the clerk's Pick, their tests and the fixture tests/fixtures/board-STATE.md) and a
-release the owner approves; it waits until 0.5.1 is cut, as the coordinator of this project
-asked, and is then one pull request there by whichever thread holds the protocol work. The
-template's parts (docs/setup/github.md for the issue types and the Projects v2 project,
-docs/setup/linear.md for tiers 1 to 3, the claim skill's optional "Linear:" line) are template
-pull requests that need no release. Tier 2's mirror step is an optional module, tools/linear.py
+board.py, the clerk's Pick, spec/PROTOCOL.md and the validation oracle, and their tests) and a
+release the owner approves; it waits until 0.5.1 is cut, as the project's channel session asked,
+and is then one pull request there by whichever thread holds the protocol work. The template's
+parts (docs/setup/github.md for the issue types and the Projects v2 project, docs/setup/linear.md
+for tiers 1 to 3, the claim skill's optional "Linear:" line, and the fixture
+tests/fixtures/board-STATE.md once the board draws the section) are template pull requests that
+need no release. Tier 2's mirror step is an optional module, tools/linear.py
 or an optional package of the library that nothing in the core imports, run as a step of
 board.yml behind the variable; it is not written until the owner chooses it.
 
@@ -281,15 +297,19 @@ action's own source and docs:
 - A, the assistant issue, recommended: the page opens once per repository and person an issue
   "Assistant: <login>" labelled assistant, whose body describes the page and a small command
   vocabulary; each question is a comment "@claude ..." with a visible fenced block of the page's
-  state (repository, focus, filter), posted as the person, which claude.yml answers on the
-  repository's own token with the action's own progress comment ("Claude Code is working...",
+  state (repository, focus, filter), posted as the person, who is signed in with write access
+  (claude.yml's condition guards nothing but the "@claude" text; the action itself answers only
+  actors with write access, a rule read from memory and listed below as not verified), which
+  claude.yml answers on the repository's own token with the action's own progress comment ("Claude Code is working...",
   edited with checkboxes and then the answer); the page polls the issue's comments with
   If-None-Match every 5 seconds for ten minutes and then every 30 seconds (a 304 costs nothing
   against the 5,000 requests an hour), renders claude[bot]'s comment, and executes only a
   read-only vocabulary from a fenced block in the reply (focus an epic, open a pull request,
   filter to blocked, show a board section), showing anything that writes as a button the person
-  presses. claude.yml gives the assistant label a turn cap of about ten, a read-only tool list
-  and an appended system prompt from .github/symphony/assistant.md. This extends the Ask Claude
+  presses. The issue's body keeps the text "@claude" out of its vocabulary, since claude.yml
+  also runs when an issue opens. claude.yml would give the assistant label a turn cap of about
+  ten, a read-only tool list and an appended system prompt from a new file
+  .github/symphony/assistant.md. This extends the Ask Claude
   box the panel already has (symphony-panel.js posts @claude comments and issues as the person
   today and does not yet poll for the answer).
 - B, a dispatch: an assistant.yml on workflow_dispatch with a question input, the action in
@@ -310,8 +330,9 @@ action's own source and docs:
 
 The two bounds of A and B: an answer is an Actions run, tens of seconds to minutes (no latency
 figure is measured anywhere in the project; the readiness research of 2026-10-14 says so), and
-every run counts against the decision of at most 10 Claude runs a day per repository unless the
-owner raises the variable. Two people at once are two runs on the same five-hour window, since
+every run would count against the cap of at most 10 Claude runs a day per repository, decided
+on 2026-10-13 and not built yet (no workflow reads such a variable), so today nothing caps
+them. Two people at once are two runs on the same five-hour window, since
 claude.yml sets no concurrency group. On a public repository the assistant issue and the run log
 are public.
 
@@ -331,6 +352,13 @@ reaches Linear.
   the identifier.
 - Whether a worker in Actions can drive Linear's agent session pane with no webhook server.
 - The latency of a claude.yml run from the comment to the first edit and to the answer.
+- Whether GITHUB_TOKEN under issues: write may POST dependencies/blocked_by from a board run,
+  and whether GraphQL answers from Actions: only this session's own token was probed, from a
+  cloud session, where REST answered and GraphQL was refused.
+- claude-code-action's rule that it answers only actors with write access, read from memory;
+  its docs answered 403 through the session's proxy.
+- The form of Linear's settings links (linear.app/<workspace>/settings/...): the page refuses
+  the proxy, so the link in the owner's steps is given with the slug to fill in.
 - Linear's per-plan check marks did not survive the pricing page's text extraction (the page
   refuses curl through the session's proxy); which plans carry Issue sync and Initiatives is read
   from the plan cards, and the owner should confirm on https://linear.app/pricing.
@@ -349,29 +377,41 @@ answers, except the writing of docs/setup pages, which is harmless.
 1. The protocol extension (tier 0): depends_on in the coordinator's plan written as native
    blocked_by, Pick reading open blockers, the board's Dependencies section as Mermaid with
    k of n, the epic's marked section. Recommended yes. It is a symphony-protocol release after
-   0.5.1 and waits for the owner's click in the environment release, as every release does.
+   0.5.1 and waits for the owner's click in the environment release, as every release does:
+   the run's page under https://github.com/OpenSpineConsortium/symphony-protocol/actions,
+   "Review deployments", tick release, "Approve and deploy".
 2. Issue types and a Projects v2 project, free, the owner's clicks (steps below). Recommended
    yes: GitHub then shows the hierarchy, the sub-issue progress and the Blocked icon today,
    before any release.
-3. Linear at all, and on which plan: Free stops at 250 issues and 2 teams (symphony-template is
-   past 140 issues; each adopted repository would be a team), Basic is $10 per user per month
+3. Linear at all, and on which plan: Free stops at 250 issues and 2 teams (symphony-template
+   has 27 issues in all, open and closed, though its numbers run to 148, since pull requests
+   share the numbering; each adopted repository would be a team), Basic is $10 per user per month
    billed yearly, Business $16. Recommended: yes on Free for a look, one-way sync only, so
    GitHub stays the truth and Linear writes nothing.
 4. Whether Linear's GitHub App may hold read and write on code, issues, pull requests, actions
    and workflows for the organization, which its sync requires, one Linear workspace per
    organization; an organization owner's install. Needed for 3.
 5. Whether a Linear personal API key may sit in a repository secret (LINEAR_API_KEY, one team,
-   read and write) so the board's run mirrors epics as projects and blocked_by as Linear blocks
-   relations (tier 2). Recommended: not yet; without it Linear shows hierarchy, status and
+   read and write, at https://github.com/OpenSpineConsortium/symphony-template/settings/secrets/actions,
+   with the variable SYMPHONY_LINEAR at
+   https://github.com/OpenSpineConsortium/symphony-template/settings/variables/actions) so the
+   board's run mirrors epics as projects and blocked_by as Linear blocks relations (tier 2).
+   Recommended: not yet; without it Linear shows hierarchy, status and
    comments, and the arrows come from a person's session through Linear's MCP server.
-6. issue-graph as a per-person canvas on each person's own laptop (recommended) or as a shared
-   host of the owner's, which means a Docker host, an authenticating layer in front of an app
+6. issue-graph as a per-person canvas on each person's own laptop (recommended; its README at
+   https://github.com/shdennlin/issue-graph#readme, the Docker line under Quick Start) or as a
+   shared host of the owner's, which means a Docker host, an authenticating layer in front of an app
    with none, the Linear key on that host and a fork of its branch resolver.
-7. Jira: recommended no. Zenhub: recommended no.
-8. The assistant: design A (the assistant issue through claude.yml) with C beside it
-   (recommended), or B (a dispatch per question), or none.
+7. Jira (https://www.atlassian.com/software/jira/pricing, the Dependencies map on Premium):
+   recommended no. Zenhub (https://www.zenhub.com/pricing): recommended no.
+8. The assistant: design A (the assistant issue through claude.yml,
+   https://github.com/OpenSpineConsortium/symphony-template/blob/main/.github/workflows/claude.yml,
+   a template pull request of ours) with C beside it (recommended), or B (a dispatch per
+   question), or none.
 9. Linear's agent session pane for workers in Actions, which needs a Linear OAuth client secret
-   in a repository secret and a test that it works without a webhook: recommended not yet.
+   in a repository secret (an application made at
+   https://linear.app/<workspace>/settings/api, "Create new" under OAuth applications) and a
+   test that it works without a webhook: recommended not yet.
 
 The owner's steps, if 2 and 3 are yes:
 
@@ -383,8 +423,10 @@ The owner's steps, if 2 and 3 are yes:
    Parent issue and Sub-issue progress; in the project's menu choose Workflows and turn on
    "Item closed" to Done and "Pull request merged" to Done; add the repository's issues with
    "Add item" or the Auto-add workflow (one on Free).
-3. Linear: in Linear open Settings > Integrations > GitHub (https://linear.app/settings/integrations/github),
-   press Enable, choose the OpenSpineConsortium organization and the repositories, and in the
+3. Linear: in Linear open Settings > Integrations > GitHub
+   (https://linear.app/<workspace>/settings/integrations/github, with the workspace's own slug
+   in place of <workspace>; the form is not verified, since the page refuses the proxy), press
+   Enable, choose the OpenSpineConsortium organization and the repositories, and in the
    same page turn on "GitHub Issues Sync" one-way from each repository to the team; then open
    https://linear.app/pricing and confirm Issue sync is on the Free card.
 
@@ -419,4 +461,5 @@ action.yml, docs/usage.md, docs/custom-automations.md, docs/security.md, docs/fa
 code.claude.com/docs/en/github-actions.md, this repository's .github/workflows/claude.yml and
 coordinator.yml, the site's assets/js/symphony-panel.js, docs/checkpoints/2026-10-14c/handoff.md.
 The survey and the judging were run as workflows of parallel readers on 2026-10-17; their
-findings are condensed here, and each fact above names the page it came from.
+outputs were not kept beyond the session, their findings are condensed here, and each fact
+above names the page it came from.
