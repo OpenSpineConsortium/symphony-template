@@ -7,6 +7,7 @@ fake gh on PATH, or in the process (tests/fake_gh.py), answers the calls
 and records them, and a fake claude prints the sign-in's screens with a
 token built here from pieces, so this file never holds one."""
 
+import ctypes
 import getpass
 import io
 import json
@@ -1456,13 +1457,244 @@ class TheScript(unittest.TestCase):
         self.assertTrue(lines)
         for line in lines:
             self.assertNotIn("--body", line)
-        self.assertNotIn("print(token", text)
+        # One print of a token: show's, which gives this machine's own copy
+        # back to the person who asked for it.
+        printing = [line for line in text.splitlines() if "print(token" in line]
+        self.assertEqual(printing, ["        print(token)"])
+        self.assertIn("print(token)", text.split("def show(", 1)[1].split("\ndef ", 1)[0])
         self.assertNotIn("{token}", text)
 
     def test_the_source_holds_no_secret_shape(self):
         for path in (SCRIPT, Path(__file__)):
             for name, pattern in check_docs.SECRET_PATTERNS:
                 self.assertIsNone(pattern.search(path.read_text()), f"{path.name}: {name}")
+
+
+class FakeAdvapi:
+    """advapi32's four credential calls, as Windows answers them, over a
+    dict: what was written, under which name, kind and persistence."""
+
+    def __init__(self):
+        self.vault = {}
+        self.error = 0
+        self.freed = 0
+        self.kept = []
+        self.refuse = False
+
+        def write(pointer, flags):
+            credential = pointer._obj
+            if self.refuse:
+                self.error = 5
+                return 0
+            blob = ctypes.string_at(credential.CredentialBlob, credential.CredentialBlobSize)
+            self.vault[credential.TargetName] = {"blob": blob, "user": credential.UserName, "type": credential.Type,
+                                                 "persist": credential.Persist, "comment": credential.Comment}
+            return 1
+
+        def read(name, kind, flags, pointer):
+            if name not in self.vault:
+                self.error = tokens.ERROR_NOT_FOUND
+                return 0
+            blob = self.vault[name]["blob"]
+            buffer = (ctypes.c_ubyte * len(blob)).from_buffer_copy(blob)
+            credential = self.credential_class()
+            credential.CredentialBlobSize = len(blob)
+            credential.CredentialBlob = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte))
+            self.kept += [buffer, credential]
+            pointer._obj.contents = credential
+            return 1
+
+        def delete(name, kind, flags):
+            if self.vault.pop(name, None) is None:
+                self.error = tokens.ERROR_NOT_FOUND
+                return 0
+            return 1
+
+        def free(pointer):
+            self.freed += 1
+
+        # What CredReadW hands back is built with the manager's own type.
+        self.credential_class = tokens.credential_type()
+        self.CredWriteW, self.CredReadW, self.CredDeleteW, self.CredFree = write, read, delete, free
+
+
+class MemoryCopies:
+    """A vault for the tests that use one, not Credential Manager's calls."""
+
+    def __init__(self, fail=False):
+        self.kept = {}
+        self.fail = fail
+
+    def put(self, name, value, user, comment):
+        if self.fail:
+            raise tokens.TokensError("refused")
+        self.kept[name] = value
+
+    def get(self, name):
+        return self.kept.get(name)
+
+    def drop(self, name):
+        return self.kept.pop(name, None) is not None
+
+
+class TheCopy(unittest.TestCase):
+    """On Windows each token stored is kept in Credential Manager too, and
+    show gives it back; no copy ever reaches the screen unasked."""
+
+    def manager(self):
+        fake = FakeAdvapi()
+        manager = tokens.CredentialManager(advapi=fake, last_error=lambda: fake.error)
+        fake.credential_class = manager.Credential
+        return fake, manager
+
+    def test_the_structure_is_windows_own(self):
+        if ctypes.sizeof(ctypes.c_void_p) != 8:
+            self.skipTest("the layout checked is the 64-bit one")
+        credential = tokens.credential_type()
+        self.assertEqual(ctypes.sizeof(credential), 80)
+        self.assertEqual((credential.TargetName.offset, credential.LastWritten.offset, credential.CredentialBlob.offset,
+                          credential.Persist.offset, credential.UserName.offset), (8, 24, 40, 48, 72))
+
+    def test_put_get_and_drop(self):
+        fake, manager = self.manager()
+        manager.put("symphony/org:octo/X", TOKEN, "X", "a comment")
+        kept = fake.vault["symphony/org:octo/X"]
+        self.assertEqual(kept["blob"], TOKEN.encode("utf-16-le"))
+        self.assertEqual((kept["type"], kept["persist"], kept["user"]), (1, 2, "X"))
+        self.assertEqual(manager.get("symphony/org:octo/X"), TOKEN)
+        self.assertEqual(fake.freed, 1)
+        self.assertIsNone(manager.get("symphony/org:octo/Y"))
+        self.assertTrue(manager.drop("symphony/org:octo/X"))
+        self.assertFalse(manager.drop("symphony/org:octo/X"))
+        fake.refuse = True
+        with self.assertRaises(tokens.TokensError) as caught:
+            manager.put("n", TOKEN, "n", "c")
+        self.assertNotIn(TOKEN, str(caught.exception))
+
+    def test_add_keeps_a_copy_under_the_place_and_the_name(self):
+        world = World(self, secrets=[secret(tokens.slot_secret(1))])
+        world.expect_store(tokens.slot_secret(2), tokens.MAIN_SECRET)
+        copies = MemoryCopies()
+        _, printed, _ = world.run_in_process(self, tokens.add, tokens.Gh(), target(), 2, "", True, False, copies=copies)
+        self.assertEqual(copies.kept, {f"symphony/org:{ORG}/{tokens.slot_secret(2)}": TOKEN,
+                                       f"symphony/org:{ORG}/{tokens.MAIN_SECRET}": TOKEN})
+        self.assertIn("a copy kept in Windows Credential Manager", printed)
+        self.assertFalse(has_token(printed))
+
+    def test_no_copy_and_a_refused_copy_still_store(self):
+        for copies in (False, MemoryCopies(fail=True)):
+            world = World(self)
+            world.expect_store(tokens.slot_secret(1))
+            _, printed, calls = world.run_in_process(self, tokens.add, tokens.Gh(), target(), 1, "", False, False, copies=copies)
+            self.assertEqual(len(find(calls, "secret set")), 1)
+            self.assertIn("GitHub lists it", printed)
+            self.assertEqual("no copy kept" in printed, copies is not False)
+
+    def test_show_gives_the_copy_back(self):
+        copies = MemoryCopies()
+        copies.put(tokens.copy_name(target(), tokens.slot_secret(3)), TOKEN, "", "")
+        with redirect_stdout(io.StringIO()) as printed:
+            tokens.show(target(), "3", copies=copies)
+        self.assertEqual(printed.getvalue(), TOKEN + "\n")
+        clipped = []
+        with patch.object(tokens.subprocess, "run", lambda command, **options: clipped.append((command, options["input"]))
+                          or subprocess.CompletedProcess(command, 0)), redirect_stdout(io.StringIO()) as printed:
+            tokens.show(target(), "3", copies=copies, clipboard=True)
+        self.assertEqual(clipped, [(["clip"], TOKEN)])
+        self.assertFalse(has_token(printed.getvalue()))
+        for which in ("4", "main"):
+            with self.assertRaises(tokens.TokensError) as caught:
+                tokens.show(target(), which, copies=copies)
+            self.assertIn("no copy", str(caught.exception))
+        for which in ("9", "03", "x"):
+            with self.assertRaises(tokens.UsageError):
+                tokens.show(target(), which, copies=copies)
+        with patch.object(tokens, "local_copies", lambda: None), self.assertRaises(tokens.TokensError) as caught:
+            tokens.show(target(), "3")
+        self.assertIn("not Windows", str(caught.exception))
+
+    def test_remove_drops_the_copy_and_profiles_names_it(self):
+        world = World(self, secrets=[secret(tokens.slot_secret(1)), secret(tokens.slot_secret(2))])
+        copies = MemoryCopies()
+        for name in (tokens.slot_secret(2), tokens.MAIN_SECRET):
+            copies.put(tokens.copy_name(target(), name), TOKEN, "", "")
+        settings = Path(world.folder) / "settings.json"
+        with redirect_stdout(io.StringIO()) as printed:
+            tokens.print_remembered(target(), settings, copies=copies)
+        self.assertIn("slot 2: the default browser, a copy of its token (show 2)", printed.getvalue())
+        self.assertIn("(show main)", printed.getvalue())
+        run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+        with patch.object(tokens.subprocess, "run", run), patch.object(tokens, "settings_path", lambda: settings), \
+                redirect_stdout(io.StringIO()) as printed:
+            tokens.remove(tokens.Gh(), target(), 2, copies=copies)
+        self.assertEqual(list(copies.kept), [tokens.copy_name(target(), tokens.MAIN_SECRET)])
+        self.assertIn("its copy on this machine deleted", printed.getvalue())
+
+    def test_a_copy_that_is_not_utf16_is_refused_and_the_comment_is_short(self):
+        fake, manager = self.manager()
+        fake.vault["odd"] = {"blob": b"abc"}
+        with self.assertRaises(tokens.TokensError):
+            manager.get("odd")
+        self.assertFalse(tokens.has_copy(manager, target(), "odd"))
+        many = tokens.Target("org", ORG, [f"repository-{n}" for n in range(30)])
+        with redirect_stdout(io.StringIO()):
+            tokens.keep_copy(manager, many, tokens.slot_secret(1), TOKEN)
+        # Credential Manager refuses a comment over 256 characters.
+        self.assertLessEqual(len(fake.vault[tokens.copy_name(many, tokens.slot_secret(1))]["comment"]), 256)
+
+    def test_show_asks_nothing_of_github(self):
+        copies = MemoryCopies()
+        copies.put(f"symphony/org:{ORG}/{tokens.slot_secret(2)}", TOKEN, "", "")
+        def no_gh(*args, **options):
+            raise AssertionError("show ran gh")
+        with patch.object(tokens, "local_copies", lambda: copies), patch.object(tokens.subprocess, "run", no_gh), \
+                redirect_stdout(io.StringIO()) as printed:
+            self.assertEqual(tokens.main(["show", "2", "--org", ORG]), 0)
+        self.assertEqual(printed.getvalue(), TOKEN + "\n")
+        with patch.object(tokens, "local_copies", lambda: copies), redirect_stdout(io.StringIO()), \
+                patch("sys.stderr", io.StringIO()):
+            self.assertEqual(tokens.main(["show", "9", "--org", ORG]), 2)
+
+    def test_elsewhere_no_copy_is_kept(self):
+        with patch.object(tokens.sys, "platform", "linux"):
+            self.assertIsNone(tokens.local_copies())
+        self.assertIsNone(tokens.machine_copies(False))
+
+
+class Sharing(unittest.TestCase):
+    """share: the slots, their labels and the list seen by a benchmark's
+    repository too, with no sign-in, each added to the list it has."""
+
+    def test_share_adds_the_repository_to_each_selected_name(self):
+        world = World(self, secrets=[secret(tokens.slot_secret(1)), secret(tokens.slot_secret(2), visibility="all"),
+                                     secret(tokens.MAIN_SECRET)],
+                      variables=[variable(tokens.slot_label(1), "runners"), variable(tokens.ACCOUNTS_VARIABLE, "1,2")])
+        routes = read_json(world.routes_file)
+        routes[f"GET repos/{ORG}/other"] = [answer(200, "4242\n")]
+        for kind, name in (("secrets", tokens.slot_secret(1)), ("variables", tokens.slot_label(1)),
+                           ("variables", tokens.ACCOUNTS_VARIABLE)):
+            routes[f"PUT orgs/{ORG}/actions/{kind}/{name}/repositories/4242"] = [answer(204, "")]
+        fake_gh.write_routes(world.routes_file, routes)
+        run = fake_gh.routed_run(subprocess.run, world.log, world.routes_file)
+        with patch.object(tokens.subprocess, "run", run), patch.object(tokens, "PROJECT", world.project), \
+                redirect_stdout(io.StringIO()) as printed:
+            tokens.share(tokens.Gh(), target(), ["other"])
+        puts = [call["key"] for call in world.calls() if call["key"].startswith("PUT")]
+        self.assertEqual(puts, [f"PUT orgs/{ORG}/actions/secrets/{tokens.slot_secret(1)}/repositories/4242",
+                                f"PUT orgs/{ORG}/actions/variables/{tokens.slot_label(1)}/repositories/4242",
+                                f"PUT orgs/{ORG}/actions/variables/{tokens.ACCOUNTS_VARIABLE}/repositories/4242"])
+        self.assertIn(f"{tokens.slot_secret(2)}: seen by every repository already", printed.getvalue())
+
+    def test_share_is_for_an_organization(self):
+        with self.assertRaises(tokens.TokensError):
+            tokens.share(None, tokens.Target("repo", ORG, name=REPO), ["other"])
+
+    def test_the_commands_parse(self):
+        args = tokens.build_parser().parse_args(["show", "main", "--copy"])
+        self.assertEqual((args.command, args.which, args.copy), ("show", "main", True))
+        args = tokens.build_parser().parse_args(["share", "coordbench,flowbench"])
+        self.assertEqual(tokens.parse_repos(args.repos), ["coordbench", "flowbench"])
+        self.assertTrue(tokens.build_parser().parse_args(["add", "--no-copy"]).no_copy)
 
 
 if __name__ == "__main__":
