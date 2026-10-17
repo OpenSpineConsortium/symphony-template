@@ -26,7 +26,11 @@ a path is that repository's.
   rules forbid, so flowbench measures the naive script itself against one
   agent alone and against the claim protocol, and leaves the framework
   arm designed, to be built only when the owner wants the report's remedy
-  measured (DESIGN.md, the arms table).
+  measured (DESIGN.md, the arms table). The two documents are the
+  owner's uploads to the claude.ai Project and are not in git: one is a
+  conversation exported from another assistant, which the research rule
+  keeps out. This bullet and DESIGN.md say what they hold, and the owner
+  can attach them again on another account.
 - SWE-bench runs from a cloud session of this project without
   huggingface.co: the task data is the GitHub repository
   SWE-bench/swe-bench-tasks (every instance as a directory: the problem
@@ -51,8 +55,10 @@ a path is that repository's.
   and records both (flowbench/run.py, prepare and take_patch).
   The first smoke test found this.
 - The adversarial review of the scaffold (2026-10-16) raised two blocking
-  findings, eighteen to fix and eleven nits, and each is answered in the
-  code or the documents: the scorer's route (above); a patch that does
+  findings, eighteen to fix and eleven nits, every one answered in the
+  code or the documents and five of them only in part (each finding and
+  its answer: docs/research/flowbench/scaffold-review.md, in this
+  repository): the scorer's route (above); a patch that does
   not apply is the arm's failure, not the harness's; the agents run with
   the login's settings, MCP servers, the web and subagents off, at one
   effort level, with their tools read back into the record; builders
@@ -141,6 +147,10 @@ Nothing below runs or is created without the owner's word.
    image is found before an agent meets it.
 3. The pilot, on the owner's word.
 
+Before the pilot, the review's open items (the last section of
+docs/research/flowbench/scaffold-review.md here) are closed where code
+can close them.
+
 ## How to resume
 
     git clone https://github.com/OpenSpineConsortium/flowbench
@@ -175,3 +185,7 @@ cloned, the harness in a virtualenv, the dataset compiled with
   the harness and the design documents moved there by flowbench#1, only
   their paths changed, and the copies here were removed, these notes
   staying as the programme's record.
+- 2026-10-16, at the checkpoint: the adversarial review's findings, kept
+  until then only in the session that ran it, written down with each
+  answer and the scorer's check on a gold patch
+  (docs/research/flowbench/scaffold-review.md).
