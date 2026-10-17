@@ -337,6 +337,57 @@ reader was read from coordbench's bench/cooperbench/actions/plan.py
   listings not read, a failed listing silent, repositories told apart by
   case) each fail the tests.
 
+## A browser profile per slot and cswap's accounts (2026-10-17)
+
+The owner ran the wizard in Windows PowerShell on 2026-10-17 and asked
+whether it could use the accounts claude-swap (cswap) already holds, so
+they need not sign in again, or sign in for them, or do it from the
+command line. Read for the answer, in the thread "Beyond cooperation",
+from the programs themselves:
+
+- cswap 0.27.2 (PyPI claude-swap, github.com/realiti4/claude-swap) keeps
+  each account's interactive OAuth login, an access token with a
+  refresh token that rotates on use, in the keychain or its encrypted
+  backups, and its list of accounts in sequence.json under
+  ~/.local/share/claude-swap on Linux and WSL (XDG_DATA_HOME where set,
+  moved there from ~/.claude-swap-backup) and ~/.claude-swap-backup on
+  Windows and macOS: per account its email, organizationName,
+  organizationUuid and an optional alias. Reusing a cswap login in
+  Actions would sign one side out at the first refresh, and it is a full
+  login, not the inference-only token setup-token makes; so it is not
+  reused, and only sequence.json is read.
+- Claude Code 2.1.302, Linux and Windows builds alike (the npm packages
+  @anthropic-ai/claude-code-linux-x64 and -win32-x64, read with
+  strings): `claude setup-token` takes no option naming an account; its
+  OAuth flow shows the manual link and opens the automatic one, whose
+  redirect is a localhost callback, with its URL opener, which starts the
+  program BROWSER names with the link as its one argument when BROWSER
+  is set (on Windows; else rundll32 url,OpenURL; on Linux, else
+  xdg-open). So a launcher named by BROWSER receives the link without
+  the wizard reading claude's screen.
+
+What was built: the wizard finds Chrome, Edge or Brave where each
+installer puts it (or SYMPHONY_BROWSER), lists the browser's profiles
+from its Local State where it can read it, and hands claude a launcher
+that opens the link with --profile-directory, written for the one run
+into a private temporary folder and removed after; cswap's accounts are
+shown by number, the alias offered as the label unless it is not a
+label's shape (an address never is); the profile's folder name and the
+cswap number per slot are kept in tokens.json in the user's settings
+folder, outside the repository. A Windows shell, which has no
+pseudo-terminal, now gets claude setup-token started in a console of its
+own with the launcher, and the token pasted at the hidden prompt, as
+before. tests/test_tokens.py runs the launcher end to end with a fake
+claude that opens BROWSER as the real one does.
+
+Not measured, since no session runs Windows or a real browser: whether
+Claude Code's Windows opener starts a .cmd launcher (if it does not,
+claude prints the link and the person opens it in the profile by hand);
+whether Chrome makes a new profile for a --profile-directory folder that
+does not exist yet, as it is documented to; and the callback from a
+Windows browser into WSL, which depends on WSL's localhost forwarding.
+The owner's first run on Windows is the test.
+
 ## Open items
 
 - tools/crowd_check.py's SECRET_NAMES does not name SYMPHONY_CLAUDE_1 to

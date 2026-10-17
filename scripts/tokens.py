@@ -43,6 +43,18 @@ the repository's workflows can see, so never an e-mail address. Refuses to
 run for a repository in crowd mode, which holds no Claude token
 (docs/setup/crowdsourcing.md). Everything that can fail is tried before
 the sign-in, since a token minted and not stored is lost with the process.
+
+Where this machine has Chrome, Edge or Brave, the wizard opens each slot's
+sign-in in a browser profile of the slot's own (add --profile NAME does
+the same), so a profile signed in to claude.ai as that account once makes
+each later token one Approve; where claude-swap (cswap) keeps a list of
+accounts, the wizard shows it and takes an account by its number, its
+alias as the label. It remembers the profile and the cswap number per
+slot in tokens.json in this machine's own settings folder, never in the
+repository; cswap's credentials are never opened, since a token minted for
+Actions is a separate, inference-only one. In a Windows shell the wizard
+starts claude setup-token in a window of its own and takes the token at a
+hidden prompt.
 Exit 0 when done, 1 on a refusal, 2 on a usage error made before any call.
 """
 
@@ -57,6 +69,8 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -399,11 +413,13 @@ def pump(master, stdin_fd, on_output):
                 stdin_open = False
 
 
-def mint(stdin_fd=None, write=None, command=SETUP_TOKEN):
+def mint(stdin_fd=None, write=None, command=SETUP_TOKEN, env=None):
     """Run claude setup-token behind a pseudo-terminal: the sign-in goes
     through to the browser and the keyboard, everything claude prints
     reaches the screen but the token, and the tokens seen come back with
-    claude's exit status and whether one was cut over two lines."""
+    claude's exit status and whether one was cut over two lines. env is
+    added to claude's environment: BROWSER, which claude opens the sign-in
+    link with."""
     import fcntl
     import pty
     import termios
@@ -422,6 +438,7 @@ def mint(stdin_fd=None, write=None, command=SETUP_TOKEN):
         # one no pattern finds whole.
         for name in ("COLUMNS", "LINES"):
             os.environ.pop(name, None)
+        os.environ.update(env or {})
         fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", *TERMINAL_SIZE, 0, 0))
         try:
             os.execvp(command[0], list(command))
@@ -530,20 +547,385 @@ def claude_command():
     return str(local) if local.is_file() and os.access(local, os.X_OK) else None
 
 
-def get_token(args, write=None, stdin_fd=None, ask=None):
+def get_token(args, write=None, stdin_fd=None, ask=None, opener=None):
     """The token, minted behind the terminal where one exists, pasted where
-    asked or where the machine has none."""
+    asked or where the machine has none. An opener sends claude's sign-in
+    link to one browser profile."""
     if args.paste:
         return pasted_token(ask)
+    claude = claude_command()
     if not pty_available():
+        if claude is not None and sys.platform == "win32":
+            return windowed_token(claude, ask, opener)
         print("This shell has no pseudo-terminal, so the token is pasted: run claude setup-token in another window first.")
         return pasted_token(ask)
-    claude = claude_command()
     if claude is None:
         print("claude is not on this machine's PATH, so the token is pasted: run claude setup-token where it is, then paste it here.")
         return pasted_token(ask)
     print("Starting claude setup-token. Approve the sign-in in your browser; the token stays out of sight.")
-    return minted_token(write=write, stdin_fd=stdin_fd, command=(claude,) + SETUP_TOKEN[1:])
+    with launcher(opener) as env:
+        return minted_token(write=write, stdin_fd=stdin_fd, command=(claude,) + SETUP_TOKEN[1:], env=env)
+
+
+def windowed_token(claude, ask, opener):
+    """A Windows shell has no pseudo-terminal to hide the token behind, so
+    claude setup-token runs in a window of its own, as a person would run
+    it by hand, and the token is pasted here at a hidden prompt."""
+    with launcher(opener) as env:
+        try:
+            subprocess.Popen([claude] + list(SETUP_TOKEN[1:]), env={**os.environ, **env},
+                             creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
+        except OSError as error:
+            raise TokensError(f"claude setup-token could not be started ({error.strerror or error}); run it yourself and use --paste") from None
+        print("claude setup-token opened in a window of its own. Approve the sign-in in the browser, copy the token that window")
+        print("  prints, paste it here, then close that window: the token is on its screen until you do.")
+        return pasted_token(ask)
+
+
+# The browser profile and cswap's accounts, remembered on this machine alone.
+#
+# claude setup-token opens its sign-in link with the program BROWSER names,
+# handing it the link as its one argument, on every platform (Claude Code
+# 2.1.302's own opener). So a slot's sign-in can go to one profile of a
+# Chromium browser through a small launcher made for the one run, and a
+# profile signed in to claude.ai as the slot's account once makes every
+# later token one Approve. What is remembered is a profile's folder name
+# and a cswap account's number per slot, in a file in this machine's own
+# settings folder, never in the repository and never an address.
+
+PROFILE_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$")
+SETTINGS_VERSION = 1
+READ_LIMIT = 4_000_000
+CSWAP_NUMBER = range(1, 1000)
+
+
+class Browser:
+    """A Chromium browser: its program, and the folder whose Local State
+    lists its profiles where that is known."""
+
+    def __init__(self, name, path, data=None):
+        self.name = name
+        self.path = str(path)
+        self.data = Path(data) if data else None
+
+
+class Opener:
+    """Where one sign-in link goes: a browser's program and a profile's folder."""
+
+    def __init__(self, browser, profile):
+        check_profile(profile)
+        check_program(browser.path)
+        self.browser = browser
+        self.profile = profile
+
+
+class CswapAccount:
+    def __init__(self, number, email, alias, organization):
+        self.number = number
+        self.email = email
+        self.alias = alias
+        self.organization = organization
+
+
+def system_name(env=None, version_file="/proc/version"):
+    """win32, darwin, wsl or linux: WSL is Linux whose browsers are
+    Windows programs under /mnt/c."""
+    env = os.environ if env is None else env
+    if sys.platform in ("win32", "darwin"):
+        return sys.platform
+    if env.get("WSL_DISTRO_NAME"):
+        return "wsl"
+    try:
+        with open(version_file, encoding="utf-8", errors="replace") as handle:
+            return "wsl" if "microsoft" in handle.read(1000).lower() else "linux"
+    except OSError:
+        return "linux"
+
+
+def browser_candidates(system, env, home):
+    """Each Chromium browser where its installer puts it: (name, program,
+    profiles folder)."""
+    if system == "win32":
+        local = env.get("LOCALAPPDATA") or str(home / "AppData" / "Local")
+        programs = [env.get("ProgramFiles") or r"C:\Program Files", env.get("ProgramFiles(x86)") or r"C:\Program Files (x86)", local]
+        found = []
+        for name, folder, program in (("Chrome", r"Google\Chrome", "chrome.exe"), ("Edge", r"Microsoft\Edge", "msedge.exe"),
+                                      ("Brave", r"BraveSoftware\Brave-Browser", "brave.exe")):
+            data = local + "\\" + folder + "\\User Data"
+            found += [(name, base + "\\" + folder + "\\Application\\" + program, data) for base in programs]
+        return found
+    if system == "darwin":
+        support = home / "Library" / "Application Support"
+        return [("Chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", support / "Google" / "Chrome"),
+                ("Edge", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", support / "Microsoft Edge"),
+                ("Brave", "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser", support / "BraveSoftware" / "Brave-Browser")]
+    if system == "wsl":
+        # The Windows user's profiles folder is not read from WSL; a
+        # profile is named by its folder instead of picked from a list.
+        return [("Chrome", base + "/Google/Chrome/Application/chrome.exe", None)
+                for base in ("/mnt/c/Program Files", "/mnt/c/Program Files (x86)")] + [
+                ("Edge", base + "/Microsoft/Edge/Application/msedge.exe", None)
+                for base in ("/mnt/c/Program Files (x86)", "/mnt/c/Program Files")]
+    config = home / ".config"
+    return [("Chrome", "google-chrome", config / "google-chrome"), ("Chrome", "google-chrome-stable", config / "google-chrome"),
+            ("Chromium", "chromium", config / "chromium"), ("Chromium", "chromium-browser", config / "chromium"),
+            ("Edge", "microsoft-edge", config / "microsoft-edge"), ("Brave", "brave-browser", config / "BraveSoftware" / "Brave-Browser")]
+
+
+def find_browser(system=None, env=None, home=None, which=shutil.which, is_file=os.path.isfile):
+    """The browser SYMPHONY_BROWSER names, else the first Chromium browser
+    installed, else None."""
+    env = os.environ if env is None else env
+    system = system or system_name(env)
+    home = Path(home) if home else Path.home()
+    named = env.get("SYMPHONY_BROWSER", "").strip()
+    if named:
+        return Browser("your browser", named)
+    for name, program, data in browser_candidates(system, env, home):
+        path = program if os.path.isabs(program) or "\\" in program else which(program)
+        if path and is_file(path):
+            return Browser(name, path, data)
+    return None
+
+
+def read_json_file(path):
+    """A small JSON file, or None where it is missing, too big or not JSON."""
+    try:
+        with open(path, "rb") as handle:
+            data = handle.read(READ_LIMIT + 1)
+        if len(data) > READ_LIMIT:
+            return None
+        return json.loads(data.decode("utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def browser_profiles(browser):
+    """The browser's own profiles as (folder, name), from its Local State,
+    or none where that is not readable."""
+    if browser is None or browser.data is None:
+        return []
+    state = read_json_file(browser.data / "Local State")
+    cache = state.get("profile", {}).get("info_cache") if isinstance(state, dict) and isinstance(state.get("profile"), dict) else None
+    if not isinstance(cache, dict):
+        return []
+    found = []
+    for folder, info in cache.items():
+        if isinstance(folder, str) and PROFILE_SHAPE.fullmatch(folder):
+            name = info.get("name") if isinstance(info, dict) else None
+            found.append((folder, name if isinstance(name, str) and name.isprintable() else folder))
+    return sorted(found, key=lambda each: (each[0] != "Default", each[0]))
+
+
+def check_profile(profile):
+    if not PROFILE_SHAPE.fullmatch(profile or ""):
+        raise TokensError("a browser profile is a folder name such as Default, \"Profile 2\" or \"Symphony 1\": up to 40 letters, "
+                          "digits, spaces, dots or dashes")
+
+
+def check_program(path):
+    """A program path goes into a launcher between double quotes, so one
+    that could end the quotes or expand in a batch file is refused."""
+    if not path or any(mark in path for mark in ('"', "%", "\n", "\r", "!", "`", "$")):
+        raise TokensError("the browser's path holds a quote, %, !, $ or a backquote, which the launcher cannot carry; "
+                          "set SYMPHONY_BROWSER to a path without them")
+
+
+def launcher_text(opener, windows):
+    """A launcher that hands the link it is given to the profile and returns
+    at once, since claude waits on the program it starts."""
+    flag = f"--profile-directory={opener.profile}"
+    if windows:
+        return f'@echo off\r\nstart "" "{opener.browser.path}" "{flag}" "%~1"\r\n'
+    import shlex
+    return f'#!/bin/sh\nnohup {shlex.quote(opener.browser.path)} {shlex.quote(flag)} "$1" >/dev/null 2>&1 &\n'
+
+
+@contextmanager
+def launcher(opener, windows=None):
+    """BROWSER for claude's environment, pointing at a launcher in a folder
+    of the run's own that is gone when the sign-in is over; none without
+    an opener, so claude opens the default browser as it does by itself."""
+    if opener is None:
+        yield {}
+        return
+    windows = sys.platform == "win32" if windows is None else windows
+    folder = tempfile.mkdtemp(prefix="symphony-browser-")
+    try:
+        path = Path(folder) / ("open.cmd" if windows else "open")
+        path.write_bytes(launcher_text(opener, windows).encode("ascii", "strict"))
+        path.chmod(0o700)
+        yield {"BROWSER": str(path)}
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+
+
+def settings_path(system=None, env=None, home=None):
+    """Where this machine keeps what the wizard remembers: the user's own
+    settings folder, never the repository."""
+    env = os.environ if env is None else env
+    system = system or system_name(env)
+    home = Path(home) if home else Path.home()
+    if system == "win32":
+        base = Path(env.get("APPDATA") or home / "AppData" / "Roaming")
+    else:
+        xdg = env.get("XDG_CONFIG_HOME", "")
+        base = Path(xdg) if xdg and os.path.isabs(xdg) else home / ".config"
+    return base / "symphony" / "tokens.json"
+
+
+def read_settings(path):
+    data = read_json_file(path) if path else None
+    if not isinstance(data, dict) or data.get("version") != SETTINGS_VERSION or not isinstance(data.get("slots"), dict):
+        return {"version": SETTINGS_VERSION, "slots": {}}
+    return data
+
+
+def place_key(target):
+    return f"{target.level}:{target.full_name if target.level == 'repo' else target.owner}"
+
+
+def remembered(settings, target, slot):
+    """What this machine remembers for a slot: a profile's folder and a
+    cswap account's number, each only where it still has its shape."""
+    entry = settings["slots"].get(place_key(target), {})
+    entry = entry.get(str(slot)) if isinstance(entry, dict) else None
+    entry = entry if isinstance(entry, dict) else {}
+    profile = entry.get("profile")
+    number = entry.get("cswap")
+    return {"profile": profile if isinstance(profile, str) and PROFILE_SHAPE.fullmatch(profile) else None,
+            "cswap": number if type(number) is int and number in CSWAP_NUMBER else None}
+
+
+def remember(path, settings, target, slot, profile, number):
+    """Keep a slot's profile and cswap account for the next run; a file
+    that cannot be written costs only the remembering."""
+    if path is None:
+        return
+    entry = {key: value for key, value in (("profile", profile), ("cswap", number)) if value is not None}
+    slots = settings["slots"].setdefault(place_key(target), {})
+    if not isinstance(slots, dict):
+        slots = settings["slots"][place_key(target)] = {}
+    if entry == {key: value for key, value in remembered(settings, target, slot).items() if value is not None}:
+        return
+    if entry:
+        slots[str(slot)] = entry
+    else:
+        slots.pop(str(slot), None)
+    try:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        part = Path(str(path) + ".part")
+        part.write_text(json.dumps(settings, indent=2, sort_keys=True) + "\n", encoding="ascii")
+        part.chmod(0o600)
+        os.replace(part, path)
+    except OSError as error:
+        print(f"  (not remembered for next time: {path} could not be written, {error.strerror or error})")
+
+
+def cswap_roots(system, env, home):
+    """Where claude-swap keeps its list of accounts: XDG's data folder on
+    Linux and WSL, with the older ~/.claude-swap-backup it moves from, and
+    that older folder alone on Windows and macOS."""
+    roots = []
+    if system in ("linux", "wsl"):
+        xdg = env.get("XDG_DATA_HOME", "")
+        xdg = os.path.expanduser(xdg) if xdg else ""
+        roots.append(Path(xdg) / "claude-swap" if xdg and os.path.isabs(xdg) else home / ".local" / "share" / "claude-swap")
+    roots.append(home / ".claude-swap-backup")
+    return roots
+
+
+def cswap_accounts(system=None, env=None, home=None):
+    """claude-swap's accounts in its own order, read from its sequence.json
+    alone: no credential of cswap's is opened, and nothing is fetched."""
+    env = os.environ if env is None else env
+    system = system or system_name(env)
+    home = Path(home) if home else Path.home()
+    for root in cswap_roots(system, env, home):
+        data = read_json_file(root / "sequence.json")
+        if not isinstance(data, dict):
+            continue
+        records = data.get("accounts") if isinstance(data.get("accounts"), dict) else {}
+        found, seen = [], set()
+        for number in data.get("sequence") or []:
+            record = records.get(str(number))
+            if type(number) is not int or number not in CSWAP_NUMBER or not isinstance(record, dict) or number in seen:
+                continue
+            seen.add(number)
+            fields = [record.get(key) for key in ("email", "alias", "organizationName")]
+            found.append(CswapAccount(number, *[value if isinstance(value, str) and value.isprintable() else "" for value in fields]))
+        return found
+    return []
+
+
+def account_line(account):
+    """How an account is shown on this machine's screen; the address is
+    shown here to tell accounts apart and is never stored or sent."""
+    name = f"{account.alias} ({account.email})" if account.alias else account.email or "an account with no address"
+    return f"  {account.number}: {name}" + (f" [{account.organization}]" if account.organization else "")
+
+
+def chosen_account(accounts, known, ask):
+    """The cswap account a slot is for, by its number in cswap's list, or
+    None where cswap has none or the person skips it."""
+    if not accounts:
+        return None
+    numbers = {account.number: account for account in accounts}
+    print("cswap's accounts on this machine:")
+    for account in accounts:
+        print(account_line(account))
+    default = known if known in numbers else None
+    answer = (ask(f"Which of them is this slot for? [{default if default else 'Enter to skip'}; its number] ") or "").strip()
+    if not answer:
+        return numbers.get(default)
+    if answer.isascii() and answer.isdigit() and len(answer) <= 3 and int(answer) in numbers:
+        return numbers[int(answer)]
+    raise TokensError("an account is one of the numbers cswap's list shows")
+
+
+def label_from(account):
+    """A cswap alias as the slot's label where it has a label's shape; an
+    address never is one."""
+    alias = account.alias if account else ""
+    return alias if alias and LABEL_SHAPE.fullmatch(alias) else ""
+
+
+def chosen_profile(browser, slot, known, ask):
+    """The browser profile a slot's sign-in opens in: one of the browser's
+    own by its number, a folder by its name, a new one named for the slot
+    by default, or none, for the default browser."""
+    if browser is None:
+        return None
+    profiles = browser_profiles(browser)
+    if profiles:
+        print(f"{browser.name}'s profiles:")
+        for number, (folder, name) in enumerate(profiles, 1):
+            print(f"  {number}: {name}" + (f" ({folder})" if name != folder else ""))
+    default = known or f"Symphony {slot}"
+    answer = (ask(f"Which {browser.name} profile opens this slot's sign-in? [{default}; "
+                  + ("a number above, " if profiles else "") + "a profile folder's name, or n for your default browser] ") or "").strip()
+    if not answer:
+        return default
+    if answer.lower() in ("n", "no", "none"):
+        return None
+    if answer.isascii() and answer.isdigit() and len(answer) <= 3 and 1 <= int(answer) <= len(profiles):
+        return profiles[int(answer) - 1][0]
+    check_profile(answer)
+    return answer
+
+
+class Local:
+    """What this machine offers the wizard: a browser, cswap's accounts and
+    a settings file."""
+
+    def __init__(self, browser=None, accounts=(), settings=None):
+        self.browser = browser
+        self.accounts = list(accounts)
+        self.settings = settings
+
+    @classmethod
+    def discover(cls):
+        return cls(find_browser(), cswap_accounts(), settings_path())
 
 
 # What is there.
@@ -906,13 +1288,18 @@ def first_free(state):
 
 # The commands.
 
-def sign_in_note(slot):
+def sign_in_note(slot, opener=None):
+    if opener is not None:
+        print(f"Slot {slot}: the sign-in opens in {opener.browser.name}'s profile {opener.profile}. The first time, sign in to claude.ai")
+        print("  there as the account this slot is for; the browser keeps it, so later the sign-in is one Approve.")
+        print("  The page that opens names the account it will approve; approve it there and the token is stored.")
+        return
     print(f"Slot {slot}: in your browser, sign in to claude.ai as the account this slot is for.")
     print("  If another account is signed in there, sign out first, or open the sign-in link in a private window.")
     print("  The page that opens names the account it will approve; approve it there and the token is stored.")
 
 
-def add(gh, target, slot=None, label="", also_main=False, paste=False, write=None, stdin_fd=None, ask=None, noted=False):
+def add(gh, target, slot=None, label="", also_main=False, paste=False, write=None, stdin_fd=None, ask=None, noted=False, opener=None):
     """One account into a slot. Every read and every scope is settled before
     the sign-in: a token minted and then not stored is a year's token lost
     with the process, so what can fail fails first."""
@@ -928,8 +1315,8 @@ def add(gh, target, slot=None, label="", also_main=False, paste=False, write=Non
     if name in state.secrets:
         print(f"Slot {slot} is set ({age_line(state.secrets[name])}); the new token replaces it.")
     if not noted:
-        sign_in_note(slot)
-    token = get_token(argparse.Namespace(paste=paste), write=write, stdin_fd=stdin_fd, ask=ask)
+        sign_in_note(slot, opener)
+    token = get_token(argparse.Namespace(paste=paste), write=write, stdin_fd=stdin_fd, ask=ask, opener=opener)
     for each in names:
         store_secret(state, each, token, scopes[each])
     token = None
@@ -955,6 +1342,18 @@ def main_token(gh, target, paste=False, write=None, stdin_fd=None, ask=None):
     store_secret(state, MAIN_SECRET, token, scope)
     token = None
     return verify(state, [MAIN_SECRET])
+
+
+def profile_opener(profile, browser=None):
+    """add --profile: the profile, in the browser this machine has."""
+    if not profile:
+        return None
+    check_profile(profile)
+    browser = browser or find_browser()
+    if browser is None:
+        raise TokensError("--profile needs Chrome, Edge or Brave, and none was found where its installer puts it: "
+                          "set SYMPHONY_BROWSER to the browser's program")
+    return Opener(browser, profile)
 
 
 def remove(gh, target, slot):
@@ -992,10 +1391,25 @@ def yes(answer, default):
     return default if not text else text in ("y", "yes")
 
 
-def wizard(gh, target, ask=input, write=None, stdin_fd=None):
-    """One account at a time: the state, then a slot, a label, the sign-in,
-    the store, the check, until the person says no more."""
+def chosen_label(account, ask):
+    """The slot's label: a word typed, else the cswap alias where it is one."""
+    offered = label_from(account)
+    if offered:
+        answer = (ask(f"A word of your own for this slot, so status says which account it is [{offered}; - for none; never an e-mail]: ") or "").strip()
+        label = "" if answer == "-" else answer or offered
+    else:
+        label = (ask("A word of your own for this slot, so status says which account it is (never an e-mail; Enter for none): ") or "").strip()
+    check_label(label)
+    return label
+
+
+def wizard(gh, target, ask=input, write=None, stdin_fd=None, local=None):
+    """One account at a time: the state, then a slot, the cswap account, a
+    label, the browser profile, the sign-in, the store, the check, until
+    the person says no more."""
     refuse_crowd(gh, target)
+    local = Local.discover() if local is None else local
+    settings = read_settings(local.settings)
     state = State(gh, target)
     print_status(state)
     added = False
@@ -1003,13 +1417,18 @@ def wizard(gh, target, ask=input, write=None, stdin_fd=None):
         slot = chosen_slot(state, ask)
         if slot is None:
             break
-        label = (ask("A word of your own for this slot, so status says which account it is (never an e-mail; Enter for none): ") or "").strip()
-        check_label(label)
-        sign_in_note(slot)
-        ask("Press Enter once the browser is signed in to that account ")
+        known = remembered(settings, target, slot)
+        account = chosen_account(local.accounts, known["cswap"], ask)
+        label = chosen_label(account, ask)
+        profile = chosen_profile(local.browser, slot, known["profile"], ask)
+        opener = Opener(local.browser, profile) if profile else None
+        remember(local.settings, settings, target, slot, profile, account.number if account else None)
+        sign_in_note(slot, opener)
+        if opener is None:
+            ask("Press Enter once the browser is signed in to that account ")
         also_main = MAIN_SECRET not in state.secrets and yes(
             ask(f"Store the same token as {MAIN_SECRET} too, the one @claude, the workers in Actions and the coordinator workflow run on? [y/N] "), False)
-        state = add(gh, target, slot, label, also_main, write=write, stdin_fd=stdin_fd, noted=True)
+        state = add(gh, target, slot, label, also_main, write=write, stdin_fd=stdin_fd, noted=True, opener=opener)
         added = True
         if not yes(ask("Another account? [y/N] "), False):
             break
@@ -1041,6 +1460,7 @@ def build_parser():
     adding.add_argument("--label", default="", help="a word of your own for the slot, never an e-mail address")
     adding.add_argument("--also-main", action="store_true", help=f"store the same token as {MAIN_SECRET} too")
     adding.add_argument("--paste", action="store_true", help="take the token from a hidden prompt instead of running claude setup-token")
+    adding.add_argument("--profile", help="open the sign-in in this profile of Chrome, Edge or Brave (its folder name, such as \"Profile 2\")")
     main_command = commands.add_parser("main", help=f"{MAIN_SECRET} alone, the token the Claude workflows run on")
     main_command.add_argument("--paste", action="store_true", help="take the token from a hidden prompt instead of running claude setup-token")
     removing = commands.add_parser("remove", help="a slot's secret and its label")
@@ -1069,7 +1489,7 @@ def main(argv=None):
         if args.command == "status":
             print_status(State(gh, target))
         elif args.command == "add":
-            add(gh, target, args.slot, args.label, args.also_main, args.paste)
+            add(gh, target, args.slot, args.label, args.also_main, args.paste, opener=profile_opener(args.profile))
         elif args.command == "main":
             main_token(gh, target, args.paste)
         elif args.command == "remove":

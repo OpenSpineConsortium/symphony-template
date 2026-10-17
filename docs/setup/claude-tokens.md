@@ -48,9 +48,18 @@ python3 scripts/tokens.py
    whether CLAUDE_CODE_OAUTH_TOKEN is set. Nothing but names, dates and
    counts; GitHub gives nobody a secret's value back.
 3. It asks which slot to fill (the first free one by default; a set
-   slot's number replaces its token) and for a label.
-4. It tells you to sign in to claude.ai in your browser as the account
-   that slot is for, and waits for Enter. The sign-in page that follows
+   slot's number replaces its token). Where claude-swap (cswap) keeps a
+   list of accounts on this machine, it shows that list and asks which
+   account the slot is for, by cswap's number; the account's cswap alias
+   is then offered as the label, unless it looks like an address. Then
+   it asks for a label.
+4. Where this machine has Chrome, Edge or Brave, it asks which browser
+   profile the slot's sign-in opens in: a new profile named "Symphony"
+   and the slot's number by default, one of the browser's own by its
+   number in the list it shows, or `n` for the default browser (see
+   "A browser profile per account" below). Without a profile, it tells
+   you to sign in to claude.ai in your browser as the account that slot
+   is for, and waits for Enter. The sign-in page that follows
    names the account it approves: if the browser is signed in to another
    of your accounts, sign out there first, or open the link claude prints
    in a private window and sign in as the right one. While
@@ -102,17 +111,51 @@ anything else that is not a token from `claude setup-token`. It refuses to
 run for a repository in crowd mode, which holds no Claude token
 (docs/setup/crowdsourcing.md).
 
+## A browser profile per account
+
+`claude setup-token` cannot be told which Claude account to approve: the
+browser's signed-in account decides. With several accounts, the wizard
+gives each slot a browser profile of its own. It hands claude a small
+launcher through BROWSER, the variable claude opens its sign-in link
+with, and the launcher opens the link in that profile; the launcher
+lives in a folder of the run's own and is gone when the sign-in ends.
+The first time, a new profile shows claude.ai's sign-in page: sign in
+there as the slot's account, then Approve. The profile keeps that
+sign-in, so every later token for the slot, a year on, is one Approve.
+
+The wizard remembers each slot's profile and its cswap account number in
+tokens.json in your own settings folder (`%APPDATA%\symphony` on
+Windows, `~/.config/symphony` elsewhere), never in the repository and
+never with an address in it, and offers them as the defaults next time.
+`add --profile "Profile 2"` opens one sign-in in a profile without
+questions. Set SYMPHONY_BROWSER to a Chromium browser's program to use
+one the wizard does not find by itself. In WSL the wizard finds Chrome
+or Edge under C:\Program Files and names a profile by its folder; the
+Windows browser reaches the sign-in's callback in WSL through WSL's
+localhost forwarding.
+
+cswap's accounts cannot stand in for a sign-in. cswap keeps each
+account's interactive login, whose refresh token changes each time it is
+used, so a copy in Actions would sign one side out; and it is a full
+login, where `claude setup-token` makes a year-long token that can only
+run Claude. The wizard reads only cswap's list of accounts, its
+sequence.json, and opens none of its credentials.
+
 ## Where it runs
 
 Linux, macOS and WSL have the pseudo-terminal the sign-in runs behind;
 claude opens the browser where it can and prints the link otherwise, and
 in WSL the link is opened in the Windows browser. A Windows shell has no
-pseudo-terminal, and a machine may have gh but not claude: there, run
-`claude setup-token` wherever claude is and give the wizard the token with
-`add --paste` or `main --paste`, at a hidden prompt that echoes nothing,
-as gh's own prompt would; the wizard takes the paste path by itself when
-it cannot run claude, and refuses a paste where Python says it cannot
-hide what is typed. In Git Bash's own window (mintty) a hidden prompt may
+pseudo-terminal to hide the token behind: there the wizard starts
+`claude setup-token` in a window of its own, opening the sign-in in the
+slot's profile, and takes the token you copy from that window at a hidden
+prompt that echoes nothing, as gh's own prompt would; close that window
+afterwards, since the token stays on its screen until you do. A machine
+may have gh but not claude: there, run `claude setup-token` wherever
+claude is and give the wizard the token with `add --paste` or
+`main --paste`; the wizard takes the paste path by itself when it cannot
+run claude, and refuses a paste where Python says it cannot hide what is
+typed. In Git Bash's own window (mintty) a hidden prompt may
 hang or echo instead, so run the wizard there through winpty, or from
 cmd, PowerShell or Windows Terminal. claude is given a terminal 400
 columns wide, so it never wraps the token; were it ever to, the cut token
