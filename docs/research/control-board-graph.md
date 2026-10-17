@@ -189,21 +189,26 @@ Tier 0, GitHub-native data, the one change the protocol needs. The coordinator's
 (tools/sdlc_protocol/team.py, plan_schema) gains a depends_on list per task, and open_task, which
 already links each task under its epic as a native sub-issue (team.py line 589,
 adapters/github.py add_sub_issue), writes each dependency as native blocked_by through POST
-/repos/{r}/issues/{n}/dependencies/blocked_by, which GITHUB_TOKEN under issues: write should be
-able to call (this session's own token, which is not GITHUB_TOKEN, answered that endpoint and
-sub_issues on 2026-10-17; the write from a board run was not probed, nor was GraphQL from
-Actions, only its refusal from a cloud session, 403; both are listed below and are probed once
-from board.yml before the protocol pull request). Pick treats a task with an open issue it is
+/repos/{r}/issues/{n}/dependencies/blocked_by with the body {"issue_id": <the blocker's id>},
+which GITHUB_TOKEN under issues: write can call: a workflow on the branch claude/graph-setup
+added, read and removed one relation on 2026-10-17 (run 39078408191, #132 blocked by #131),
+and DELETE .../dependencies/blocked_by/{issue_id} removes one. GraphQL from Actions was not
+probed, only its refusal from a cloud session, 403, and nothing here needs it: every REST
+issue object carries issue_dependencies_summary (blocked_by, blocking, total_blocked_by,
+total_blocking) and sub_issues_summary (total, completed, percent_completed), read on #127 and
+#132 the same day. Pick treats a task with an open issue it is
 blocked by as not free: GitHub's relation is a third thing beside the label blocker, which
 stops everyone, and the label blocked, a holder waiting on a peer, and the clerk's deal
 approximates it today with the blocked label and would now read the relation; that changes the
 spec's Pick, so spec/PROTOCOL.md and the validation oracle written from its text change with
-it. The board's run reads each open issue's sub_issues and blocked_by, two REST calls per open
-issue (36 for the 18 open here) against GITHUB_TOKEN's 1,000 an hour and the count
-symphony-protocol#38 measured for a board run; the board's run keeps no reserve today, the one
-that skips the metrics breakdown is tools/metrics.py's own, so the section is skipped by the
-same accounting once the board's run has it. It computes preconditions met as blockers closed or
-merged against blockers in all, and writes a Dependencies section to STATE.md: one Mermaid
+it. The board's run reads each open epic's sub_issues (one call per open epic) and the blocked_by
+list of each task whose summary says total_blocked_by is above zero (one call each), so the
+18 open issues here cost four calls for their four epics and none for edges until a plan
+writes one, against GITHUB_TOKEN's 1,000 an hour and the count symphony-protocol#38 measured
+for a board run; the board's run keeps no reserve today, the one that skips the metrics
+breakdown is tools/metrics.py's own, so the section is skipped by the same accounting once the
+board's run has it. It computes preconditions met from the summary alone, total_blocked_by
+less blocked_by (the open ones) against total_blocked_by, and writes a Dependencies section to STATE.md: one Mermaid
 block per open epic, its tasks as nodes colored by label with "k/n" in the label and blocked_by
 as arrows, and one block of goals to epics, where a goal is an issue labelled goal, a new label
 beside epic, that the epics are sub-issues of; the board keys on labels, as the protocol does
@@ -355,9 +360,9 @@ reaches Linear.
   the identifier.
 - Whether a worker in Actions can drive Linear's agent session pane with no webhook server.
 - The latency of a claude.yml run from the comment to the first edit and to the answer.
-- Whether GITHUB_TOKEN under issues: write may POST dependencies/blocked_by from a board run,
-  and whether GraphQL answers from Actions: only this session's own token was probed, from a
-  cloud session, where REST answered and GraphQL was refused.
+- Whether GraphQL answers from Actions: only its refusal from a cloud session was seen, and
+  nothing in the plan needs it, since REST's issue objects carry both summaries (the write of
+  blocked_by from a workflow was verified on 2026-10-17, above).
 - claude-code-action's rule that it answers only actors with write access, read from memory;
   its docs answered 403 through the session's proxy.
 - The form of Linear's settings links (linear.app/<workspace>/settings/...): the page refuses
