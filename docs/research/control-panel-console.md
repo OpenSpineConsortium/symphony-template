@@ -18,7 +18,8 @@ After: the panel is one console that fills the window under the site's header an
 strip and never makes the page scroll at a laptop's size:
 
 - A command bar: the repository picker, the four links to GitHub, who is signed in, Refresh and
-  Forget the token.
+  Forget the token (folded into the side column and a status line at the foot in the second pass,
+  below).
 - A rail of ten tabs on the left: Command, Board, Tasks, Pull requests, Runs, Workers, Ask Claude,
   Tokens, Repositories, About. Tasks, Pull requests and Workers carry their counts.
 - Command, the tab it opens on: seven readouts (Queue, Given to workers, At work, In review,
@@ -36,6 +37,76 @@ strip and never makes the page scroll at a laptop's size:
 - Each tab has an address (#command, #board, #tasks, #pulls, #runs, #workers, #ask, #tokens,
   #repos, #about), so a link or a reload opens it again; nothing about the tab is stored.
 - The deck is dark inside the cream site, so it reads as an instrument, not an article.
+
+## Nearly fullscreen (the second pass, same day)
+
+greg, after the first version, in his words: "the layout on how this looks with 3 different
+navigation panels is way to cluttered, you can barely see the control panel, which should be
+nearly fullscreen with the exvception of the topmsot panel"; then "why is the control panel so
+squished vertically? it should stretch down to take up the height of the page"; then "i cant read
+the full fucking repo name, and i think this panel can be more condensed, and if it has to stay
+for messages, make sure it is frozen, meaning its always visible". He also said that pressing
+Add a Claude account moved the window and printed partly off screen.
+
+The three bars he counted were the site's header, the Symphony strip and the console's own command
+bar; a growing message line above the deck was a fourth thing that pushed the deck down. The Website
+docs and navigation thread made the strip a drop-down that opens over the page on hover (site #41).
+This pass (site #48) made these changes:
+
+- The command bar is gone. The repository and the four GitHub links sit at the top of the rail's
+  column. The repository's whole name shows wrapped, owner on its own line, with the select laid
+  invisibly over it so a press opens the browser's own list.
+- The page's message is a status line at the console's foot. It is always there, with a faint
+  placeholder outside the live region when it is empty. It never sits above the tabs and never
+  covers a control. A long message, such as Add a Claude account's sign-in step with its button
+  and code box on one line, scrolls inside it. Clear empties the line, except while a step waits
+  on a box the person has to fill.
+- Who is signed in, Refresh and Forget the token sit at the right end of that line.
+- The console now runs from the 64 px header to the window's bottom edge, measured at 1000 x 700,
+  1366 x 657, 1536 x 730 and 1920 x 969, with the window at 0. The whole rail, eleven tabs with
+  Share, fits at 1366 x 657.
+- Below 900 px the status line is sticky at the bottom. The console's measured height no longer
+  wins over the phone layout's auto height; before this, a tab's form drew over its list on a phone.
+
+The review before the pull request found these problems, each fixed: the shown name went stale
+after the last repository was removed or after another account signed in (it is drawn wherever the
+select is filled); Clear wiped the sign-in step mid-flow; the inline rule missed the step's
+paragraphs; the placeholder sat inside the live region; the page scrolled a few pixels at 520 to
+523 px tall; and two messages still said "the bar above".
+
+Merging master along the way found that the Tokens tiles (site #44) declared a second `var MODELS`
+in the script's one function. The tiles' list overwrote the cost page's price table, so
+/symphony/cost.html threw. Site #46 renamed the tiles' list TILE_MODELS, ahead of this change.
+
+## Graphical sections and the frame's last pieces (the third pass, same day)
+
+greg asked, in a message the coordinator split among the threads, for several things. This thread
+took four of them: a message that flashes when it arrives, a full screen mode without the site's
+header, a place for a frozen Ask Claude bar, and Tasks, Pull requests, Runs and Workers drawn as
+pictures rather than text, with a worker added without a form.
+
+- Site #51. When a message arrives or changes, the status line flashes white; when it empties, it
+  does not. A Full screen button beside the title uses the browser's fullscreen and hides the site's
+  header. If the browser itself is full screen (F11), the button says how to leave. An empty
+  `#cp-askbar` sits above the status line for the Ask Claude bar thread to fill. It is hidden while
+  it is empty or while nobody is signed in.
+- Site #56. Tasks is a board of six columns, one per list, each with its own scroll. The list
+  buttons slide the board sideways to their column. Every task is a card with its number, title,
+  label chips and actions. Pull requests are cards with a Ready or Draft pill. Runs are cards
+  with a large mark for passed, failed or running. Workers are cards with an emblem for where each
+  runs and chips for its settings. A worker is added by pressing tiles. The two selects stay hidden
+  behind the tiles and remain what the add reads; a tile sets its select through a change event,
+  so every listener hears it.
+- The cards are CSS over the same tables. Each cell carries a `cell--<part>` class, so the data,
+  ids, handlers and the browser checks' selectors are unchanged.
+- Pull request cards carry `data-number` so the Ask Claude bar's "merge #N" finds the Merge
+  button. They also carry `data-pull`, so the task filter does not read them as tasks.
+- The review caught one problem, now fixed: a card's grid display overrode the filter's hidden
+  rows.
+- Site #59. The Agents tab (site #55) is drawn as cards too, with the purpose as a pill. The
+  leaderboard (site #53) gives its first three places gold, silver and bronze. The rail now has
+  fourteen tabs, so in a window up to 820 px tall its rows close up and all of them fit at
+  1366x657; in shorter windows the rail scrolls.
 
 ## Design decisions
 

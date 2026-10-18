@@ -13,7 +13,7 @@ account you have, without the token ever being shown.
 | Secret or variable | One per | Read by |
 | --- | --- | --- |
 | CLAUDE_CODE_OAUTH_TOKEN | repository, or organization | @claude, the workers in Actions and the coordinator workflow of every repository that sees it (docs/setup/claude-action.md) |
-| SYMPHONY_CLAUDE_1 to SYMPHONY_CLAUDE_8 | account: one slot each | a benchmark in Actions, which spreads its agents over the slots, one account per job at a time (OpenSpineConsortium/coordbench's bench.yml); any workflow that names a slot |
+| SYMPHONY_CLAUDE_1 to SYMPHONY_CLAUDE_32 | account: one slot each | the workers in Actions on auto or on a slot; a benchmark in Actions, which spreads its agents over slots 1 to 8, one account per job at a time (OpenSpineConsortium/coordbench's bench.yml); any workflow that names a slot. The control panel fills all 32, an organization's pool holding every member's tokens; this wizard fills 1 to 8 |
 | SYMPHONY_CLAUDE_ACCOUNTS | the place | the slots in use, as a list such as `1,2,3`; the wizard keeps it equal to the slots whose secret exists. The bench stops a real run on any other word, such as `01` or `9`, so the wizard writes such a list again |
 | SYMPHONY_CLAUDE_<slot>_LABEL | slot, optional | nothing; a word of your own so that `status` can say which account a slot is. A variable is readable by anyone who can read the repository's workflows, so never an e-mail address |
 | SYMPHONY_CLAUDE_SETTINGS | the place, optional | the workers in Actions, and for main the coordinator, @claude and the assistant: each slot's model, effort, fallback model and whether it resumes by itself, as JSON by slot, which the control panel's token tiles write (below, "Each token's settings") |
@@ -277,11 +277,14 @@ A worker in Actions runs on CLAUDE_CODE_OAUTH_TOKEN unless the file
 .github/symphony/accounts.json says otherwise:
 
 ```
-{"default": "main", "workers": {"runner": "auto", "docs": "2"}}
+{"default": "main", "workers": {"runner": "auto", "docs": "2", "review": ["3", "5"]}}
 ```
 
-`main` is CLAUDE_CODE_OAUTH_TOKEN, a number from 1 to 8 is that slot's
-SYMPHONY_CLAUDE_<slot>, and `auto` takes, at the start of each run, the
+`main` is CLAUDE_CODE_OAUTH_TOKEN, a number from 1 to 32 is that slot's
+SYMPHONY_CLAUDE_<slot>, a list of slots is `auto` over those of them
+SYMPHONY_CLAUDE_ACCOUNTS holds (falling back to main only where the list
+names `main`), which is how the control panel gives each worker or agent
+its own share of the tokens in one repository, and `auto` takes, at the start of each run, the
 slot of SYMPHONY_CLAUDE_ACCOUNTS with the most room, so a worker moves to
 the next account before the one it was on runs out. A run already going
 finishes on its account. Workers of one run are dealt different free
@@ -319,6 +322,12 @@ not name runs as before:
   of auto, once a reading after resumedAt shows it at its limit, until
   Resume on its tile sets resumedAt anew.
 - paused: true keeps the slot out of auto whatever its readings say.
+- id: eight hexadecimal digits the Tokens tab gives each token, which stay
+  with the token while it is renewed. A worker in Actions labels the issue
+  it worked `token:<id>`, so the control panel's leaderboard credits the
+  token, and the person it belongs to, with the issues it closed.
+- owner: the GitHub login of the person who added the token; the Tokens
+  tab lets only that person, or an owner of the organization, change it.
 
 A per-model limit holds a run only of that model's family (the name's
 fable, opus, sonnet or haiku); with no model named, any of them holds the

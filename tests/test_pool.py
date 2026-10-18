@@ -166,7 +166,7 @@ class ThePick(unittest.TestCase):
 
     def test_the_list_of_slots(self):
         self.assertEqual(pool.parse_slots("3, 1,3 main"), ["3", "1", "main"])
-        for text in ("9", "01", "x"):
+        for text in ("33", "01", "x"):
             with self.assertRaises(pool.PoolError):
                 pool.parse_slots(text)
         with self.assertRaises(pool.PoolError):
@@ -273,8 +273,18 @@ class TheAssignments(unittest.TestCase):
         dealt = [pool.choose("runner", "1,2", self.path, self.readings, now=NOW, spread=place)[0] for place in (0, 1)]
         self.assertEqual(dealt, ["2", "1"])
 
+    def test_a_list_is_auto_over_its_own_slots(self):
+        self.path.write_text(json.dumps({"workers": {"review": ["1", "3"], "tests": ["4", "main"], "lone": ["4"]}}))
+        self.assertEqual(self.choose("review", "1,2,3")[:2], ("1", "auto"))
+        pool.write(self.readings / "slot-1.run.json", record("1", 0.99, 0.1))
+        self.assertIsNotNone(self.choose("review", "1,2")[2])
+        self.assertEqual(self.choose("tests", "1,2")[0], "main")
+        with self.assertRaisesRegex(pool.PoolError, "holds none of them"):
+            self.choose("lone", "1,2")
+
     def test_a_file_that_does_not_hold_together_is_refused(self):
-        for body in ("[]", '{"workers": {"a": "9"}}', '{"default": "x"}', '{"extra": 1}', "not json"):
+        for body in ("[]", '{"workers": {"a": "33"}}', '{"workers": {"a": []}}', '{"workers": {"a": ["1", "1"]}}',
+                     '{"workers": {"a": ["auto"]}}', '{"workers": {"a": [1]}}', '{"default": "x"}', '{"extra": 1}', "not json"):
             self.path.write_text(body)
             with self.assertRaises(pool.PoolError):
                 self.choose("a")
@@ -347,7 +357,7 @@ class TheSettings(unittest.TestCase):
     def test_values_that_do_not_hold_together_are_left_out(self):
         said = []
         text = json.dumps({"1": {"model": "opus; rm -rf /", "effort": "huge", "fallback": "x y", "resume": "no",
-                                 "resumedAt": "soon"}, "9": {}, "2": "x"})
+                                 "resumedAt": "soon"}, "33": {}, "2": "x"})
         self.assertEqual(pool.parse_settings(text, said.append), {"1": {}})
         self.assertEqual(len(said), 6)
         # a name of the right shape that no model answers to, or one with a
@@ -371,6 +381,30 @@ class TheSettings(unittest.TestCase):
         self.assertEqual(printed.getvalue(),
                          "slot=3\nmodel=claude-opus-5-5\neffort=max\nfallback=claude-sonnet-5-5\n")
 
+
+    def test_a_tokens_id_and_owner_are_kept_when_they_hold_their_shape(self):
+        said = []
+        found = pool.parse_settings(json.dumps({"3": {"id": "0a1b2c3d", "owner": "Gregory-Schwing-MD-PhD"},
+                                                "4": {"id": "0A1B2C3D", "owner": "-greg"},
+                                                "5": {"id": "0a1b2c3d\n", "owner": "greg\nslot=8"}}), said.append)
+        self.assertEqual(found["3"], {"id": "0a1b2c3d", "owner": "Gregory-Schwing-MD-PhD"})
+        self.assertEqual(found.get("4", {}), {})
+        self.assertEqual(found.get("5", {}), {})
+        self.assertEqual(len(said), 4)
+
+    def test_the_id_is_a_step_output_for_the_credit(self):
+        settings = json.dumps({"3": {"id": "0a1b2c3d"}})
+        with redirect_stdout(io.StringIO()) as printed, patch_stderr():
+            pool.main(["settings", "--slot", "3", "--settings", settings])
+        self.assertEqual(printed.getvalue(), "id=0a1b2c3d\n")
+
+    def test_the_pool_has_room_for_32(self):
+        self.assertEqual(pool.parse_slots("1,32,main"), ["1", "32", "main"])
+        with self.assertRaises(pool.PoolError):
+            pool.parse_slots("33")
+        self.assertTrue(pool.FILE_NAME.match("slot-32.run.json"))
+        self.assertFalse(pool.FILE_NAME.match("slot-33.run.json"))
+        self.assertFalse(pool.FILE_NAME.match("slot-01.run.json"))
 
 class TheMainTokensSettings(unittest.TestCase):
     """@claude and the coordinator run on main and take its tile's settings."""

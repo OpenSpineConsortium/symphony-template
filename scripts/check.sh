@@ -20,6 +20,10 @@ python3 tools/sdlc_protocol/vendoring.py verify tools
 # (docs/agents/WORKERS.md): a misspelt setting or a name that is no label
 # fails here, before the workflows that read the registry would.
 python3 tools/workers.py check
+# Every agent under .claude/agents/ and its line in .github/symphony/agents.json
+# must hold together (docs/agents/AGENTS.md), and an imported agent must be
+# the file it was when it came, so a hand edit is a choice, not an accident.
+python3 tools/agents.py check
 python3 -m unittest discover -s tests -v
 
 # The project's own checks go here: its linter, its test runner, its build.

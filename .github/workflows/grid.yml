@@ -76,7 +76,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         if: inputs.python
         with:
           python-version: "3.12"
@@ -89,7 +89,7 @@ jobs:
           bash -c "$COMMAND" 2>&1 | tee -a grid.log
       - name: keep the log as an artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.artifact || 'grid' }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: grid.log
