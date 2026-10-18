@@ -129,9 +129,9 @@ accept running in a public repository, and a folder past the depth limit counted
 
 ## Not yet known
 
-- Nothing has run against a real drive. The first catalog waits on a connected drive (the Folders
-  tab and the owner's Microsoft clicks in drive-sync.md), and the first organize waits on the
-  owner's word, since it spends the Claude plan.
+- Nothing has run against a real drive. OneDrive Connect works since 2026-10-18 (drive-sync.md),
+  so the first catalog needs only drive.json's "organize" items in a private repository, and the
+  first organize waits on the owner's word, since it spends the Claude plan.
 - How long a large drive takes to walk: one Graph call per folder per 200 children, so a drive of
   50,000 files in 3,000 folders is a few thousand calls, inside the 90-minute job. Not measured.
 - Graph throttling (429) on a large walk is not retried yet; the folder is named as unlisted.
