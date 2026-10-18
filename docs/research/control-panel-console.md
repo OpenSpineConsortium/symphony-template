@@ -49,8 +49,15 @@ strip and never makes the page scroll at a laptop's size:
 - Every element id the script and the browser checks use is kept, so no behaviour moved. Where the
   page points at something in another tab (the assistant's focus on a task row, its filter, a board
   section, "Ask Claude on it" from a row), it opens that tab first and then scrolls as before.
-- The tab's address names its rail button, and the button carries a scroll margin of a whole
-  window, so the browser never scrolls the page to it.
+- The tab's address (#tokens) matches no element's id, the rail buttons being rail-NAME, since a
+  browser scrolls the window to an element the address names and would carry the bar and the strip
+  out of sight; a scroll margin on the button did not stop it (the review below). An address that
+  names no tab, such as the skip link's #main, leaves the tab as it is.
+- Where the page scrolls to a row or a heading, it scrolls the tab's own box and puts the window
+  back, since scrollIntoView moves every box around the node, the window too.
+- A new sign-in reads the Tokens tab afresh, so another account never sees the last one's slots.
+- Between 901 and 1279 pixels wide the bar takes a second row for its links rather than cut them,
+  and the rail and the side forms narrow.
 - The rail's buttons are ARIA tabs (aria-selected, arrow keys move between them), the panels
   tabpanels, so a screen reader and a browsing Claude read the same structure.
 
@@ -66,11 +73,27 @@ still below the deck, reachable by scrolling, as the site's build requires.
 ## For the threads that add sections
 
 A new section is one rail button and one panel in tools/pages/symphony/control/index/body.html of
-the site: `<button type="button" role="tab" data-tab="NAME" id="NAME" aria-controls="tab-NAME">` in
+the site: `<button type="button" role="tab" data-tab="NAME" id="rail-NAME" aria-controls="tab-NAME">` in
 the rail, and `<section class="console__panel" id="tab-NAME" data-tab-panel="NAME" role="tabpanel"
-aria-labelledby="NAME" hidden>` in the stage, with a `console__head` and a `console__scroll` inside;
+aria-labelledby="rail-NAME" hidden>` in the stage, with a `console__head` and a `console__scroll` inside;
 `console__panel--split` gives a list on the left and a form on the right. The Dependencies section
 and the Folders page are expected to arrive this way.
 
 The panel's browser checks press a tab's rail button before they read or press anything inside it,
-since a hidden tab's contents are not visible to Playwright.
+since a hidden tab's contents are not visible to Playwright: symphony-app's
+signin/panel-checks/e2e2/console-tabs.mjs wraps the page's actions and its locators so that each
+opens the tab holding its selector first, and each suite installs it once after launching the
+browser.
+
+## Review
+
+An adversarial review of the first version, run in the thread before the pull request, found the
+window scrolled 107 pixels on every signed-in load, since the tab's address named a rail button;
+scrollIntoView from "Ask Claude on it" and the assistant moving the window; the Tokens tab keeping
+the last sign-in's readings after a new one; any other address sending the person to Command; the
+bar cutting its links between 901 and about 1250 pixels; Home and End doing nothing on the rail;
+and words that still said "below" or "Tokens page". Each is fixed as the decisions above say, and
+the four addresses (/symphony/control/, ?repo=, #board, tokens.html?repo=) now load with the window
+at 0 at 1366 x 657 and 1000 x 700. Two edges stay: a sign-in begun on the old tokens.html before
+this change and finished after it is refused once and asks to try again, and a return from Sign in
+with GitHub opens Command, since GitHub's callback carries no address fragment.
