@@ -94,7 +94,7 @@ class TokenRunTest(unittest.TestCase):
 
     def test_a_wrong_code_seals_nothing(self):
         github = FakeGitHub("wrong-code-1")
-        with self.assertRaises(token_run.RunError):
+        with self.assertRaisesRegex(token_run.RunError, "claude said: .*Invalid code"):
             self.run_with(github)
         self.assertEqual(len(github.posted), 1)
 
