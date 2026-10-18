@@ -273,8 +273,18 @@ class TheAssignments(unittest.TestCase):
         dealt = [pool.choose("runner", "1,2", self.path, self.readings, now=NOW, spread=place)[0] for place in (0, 1)]
         self.assertEqual(dealt, ["2", "1"])
 
+    def test_a_list_is_auto_over_its_own_slots(self):
+        self.path.write_text(json.dumps({"workers": {"review": ["1", "3"], "tests": ["4", "main"], "lone": ["4"]}}))
+        self.assertEqual(self.choose("review", "1,2,3")[:2], ("1", "auto"))
+        pool.write(self.readings / "slot-1.run.json", record("1", 0.99, 0.1))
+        self.assertIsNotNone(self.choose("review", "1,2")[2])
+        self.assertEqual(self.choose("tests", "1,2")[0], "main")
+        with self.assertRaisesRegex(pool.PoolError, "holds none of them"):
+            self.choose("lone", "1,2")
+
     def test_a_file_that_does_not_hold_together_is_refused(self):
-        for body in ("[]", '{"workers": {"a": "33"}}', '{"default": "x"}', '{"extra": 1}', "not json"):
+        for body in ("[]", '{"workers": {"a": "33"}}', '{"workers": {"a": []}}', '{"workers": {"a": ["1", "1"]}}',
+                     '{"workers": {"a": ["auto"]}}', '{"workers": {"a": [1]}}', '{"default": "x"}', '{"extra": 1}', "not json"):
             self.path.write_text(body)
             with self.assertRaises(pool.PoolError):
                 self.choose("a")

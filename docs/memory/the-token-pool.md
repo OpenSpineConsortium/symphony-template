@@ -22,3 +22,9 @@ own branch pool (a copy of pool.py there), fed by its real jobs and by
 panel's Tokens tab is the token tiles alone (site #49); which agent runs on which token is set on the agents' tab. The picker moves to the protocol library after 0.5.1 is cut.
 docs/research/claude-token-pool.md has the sources and the four steps;
 from the token wizard's thread, 2026-10-17.
+
+A worker's or an agent's line in .github/symphony/accounts.json may be a
+list of slots, ["3", "5"]: auto over those the pool holds, main only where
+the list names it, and a refusal where it holds none; the control panel's
+tokenAssignBox writes it per repository, so one repository divides its
+tokens between review, development and testing.

@@ -277,11 +277,14 @@ A worker in Actions runs on CLAUDE_CODE_OAUTH_TOKEN unless the file
 .github/symphony/accounts.json says otherwise:
 
 ```
-{"default": "main", "workers": {"runner": "auto", "docs": "2"}}
+{"default": "main", "workers": {"runner": "auto", "docs": "2", "review": ["3", "5"]}}
 ```
 
-`main` is CLAUDE_CODE_OAUTH_TOKEN, a number from 1 to 8 is that slot's
-SYMPHONY_CLAUDE_<slot>, and `auto` takes, at the start of each run, the
+`main` is CLAUDE_CODE_OAUTH_TOKEN, a number from 1 to 32 is that slot's
+SYMPHONY_CLAUDE_<slot>, a list of slots is `auto` over those of them
+SYMPHONY_CLAUDE_ACCOUNTS holds (falling back to main only where the list
+names `main`), which is how the control panel gives each worker or agent
+its own share of the tokens in one repository, and `auto` takes, at the start of each run, the
 slot of SYMPHONY_CLAUDE_ACCOUNTS with the most room, so a worker moves to
 the next account before the one it was on runs out. A run already going
 finishes on its account. Workers of one run are dealt different free
