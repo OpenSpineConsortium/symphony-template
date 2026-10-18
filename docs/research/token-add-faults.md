@@ -1,0 +1,38 @@
+# Add Token faults of 2026-10-18
+
+Source: the project thread "Add token faults" (greg's report of 2026-10-18, relayed by the coordinator), with the Control panel sign-in thread's diagnosis. Read from issue #222 and the logs of the Token workflow's runs 1 to 7 on this repository, and from `claude setup-token` 2.1.302 run in a cloud container behind tools/token_run.py's own pseudo-terminal with a made-up code, which no account can redeem.
+
+## 1. A repository whose adoption is not merged
+
+Ashley's repository, aschehr/OpenSpineToolbox-S1fix-2Dprojection, had its adoption pull request open, so its default branch had no .github/workflows/token.yml. The page opened an issue there, then the dispatch answered 404, and the page's hint told her to "pick symphony-template in the Repository box", which is the wrong advice for someone adding a token to her own repository.
+
+The fix (site pull request "Tokens: say to merge the adoption first, and never strand Add Token"): the page reads `GET /repos/{repo}/actions/workflows/token.yml` before it opens the issue, so such a repository gets no stray issue, and on 404 says the workflow comes with the adoption and to merge the adoption pull request first, linking the open one from the branch symphony/adopt where there is one.
+
+## 2. Add Token stuck after the dialog was closed
+
+greg's press opened issue #222 and started run 39165163409, which posted the sign-in link at 20:51:01, 18 seconds after the run began. The page never showed the Sign in button, and Add Token did nothing afterwards. Three things in symphony-panel.js combined:
+
+- GitHub answers an issue's comments with `Cache-Control: private, max-age=60`, so the browser served the page's first, empty read of the comments for up to a minute: the link could reach the page as much as a minute after the run posted it.
+- Close only hid the dialog, and the poll went on for up to 15 minutes with the Add button disabled. Pressing Add Token opened the settings form, which cleared the dialog, so the sign-in view the poll drew into was no longer on the page; its Save and sign in then returned at once on the disabled button, and nothing showed.
+- Nothing could stop the poll.
+
+The same pull request reads the comments at an address of its own each time, so no cached answer is served; remembers the sign-in under way, so Add Token (or Renew) shows its dialog again instead of a dead form; and adds a Stop this sign-in button, which ends the poll, closes the issue as not planned and frees Add Token. The stop is hidden once the sealed token has arrived, so it never cuts the save of the secret short. An adversarial review of the change found that a stop which waited for the call on its way could wait for good, since the page leaves a call unanswered once it has signed out, so the stop frees Add Token at once and a sign-in begun before a sign-out is let go; the Add Token tile reads Sign-in waiting while one is under way; the dialog names the repository and says when another sign-in holds it; a 404 first asks whether SymphonyBoard reaches the repository at all; and a workflow Token that is turned off is said so, with its page, before any issue is opened.
+
+## 3. Why runs 1 to 6 printed no token
+
+Every run posted its sign-in link within about 15 seconds. Then:
+
+| Run | Issue | What happened |
+| --- | --- | --- |
+| 1, 3, 4 | 187, 195, 196 | no code came within ten minutes |
+| 2, 5, 6 | 189, 201, 202 | the code reached claude, which showed it as 92 asterisks, and printed nothing more within the 60 seconds the run waits |
+
+Runs 1, 3 and 4 fit fault 2: the page drew its sign-in where nobody saw it, or a second press (runs 3 and 4 began 33 seconds apart) left one of them waiting.
+
+Runs 2, 5 and 6 are not settled. What is known:
+
+- The code's length, 92, is a 48-character code, the `#` and the 43-character state, so the page passed it whole.
+- In the container, the same script's paste and Enter reach claude 2.1.302: a made-up code of that shape draws "OAuth error: Request failed with status code 400. Press Enter to retry." within seconds, with TERM set, with TERM unset, with TERM=dumb and with CI=true. A wrong or used code would have said so in the runs' last words; they show no error and no "Long-lived authentication token created successfully!" either. So claude neither refused the code nor finished within the minute, or it drew something the run did not keep.
+- Inferred, not yet measured on a runner: GitHub's runners set no TERM, and with TERM unset claude draws only the cells that change, words separated by cursor moves (`\x1b[20G`) in place of the letters already on the screen. A token drawn over earlier text in that mode would reach tools/token_run.py in pieces that tokens.Masker's whole-token shape does not match, so it would be counted as no token and a piece of it could pass the mask. The runs show no sign this happened, since even the success line is missing, but it is a reason to give claude a TERM.
+
+Proposed next step, not made here since any real token run is the owner's: in .github/workflows/token.yml set `TERM: xterm-256color` for the step, and on failure have tools/token_run.py report counts alone (bytes claude printed after the Enter, whether claude was still running, whether the mask holds a tail back), never text, so the owner's next run either works or says which of these it was.
