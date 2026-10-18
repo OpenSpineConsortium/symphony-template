@@ -89,6 +89,29 @@ GITHUB_TOKEN makes starts no workflow, so such a revision waits for the half-hou
 - Tests: tests/test_drive_sync.py (each decision, a round trip against a drive in memory, both
   providers' calls) and tests/test_docx_review.py (watch, renumbering).
 
+## Three fixes after the sign-in thread's review (2026-10-18)
+
+The thread "OneDrive sync fixes" fixed three faults the Control panel sign-in thread's review found:
+
+- One picked item the drive would no longer list, deleted or unshared, failed the whole run, since
+  the listing ran outside the per-file handling. Now each item is listed on its own: one that fails
+  is named in the summary and the others sync. While any item is unlisted the run forgets no file, moves none to a new
+  path and gives no new file the path of a file it kept, since an unseen file may only sit in the
+  item that failed. A run
+  that can list none of the items still fails.
+- The folder gate took any plain name, so drive.json naming scripts or tools would let whoever may
+  edit the drive's folder replace the repository's own check scripts through drive/sync, which
+  merges by itself. Now `tools/drive_sync.py folder` refuses a folder whose top already exists on
+  the default branch, file or folder, unless drive-state says the sync keeps it: state.json now
+  records its folder, and a state from before that counts only where the folder holds files and
+  every one of them is one the sync brought in. To take back a folder the sync kept before, the
+  owner deletes the branch drive-state, as the refusal says. Records of another folder are dropped, so a changed folder starts
+  afresh. The Folders page (site #37) refuses the same before Track.
+- A refused call printed up to 200 bytes of the answer into the Actions log, public on a public
+  repository, and a drive's message can name a file or a person. Now only the answer's error code
+  is printed (the sign-in service's error, Graph's error.code, Google's error.status), and only
+  where it is a short token.
+
 ## What other threads build, and the owner's clicks
 
 The sign-in service (symphony-app/signin, the Control panel sign-in thread's) takes two routes. Both
