@@ -315,6 +315,22 @@ code and the grid's own shell answered "status: command not found": a password s
 gate, which only the key's own line runs, and a key made afresh on the same computer
 replaces the line with `--gate-key`.
 
+With the key made afresh the owner's test from outside printed the chain's state and "HPCW-GRID-GATE
+status ok" (2026-10-17, 23:51 UTC): the gate works from outside the VPN. That state also showed why
+step 2's grid.yml run stayed queued: the chain's STOP file was written at 19:46 UTC, minutes after it
+started, so its job ended with no runner registered, and the chain needs grid.yml's start box (or
+`--start`) again. The owner then asked for a wizard ("that was a fucking nightmare to do") and, of the
+token wizard too, "how could you do this browser side only?". Every step of the gate can be done from
+the grid's own shell, which Open OnDemand opens in a browser: the account's gh there is signed in
+already (the runner mints its registration credentials with it), ssh-keygen is there, and the site's
+profile holds the host key's fingerprint as it was seen from the internet, so the login node can pick
+its own host key with that fingerprint and pin it for GitHub's machine without a scan from outside. So
+hpcworker's `grid_runner.sh --gate-setup` (hpcworker, 2026-10-18) does the whole setup in one command
+there, and nothing runs on the owner's computer; the only call from outside is grid-gate.yml's own run
+from GitHub's machine, which it starts. A first draft that ran on the owner's computer (Python, Git
+Bash, one password sign-in) was set aside before it was opened, since it needed the very tools the
+owner had no easy way to run.
+
 ## The ssh gate, built
 
 Planned on 2026-10-16 (the card of 00:24 UTC chose both directions, the runner first) and built on
