@@ -69,3 +69,14 @@ are"). The work is in OpenSpineConsortium/openspineconsortium.github.io, pull re
   a shared script's buttons listed on every page that loads it, icon buttons named by their
   glyph, and Symphony for Chrome's change notes, written as one sentence, missed; all are fixed
   in #32's second commit.
+
+## Later the same day: the strip
+
+- Site #35 put the Symphony strip back on the control panel, Tokens and cost pages, which had set
+  `strip: no` and so left greg no way back to the other Symphony pages.
+- Site #41 then followed greg's ask that only the top bar show, with a tab's pages dropping down
+  while the pointer is on the tab, as apple.com does: every page carries every section's strip
+  after the header, hidden on a computer with a mouse until a tab is hovered or focused, and laid
+  over the page so a full-screen console under it never moves; a phone or tablet, which cannot
+  hover, keeps the current section's strip in the page. The mode is chosen by a class the header
+  block sets before anything is drawn, so the strip never flashes and vanishes.
