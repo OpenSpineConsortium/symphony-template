@@ -55,7 +55,7 @@ jobs:
       # and only where the App is set up. A copy whose organization sets the
       # variable but whose App is not installed on it carries on with
       # GITHUB_TOKEN, as a copy without the App does, instead of failing.
-      - uses: actions/create-github-app-token@v1
+      - uses: actions/create-github-app-token@v3
         id: app-token
         if: steps.pending.outputs.pending == 'true' && vars.SDLC_APP_ID != ''
         continue-on-error: true
