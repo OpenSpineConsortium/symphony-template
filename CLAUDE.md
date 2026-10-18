@@ -23,7 +23,7 @@ A fact worth keeping is one file under docs/memory/ with one index line in MEMOR
 - Memory (.claude/rules/memory.md): one fact per file, a kebab-case name, a one-line description first, one index line; never a secret.
 - Writing (.claude/rules/writing.md): plain prose that says why, short functions, names that read as English, no emoji, ASCII and LF, no new dependencies; tag a durable fact in conversation as Decision: or Constraint: so a checkpoint keeps it.
 - Research (.claude/rules/research.md): what a session finds out goes under docs/research/, one file or folder per topic that opens by naming its source, with a line in docs/research/README.md, in the same pull request as the work and before its checkpoint; a handoff under docs/checkpoints/ points to it and never carries it.
-- Skills: .claude/skills/claim, .claude/skills/remember and .claude/skills/checkpoint are the three procedures, in the order a piece of work meets them.
+- Skills: .claude/skills/claim, .claude/skills/remember and .claude/skills/checkpoint are the three procedures, in the order a piece of work meets them; .claude/skills/drive-organize (a OneDrive sorted into projects through the Microsoft 365 connector) and .claude/skills/lens-review (several reviewers on one Word document) are run when the owner asks.
 - The block at the end of this file, between the cswap markers, is rewritten by the checkpoint skill and by `cswap checkpoint write`; do not edit it by hand.
 
 ## Checks

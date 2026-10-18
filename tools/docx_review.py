@@ -23,6 +23,7 @@ lands on another after the text moved.
   python3 tools/docx_review.py tasks FOLDER [--gh]        one task per document
   python3 tools/docx_review.py watch FILE.docx [...]      queue new comments (papers.yml)
   python3 tools/docx_review.py apply FILE.docx REVISIONS [--out OUT.docx]
+  python3 tools/docx_review.py panel FILE.docx --lens "Name=REVISIONS" [...] [--out OUT.docx]
   python3 tools/docx_review.py sample OUT.docx            a small paper to try
 
 A paragraph holding anything but plain text runs (a field, a picture, a
@@ -500,6 +501,80 @@ def apply(path, revisions, out=None, author="Claude", now=None):
     write_parts(path, parts, out or path)
 
 
+AUTHOR = re.compile(r"[^\x00-\x1f<>&\"]{1,60}")
+
+
+def panel(path, lenses, out=None, now=None):
+    """Several reviewers' revisions, each under its own author, one after
+    another: each lens is a name and its revisions, written as apply writes
+    them, so the author sees in Word whose every change and comment is. A
+    revision an earlier lens has already changed the paragraph for, or that
+    no longer reads as its old text, or that a paragraph's content refuses,
+    becomes that lens's comment on the paragraph, "Suggests: ...", so no
+    reviewer's view is lost and none overwrites another's. Returns what each
+    lens did."""
+    target = out or path
+    report, source = [], path
+    for author, revisions in lenses:
+        if not AUTHOR.fullmatch(author) or author != author.strip():
+            raise Refused(f"the author name {author[:20]!r} is not one line of up to 60 plain characters")
+        kept, revised, suggested, skipped = sort_lens(source, revisions)
+        apply(source, kept, target, author, now)
+        source = target
+        report.append({"author": author, "revised": revised, "suggested": suggested,
+                       "commented": sum(1 for k in kept if k.get("why")) - suggested,
+                       "skipped": skipped})
+    return report
+
+
+def sort_lens(path, revisions):
+    """One lens's revisions as apply takes them: those that still fit, and
+    the rest as comments, with what could be neither said."""
+    parts = read_parts(path)
+    all_paragraphs = paragraphs(parse(parts[DOCUMENT]))
+    has_comments = COMMENTS in parts
+    kept, seen, suggested, skipped, revised = [], set(), 0, [], 0
+    for revision in revisions:
+        index, text = revision.get("paragraph"), str(revision.get("text", ""))
+        if not isinstance(index, int) or not 0 <= index < len(all_paragraphs) or index in seen:
+            skipped.append(f"paragraph {index}: not in the document, or named twice")
+            continue
+        if any(ord(ch) < 32 and ch != "\t" for ch in text):
+            skipped.append(f"paragraph {index}: the new text holds a line break")
+            continue
+        paragraph = all_paragraphs[index]
+        current = paragraph_text(paragraph)
+        why = str(revision.get("why", ""))
+        try:
+            old_atoms(paragraph, index)
+            fits = current == revision.get("old")
+        except Refused:
+            fits = False
+        comment_only = text in (current, revision.get("old"))
+        if fits and (text != current or why and has_comments):
+            kept.append({**revision, "text": text, "why": why if has_comments else ""})
+            revised += text != current
+        elif not has_comments:
+            skipped.append(f"paragraph {index}: changed since the review sheet or not plain text, and the "
+                           "document has no comments part to suggest it in")
+            continue
+        elif comment_only and why:
+            # A note with no change of its own: a comment holds it, on a
+            # paragraph an earlier lens has changed too.
+            kept.append({"paragraph": index, "old": current, "text": current, "why": why,
+                         "comment": revision.get("comment", "")})
+        elif comment_only:
+            skipped.append(f"paragraph {index}: nothing to change or say")
+            continue
+        else:
+            note = f"Suggests: {text}" + (f" Why: {why}" if why else "")
+            kept.append({"paragraph": index, "old": current, "text": current, "why": note,
+                         "comment": revision.get("comment", "")})
+            suggested += 1
+        seen.add(index)
+    return kept, revised, suggested, skipped
+
+
 class IdSource:
     """Fresh w:id values above every one the document and comments use."""
 
@@ -776,6 +851,10 @@ def main(argv=None):
     write.add_argument("revisions")
     write.add_argument("--out")
     write.add_argument("--author", default="Claude")
+    lensing = sub.add_parser("panel")
+    lensing.add_argument("file")
+    lensing.add_argument("--lens", action="append", required=True, help="Author=revisions.json, once per reviewer")
+    lensing.add_argument("--out")
     sub.add_parser("sample").add_argument("out")
     args = parser.parse_args(argv)
     try:
@@ -794,6 +873,14 @@ def main(argv=None):
             revisions = json.loads(Path(args.revisions).read_text(encoding="utf-8"))
             apply(args.file, revisions, args.out, args.author)
             print(args.out or args.file)
+        elif args.command == "panel":
+            lenses = []
+            for lens in args.lens:
+                author, sep, file = lens.partition("=")
+                if not sep or not author:
+                    raise Refused(f"--lens takes Author=revisions.json, got {lens[:40]!r}")
+                lenses.append((author, json.loads(Path(file).read_text(encoding="utf-8"))))
+            print(json.dumps(panel(args.file, lenses, args.out), indent=1))
         elif args.command == "sample":
             sample(args.out)
             print(args.out)
