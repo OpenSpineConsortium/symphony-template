@@ -7,15 +7,24 @@ name: Agents
 #
 # Running: an agent whose registry entry says "runs": "pull_request" runs
 # on every pull request opened, reopened or marked ready, drafts and forks
-# left out (a fork's run sees no secret); any agent runs by hand with Run
-# workflow, naming it and the pull request or issue it works on. The run
-# checks out the default branch, so the agent's own file and the registry
-# are the merged ones and a pull request cannot rewrite the agent that
-# reviews it, and the session runs as the agent (`claude --agent NAME`)
-# with only the tools the agent lists. Which Claude token it runs on is
-# .github/symphony/accounts.json under the agent's name, the Tokens tab's
-# file, chosen by tools/pool.py as for a worker in Actions; with no line
-# for the agent it runs on CLAUDE_CODE_OAUTH_TOKEN. Each run records what
+# left out; any agent but a developer runs by hand with Run workflow,
+# naming it and the pull request or issue it works on. The trigger is
+# pull_request_target, so this file, the registry and the agent's own file
+# are the default branch's: a pull request cannot rewrite the workflow or
+# the agent that reviews it. The session runs as the agent (`claude
+# --agent NAME`) with only the tools the agent lists, and on this job's
+# GITHUB_TOKEN, which may read the code and comment and review but not
+# push, merge or mint the Claude App's own token (no id-token), so an
+# agent a diff talks into something can still only comment. A developer
+# writes code, so it runs as a worker in Actions instead (its workers
+# list), under workers.yml's claim protocol. The tester runs a pull
+# request's code, as the person who opened it from this repository's own
+# branches could already run any code with its secrets by pushing a
+# workflow; a fork's pull request starts nothing here. Which Claude token
+# a run takes is .github/symphony/accounts.json under the agent's name, the
+# Tokens tab's file, chosen by tools/pool.py as for a worker in Actions:
+# with no line for the agent, the file's default, else
+# CLAUDE_CODE_OAUTH_TOKEN. Each run records what
 # it spent for the field metrics, as every Claude run here does. The
 # agents the template brings all say "manual", so nothing here spends a
 # token until someone switches an agent on.
@@ -33,7 +42,7 @@ name: Agents
 # worker in Actions there.
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
@@ -111,7 +120,7 @@ jobs:
     if: >-
       vars.CLAUDE_CROWD != 'true'
       && ((github.event_name == 'workflow_dispatch' && inputs.import == '' && inputs.agent != '')
-          || (github.event_name == 'pull_request' && !github.event.pull_request.draft
+          || (github.event_name == 'pull_request_target' && !github.event.pull_request.draft
               && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -136,6 +145,11 @@ jobs:
           esac
           if [ -n "${ONLY:-}" ]; then
             python3 tools/agents.py allowed-tools "$ONLY" > /dev/null
+            purpose=$(python3 -c 'import json, sys; print(json.load(open(".github/symphony/agents.json"))["agents"][sys.argv[1]]["purpose"])' "$ONLY")
+            if [ "$purpose" = develop ]; then
+              echo "$ONLY writes code, so it runs as a worker in Actions under the claim protocol: list a worker under its workers in .github/symphony/agents.json (docs/agents/AGENTS.md)"
+              exit 1
+            fi
             agents=$(python3 -c 'import json, sys; print(json.dumps([sys.argv[1]]))' "$ONLY")
           else
             agents=$(python3 tools/agents.py runs-on pull_request)
@@ -157,11 +171,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
       issues: write
       actions: read
-      id-token: write
     env:
       HAVE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
       AGENT: ${{ matrix.agent }}
@@ -178,7 +191,11 @@ jobs:
       - name: Read the agent's tools
         id: agent
         if: env.HAVE_TOKEN == 'true'
-        run: echo "tools=$(python3 tools/agents.py allowed-tools "$AGENT")" >> "$GITHUB_OUTPUT"
+        run: |
+          set -eu
+          tools=$(python3 tools/agents.py allowed-tools "$AGENT")
+          if [ -z "$tools" ]; then echo "$AGENT lists no tools; a run in Actions allows only what an agent lists"; exit 1; fi
+          echo "tools=$tools" >> "$GITHUB_OUTPUT"
       - name: Choose the Claude account the agent runs on
         id: account
         if: env.HAVE_TOKEN == 'true'
@@ -246,13 +263,17 @@ jobs:
             (steps.secret.outputs.slot == '8' && secrets.SYMPHONY_CLAUDE_8) ||
             secrets.CLAUDE_CODE_OAUTH_TOKEN
             }}
+          # This job's own token, read-only for code, in place of the Claude
+          # App's, which the action would mint with id-token and which may push.
+          github_token: ${{ github.token }}
+          allowed_bots: "claude,github-actions"
           claude_args: |
             --agent ${{ matrix.agent }}
             --max-turns 60
             ${{ steps.account.outputs.model != '' && format('--model {0}', steps.account.outputs.model) || '' }}
             ${{ steps.account.outputs.effort != '' && format('--effort {0}', steps.account.outputs.effort) || '' }}
             ${{ steps.account.outputs.fallback != '' && format('--fallback-model {0}', steps.account.outputs.fallback) || '' }}
-            ${{ steps.agent.outputs.tools != '' && format('--allowedTools "{0}"', steps.agent.outputs.tools) || '' }}
+            --allowedTools "${{ steps.agent.outputs.tools }}"
           prompt: |
             You are the agent ${{ matrix.agent }} on the repository ${{ github.repository }}, run by its Agents workflow. Work on #${{ env.TARGET }}, which is a pull request when `gh pr view ${{ env.TARGET }}` answers and an issue otherwise, exactly as your instructions say, and nothing else.
       - name: Record what the run spent, for the field metrics

@@ -75,16 +75,28 @@ class ReadingAnAgent(unittest.TestCase):
         text = AGENT.replace("tools: Read, Edit, Bash(git:*)", "tools:\n  - Read\n  - Grep")
         self.assertEqual(agents.read_agent(text)["tools"], ["Read", "Grep"])
 
-    def test_an_import_must_list_its_tools(self):
+    def test_every_agent_must_list_its_tools(self):
         text = AGENT.replace("tools: Read, Edit, Bash(git:*)\n", "")
-        self.assertIsNone(agents.read_agent(text)["tools"])
-        with self.assertRaisesRegex(agents.AgentError, "must list its tools"):
-            agents.read_agent(text, imported=True)
+        for imported in (False, True):
+            with self.subTest(imported=imported), self.assertRaisesRegex(agents.AgentError, "tools must list"):
+                agents.read_agent(text, imported=imported)
 
-    def test_an_import_may_not_carry_hooks_or_bypass_permissions(self):
-        for extra in ("hooks:\n  PreToolUse: x\n", "mcpServers:\n  - x\n", "permissionMode: bypassPermissions\n"):
+    def test_an_import_carries_only_the_plain_keys(self):
+        for extra in ("hooks:\n  PreToolUse: x\n", "mcpServers:\n  - x\n", "permissionMode: bypassPermissions\n",
+                      "permissionMode: bypassPermissions # x\n", "permissionMode: >-\n  bypassPermissions\n",
+                      "skills: x\n"):
             with self.subTest(extra=extra), self.assertRaises(agents.AgentError):
                 agents.read_agent(AGENT.replace("model: sonnet\n", "model: sonnet\n" + extra), imported=True)
+
+    def test_spellings_yaml_reads_as_other_keys_are_refused(self):
+        for extra in ('"hooks":\n  x: y\n', "'mcpServers': {}\n", "<<: {hooks: x}\n"):
+            with self.subTest(extra=extra), self.assertRaisesRegex(agents.AgentError, "plain key"):
+                agents.read_agent(AGENT.replace("model: sonnet\n", "model: sonnet\n" + extra))
+
+    def test_an_indented_rule_does_not_end_the_front_matter(self):
+        text = AGENT.replace("model: sonnet\n", "model: sonnet\ncolor: |\n  ---\npermissionMode: bypassPermissions\n")
+        with self.assertRaises(agents.AgentError):
+            agents.read_agent(text, imported=True)
 
     def test_a_quote_in_a_tool_is_refused(self):
         with self.assertRaisesRegex(agents.AgentError, "not a tool"):
@@ -128,6 +140,15 @@ class Importing(Repository):
         (self.root / ".github/symphony/workers/lint-fixer.json").write_text("{}")
         with self.assertRaisesRegex(agents.AgentError, "also a worker"):
             agents.import_agent(self.root, "https://example.com/a.md", opener=opener_for(AGENT))
+
+    def test_a_dotted_path_is_refused(self):
+        with self.assertRaisesRegex(agents.AgentError, r"\.\."):
+            agents.import_agent(self.root, "o/r/../../evil/repo/HEAD/a.md", opener=opener_for(AGENT))
+
+    def test_an_agent_in_a_subfolder_fails_the_check(self):
+        (self.root / ".claude/agents/x").mkdir()
+        (self.root / ".claude/agents/x/evil.md").write_text(AGENT)
+        self.assertTrue(any("directly under" in p for p in agents.check(self.root)))
 
     def test_plain_http_is_refused(self):
         with self.assertRaisesRegex(agents.AgentError, "https"):

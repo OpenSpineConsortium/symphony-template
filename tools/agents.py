@@ -63,10 +63,14 @@ MODEL = re.compile(r"^(inherit|fable|opus|sonnet|haiku|claude-[a-z0-9.-]{1,60}(\
 TOOL = re.compile(r"^(mcp__[A-Za-z0-9_-]+|[A-Z][A-Za-z0-9_]*(\([^()\"'\\\n]{1,200}\))?)$")
 GITHUB_SOURCE = re.compile(r"^([A-Za-z0-9-]{1,39})/([A-Za-z0-9._-]{1,100})/([^@\s]+\.md)(?:@([A-Za-z0-9._/-]{1,200}))?$")
 MAX_BYTES = 64 * 1024
+KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# The only front matter an imported agent may carry: anything else,
+# hooks, MCP servers and permission modes among them, could run what its
+# text does not show, and an allowlist does not miss a spelling YAML reads
+# that a blocklist would.
+IMPORTED_KEYS = ("name", "description", "tools", "model", "color")
+COLOR = re.compile(r"^[a-z]{1,20}$")
 FETCH_TIMEOUT = 30
-# Front matter an imported agent may not carry: each runs or reaches
-# something that the agent's own text does not show its reviewer.
-FORBIDDEN_IMPORTED = ("hooks", "mcpServers", "mcp_servers")
 # Typography that imported files often carry and the ASCII rule refuses
 # (.claude/rules/writing.md); anything else outside ASCII is refused.
 PLAIN = {"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2013": "-", "\u2014": " - ",
@@ -80,12 +84,15 @@ class AgentError(Exception):
 # Reading an agent's file.
 
 def split_front_matter(text):
-    """The front matter's lines and the body; an agent's file opens on ---."""
+    """The front matter's lines and the body; an agent's file opens on ---.
+    Only a line that is exactly --- opens or closes it, as YAML front
+    matter is read: an indented --- inside a value must not end it here
+    while Claude Code reads on past it."""
     lines = text.split("\n")
-    if not lines or lines[0].strip() != "---":
+    if not lines or lines[0].rstrip() != "---":
         raise AgentError("the file must open with a front matter between two lines of ---")
     for index in range(1, len(lines)):
-        if lines[index].strip() == "---":
+        if lines[index].rstrip() == "---":
             return lines[1:index], "\n".join(lines[index + 1:])
     raise AgentError("the front matter has no closing ---")
 
@@ -118,6 +125,8 @@ def parse_front_matter(lines):
             raise AgentError(f"a front matter line is not key: value: {line.strip()}")
         key, value = line.split(":", 1)
         key = key.strip()
+        if not KEY.match(key):
+            raise AgentError(f"{key!r} is not a plain key; quoted keys and merge keys are not read here")
         if key in fields:
             raise AgentError(f"{key} is given twice")
         value = value.strip()
@@ -151,17 +160,16 @@ def read_agent(text, imported=False):
     for tool in tools or []:
         if not TOOL.match(tool):
             problems.append(f"{tool!r} is not a tool's name")
-    if imported and not tools:
-        problems.append("an imported agent must list its tools, so its reviewer sees what it may do")
+    if not tools:
+        problems.append("tools must list what the agent may use, so its reviewer sees it and a run in Actions allows nothing else")
     model = fields.get("model", "inherit")
     if not isinstance(model, str) or not MODEL.match(model):
         problems.append("model must be inherit, fable, opus, sonnet, haiku or a claude- model id")
     if imported:
-        for key in FORBIDDEN_IMPORTED:
-            if key in fields:
-                problems.append(f"an imported agent may not carry {key}: it runs what its text does not show")
-        if fields.get("permissionMode") == "bypassPermissions":
-            problems.append("an imported agent may not bypass permissions")
+        for key in sorted(set(fields) - set(IMPORTED_KEYS)):
+            problems.append(f"an imported agent may not carry {key}; it may carry only " + ", ".join(IMPORTED_KEYS))
+        if "color" in fields and not (isinstance(fields["color"], str) and COLOR.match(fields["color"])):
+            problems.append("color must be a plain colour name")
     if not body.strip():
         problems.append("the body, the agent's instructions, is empty")
     if problems:
@@ -223,6 +231,8 @@ def entry_problems(name, entry, workers):
         problems.append("purpose must be one of " + ", ".join(PURPOSES))
     if entry.get("runs", "manual") not in RUNS:
         problems.append("runs must be one of " + ", ".join(RUNS))
+    elif entry.get("runs") == "pull_request" and entry.get("purpose") == "develop":
+        problems.append("a developer writes code, so it runs as a worker in Actions (workers), never on pull requests")
     source = entry.get("source")
     if not isinstance(source, str) or not source:
         problems.append(f"source must be {BUILTIN}, {LOCAL} or where it was imported from")
@@ -251,6 +261,10 @@ def check(root):
     workers = worker_names(root)
     folder = root / AGENTS_DIR
     files = {path.stem: path for path in folder.glob("*.md")} if folder.is_dir() else {}
+    for path in sorted(folder.rglob("*.md")) if folder.is_dir() else []:
+        if path.parent != folder:
+            problems.append(f"{path.relative_to(root).as_posix()}: agents live directly under {AGENTS_DIR}, "
+                            "where the check reads them; Claude Code would load this one unchecked")
     claimed = {}
     for name, entry in data["agents"].items():
         for problem in entry_problems(name, entry, workers):
@@ -296,8 +310,23 @@ def source_url(source):
     match = GITHUB_SOURCE.match(source)
     if match and not Path(source).exists():
         owner, repo, path, ref = match.groups()
+        if ".." in path.split("/") or ".." in (ref or "").split("/"):
+            raise AgentError(f"{source}: a path or ref with .. is refused, so the source recorded is the one read")
         return f"https://raw.githubusercontent.com/{owner}/{repo}/{ref or 'HEAD'}/{path}"
     return None
+
+
+class HttpsOnlyRedirects(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only to https, so the https rule holds after one."""
+
+    def redirect_request(self, request, fp, code, message, headers, new_url):
+        if not new_url.startswith("https://"):
+            raise AgentError(f"{request.full_url} redirects to {new_url}, which is not https")
+        return super().redirect_request(request, fp, code, message, headers, new_url)
+
+
+def https_only_opener():
+    return urllib.request.build_opener(HttpsOnlyRedirects)
 
 
 def fetch(source, opener=None):
@@ -311,7 +340,7 @@ def fetch(source, opener=None):
     else:
         request = urllib.request.Request(url, headers={"User-Agent": "symphony-agents"})
         try:
-            with (opener or urllib.request.urlopen)(request, timeout=FETCH_TIMEOUT) as response:
+            with (opener or https_only_opener().open)(request, timeout=FETCH_TIMEOUT) as response:
                 data = response.read(MAX_BYTES + 1)
         except urllib.error.HTTPError as error:
             raise AgentError(f"{url}: GitHub answered {error.code}; a private repository's file is "
