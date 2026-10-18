@@ -11,7 +11,14 @@
   "postCreateCommand": "bash scripts/codespace.sh install",
   "customizations": {
     "codespaces": {
-      "openFiles": ["docs/setup/codespace.md"]
+      "openFiles": [
+        "docs/setup/codespace.md"
+      ]
+    },
+    "vscode": {
+      "settings": {
+        "task.allowAutomaticTasks": "on"
+      }
     }
   }
 }
