@@ -19,14 +19,16 @@ Codespace, and scripts/codespace.sh is what runs in it.
    github.com/login/device in a new tab; paste the code there and press
    **Authorize**. The Codespace's own token cannot change settings or
    secrets, so this sign-in is yours, and it stays in this Codespace only.
-4. Answer Enter to apply the repository's settings (the ruleset,
-   auto-merge, the labels, secret scanning).
-5. Answer Enter to store tokens. The wizard asks for a slot, a label and
-   whether the same token is also `main`; then `claude setup-token` opens
-   claude.ai's sign-in in a new tab. Sign in as the account the slot is for
-   and press **Authorize**; where claude.ai shows a code instead, paste it
-   into the terminal. The token goes straight from claude to GitHub, sealed,
-   and is never on the screen.
+4. The settings come next by themselves (the ruleset, auto-merge, the
+   labels, secret scanning), on the repository the Codespace is on, which
+   GitHub names in GITHUB_REPOSITORY.
+5. Then the token wizard: it asks for a slot, a label and whether the same
+   token is also `main`; then `claude setup-token` opens claude.ai's
+   sign-in in a new tab. Sign in as the account the slot is for and press
+   **Authorize**; where claude.ai shows a code instead, paste it into the
+   terminal. The token goes straight from claude to GitHub, sealed, and is
+   never on the screen. A repository of an organization keeps the tokens as
+   the organization's secrets, seen by this repository.
 6. When you are done, delete the Codespace at https://github.com/codespaces
    (the three dots beside it, then **Delete**), which also drops the GitHub
    sign-in it held.

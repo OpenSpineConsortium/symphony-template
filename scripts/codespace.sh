@@ -27,6 +27,10 @@ DONE_MARK="$HOME/.symphony-setup-started"
 SCOPES="repo,workflow,admin:org"
 
 install() {
+  # a Codespace's folder may belong to another user than the one its
+  # terminals run as, and git then refuses to read it ("dubious ownership"),
+  # which hid the repository from gh and the wizard on the owner's first run
+  git config --global --add safe.directory "$ROOT"
   if ! command -v claude >/dev/null 2>&1; then
     npm install -g @anthropic-ai/claude-code
   fi
@@ -54,22 +58,48 @@ github_sign_in() {
   env -u GITHUB_TOKEN -u GH_TOKEN gh auth login --web --git-protocol https --scopes "$SCOPES"
 }
 
-ask_yes() {
-  local answer
-  read -r -p "$1 [Y/n] " answer
-  [[ -z "$answer" || "$answer" =~ ^[Yy] ]]
+# The repository this Codespace is on: GitHub names it in GITHUB_REPOSITORY,
+# so nothing depends on the clone's remote, and the clone's origin otherwise.
+repository() {
+  if [[ "${GITHUB_REPOSITORY:-}" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$ ]]; then
+    echo "$GITHUB_REPOSITORY"
+    return
+  fi
+  git -C "$ROOT" remote get-url origin 2>/dev/null | sed -E -n 's#^.*github\.com[:/]([^/]+/[^/]+)/?$#\1#p' | sed 's/\.git$//'
 }
+
+# Where the tokens go, as tokens.py takes it: an organization's secrets seen
+# by this repository, or a personal account's repository's own.
+token_place() {
+  local repo=$1 kind
+  kind=$(as_you gh api "repos/$repo" --jq .owner.type)
+  if [ "$kind" = "Organization" ]; then
+    echo "--org ${repo%%/*} --repos ${repo#*/}"
+  else
+    echo "--repo $repo"
+  fi
+}
+
+as_you() { env -u GITHUB_TOKEN -u GH_TOKEN "$@"; }
 
 setup() {
   cd "$ROOT"
-  echo "Symphony setup in this Codespace: GitHub's settings for the repository, then its Claude tokens."
+  git config --global --get-all safe.directory 2>/dev/null | grep -qx "$ROOT" || git config --global --add safe.directory "$ROOT"
+  local repo place
+  repo=$(repository)
+  if [ -z "$repo" ]; then
+    echo "This Codespace does not say which repository it is on; run: bash scripts/codespace.sh OWNER/NAME" >&2
+    exit 1
+  fi
+  echo "Symphony setup for $repo: its GitHub settings, then its Claude tokens. Ctrl-C stops it; run 'bash scripts/codespace.sh' to start again."
   github_sign_in
-  if ask_yes "Apply the repository's settings now (scripts/setup-repo.sh: the ruleset, auto-merge, the labels, scanning)?"; then
-    env -u GITHUB_TOKEN -u GH_TOKEN bash scripts/setup-repo.sh || echo "setup-repo.sh stopped; its last line says why. The tokens come next."
-  fi
-  if ask_yes "Store your Claude accounts' tokens now (scripts/tokens.py: claude setup-token, one account at a time)?"; then
-    env -u GITHUB_TOKEN -u GH_TOKEN python3 scripts/tokens.py
-  fi
+  echo
+  echo "== 1 of 2: the repository's settings (the ruleset, auto-merge, the labels, scanning)"
+  as_you bash scripts/setup-repo.sh "$repo" || echo "The settings stopped at the line above; the tokens come next."
+  echo
+  echo "== 2 of 2: Claude tokens, one account at a time"
+  # shellcheck disable=SC2046 # the place is two or four words, split on purpose
+  as_you python3 scripts/tokens.py $(token_place "$repo")
   echo "Done. Run 'bash scripts/codespace.sh' to do it again, and delete this Codespace when you have finished:"
   echo "https://github.com/codespaces"
 }
@@ -77,6 +107,7 @@ setup() {
 case "${1:-}" in
   install) install ;;
   "") setup ;;
+  */*) GITHUB_REPOSITORY=$1 setup ;;
   -h|--help) sed -n '2,22p' "${BASH_SOURCE[0]}" ;;
-  *) echo "usage: bash scripts/codespace.sh [install]" >&2; exit 2 ;;
+  *) echo "usage: bash scripts/codespace.sh [install | OWNER/NAME]" >&2; exit 2 ;;
 esac
