@@ -392,6 +392,35 @@ environment secret, with the password nowhere.
   PATH when sbatch is missing), and whether every login node behind grid.wayne.edu shows the same
   host key; hpcworker's docs/OPEN_QUESTIONS.md holds each with its first test.
 
+## The gate's setup as a button, 2026-10-18
+
+In the thread "Grid ssh gate" the owner asked for the setup to be a button on the SymphonyBoard site,
+in Beethoven, or both, and chose a Beethoven button on a card. The reasons it lives in Beethoven and
+not on the site: the key must be made and written into the grid account's authorized_keys from inside
+that account, which only a shell on the grid can do, and Beethoven already types lines into the
+portal's shell for the student; the site holds no grid sign-in and should not.
+
+- hpcworker#17 (merged) publishes two lines in its contract export, cli.json's grid-gate-setup and
+  grid-gate-off: a cd into the lab lead's own hpcworker clone in their home, a pull with
+  GIT_TERMINAL_PROMPT=0 and ssh in batch mode so it never stops to ask, then
+  `tools/grid_runner.sh --gate-setup` or `--gate-off` for one repository and the site. Its CLAUDE.md
+  names the two exceptions this makes to its grid etiquette: git, ssh-keygen and a few gh calls on the
+  login node, for one press by a lab lead.
+- beethoven-extension#18 (22.0.0) adds *Connect GitHub Actions* and *Remove* under Settings' folded
+  *For your lab lead*: the repository (OWNER/NAME) and the clone's folder are checked against the same
+  patterns the contract's values carry, the press runs only for an approved account and one at a time,
+  waits at most 240 seconds (under the service worker's five-minute event and the portal shell's idle
+  limit), and shows one sentence from the tool's own output with a link to grid-gate.yml. The tool's
+  check that a person pressed it holds, since the portal's shell is a terminal with no agent's marker.
+  Beethoven never sees the key or a GitHub sign-in and keeps nothing of it.
+- The privacy statement went to version 17 alone and the agreement stayed at 15, the owner's choice
+  ("Statement only"): nothing is typed unless a lab lead presses, so students are not asked to accept
+  again.
+- A merge to beethoven-extension's main is a Chrome Web Store submission now that the organization's
+  CWS_ON_PUSH is publish, so #18 merges only on the owner's word.
+- Not yet measured: the press against the real portal shell, and how long the setup takes there; the
+  selftest's mock portal and the unit tests hold the lines and the sentences.
+
 ## How the fixes were proven, and how to prove the next
 
 The review's fixes were each proven by a mutation: one fix undone in a copy of the checkout, the
