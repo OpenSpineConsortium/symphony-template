@@ -32,3 +32,10 @@ repository (.devcontainer/devcontainer.json, scripts/codespace.sh, docs/setup/co
 2026-10-18): the Codespace's GITHUB_TOKEN cannot set settings or secrets, so gh
 signs in again as the person with a one-time code, then setup-repo.sh and the
 wizard run; the sign-in's return to claude in a browser Codespace is not yet measured.
+The Tokens page's Add a Claude account mints on an Actions runner instead
+(.github/workflows/token.yml, tools/token_run.py, 2026-10-18), since a
+Codespace took minutes to start: the run posts claude's sign-in link on an
+issue the page opened, takes the code claude.ai shows from the person's
+own comment, and posts the token only as a sealed box for the secrets
+public key the page gave (tools/sealbox.py, standard library, held to
+libsodium by tests/test_sealbox.py), which the page stores as the slot.

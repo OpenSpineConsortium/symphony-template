@@ -296,10 +296,41 @@ The control panel's Tokens page, https://openspineconsortium.com/symphony/contro
 shows each slot's windows, resets and per-model limits from the branch
 pool, whether it is held, and which slot auto would take now. Its "Read
 every slot now" starts the workflow Pool, and its assignments open a pull
-request that sets .github/symphony/accounts.json. Its "Add or renew a
-slot" takes a token printed anywhere, seals it in the browser for GitHub
-and stores it as the slot's secret, and links a Codespace that runs this
-wizard for the repository (docs/setup/codespace.md).
+request that sets .github/symphony/accounts.json. Its "Paste a token
+instead" takes a token printed anywhere, seals it in the browser for
+GitHub and stores it as the slot's secret.
+
+## Add a Claude account, from the page
+
+The Tokens page's Add a Claude account mints a token on a GitHub Actions
+runner, which starts in seconds where a Codespace took minutes
+(.github/workflows/token.yml, tools/token_run.py):
+
+1. The page opens an issue on the repository and starts the workflow
+   Token with the issue's number and the secrets public key GitHub gives
+   for where the slots live, the organization's or the repository's.
+2. The run installs Claude Code and runs `claude setup-token` behind a
+   pseudo-terminal. With no browser on the runner, claude prints its
+   sign-in link and waits for a code; the run posts the link on the issue.
+3. The page shows the link as a button. You sign in to claude.ai as the
+   account for the slot, press **Authorize**, and paste the code claude.ai
+   shows into the page's box; the page posts it on the issue as you, and
+   the run deletes that comment once read. The code mints nothing on its
+   own: claude's sign-in is PKCE, so only the claude that printed the link
+   can exchange it, and only once, and the run takes a code only from the
+   person who started it.
+4. The run takes the token out of what claude prints with the wizard's own
+   mask, seals it for the page's key (tools/sealbox.py, a libsodium sealed
+   box in the standard library) and posts only the sealed value. The page
+   stores it as the next free SYMPHONY_CLAUDE_<slot>, and as
+   CLAUDE_CODE_OAUTH_TOKEN too when that secret is missing, adds the slot
+   to SYMPHONY_CLAUDE_ACCOUNTS and closes the issue.
+
+GitHub opens a sealed box made for its key and nobody else can, so the
+token is on no page, in no comment and in no log. The run holds no secret
+and GITHUB_TOKEN only comments; starting it needs write access here and,
+for the page, SymphonyBoard's Actions permission, read and write. In crowd
+mode it never runs.
 
 ## Renewing and removing
 
