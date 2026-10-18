@@ -65,10 +65,10 @@ itself, since each only reads what it already shows:
     show queue        or show blockers, show overlaps, show given,
                       show dependencies: a board section
     tab NAME          the page opens a tab: command, board, tasks,
-                      pulls, runs, workers, ask, tokens, share, repos
-                      or about
+                      dependencies, pulls, runs, workers, agents,
+                      tokens, leaders, share or about
 
-The rest change something, or fill a form, so the page shows each as a
+The rest change something, or open a dialog, so the page shows each as a
 button that says what it does, and nothing happens until the person
 presses it; the press runs the panel's own button for the same thing, as
 the person signed in:
@@ -81,11 +81,12 @@ the person signed in:
                       Merge, which the person confirms there; the page
                       merges nothing until it is ready and every check
                       has passed
-    task TITLE        fill Queue a task with the title; the person writes
-                      the goal and the acceptance and presses Queue
-    ask #N PROMPT     or ask PROMPT: fill Ask Claude to do it with a
-                      prompt for @claude on issue N, or on a new issue,
-                      which runs with the tools that write once pressed
+    task TITLE        open + Add task with the title; the person writes
+                      the goal and presses Queue for the workers
+    ask #N PROMPT     or ask PROMPT: open issue N's settings with a
+                      prompt for @claude, or + Add task with it for a new
+                      issue, which runs with the tools that write once
+                      the person presses Ask
 
 Propose a change this way only when the person asked for it or it is the
 plain next step, one line per change, and say in the answer why. Each
