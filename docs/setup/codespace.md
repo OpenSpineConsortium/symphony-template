@@ -37,22 +37,33 @@ Codespace, and scripts/codespace.sh is what runs in it.
 ## One button: the Tokens page
 
 The control panel's Tokens page has "Add with one press", which does the
-above for one account and one slot with no terminal to type in:
+token part of the above for one account, with nothing to type:
 
-1. The page saves three of your Codespaces secrets, seen by this repository
-   alone: SYMPHONY_GITHUB_TOKEN (the page's own GitHub sign-in, so the
-   Codespace needs no GitHub sign-in of its own), SYMPHONY_SLOT and
-   SYMPHONY_LABEL.
-2. It creates a Codespace on the repository and opens it in a new tab.
-3. The setup task sees the three and runs only `scripts/tokens.py add` for
-   that slot: claude.ai's sign-in opens in another tab, and you press
-   **Authorize** as the account the slot is for.
-4. The page watches the slot's secret; once GitHub lists it as updated, it
-   deletes the three Codespaces secrets and says so, and the Codespace can
-   be deleted.
+1. The page saves one of your Codespaces secrets, SYMPHONY_GITHUB_HANDOVER,
+   which only your own Codespaces on this repository see: the page's own
+   GitHub sign-in, sealed in the browser, so the Codespace needs no GitHub
+   code of its own.
+2. It creates a Codespace on the repository with
+   .devcontainer/token/devcontainer.json, which sets SYMPHONY_SETUP=token,
+   and opens it in a new tab.
+3. The setup task runs `scripts/tokens.py add` for the next free slot with
+   that sign-in: claude.ai's sign-in opens in another tab, and you press
+   **Authorize** as the account for the slot. The Claude token goes from
+   claude to GitHub through gh and is never shown.
+4. The page watches the organization's slots; once a new one appears it says
+   so and deletes the Codespaces secret and the Codespace. A label, or
+   renewing a set slot, stays with "Seal and save the slot" or the full
+   setup.
 
-It needs the SymphonyBoard App's user permission Codespaces user secrets
-and its repository permission Codespaces, both read and write.
+It needs the SymphonyBoard App's account permission Codespaces user secrets
+and its repository permission Codespaces, both read and write. Without the
+first, the Codespace asks for a one-time GitHub code instead (paste it on
+github.com/login/device and press **Authorize**); without the second, the
+page opens GitHub's own Codespace page for the repository, where one more
+press makes it. A sign-in made with Sign in with GitHub lasts eight hours
+whether or not its deletion succeeds; a pasted token lasts as long as you
+made it for, and a secret left behind is deleted at
+https://github.com/settings/codespaces.
 
 ## What it costs and where it runs
 
