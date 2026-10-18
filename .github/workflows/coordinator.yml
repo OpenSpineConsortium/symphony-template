@@ -133,11 +133,17 @@ jobs:
             python3 tools/workers.py --dir "$REGISTRY" describe
             echo "WORKERS_END"
           } >> "$GITHUB_OUTPUT"
-      - name: Keep a copy of the usage recorder, which the run cannot move
+      - name: Keep a copy of the usage recorder, which the run cannot move, and read the main token's settings
+        id: main
         if: steps.due.outputs.phase == 'plan'
+        env:
+          SETTINGS: ${{ vars.SYMPHONY_CLAUDE_SETTINGS }}
         run: |
           cp tools/usage.py "$RUNNER_TEMP/usage.py"
           cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
+          # the model, effort and fallback the Tokens tab's main tile sets (tools/pool.py);
+          # a variable that does not hold together leaves Claude's own defaults
+          python3 tools/pool.py settings --slot main --settings "$SETTINGS" >> "$GITHUB_OUTPUT" || true
       - uses: anthropics/claude-code-action@v1
         id: plan
         if: steps.due.outputs.phase == 'plan'
@@ -146,6 +152,9 @@ jobs:
           allowed_bots: "github-actions,claude"
           claude_args: |
             --max-turns 40
+            ${{ steps.main.outputs.model != '' && format('--model {0}', steps.main.outputs.model) || '' }}
+            ${{ steps.main.outputs.effort != '' && format('--effort {0}', steps.main.outputs.effort) || '' }}
+            ${{ steps.main.outputs.fallback != '' && format('--fallback-model {0}', steps.main.outputs.fallback) || '' }}
             --allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(git log:*)"
             --json-schema '${{ steps.due.outputs.schema }}'
           prompt: |
@@ -225,11 +234,17 @@ jobs:
           answer=$(python3 tools/team.py route --event "$EVENT" --issue "$ISSUE" --label "$LABEL")
           echo "$answer"
           echo "phase=${answer%% *}" >> "$GITHUB_OUTPUT"
-      - name: Keep a copy of the usage recorder, which the run cannot move
+      - name: Keep a copy of the usage recorder, which the run cannot move, and read the main token's settings
+        id: main
         if: steps.due.outputs.phase == 'unblock'
+        env:
+          SETTINGS: ${{ vars.SYMPHONY_CLAUDE_SETTINGS }}
         run: |
           cp tools/usage.py "$RUNNER_TEMP/usage.py"
           cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
+          # the model, effort and fallback the Tokens tab's main tile sets (tools/pool.py);
+          # a variable that does not hold together leaves Claude's own defaults
+          python3 tools/pool.py settings --slot main --settings "$SETTINGS" >> "$GITHUB_OUTPUT" || true
       - uses: anthropics/claude-code-action@v1
         id: settle
         if: steps.due.outputs.phase == 'unblock'
@@ -238,6 +253,9 @@ jobs:
           allowed_bots: "github-actions,claude"
           claude_args: |
             --max-turns 40
+            ${{ steps.main.outputs.model != '' && format('--model {0}', steps.main.outputs.model) || '' }}
+            ${{ steps.main.outputs.effort != '' && format('--effort {0}', steps.main.outputs.effort) || '' }}
+            ${{ steps.main.outputs.fallback != '' && format('--fallback-model {0}', steps.main.outputs.fallback) || '' }}
             --allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr view:*),Bash(git fetch:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git branch:*)"
           prompt: |
             You are the coordinator on this repository, and the worker that holds task #${{ env.TASK }} has labelled it blocked: it needs something only you or a peer can settle. Read the task and what has been said on it (gh issue view ${{ env.TASK }} --comments), then its epic, named on the task's "Epic: #N" line, with its plan and comments (gh issue view N --comments), CLAUDE.md, docs/agents/WORKERS.md and the registry of workers under .github/symphony/workers/. Look at the code and at the workers' branches where they bear on it (git fetch origin, then the claude/ branches of the epic's tasks).
@@ -327,11 +345,17 @@ jobs:
           answer=$(python3 tools/team.py route --event "$EVENT" --issue "$ISSUE" --label "$LABEL")
           echo "$answer"
           echo "phase=${answer%% *}" >> "$GITHUB_OUTPUT"
-      - name: Keep a copy of the usage recorder, which the run cannot move
+      - name: Keep a copy of the usage recorder, which the run cannot move, and read the main token's settings
+        id: main
         if: steps.due.outputs.phase == 'integrate'
+        env:
+          SETTINGS: ${{ vars.SYMPHONY_CLAUDE_SETTINGS }}
         run: |
           cp tools/usage.py "$RUNNER_TEMP/usage.py"
           cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
+          # the model, effort and fallback the Tokens tab's main tile sets (tools/pool.py);
+          # a variable that does not hold together leaves Claude's own defaults
+          python3 tools/pool.py settings --slot main --settings "$SETTINGS" >> "$GITHUB_OUTPUT" || true
       - uses: anthropics/claude-code-action@v1
         id: integrate
         if: steps.due.outputs.phase == 'integrate'
@@ -340,6 +364,9 @@ jobs:
           allowed_bots: "github-actions,claude"
           claude_args: |
             --max-turns 60
+            ${{ steps.main.outputs.model != '' && format('--model {0}', steps.main.outputs.model) || '' }}
+            ${{ steps.main.outputs.effort != '' && format('--effort {0}', steps.main.outputs.effort) || '' }}
+            ${{ steps.main.outputs.fallback != '' && format('--fallback-model {0}', steps.main.outputs.fallback) || '' }}
             --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
           prompt: |
             You are the coordinator, and every task of epic #${{ env.EPIC }} is closed. Integration is the whole point of your job now: every task can pass alone while the whole fails. Read the epic, its plan and what has been said on it (gh issue view ${{ env.EPIC }} --comments), CLAUDE.md and docs/agents/WORKERS.md.
@@ -390,11 +417,17 @@ jobs:
         if: env.HAVE_TOKEN == 'true'
         with:
           fetch-depth: 0
-      - name: Keep a copy of the usage recorder, which the run cannot move
+      - name: Keep a copy of the usage recorder, which the run cannot move, and read the main token's settings
+        id: main
         if: env.HAVE_TOKEN == 'true'
+        env:
+          SETTINGS: ${{ vars.SYMPHONY_CLAUDE_SETTINGS }}
         run: |
           cp tools/usage.py "$RUNNER_TEMP/usage.py"
           cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
+          # the model, effort and fallback the Tokens tab's main tile sets (tools/pool.py);
+          # a variable that does not hold together leaves Claude's own defaults
+          python3 tools/pool.py settings --slot main --settings "$SETTINGS" >> "$GITHUB_OUTPUT" || true
       - uses: anthropics/claude-code-action@v1
         id: tidy
         if: env.HAVE_TOKEN == 'true'
@@ -403,6 +436,9 @@ jobs:
           allowed_bots: "github-actions,claude"
           claude_args: |
             --max-turns 60
+            ${{ steps.main.outputs.model != '' && format('--model {0}', steps.main.outputs.model) || '' }}
+            ${{ steps.main.outputs.effort != '' && format('--effort {0}', steps.main.outputs.effort) || '' }}
+            ${{ steps.main.outputs.fallback != '' && format('--fallback-model {0}', steps.main.outputs.fallback) || '' }}
             --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
           prompt: |
             You coordinate the repository ${{ github.repository }}. Run `git fetch origin ${{ env.DEFAULT_BRANCH }} && git show origin/${{ env.DEFAULT_BRANCH }}:docs/agents/routines/coordinator.md` and do what the last fenced block of that page says, exactly and nothing else. Read it again on every run, since it changes by pull request.
