@@ -553,6 +553,10 @@ Checks Read-only, Contents Read and write, Issues Read and write, Pull requests 
   Client ID.
 - The Playwright tests live outside the repositories; the site has no test runner, and adding
   one is a proposal, not a change (the writing rule on dependencies).
+- The panel's Assistant section (design A of docs/research/control-board-graph.md, the owner's
+  choice of 2026-10-17): built on 2026-10-18 as openspineconsortium.github.io#28, its twenty browser
+  checks as symphony-app#18 and the Apps' privacy statement version 11 as symphony-start#47, merged
+  first; done.
 - Not built, by the owner's choice of shape: a hosted server and an account pool. The Tokens
   page's Add a slot box, which takes a pasted Claude token, is built elsewhere since the owner
   dropped the no-token rule on 2026-10-18 (decision 3 above).

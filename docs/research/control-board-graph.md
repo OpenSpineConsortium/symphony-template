@@ -325,8 +325,19 @@ action's own source and docs:
   .github/symphony/assistant.md. This extends the Ask Claude
   box the panel already has (symphony-panel.js posts @claude comments and issues as the person
   today and does not yet poll for the answer). The template's side is built (claude.yml,
-  .github/symphony/assistant.md, docs/setup/claude-action.md, 2026-10-17); the page's side
-  follows in the site repository.
+  .github/symphony/assistant.md, docs/setup/claude-action.md, 2026-10-17, symphony-template#165),
+  and so is the page's side (the Assistant section of /symphony/control/, 2026-10-18,
+  openspineconsortium.github.io#28): it offers the box only where GitHub says the person may write
+  and the default branch carries .github/symphony/assistant.md, opens the issue once per repository
+  and person on a press and keeps its number in the browser, posts each question as a comment with a
+  fenced symphony-state block, reads the issue's comments with If-None-Match until the action's
+  "Claude finished" or "Claude encountered an error" header opens the comment (the phrase "Claude
+  Code is working" is gone from the comment at Claude's first edit, so it is no sign of anything),
+  renders the answer through the board's renderer with off-GitHub links shown as text, and acts on
+  the symphony block's five forms. Twenty browser checks against a mocked GitHub are symphony-app's
+  signin/panel-checks/e2e2/assistant.test.mjs (symphony-app#18), and the Apps' privacy statement
+  version 11 (symphony-start#47) lists the issue, the comments as questions, the reads while waiting
+  and the kept number, before the page went live.
 - B, a dispatch: an assistant.yml on workflow_dispatch with a question input, the action in
   agent mode with --json-schema, and a step posting the structured output as a check run named
   assistant on the default branch's head (up to 65,535 characters, readable with a plain GET)
