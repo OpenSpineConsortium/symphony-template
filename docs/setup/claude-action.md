@@ -48,6 +48,11 @@ By hand, where neither is at hand:
   weekly limit, shared with that account's interactive sessions and
   routines. The workflow caps each run (--max-turns, a job timeout), but
   mentions are still deliberate asks, not decoration.
+- The main token's tile on the control panel's Tokens tab (the variable
+  SYMPHONY_CLAUDE_SETTINGS) sets the model, effort and fallback model of
+  every run, the assistant's included; with none set, Claude's own
+  defaults hold (docs/setup/claude-tokens.md). A stronger model or a higher
+  effort spends more of the window on each question.
 - Keep usage credits off on the main account unless overage billed at API
   rates is wanted; with them on, a run past the limits bills quietly.
 - A pull request from a fork gets no secrets, so @claude does not run
