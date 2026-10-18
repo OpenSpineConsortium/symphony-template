@@ -51,6 +51,11 @@ What the reviews found about the template, for its follow-up below: its hook, to
 - F29 merged as symphony-protocol#53 on 2026-10-18 at about 15:10 UTC (merge f6ac177, head 0d1dd26), every check green on that head, mutants included; main's tree after the merge equals the head's. Still owed from its checkpoint: the over-refusal fuzz comparing a4ff6c3 with main over session-style commands, and its description still carries the literal line OVER_REFUSAL_PLACEHOLDER where that fuzz's result was to go.
 - Then, after the owner publishes 0.5.0: the template follow-up below, then the 0.5.1 version raise in its own pull request.
 
+## 2026-10-18, after F29 merged
+
+- The over-refusal fuzz owed from F29's checkpoint ran over 40,000 session-style commands: main refuses none that a4ff6c3 passed save 5 quoted notes bodies of a shape F29 already names, and none fewer; symphony-protocol#53's description carries the result in place of its placeholder (f29-over-refusal-fuzz.md, scripts/over-refusal-fuzz/).
+- The three guard misses the handoff named (`$'main'`, `pu$(true)sh`, here-documents) are refused on main since F29; no pull request is owed for them. What still passes is the documented class of text handed to another shell (`bash -c`, `eval`, a here-string or a pipe into a shell), which waits on the owner's call.
+
 ## The template's follow-up for 0.5.1
 
 Not started, on purpose. The template vendors 0.5.0 (the commit that raised it); if it vendored main now, the sync that follows the owner's approval of 0.5.0 would open a pull request taking the template back to 0.5.0. So once 0.5.0 is published, one symphony-template pull request vendors the library's main, switches tools/guard_push.py to guard.refused_push (F21's fix reaches the template's hook only then), has tools/metrics.py's Budgeted count its calls from the client's `made` (the first rate-limit review's sixth finding: the tries the client makes again are not in Budgeted's own count), and brings docs/agents/PROTOCOL.md's Release in line with F22's and F23's spec text. The durable decision in CLAUDE.md that a release puts the labels back when its comment fails has been untrue since F20; it is corrected by a line tagged Decision: in conversation for the checkpoint skill, never by hand.
