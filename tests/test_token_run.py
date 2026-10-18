@@ -6,11 +6,14 @@ and prints a token of the subscription token's shape, built from pieces
 so this file never looks like a secret; GitHub is a list of comments."""
 
 import base64
+import io
+import json
 import os
 import stat
 import sys
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -152,6 +155,135 @@ class TokenRunTest(unittest.TestCase):
         for name, value in (("ISSUE", "07"), ("KEY_ID", "a b"), ("KEY", "short")):
             with self.assertRaises((token_run.RunError, sealbox.SealError)):
                 token_run.settings({**self.environ, name: value})
+
+
+class FakeOrg:
+    """The organization's Actions secrets and variables as GitHub's API
+    answers them, for the run's own store into the pool."""
+
+    def __init__(self, secrets=(), variables=None, refuse=""):
+        self.secrets = {name: None for name in secrets}
+        self.variables = dict(variables or {})
+        self.reached = {}
+        self.refuse = refuse
+        self.calls = []
+
+    def call(self, method, path, body=None):
+        self.calls.append((method, path))
+        if self.refuse and self.refuse in path and method != "GET":
+            raise urllib.error.HTTPError(path, 403, "Forbidden", {}, io.BytesIO())
+        base = "/orgs/acme/actions"
+        if path.startswith(base + "/secrets?"):
+            return {"secrets": [{"name": n} for n in sorted(self.secrets)]}
+        if path == base + "/secrets/public-key":
+            return {"key": base64.b64encode(sealbox.public_key(SECRET)).decode(), "key_id": "org-key"}
+        if path.startswith(base + "/secrets/") and method == "PUT":
+            self.secrets[path.rsplit("/", 1)[1]] = body
+            return None
+        if path == base + "/variables" and method == "POST":
+            self.variables[body["name"]] = body["value"]
+            self.reached[body["name"]] = body["selected_repository_ids"]
+            return None
+        if "/repositories/" in path and method == "PUT":
+            name = path.split("/variables/")[1].split("/")[0]
+            self.reached.setdefault(name, []).append(int(path.rsplit("/", 1)[1]))
+            return None
+        if path.startswith(base + "/variables/"):
+            name = path.rsplit("/", 1)[1]
+            if method == "PATCH":
+                self.variables[name] = body["value"]
+                return None
+            if name not in self.variables:
+                raise urllib.error.HTTPError(path, 404, "Not Found", {}, io.BytesIO())
+            return {"name": name, "value": self.variables[name], "visibility": "selected"}
+        raise AssertionError(f"unexpected call {method} {path}")
+
+
+class PoolStoreTest(unittest.TestCase):
+    def setUp(self):
+        self.folder = tempfile.mkdtemp()
+        claude = Path(self.folder) / "claude"
+        claude.write_text(STAND_IN)
+        claude.chmod(claude.stat().st_mode | stat.S_IEXEC)
+        self.command = (str(claude),)
+        self.environ = {"ISSUE": "7", "ACTOR": "ashley", "GITHUB_REPOSITORY": "acme/r", "GITHUB_TOKEN": "t",
+                        "STORE_ORG": "acme", "APP_TOKEN": "app", "REPO_ID": "42"}
+        token_run.WAIT_FOR_CODE = 5
+        token_run.POLL_EVERY = 0.2
+
+    def store(self, org, poster="ashley"):
+        github = FakeGitHub(CODE, poster=poster)
+        original = token_run.settings
+        token_run.settings = lambda environ: (github, *original(environ)[1:])
+        try:
+            token_run.run(self.environ, start=lambda: token_run.Claude(command=self.command),
+                          pool=token_run.Pool("acme", "app", 42, call=org.call))
+        finally:
+            token_run.settings = original
+        return github
+
+    def test_the_token_goes_into_the_first_free_slot_marked_as_the_persons(self):
+        org = FakeOrg(secrets=["SYMPHONY_CLAUDE_1", "SYMPHONY_CLAUDE_2"],
+                      variables={"SYMPHONY_CLAUDE_ACCOUNTS": "1,2",
+                                 "SYMPHONY_CLAUDE_SETTINGS": json.dumps({"1": {"model": "claude-opus-5-5"}})})
+        github = self.store(org)
+        self.assertEqual(github.posted[1], f"{token_run.STORED_MARK}\n3")
+        put = org.secrets["SYMPHONY_CLAUDE_3"]
+        self.assertEqual((put["key_id"], put["visibility"], put["selected_repository_ids"]), ("org-key", "selected", [42]))
+        self.assertEqual(sealbox.open_sealed(base64.b64decode(put["encrypted_value"]), SECRET).decode(), TOKEN)
+        self.assertEqual(org.variables["SYMPHONY_CLAUDE_ACCOUNTS"], "1,2,3")
+        settings = json.loads(org.variables["SYMPHONY_CLAUDE_SETTINGS"])
+        self.assertEqual(settings["1"], {"model": "claude-opus-5-5"})
+        self.assertEqual(settings["3"]["owner"], "ashley")
+        self.assertRegex(settings["3"]["id"], r"^[0-9a-f]{8}$")
+        self.assertNotIn(TOKEN, "".join(github.posted))
+
+    def test_no_slot_that_holds_a_token_is_ever_written(self):
+        org = FakeOrg(secrets=[f"SYMPHONY_CLAUDE_{n}" for n in range(1, 33)])
+        with self.assertRaisesRegex(token_run.RunError, "all 32 slots"):
+            self.store(org)
+        self.assertFalse([c for c in org.calls if c[0] != "GET"])
+
+    def test_variables_made_new_reach_the_repository(self):
+        org = FakeOrg()
+        self.store(org)
+        self.assertEqual(org.variables["SYMPHONY_CLAUDE_ACCOUNTS"], "1")
+        self.assertEqual(org.reached["SYMPHONY_CLAUDE_SETTINGS"], [42])
+
+    def test_settings_that_are_not_json_by_slot_are_left_for_an_owner(self):
+        org = FakeOrg(variables={"SYMPHONY_CLAUDE_SETTINGS": "[1, 2]"})
+        with self.assertRaisesRegex(token_run.RunError, "slot 1.*not JSON by slot"):
+            self.store(org)
+        self.assertEqual(org.variables["SYMPHONY_CLAUDE_SETTINGS"], "[1, 2]")
+
+    def test_a_refusal_from_github_is_said_in_words_the_page_shows(self):
+        org = FakeOrg(refuse="/secrets/SYMPHONY_CLAUDE_")
+        with self.assertRaisesRegex(token_run.RunError, "403 when the run tried to store the token in slot 1"):
+            self.store(org)
+
+    def test_store_mode_needs_its_organization_token_and_repository(self):
+        for name, value in (("STORE_ORG", "-bad"), ("APP_TOKEN", ""), ("REPO_ID", "042")):
+            with self.assertRaises(token_run.RunError):
+                token_run.pool_of({**self.environ, name: value})
+
+    def test_claude_never_sees_the_runs_tokens(self):
+        script = Path(self.folder) / "env"
+        script.write_text("#!/bin/sh\necho \"gh=${GITHUB_TOKEN:-none} app=${APP_TOKEN:-none}\"\n")
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+        saved = {k: os.environ.get(k) for k in token_run.WITHHELD}
+        os.environ.update({k: "visible" for k in token_run.WITHHELD})
+        try:
+            claude = token_run.Claude(command=(str(script),))
+            while not claude.ended:
+                claude.read(1)
+            claude.finish()
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        self.assertIn("gh=none app=none", claude.seen)
 
 
 if __name__ == "__main__":
