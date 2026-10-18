@@ -13,23 +13,29 @@ The owner's ask: the protocol fixes toward 0.5.0, in part 2.1's order, then tell
 5. The taxonomy review's two findings: F21 merged, symphony-protocol#39 (the push guard judges a push in the clone it runs in); F22 open as draft symphony-protocol#42 (a reopened issue is freed of the labels its ended claim left).
 6. Telling the owner: once F22 merges.
 
-0.5.1 will carry what main holds since the commit that raised it to 0.5.0 (68946e6, merged as ec49498): #38, #39 and #40 now, and F22, F23, F25, F26, F24 and F27 as each merges. Raising the version to 0.5.1 is a pull request of its own once they are in; its release waits for the owner's approval as 0.5.0's does.
+0.5.1 will carry what main holds since the commit that raised it to 0.5.0 (68946e6, merged as ec49498): #38, #39 and #40, and F22 to F28 with the deep lane's SIGTERM test, all merged by 2026-10-18 (below), with F29 and F30 if they merge first. Raising the version to 0.5.1 is a pull request of its own; its release waits for the owner's approval as 0.5.0's does.
 
-## Open pull requests in OpenSpineConsortium/symphony-protocol
+## Where it stands on 2026-10-18
 
-Each is a draft, assigned to the owner, with its next steps at the top of its description.
+Updated by the thread "Protocol fixes toward 0.5.1" (the 2026-10-16 handoff's part 2.1, taken on from another account). Every fix planned for 0.5.1 has merged in OpenSpineConsortium/symphony-protocol, each after its checks and at least two adversarial reviews, with main's tree compared with the head's after the merge:
 
-- #42, F22, branch claude/owner-decisions-f22-reopened at 022836c: fix, harness, bookkeeping and two merges of main done; check.sh and the mutation lane were running on 022836c when the worker was stopped, so the pull request's CI is its first full check. Next: CI, an adversarial review, its fixes, a second review, ready, merge.
-- #41, F23, branch claude/owner-decisions-f23-late-comment at 2529d78: the fix (bd99ad5) and its first review's fixes (a1fa9f4, green on every check) done; 0099bd1 merges main (F21 and #40); 2529d78 is a checkpoint commit of the first review's finding 3, unfinished: a rate limit's refusal read as one GitHub may have written (`wrote_nothing` false where `github.rate_limited` holds), since whether GitHub acts on a call it refuses for a rate limit is the unverified assumption C4. drafts/f23-finding-3-commit-message.txt is the worker's draft message for it. Next: finish finding 3, check.sh and the lane, a second review, ready, merge.
-- #43, F25, branch claude/owner-decisions-f25-unread-command at 8271243, unfinished: the guard's reading of a command it cannot read whole and of here-document bodies. Next: merge main, finish the fix, its entry and counts, the checks, the reviews.
-- #44, F26, branch claude/owner-decisions-f26-long-options at 6411668, unfinished but far along: drafts/f26-commit-message-fix.txt and drafts/f26-commit-message-harness.txt are the worker's draft messages, which say what it had built (the trace, four grammar prefixes, three mutants) and one more hole it found: GNU time's own name for its output option is --output-file, which the guard's table knew as --output. Next: merge main, finish, the checks, the reviews.
+- F26, #44, merged at 73619e3: the guard reads long options as getopt_long does, and the wrappers' option tables.
+- F22, #42, merged at 4e1eb0b: a reopened issue is freed of the labels its ended claim left.
+- F23, #41, merged at c6e8e1f: a call GitHub refused for a rate limit or a 5xx is not read as one that wrote nothing.
+- F25, #43, merged at a272513: the guard's reading of a command it cannot read whole, here-document bodies cut out, and its length, depth and time limits.
+- F27, #46, merged at fcbe822: a label whose removal GitHub made but answered with a 5xx or no answer is put back unless the call wrote nothing.
+- F28, #47, merged at 930290e: env's words read as GNU env reads them (every word holding = after its options an assignment, a lone - ending them, -S split as env.c splits it, every mix of set and unset ${NAME} up to six names), and no helper the template's hook calls raises. Found by F26's review; three review rounds.
+- The deep lane's SIGTERM test, #49, merged at fdac907: its test parts wait in short sleeps, since one long sleep slept through a SIGTERM caught just before the sleep's system call (about 1 in 1,000 runs under load); the library was right.
+- F24, #48, merged at a4ff6c3: every substitution's text read as commands, in double quotes, parameter expansions, arithmetic and unquoted here-document bodies too, with quoted bodies left as text. Two review rounds; the fuzz's misses went from 1,670 of 5,599 on main to 1 of 9,557.
 
-## Findings with no pull request yet
+Mutants: 194 within the bound of 200 on main a4ff6c3.
 
-Each was reproduced on symphony-protocol main ff75657 (F24) or 4c5e3f2 (F27) and gets its own branch, trace, mutants and DESIGN.md entry.
+The reviews found more, each now its own branch:
 
-- F24: the guard reads the quoting inside a command substitution as the quoting around it, so `out="$(git push --force origin main 2>&1)"` and `cat <(git push --force origin main)` pass guard.refused_push on main (scripts/guard-holes-probe.py shows both). The fix reads every substitution's body, `$(...)`, backquotes, `<(...)` and `>(...)`, as commands, inside double quotes too. It touches shell_parts and plain_shell, as F25 does, so it comes after F25 merges.
-- F27: a label removal GitHub made but answered with a 5xx or no answer is not put back: github.release_one's first except puts back only the labels in taken_off, and take_label_off raises on anything but a 404. scripts/f23-review/label_delete_lost_main.py gives G3L on main 4c5e3f2 with the faults label-delete-lost and label-delete-unanswered added in memory. The fix puts back the label whose removal failed unless `wrote_nothing(problem)`, so it comes after F23 merges. Found by F23's first review, its finding 4 (reviews/f23-first-review.md).
+- F29, branch claude/owner-decisions-f29-words-built: words bash builds that the guard reads otherwise: ANSI-C quoting (`git push origin $'main'`), a substitution inside a word (`git pu$(true)sh origin main`), an empty expansion as the command word (`$NOPE git push origin main`), a bare `GIT_DIR=` assignment judged only in the session's clone, and lexer edge cases (a `#` after a line continuation, a substitution in a here-document's delimiter, arithmetic around a quoted nested here-document, the one miss F24's second review left).
+- F30, branch claude/owner-decisions-f30-reopen-rename-back: F22's review met G1 or G11a in a search of reopened issues to depth 5, on paths where a released branch is renamed back.
+
+What the reviews found about the template, for its follow-up below: its hook, tools/guard_push.py, calls simple_commands, push_arguments and refusal itself and never guard.refused_push, so F21's, F24's and F25's readings never reach it, and its own first test (`"push" not in command`) lets `git pu""sh origin main` through; it has no length or time limit either. With 0.5.0's library a command like `cat <(git push origin main)` passes it. Switching it to guard.refused_push, as the follow-up already says, closes all of these.
 
 ## The template's follow-up for 0.5.1
 
@@ -44,7 +50,7 @@ Not started, on purpose. The template vendors 0.5.0 (the commit that raised it);
 
 ## The first step from a new account
 
-Attach OpenSpineConsortium/symphony-protocol with push access, clone it, fetch the four branches above, read #42's description and run its CI's results through an adversarial review; then #41's finding 3; then #43 and #44; then F24 and F27; then, once the owner has approved 0.5.0, the template's follow-up and the raise to 0.5.1.
+Attach OpenSpineConsortium/symphony-protocol with push access, clone it, and fetch the F29 and F30 branches; carry each through its checks, two adversarial reviews and the merge. Then, once the owner has published 0.5.0, the template's follow-up and the raise to 0.5.1.
 
 ## Files here
 
