@@ -107,6 +107,18 @@ jobs:
             gh workflow run workers.yml --repo "$REPO" || echo "could not wake the workers" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Start the accepted drive projects whose files are here now
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A project the drive organizer proposed and a person accepted
+          # (drive-organize.yml) gives its tasks to the workers once the
+          # sync has brought its folders in; a refused call never stops the
+          # sync below.
+          python3 tools/drive_organize.py ready --config "$CONFIG" --root . >> "$GITHUB_STEP_SUMMARY" ||
+            echo "the accepted drive projects could not be checked; see the log" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Ask the drive what changed, and send up what changed here
         id: drive
         if: steps.gate.outputs.skip != 'true'
