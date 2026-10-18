@@ -38,6 +38,7 @@ A window whose reset has passed counts as empty, since it is.
   python3 tools/pool.py show DIR               the slots as the panel shows them
   python3 tools/pool.py pick DIR --slots 1,2,3 [--threshold 0.9]
   python3 tools/pool.py choose --worker NAME --pool 1,2,3   the slot a worker's run takes
+  python3 tools/pool.py settings --slot main --settings JSON   a slot's model, effort and fallback
 
 Which account a worker in Actions runs on is the file
 .github/symphony/accounts.json, {"default": "main", "workers": {"NAME":
@@ -547,6 +548,7 @@ def choose_run(worker, pool_text, path=ASSIGNMENTS, folder=None, now=None, sprea
 
 def run_of(slot, how, until, model, settings):
     setting = settings.get(slot) or {}
+    model = model or setting.get("model", "")
     fallback = setting.get("fallback", "")
     return {"slot": slot, "how": how, "until": until, "model": model or "",
             "effort": setting.get("effort", ""), "fallback": fallback if fallback != model else ""}
@@ -670,6 +672,9 @@ def build_parser():
     choosing.add_argument("--spread", type=int, default=0, help="the worker's place in its run, from 0")
     choosing.add_argument("--settings", default="", help="SYMPHONY_CLAUDE_SETTINGS, the slots' settings as JSON")
     choosing.add_argument("--model", default="", help="the worker's own model, taken where the slot names none")
+    showing_settings = commands.add_parser("settings", help="one slot's model, effort and fallback, as step outputs")
+    showing_settings.add_argument("--slot", required=True, choices=SLOTS)
+    showing_settings.add_argument("--settings", default="", help="SYMPHONY_CLAUDE_SETTINGS, the slots' settings as JSON")
     return parser
 
 
@@ -716,6 +721,11 @@ def main(argv=None):
             print(f"pool: {args.worker} runs on {'slot ' + slot if slot != 'main' else 'the main token'} ({run['how']})"
                   + (f" with {run['model']}" if run["model"] else "")
                   + (", though every slot of the pool is held" if until else ""), file=sys.stderr)
+        elif args.command == "settings":
+            run = run_of(args.slot, "", None, "", parse_settings(args.settings))
+            for key in ("model", "effort", "fallback"):
+                if run[key]:
+                    print(f"{key}={run[key]}")
     except PoolError as error:
         print(f"pool: {error}", file=sys.stderr)
         return 1
