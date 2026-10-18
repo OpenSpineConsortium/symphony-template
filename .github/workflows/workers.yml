@@ -262,6 +262,9 @@ jobs:
           for setting in model max_turns rounds; do
             echo "$setting=$(python3 tools/workers.py --dir "$REGISTRY" get "$WORKER" "$setting")" >> "$GITHUB_OUTPUT"
           done
+          # The agent the worker runs under, when .github/symphony/agents.json
+          # names it (docs/agents/AGENTS.md); none leaves the worker prompt alone.
+          echo "agent=$(python3 tools/agents.py for-worker "$WORKER" 2> /dev/null || true)" >> "$GITHUB_OUTPUT"
       - name: Choose the Claude account the worker runs on
         id: account
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
@@ -389,6 +392,7 @@ jobs:
           allowed_bots: "github-actions,claude"
           claude_args: |
             --max-turns ${{ steps.next.outputs.max_turns }}
+            ${{ steps.next.outputs.agent != '' && format('--agent {0}', steps.next.outputs.agent) || '' }}
             ${{ steps.account.outputs.model != '' && format('--model {0}', steps.account.outputs.model) || '' }}
             ${{ steps.account.outputs.effort != '' && format('--effort {0}', steps.account.outputs.effort) || '' }}
             ${{ steps.account.outputs.fallback != '' && format('--fallback-model {0}', steps.account.outputs.fallback) || '' }}
