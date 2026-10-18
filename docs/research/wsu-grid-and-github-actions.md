@@ -304,6 +304,17 @@ above that root or another account owns as a note for the university and refuses
 while a folder of the account's own that others may change is still refused. Asking C&IT for
 `chmod +t` on the two folders would close the gap for both keys.
 
+The key then went in (23:20 UTC). Two things the setup page had wrong came out of the next steps.
+grid.wayne.edu offers only its RSA host key from outside the VPN: `ssh-keyscan -t ed25519` printed
+nothing but the server's banner (OpenSSH 7.4), and the plain scan printed one `ssh-rsa` line whose
+fingerprint, SHA256:kLTz1xK6anQ1denM+31kDEryQtgan2P76r9aLno+K3s, is the one the login node's
+/etc/ssh/ssh_host_rsa_key.pub gives, though the node holds an ed25519 key too; GRID_HOST_KEY is that
+RSA line, and docs/setup/grid.md step 3 now says so. And the gate key's private half was made
+somewhere other than the computer the test ran on, so the test fell back to the password and one-time
+code and the grid's own shell answered "status: command not found": a password sign-in never reaches the
+gate, which only the key's own line runs, and a key made afresh on the same computer
+replaces the line with `--gate-key`.
+
 ## The ssh gate, built
 
 Planned on 2026-10-16 (the card of 00:24 UTC chose both directions, the runner first) and built on
