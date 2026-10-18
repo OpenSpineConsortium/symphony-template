@@ -7,9 +7,9 @@
 #
 #   bash scripts/codespace.sh install   what .devcontainer/devcontainer.json
 #                                       runs once when the Codespace is made:
-#                                       Claude Code; .vscode/tasks.json then
-#                                       starts the setup in a terminal the
-#                                       first time the Codespace opens
+#                                       Claude Code; the Codespace's terminal
+#                                       then starts the setup by itself the
+#                                       first time it opens (its profile)
 #   bash scripts/codespace.sh           the setup: a GitHub sign-in of your
 #                                       own, the repository's settings, then
 #                                       the token wizard, one account at a time
@@ -23,6 +23,8 @@
 # screen or in a file: tokens.py catches what claude setup-token prints and
 # hands it to gh, which seals it for GitHub, as on a computer of your own.
 set -euo pipefail
+# a stop is never silent: the terminal says where, and how to start again
+trap 'echo "Symphony setup stopped at line $LINENO of scripts/codespace.sh; run: bash scripts/codespace.sh" >&2' ERR
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 DONE_MARK="$HOME/.symphony-setup-started"
@@ -148,8 +150,8 @@ setup() {
 case "${1:-}" in
   install) install ;;
   "") setup ;;
-  # the task in .vscode/tasks.json runs this each time the Codespace opens;
-  # the setup starts by itself only the first time
+  # the terminal profile in .devcontainer/ runs this in every new terminal;
+  # the setup starts by itself only in the first
   auto) [ -e "$DONE_MARK" ] && exit 0; touch "$DONE_MARK"; setup ;;
   */*) GITHUB_REPOSITORY=$1 setup ;;
   -h|--help) sed -n '2,22p' "${BASH_SOURCE[0]}" ;;
