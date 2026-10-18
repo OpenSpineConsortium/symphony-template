@@ -129,7 +129,7 @@ accept running in a public repository, and a folder past the depth limit counted
 
 ## Not yet known
 
-- Nothing has run against a real drive. OneDrive Connect works since 2026-10-18 (drive-sync.md),
+- Nothing has run against a real drive. OneDrive Connect works with a personal Microsoft account since 2026-10-18 (drive-sync.md),
   so the first catalog needs only drive.json's "organize" items in a private repository, and the
   first organize waits on the owner's word, since it spends the Claude plan.
 - How long a large drive takes to walk: one Graph call per folder per 200 children, so a drive of
