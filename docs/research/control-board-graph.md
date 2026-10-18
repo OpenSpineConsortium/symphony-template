@@ -305,9 +305,14 @@ action's own source and docs:
 - A, the assistant issue, recommended: the page opens once per repository and person an issue
   "Assistant: <login>" labelled assistant, whose body describes the page and a small command
   vocabulary; each question is a comment "@claude ..." with a visible fenced block of the page's
-  state (repository, focus, filter), posted as the person, who is signed in with write access
-  (claude.yml's condition guards nothing but the "@claude" text; the action itself answers only
-  actors with write access, a rule read from memory and listed below as not verified), which
+  state (repository, focus, filter, section), posted as the person, who is signed in with write
+  access (claude.yml's condition guards nothing but the "@claude" text; the action itself
+  answers only actors with write access: checkActorWritePermissions in
+  src/github/validation/permissions.ts of anthropics/claude-code-action, read on its main at
+  f27be6b65a4652f08a2ba3cff79114829b588967 on 2026-10-17, passes an actor whose collaborator
+  permission is admin or write, and any login ending in [bot], which the action's human check
+  (checkHumanActor in src/github/validation/actor.ts) then refuses unless allowed_bots names
+  it, both before any comment is posted, and fails the run for anyone else), which
   claude.yml answers on the repository's own token with the action's own progress comment ("Claude Code is working...",
   edited with checkboxes and then the answer); the page polls the issue's comments with
   If-None-Match every 5 seconds for ten minutes and then every 30 seconds (a 304 costs nothing
@@ -315,11 +320,13 @@ action's own source and docs:
   read-only vocabulary from a fenced block in the reply (focus an epic, open a pull request,
   filter to blocked, show a board section), showing anything that writes as a button the person
   presses. The issue's body keeps the text "@claude" out of its vocabulary, since claude.yml
-  also runs when an issue opens. claude.yml would give the assistant label a turn cap of about
-  ten, a read-only tool list and an appended system prompt from a new file
+  also runs when an issue opens. claude.yml gives the assistant label a turn cap of ten, a
+  read-only tool list and an appended system prompt from the file
   .github/symphony/assistant.md. This extends the Ask Claude
   box the panel already has (symphony-panel.js posts @claude comments and issues as the person
-  today and does not yet poll for the answer).
+  today and does not yet poll for the answer). The template's side is built (claude.yml,
+  .github/symphony/assistant.md, docs/setup/claude-action.md, 2026-10-17); the page's side
+  follows in the site repository.
 - B, a dispatch: an assistant.yml on workflow_dispatch with a question input, the action in
   agent mode with --json-schema, and a step posting the structured output as a check run named
   assistant on the default branch's head (up to 65,535 characters, readable with a plain GET)
@@ -363,8 +370,11 @@ reaches Linear.
 - Whether GraphQL answers from Actions: only its refusal from a cloud session was seen, and
   nothing in the plan needs it, since REST's issue objects carry both summaries (the write of
   blocked_by from a workflow was verified on 2026-10-17, above).
-- claude-code-action's rule that it answers only actors with write access, read from memory;
-  its docs answered 403 through the session's proxy.
+- Whether the maintain role passes claude-code-action's write check, now read from its source
+  (Claude in the board, above): checkActorWritePermissions compares the legacy permission
+  field of the collaborator permission endpoint with admin and write, and that GitHub reports
+  maintain there as write, and triage as read, is from memory, not from a docs page read in
+  this session.
 - The form of Linear's settings links (linear.app/<workspace>/settings/...): the page refuses
   the proxy, so the link in the owner's steps is given with the slug to fill in.
 - Linear's per-plan check marks did not survive the pricing page's text extraction (the page

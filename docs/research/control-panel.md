@@ -123,8 +123,13 @@ signed-in person, with nothing of ours in between.
    fine-grained personal access token stays as the fallback, folded under "Use a fine-grained
    token instead": it needs nothing deployed and nothing from the App, and it reaches what the
    App's permissions leave out (listing Actions runs and starting a workflow).
-3. Never a Claude token. The page never asks for one, holds one or sends one; the workers run on
-   the token the repository holds as its secret. This is the project's one fundamental rule.
+3. No Claude token, until 2026-10-18. The page asked for none, held none and sent none; the
+   workers run on the token the repository holds as its secret. The owner dropped the rule on
+   2026-10-18, saying it was set arbitrarily, for the Tokens page's Add a slot box, which saves
+   a pasted token as an organization secret through the App, which then needs organization
+   secrets write, granted by the owner. The box is built by the thread that owns the Claude
+   tokens, not from the pages described here, and the Apps' privacy statement, which says the
+   pages never take a Claude token, is versioned before the box goes live.
 4. The GitHub token lives in the browser only: sessionStorage by default (gone when the tab
    closes), localStorage when "Keep me signed in" is ticked, and the tick is off by default so
    that a shared computer forgets. A sign-in for one tab keeps its refresh token in the open
@@ -548,8 +553,9 @@ Checks Read-only, Contents Read and write, Issues Read and write, Pull requests 
   Client ID.
 - The Playwright tests live outside the repositories; the site has no test runner, and adding
   one is a proposal, not a change (the writing rule on dependencies).
-- Not built, by the owner's choice of shape: a hosted server, an account pool, anything that
-  touches a Claude token.
+- Not built, by the owner's choice of shape: a hosted server and an account pool. The Tokens
+  page's Add a slot box, which takes a pasted Claude token, is built elsewhere since the owner
+  dropped the no-token rule on 2026-10-18 (decision 3 above).
 
 ## Sources
 
