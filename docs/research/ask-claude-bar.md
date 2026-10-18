@@ -58,7 +58,7 @@ the bar's `ask` button fills, and the help text.
 
 ## Checks
 
-symphony-app's signin/panel-checks/e2e2/assistant.test.mjs carries three new checks beside the
+symphony-app's signin/panel-checks/e2e2/assistant.test.mjs carries five new checks beside the
 twenty earlier ones (check B changed: `merge #9` names an issue, so it is now said as "Not
 offered"):
 
@@ -69,9 +69,26 @@ offered"):
   writes exactly what the panel's own button writes (the workflow dispatch, the label, the merge
   only after Confirm, a draft pull request refused in words), a pressed button cannot be pressed
   again, and the drafts fill their forms and write nothing.
-- N2: a button kept from before a Refresh starts no workflow.
+- N2: a button kept across a Refresh still runs once; one from before another account signed in
+  runs nothing.
+- N3: a merge pressed before the checks are read is refused in words and the button comes back.
+- N4: the block hidden from the rendered answer is exactly the block acted on; another fenced block
+  stays.
 
-Six mutants, each run against M, N and N2, were all caught: the stale-answer guard removed, the
+The adversarial review before the pull requests found, and the change fixed: every button died on
+a Refresh of the same repository; a refused press (checks still being read) lost its button for
+good; the regex that hid the block differed from the one that read it, so a block could be acted on
+and shown, or hide prose after it; Escape worked only with focus inside the drawer; the Enter that
+ends an input method's composition in Safari could send; and the vocabulary said merge was offered
+only once checks pass, while the page draws it and refuses on the press. Left as they are: an edit
+of the answer within its grace rebuilds the buttons, so one can move under the cursor (merge still
+needs Confirm); and the page takes any Bot's comment after the question as the answer, as before.
+
+Two checks failed in the full runs for reasons outside this change: signin.test.mjs's F6 fails on
+site master too, and assistant.test.mjs's E2 compares fixed comment times on 2026-10-18 with the
+clock, so it fails once that day passes 10:03 UTC.
+
+Six mutants, each run against M, N and the first N2, were all caught: the stale-answer guard removed, the
 actions run without a press, a button pressable twice, the merge confirmed by the page, Shift and
 Enter sending, and give offered to an unregistered worker.
 
