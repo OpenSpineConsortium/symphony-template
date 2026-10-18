@@ -78,6 +78,36 @@ Merging master along the way found that the Tokens tiles (site #44) declared a s
 in the script's one function. The tiles' list overwrote the cost page's price table, so
 /symphony/cost.html threw. Site #46 renamed the tiles' list TILE_MODELS, ahead of this change.
 
+## Graphical sections and the frame's last pieces (the third pass, same day)
+
+greg asked, in a message the coordinator split among the threads, for several things. This thread
+took four of them: a message that flashes when it arrives, a full screen mode without the site's
+header, a place for a frozen Ask Claude bar, and Tasks, Pull requests, Runs and Workers drawn as
+pictures rather than text, with a worker added without a form.
+
+- Site #51. When a message arrives or changes, the status line flashes white; when it empties, it
+  does not. A Full screen button beside the title uses the browser's fullscreen and hides the site's
+  header. If the browser itself is full screen (F11), the button says how to leave. An empty
+  `#cp-askbar` sits above the status line for the Ask Claude bar thread to fill. It is hidden while
+  it is empty or while nobody is signed in.
+- Site #56. Tasks is a board of six columns, one per list, each with its own scroll. The list
+  buttons slide the board sideways to their column. Every task is a card with its number, title,
+  label chips and actions. Pull requests are cards with a Ready or Draft pill. Runs are cards
+  with a large mark for passed, failed or running. Workers are cards with an emblem for where each
+  runs and chips for its settings. A worker is added by pressing tiles. The two selects stay hidden
+  behind the tiles and remain what the add reads; a tile sets its select through a change event,
+  so every listener hears it.
+- The cards are CSS over the same tables. Each cell carries a `cell--<part>` class, so the data,
+  ids, handlers and the browser checks' selectors are unchanged.
+- Pull request cards carry `data-number` so the Ask Claude bar's "merge #N" finds the Merge
+  button. They also carry `data-pull`, so the task filter does not read them as tasks.
+- The review caught one problem, now fixed: a card's grid display overrode the filter's hidden
+  rows.
+- Site #59. The Agents tab (site #55) is drawn as cards too, with the purpose as a pill. The
+  leaderboard (site #53) gives its first three places gold, silver and bronze. The rail now has
+  fourteen tabs, so in a window up to 820 px tall its rows close up and all of them fit at
+  1366x657; in shorter windows the rail scrolls.
+
 ## Design decisions
 
 - One page with in-page tabs, not several pages: one sign-in, one repository, and switching costs
