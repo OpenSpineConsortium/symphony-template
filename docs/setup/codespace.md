@@ -12,10 +12,11 @@ Codespace, and scripts/codespace.sh is what runs in it.
 1. Open https://codespaces.new/OWNER/NAME, with your repository's owner and
    name, and press **Create codespace**. The control panel's Tokens page
    links it for the repository it shows.
-2. Wait for the editor to open. The task "Symphony setup"
-   (.vscode/tasks.json) starts the setup in a terminal by itself the first
-   time; if it does not, type `bash scripts/codespace.sh` in the terminal
-   and press Enter.
+2. Wait for the Codespace to open. It opens as one terminal, whose profile
+   (set in .devcontainer/) starts the setup by itself the first time; if
+   VS Code asks whether you trust the folder, press **Trust**, since the
+   terminal cannot run until you do. If the setup does not start, type
+   `bash scripts/codespace.sh` and press Enter.
 3. Sign in to GitHub when asked: gh shows a one-time code and opens
    github.com/login/device in a new tab; paste the code there and press
    **Authorize**. The Codespace's own token cannot change settings or
@@ -72,6 +73,15 @@ free monthly Codespaces hours. On an organization's repository the
 organization pays, and only once an owner allows Codespaces for its members
 at https://github.com/organizations/ORG/settings/codespaces. The setup takes
 minutes on the smallest machine, two cores.
+
+The Codespace starts from GitHub's default image
+(mcr.microsoft.com/devcontainers/universal:linux) with no features added, since
+GitHub keeps that image on its hosts and stores it free of charge, while an
+image with features is built at every start. The image already holds
+Python, Node and gh; only Claude Code is installed, once, when the Codespace
+is made. No terminal can be shown inside the control panel's own page:
+GitHub reaches a Codespace's terminal only through its editor or ssh, and
+showing it elsewhere would need a server of ours.
 
 ## What is not measured yet
 

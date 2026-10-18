@@ -1,23 +1,22 @@
 {
   "name": "Symphony: add a Claude token",
-  "image": "mcr.microsoft.com/devcontainers/python:1-3.12",
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
-  },
-  "hostRequirements": {
-    "cpus": 2
-  },
+  "image": "mcr.microsoft.com/devcontainers/universal:linux",
   "postCreateCommand": "bash scripts/codespace.sh install",
   "customizations": {
-    "codespaces": {
-      "openFiles": [
-        "docs/setup/codespace.md"
-      ]
-    },
     "vscode": {
       "settings": {
-        "task.allowAutomaticTasks": "on"
+        "terminal.integrated.profiles.linux": {
+          "Symphony setup": {
+            "path": "bash",
+            "args": [
+              "-lc",
+              "bash scripts/codespace.sh auto; exec bash -l"
+            ]
+          }
+        },
+        "terminal.integrated.defaultProfile.linux": "Symphony setup",
+        "workbench.startupEditor": "none",
+        "workbench.panel.opensMaximized": "always"
       }
     }
   },
