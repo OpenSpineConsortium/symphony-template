@@ -15,6 +15,8 @@ on it carries as its issue's.
 
 import json
 import re
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -125,6 +127,15 @@ class TheTileSettings(unittest.TestCase):
         self.assertIn("SETTINGS: ${{ vars.SYMPHONY_CLAUDE_SETTINGS }}", step)
         self.assertIn(TILE_READ, step)
         self.assertLess(text.index(TILE_READ), text.index("claude_args: |"))
+
+    def test_the_command_the_step_runs_is_one_pool_py_has(self):
+        """The step's || true would hide a command pool.py lacks, and the
+        settings would then be dropped with no word."""
+        run = subprocess.run([sys.executable, str(ROOT / "tools" / "pool.py"), "settings", "--slot", "main",
+                              "--settings", '{"main": {"model": "claude-opus-5-5"}}'],
+                             capture_output=True, text=True, check=False)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(run.stdout, "model=claude-opus-5-5\n")
 
 
 class TheTurns(unittest.TestCase):
