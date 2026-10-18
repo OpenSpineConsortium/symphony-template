@@ -102,13 +102,17 @@ The panel's Folders page is the site's and the same thread's. Every page that si
 SymphonyBoard Callback URL, which is the owner's click. Saving a repository secret needs
 SymphonyBoard's Secrets permission, the grant already waiting on the owner for the Tokens page.
 The Apps' privacy statement gains what the page and the service handle before either ships
-(version 11 is the grid thread's, so this is the next).
+(11 was the Assistant's and 12 is the beyond cooperation thread's, so the Folders page takes the
+next free version, or shares 13 with the Dependencies section).
 
 The owner's one-time clicks, given with their links when the page is built:
 
 - Google: a Cloud project with the Drive API and the Picker API on. An OAuth client of type "Web
   application", whose redirect URI is the Folders page. A browser API key restricted to
-  openspineconsortium.com, which is public by design and no secret. The consent screen published
+  openspineconsortium.com, which the Picker takes. It is public by design and is no secret, but
+  the owner's rule says "No API key ... anywhere", so it waits for the owner's word, and the page
+  waits with it. Without the key, the Picker is replaced by a list the page draws itself, which
+  needs a wider Drive scope than drive.file, and Google's verification for that scope. The consent screen published
   "In production": the one scope, drive.file, is non-sensitive, so no verification is due, and in
   Testing a refresh token lapses after seven days.
 - Microsoft: an app registration for "Accounts in any organizational directory and personal
