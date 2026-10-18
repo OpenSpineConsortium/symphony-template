@@ -14,10 +14,11 @@ reset. .github/symphony/accounts.json gives each worker in Actions
 main, a slot or auto (no file: main), and workers.yml records each run's
 reading. SYMPHONY_CLAUDE_SETTINGS, which the Tokens tab's tiles write, gives each slot a model, an effort, a
 fallback taken when the model's own weekly limit is spent, and resume or paused, which keep a slot out of auto
-(docs/setup/claude-tokens.md, "Each token's settings"). coordbench's bench.yml takes auto in its accounts box from its
+(docs/setup/claude-tokens.md, "Each token's settings"), and an id and its owner's login: workers.yml labels each
+issue a run worked token:<id> for the panel's leaderboard. The pool has 32 slots, an organization's holding every
+member's tokens (the owner, 2026-10-18); scripts/tokens.py and the bench keep to 1 to 8. coordbench's bench.yml takes auto in its accounts box from its
 own branch pool (a copy of pool.py there), fed by its real jobs and by
-`tokens.py usage --also coordbench`. The site's
-/symphony/control/tokens.html shows the slots and proposes
-assignments by pull request. The picker moves to the protocol library after 0.5.1 is cut.
+`tokens.py usage --also coordbench`. The control
+panel's Tokens tab is the token tiles alone (site #49); which agent runs on which token is set on the agents' tab. The picker moves to the protocol library after 0.5.1 is cut.
 docs/research/claude-token-pool.md has the sources and the four steps;
 from the token wizard's thread, 2026-10-17.
