@@ -110,12 +110,17 @@ token, in the same five-hour window, with the step's settings changed:
 - The file .github/symphony/assistant.md appended to the system prompt
   through the CLI's --append-system-prompt-file, which the action passes
   through untouched. The file says what the page is, what to read, how to
-  answer and the few lines of a reply the page acts on (focus, open,
-  filter, show).
+  answer and the few lines of a reply the page acts on: the reads it
+  does by itself (focus, open, filter, show, tab) and the changes it
+  offers as buttons the person presses (run, give, merge, task, ask).
 
 The job's permissions stay as they are: the tools, not the token, are
 what keeps the assistant read-only. A question that asks for a change is
-answered with what the person would do and where, never done. No run has
+answered with what the person would do and where, never done; where the
+panel has a button for that change, the answer names it in its symphony
+block, and the page shows it as a button that runs only when the person
+presses it, as the person, through the panel's own handler. Claude in
+Chrome is not needed for this, and the run never writes. No run has
 been made with these settings yet, so the first answer should show it
 followed the file, and its run log a refusal should the session try the
 push script, a file command or git fetch; if not, the flags are the

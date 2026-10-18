@@ -208,6 +208,20 @@ class ThePrompt(unittest.TestCase):
         self.assertNotIn("git fetch origin", text, "no fetch is allowed, so the board is read as checked out")
         self.assertNotIn("gh pr checks", text, "checks: read is not asked for")
 
+    def test_the_vocabulary_is_the_one_the_page_acts_on(self):
+        """The page (openspineconsortium.github.io, assets/js/symphony-panel.js,
+        assistantRun) does the reads by itself and offers the changes as
+        buttons; a verb the prompt names and the page does not know would be
+        shown as text, and one the page knows and the prompt leaves out is
+        never proposed."""
+        text = PROMPT.read_text(encoding="utf-8")
+        section = text.split("## The reply vocabulary", 1)[1]
+        verbs = set(re.findall(r"^    ([a-z]+) ", section, re.M))
+        self.assertEqual(verbs, {"focus", "open", "filter", "show", "tab", "run", "give", "merge", "task", "ask"})
+        reads, changes = section.split("The rest change something", 1)
+        self.assertEqual(set(re.findall(r"^    ([a-z]+) ", reads, re.M)), {"focus", "open", "filter", "show", "tab"})
+        self.assertIn("nothing happens until the person", re.sub(r"\s+", " ", changes))
+
 
 class TheToken(unittest.TestCase):
     def test_the_assistant_alone_asks_for_actions_read(self):
