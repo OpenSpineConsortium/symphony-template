@@ -62,6 +62,7 @@ PROMPT = "Paste code here"
 # it go in two writes with this pause between.
 PASTE_SETTLE = 1.0
 POLL_EVERY = 3
+TERMINAL_TYPE = "xterm-256color"
 API = "https://api.github.com"
 
 
@@ -120,6 +121,9 @@ class Claude:
         if self.pid == 0:
             for name in ("COLUMNS", "LINES"):
                 os.environ.pop(name, None)
+            # GitHub's runners set no TERM, and claude then draws only the cells
+            # that change, with cursor moves between, which no token pattern finds
+            os.environ["TERM"] = os.environ.get("TERM") or TERMINAL_TYPE
             fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", *tokens.TERMINAL_SIZE, 0, 0))
             try:
                 os.execvp(command[0], list(command))

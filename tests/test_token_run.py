@@ -123,6 +123,19 @@ class TokenRunTest(unittest.TestCase):
         self.assertEqual(mark, token_run.SEALED_MARK)
         self.assertEqual(sealbox.open_sealed(base64.b64decode(sealed), SECRET).decode(), TOKEN)
 
+    def test_claude_gets_a_terminal_type_where_the_runner_sets_none(self):
+        self.use_stand_in("#!/bin/sh\necho \"term=$TERM\"\n")
+        saved = os.environ.pop("TERM", None)
+        try:
+            claude = token_run.Claude(command=(str(self.claude),))
+            while not claude.ended:
+                claude.read(1)
+            claude.finish()
+        finally:
+            if saved is not None:
+                os.environ["TERM"] = saved
+        self.assertIn("term=" + token_run.TERMINAL_TYPE, claude.seen)
+
     def test_a_code_from_anyone_else_is_never_typed(self):
         github = FakeGitHub(CODE, poster="someone-else")
         with self.assertRaisesRegex(token_run.RunError, "no code came"):
