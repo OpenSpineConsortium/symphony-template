@@ -103,6 +103,10 @@ pictures rather than text, with a worker added without a form.
   button. They also carry `data-pull`, so the task filter does not read them as tasks.
 - The review caught one problem, now fixed: a card's grid display overrode the filter's hidden
   rows.
+- Site #59. The Agents tab (site #55) is drawn as cards too, with the purpose as a pill. The
+  leaderboard (site #53) gives its first three places gold, silver and bronze. The rail now has
+  fourteen tabs, so in a window up to 820 px tall its rows close up and all of them fit at
+  1366x657; in shorter windows the rail scrolls.
 
 ## Design decisions
 
