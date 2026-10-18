@@ -54,10 +54,8 @@ control-panel-console.md beside this file covers the console's layout as it was 
 
 symphony-app's signin/panel-checks/e2e2 browser checks follow the dialogs (symphony-app#28, and #29 for the third pull request, openspineconsortium.github.io#62). console-tabs.mjs presses the button that opens the dialog a selector is in. Each pull request had an adversarial review before it opened, and its findings were fixed in the same pull request.
 
-## What waits
+## Where it stands
 
-The Apps' privacy statement must list each change before it goes live:
-- version 20 (symphony-start#58) covers the layout key
-- the Share tab's reads and writes need version 22 or later, which the "Control panel sign-in" thread writes
+All three site pull requests merged on 2026-10-18, each rebuilt on master after the one before it, with their checks (symphony-app#28, #29 and #30). The Apps' privacy statement listed each change first: version 20 (symphony-start#58) the layout key, version 22 (symphony-start#59) the cards' writes, the repository picker and the Share tab's reads and writes.
 
-The site pull requests merge in order, each rebuilt on master after the one before it.
+The Folders tab, which landed on master meanwhile, needs no repository, so the picker opens by itself where nothing is listed except over that tab.
