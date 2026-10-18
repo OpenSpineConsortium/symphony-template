@@ -1,0 +1,53 @@
+# One Claude account's subscription token for the control panel's Tokens
+# page (Add a Claude account), minted on a runner in about a minute
+# instead of in a Codespace, which took minutes to start. The page opens
+# an issue, starts this workflow with the issue's number and the public
+# key GitHub's secrets API gave it, and watches the issue: the run posts
+# claude's sign-in link there, the person signs in and the page posts the
+# code claude.ai shows back as the person, and the run posts the token
+# sealed for that key, which the page stores as the slot's secret. The
+# token is never on the page, in the issue or in the log
+# (tools/token_run.py, docs/setup/claude-tokens.md). The run holds no
+# secret and needs none: GITHUB_TOKEN only comments, and only someone who
+# may write here can start it. In crowd mode it never runs, since the
+# repository then holds no Claude token (docs/setup/crowdsourcing.md).
+name: Token
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: the issue the Tokens page opened for this sign-in
+        required: true
+      key:
+        description: the secrets public key, in base64, to seal the token for
+        required: true
+      key_id:
+        description: that key's id
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: token-${{ inputs.issue }}
+
+jobs:
+  mint:
+    if: vars.CLAUDE_CROWD != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Claude Code
+        run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code
+      - name: Sign in and seal the token
+        env:
+          ISSUE: ${{ inputs.issue }}
+          KEY: ${{ inputs.key }}
+          KEY_ID: ${{ inputs.key_id }}
+          ACTOR: ${{ github.triggering_actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tools/token_run.py

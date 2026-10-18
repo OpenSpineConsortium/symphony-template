@@ -37,6 +37,11 @@ Codespace, and scripts/codespace.sh is what runs in it.
 
 ## One button: the Tokens page
 
+The Tokens page's Add a Claude account no longer uses a Codespace: it mints
+the token on an Actions runner in about a minute (docs/setup/claude-tokens.md,
+Add a Claude account, from the page). What follows is the Codespace route it
+replaced, which the token devcontainer still serves.
+
 The control panel's Tokens page has "Add with one press", which does the
 token part of the above for one account, with nothing to type:
 
