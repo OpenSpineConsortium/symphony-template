@@ -38,6 +38,7 @@ A window whose reset has passed counts as empty, since it is.
   python3 tools/pool.py show DIR               the slots as the panel shows them
   python3 tools/pool.py pick DIR --slots 1,2,3 [--threshold 0.9]
   python3 tools/pool.py choose --worker NAME --pool 1,2,3   the slot a worker's run takes
+  python3 tools/pool.py settings --slot main --settings JSON   a slot's model, effort and fallback
 
 Which account a worker in Actions runs on is the file
 .github/symphony/accounts.json, {"default": "main", "workers": {"NAME":
@@ -45,6 +46,20 @@ Which account a worker in Actions runs on is the file
 slot's SYMPHONY_CLAUDE_<slot>, and auto is pick over the pool, the slots
 of SYMPHONY_CLAUDE_ACCOUNTS. With no file, or no line for the worker and
 no default, the worker runs on main, as every worker did before.
+
+How each slot runs is the variable SYMPHONY_CLAUDE_SETTINGS, which the
+control panel's Tokens tab writes when a token's tile is set: a JSON
+object by slot, {"1": {"model": "claude-opus-5-5", "effort": "high",
+"fallback": "claude-sonnet-5-5", "resume": true}}. The model, when set,
+is the one the slot's runs take in place of the worker's; the effort is
+Claude Code's --effort; the fallback is the lesser model a run takes when
+the model's own weekly limit is spent while the slot's other windows have
+room, and Claude Code's --fallback-model when the model is busy. resume
+false keeps a slot out of auto, once a reading after resumedAt shows it at
+its limit, until a person presses Resume, which sets resumedAt anew;
+paused true keeps it out of auto whatever its readings say. A setting that
+does not hold together is left out with a word on stderr, so one bad
+value never stops a worker; a slot with no settings runs as before.
 """
 
 import argparse
@@ -71,6 +86,16 @@ PROBE_TIMEOUT = 120
 PUSH_ATTEMPTS = 5
 ASSIGNMENTS = ".github/symphony/accounts.json"
 CHOICES = SLOTS + ("auto",)
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+# The models a token's tile offers. A setting names one of them or is
+# left out: a name of the right shape that no model answers to would fail
+# every run on the token, and a setting must never stop a run. The control
+# panel's tile list (assets/js/symphony-panel.js, TILE_MODELS) is the same.
+KNOWN_MODELS = ("claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5")
+# The worker's own model, as the registry takes it (tools/sdlc_protocol/workers.py).
+WORKER_MODEL = re.compile(r"[A-Za-z0-9._:\[\]-]{0,80}")
+# The per-model weekly limits by the family a model's name holds.
+FAMILIES = ("fable", "opus", "sonnet", "haiku")
 
 
 class PoolError(Exception):
@@ -297,27 +322,90 @@ def held_until(windows, scoped, threshold, now):
     return until
 
 
-def pick(found, slots, threshold=THRESHOLD, now=None, spread=0):
-    """(slot, None) for the slot with the most room, or (slot, until) for
-    the one whose hold ends first when every slot is held. Workers of one
-    run all read the pool before any of them writes it, so spread, each
-    worker's place in the run, deals them the free slots in turn, the
-    one with the most room to the first."""
+def family(model):
+    """The per-model limit's name a model's runs count against, or None
+    where the name says no family, as the subscription's default does."""
+    for each in FAMILIES:
+        if each in (model or ""):
+            return each.capitalize()
+    return None
+
+
+def scoped_for(scoped, model):
+    """The per-model limits that hold a run of the model: its family's
+    alone, or every one where the family is not known, as before."""
+    name = family(model)
+    return [each for each in scoped if name is None or each.get("name") == name]
+
+
+def tripped(records, since, threshold):
+    """Whether a reading taken at or after since saw a window at its limit,
+    for a slot that does not resume by itself."""
+    since = parse_time(since)
+    for record in records:
+        if since is not None and parse_time(record["at"]) < since:
+            continue
+        seen = list((record.get("windows") or {}).values()) + list(record.get("scoped") or [])
+        if any(isinstance(each, dict) and (fraction(each.get("utilization")) or 0.0) >= threshold for each in seen):
+            return True
+    return False
+
+
+def slot_state(records, setting, model, threshold, now):
+    """(until, model, why) for one slot: until is when a held slot is free
+    again (datetime.max for one a person must resume), model the one its run
+    takes, and why a word on the fallback or the hold."""
+    setting = setting or {}
+    model = setting.get("model") or model
+    if setting.get("paused"):
+        return datetime.max.replace(tzinfo=timezone.utc), model, "paused"
+    if setting.get("resume") is False and tripped(records, setting.get("resumedAt"), threshold):
+        return datetime.max.replace(tzinfo=timezone.utc), model, "at its limit, waiting for Resume"
+    windows, scoped = current(records, now)
+    general = held_until(windows, [], threshold, now)
+    if general:
+        return general, model, "at its limit"
+    own = held_until({}, scoped_for(scoped, model), threshold, now)
+    if not own:
+        return None, model, ""
+    fallback = setting.get("fallback")
+    if fallback and fallback != model and not held_until({}, scoped_for(scoped, fallback), threshold, now):
+        return None, fallback, f"{model or 'the model'} is at its weekly limit, so {fallback}"
+    return own, model, "the model is at its weekly limit"
+
+
+def pick_run(found, slots, settings=None, model="", threshold=THRESHOLD, now=None, spread=0):
+    """(slot, until, model, why): the slot with the most room, the model
+    its run takes and why it is not the usual one; for every slot held,
+    the one whose hold ends first, with until set. Workers of one run all
+    read the pool before any of them writes it, so spread, each worker's
+    place in the run, deals them the free slots in turn, the one with the
+    most room to the first."""
     now = now or datetime.now(timezone.utc)
+    settings = settings or {}
     if not slots:
         raise PoolError("the pool names no slot")
     free, held = [], []
     for order, slot in enumerate(slots):
-        windows, scoped = current(found.get(slot, []), now)
-        until = held_until(windows, scoped, threshold, now)
+        records = found.get(slot, [])
+        until, taken, why = slot_state(records, settings.get(slot), model, threshold, now)
+        windows, _ = current(records, now)
         room = tuple(fraction((windows.get(name) or {}).get("utilization")) or 0.0 for name in WINDOWS)
         # A slot no reading names comes after every slot one does: its
         # secret may be unset or revoked, which no reading would show.
-        (held if until else free).append((until, (not windows, room), order, slot))
+        (held if until else free).append((until, (not windows, room), order, slot, taken, why))
     if free:
         free.sort(key=lambda each: (each[1], each[2]))
-        return free[spread % len(free)][3], None
-    until, _, _, slot = min(held, key=lambda each: (each[0], each[2]))
+        _, _, _, slot, taken, why = free[spread % len(free)]
+        return slot, None, taken, why
+    until, _, _, slot, taken, why = min(held, key=lambda each: (each[0], each[2]))
+    return slot, until, taken, why
+
+
+def pick(found, slots, threshold=THRESHOLD, now=None, spread=0):
+    """(slot, None) for the slot with the most room, or (slot, until) for
+    the one whose hold ends first when every slot is held."""
+    slot, until, _, _ = pick_run(found, slots, threshold=threshold, now=now, spread=spread)
     return slot, until
 
 
@@ -330,6 +418,56 @@ def parse_slots(text):
         if word and word not in slots:
             slots.append(word)
     return slots
+
+
+def parse_settings(text, complain=None):
+    """SYMPHONY_CLAUDE_SETTINGS as {slot: setting}, each value checked and
+    one that is not what it should be left out and named to complain."""
+    complain = complain or (lambda words: print(f"pool: {words}", file=sys.stderr))
+    if not (text or "").strip():
+        return {}
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        complain("SYMPHONY_CLAUDE_SETTINGS is not JSON; every slot runs as it would with none")
+        return {}
+    if not isinstance(data, dict):
+        complain("SYMPHONY_CLAUDE_SETTINGS is not an object by slot; every slot runs as it would with none")
+        return {}
+    settings = {}
+    for slot, each in data.items():
+        if slot not in SLOTS or not isinstance(each, dict):
+            complain(f"SYMPHONY_CLAUDE_SETTINGS: {str(slot)[:20]!r} is no slot's settings; left out")
+            continue
+        settings[slot] = setting_of(slot, each, complain)
+    return settings
+
+
+def setting_of(slot, each, complain):
+    found = {}
+    for key in ("model", "fallback"):
+        value = each.get(key)
+        if value in (None, ""):
+            continue
+        if value in KNOWN_MODELS:
+            found[key] = value
+        else:
+            complain(f"slot {slot}: the {key} is one of {', '.join(KNOWN_MODELS)}; left out")
+    effort = each.get("effort")
+    if effort not in (None, ""):
+        if effort in EFFORTS:
+            found["effort"] = effort
+        else:
+            complain(f"slot {slot}: the effort is one of {', '.join(EFFORTS)}; left out")
+    for key in ("resume", "paused"):
+        if isinstance(each.get(key), bool):
+            found[key] = each[key]
+    if each.get("resumedAt") is not None:
+        if parse_time(each["resumedAt"]):
+            found["resumedAt"] = each["resumedAt"]
+        else:
+            complain(f"slot {slot}: resumedAt is not a time; left out")
+    return found
 
 
 def summary(found, threshold=THRESHOLD, now=None):
@@ -386,24 +524,43 @@ def branch_readings(folder, cwd=None):
     return folder
 
 
-def choose(worker, pool_text, path=ASSIGNMENTS, folder=None, now=None, spread=0):
-    """(slot, how, until): the slot a worker's run takes, how it was
-    chosen, and, for auto with every slot held, when the first is free."""
+def choose_run(worker, pool_text, path=ASSIGNMENTS, folder=None, now=None, spread=0, settings=None, model=""):
+    """What a worker's run takes, as a dict: the slot, how it was chosen,
+    for a held auto pick when the first slot is free (until), and the
+    model, effort and fallback the slot's settings give, the model the
+    worker's own where the slot names none."""
+    settings = settings or {}
     workers, default = assignments(path)
     choice = workers.get(worker, default)
     how = "assigned" if worker in workers else "default"
+    if choice == "auto":
+        slots = [slot for slot in parse_slots(pool_text) if slot != "main"]
+        if not slots:
+            choice, how = "main", "auto, with no slot in SYMPHONY_CLAUDE_ACCOUNTS"
     if choice != "auto":
-        return choice, how, None
-    slots = [slot for slot in parse_slots(pool_text) if slot != "main"]
-    if not slots:
-        return "main", "auto, with no slot in SYMPHONY_CLAUDE_ACCOUNTS", None
+        return run_of(choice, how, None, (settings.get(choice) or {}).get("model") or model, settings)
     if folder is None:
         with tempfile.TemporaryDirectory(prefix="pool-") as scratch:
             found = load(branch_readings(scratch))
     else:
         found = load(folder)
-    slot, until = pick(found, slots, now=now, spread=spread)
-    return slot, "auto", until
+    slot, until, taken, why = pick_run(found, slots, settings, model, now=now, spread=spread)
+    return run_of(slot, "auto" + (f", {why}" if why and not until else ""), until, taken, settings)
+
+
+def run_of(slot, how, until, model, settings):
+    setting = settings.get(slot) or {}
+    model = model or setting.get("model", "")
+    fallback = setting.get("fallback", "")
+    return {"slot": slot, "how": how, "until": until, "model": model or "",
+            "effort": setting.get("effort", ""), "fallback": fallback if fallback != model else ""}
+
+
+def choose(worker, pool_text, path=ASSIGNMENTS, folder=None, now=None, spread=0):
+    """(slot, how, until): the slot a worker's run takes, how it was
+    chosen, and, for auto with every slot held, when the first is free."""
+    found = choose_run(worker, pool_text, path, folder, now, spread)
+    return found["slot"], found["how"], found["until"]
 
 
 # Probing and publishing, in Actions.
@@ -515,6 +672,11 @@ def build_parser():
     choosing.add_argument("--pool", default="")
     choosing.add_argument("--assignments", default=ASSIGNMENTS)
     choosing.add_argument("--spread", type=int, default=0, help="the worker's place in its run, from 0")
+    choosing.add_argument("--settings", default="", help="SYMPHONY_CLAUDE_SETTINGS, the slots' settings as JSON")
+    choosing.add_argument("--model", default="", help="the worker's own model, taken where the slot names none")
+    showing_settings = commands.add_parser("settings", help="one slot's model, effort and fallback, as step outputs")
+    showing_settings.add_argument("--slot", required=True, choices=SLOTS)
+    showing_settings.add_argument("--settings", default="", help="SYMPHONY_CLAUDE_SETTINGS, the slots' settings as JSON")
     return parser
 
 
@@ -546,13 +708,26 @@ def main(argv=None):
                 print(f"pool: every slot is held; slot {slot} is free first, at "
                       f"{iso(until)}", file=sys.stderr)
         elif args.command == "choose":
-            slot, how, until = choose(args.worker, args.pool, args.assignments, spread=max(args.spread, 0))
-            print(f"slot={slot}")
+            model = args.model if WORKER_MODEL.fullmatch(args.model or "") else ""
+            run = choose_run(args.worker, args.pool, args.assignments, spread=max(args.spread, 0),
+                             settings=parse_settings(args.settings), model=model)
+            print(f"slot={run['slot']}")
+            for key in ("model", "effort", "fallback"):
+                if run[key]:
+                    print(f"{key}={run[key]}")
+            until = run["until"]
             if until:
                 print("wait=true")
-                print(f"until={iso(until)}")
-            print(f"pool: {args.worker} runs on {'slot ' + slot if slot != 'main' else 'the main token'} ({how})"
+                print(f"until={'when a person presses Resume on its tile' if until.year == 9999 else 'at ' + iso(until)}")
+            slot = run["slot"]
+            print(f"pool: {args.worker} runs on {'slot ' + slot if slot != 'main' else 'the main token'} ({run['how']})"
+                  + (f" with {run['model']}" if run["model"] else "")
                   + (", though every slot of the pool is held" if until else ""), file=sys.stderr)
+        elif args.command == "settings":
+            run = run_of(args.slot, "", None, "", parse_settings(args.settings))
+            for key in ("model", "effort", "fallback"):
+                if run[key]:
+                    print(f"{key}={run[key]}")
     except PoolError as error:
         print(f"pool: {error}", file=sys.stderr)
         return 1

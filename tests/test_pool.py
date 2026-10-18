@@ -289,6 +289,106 @@ class TheAssignments(unittest.TestCase):
         self.assertEqual(printed.getvalue(), "slot=4\n")
 
 
+class TheSettings(unittest.TestCase):
+    """SYMPHONY_CLAUDE_SETTINGS, as the Tokens tab's tiles write it."""
+
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp(prefix="pool-settings-"))
+        self.addCleanup(shutil.rmtree, self.folder, ignore_errors=True)
+        self.path = self.folder / "accounts.json"
+        self.path.write_text(json.dumps({"default": "auto", "workers": {"docs": "3"}}))
+        self.readings = self.folder / "readings"
+        self.readings.mkdir()
+        pool.write(self.readings / "slot-1.run.json", record("1", 0.8, 0.1))
+        pool.write(self.readings / "slot-2.run.json", record("2", 0.1, 0.1))
+
+    def run_of(self, worker, settings, model=""):
+        return pool.choose_run(worker, "1,2", self.path, self.readings, now=NOW,
+                               settings=pool.parse_settings(json.dumps(settings), lambda words: None), model=model)
+
+    def fable_spent(self, slot):
+        held = record(slot, 0.1, 0.1, source="cswap")
+        held["scoped"] = [{"name": "Fable", "utilization": 1.0, "resetsAt": "2026-10-22T21:00:00Z"}]
+        pool.write(self.readings / f"slot-{slot}.cswap.json", held)
+
+    def test_a_slot_gives_its_model_and_effort(self):
+        run = self.run_of("runner", {"2": {"model": "claude-opus-5-5", "effort": "high", "fallback": "claude-sonnet-5-5"}}, "haiku")
+        self.assertEqual((run["slot"], run["model"], run["effort"], run["fallback"]),
+                         ("2", "claude-opus-5-5", "high", "claude-sonnet-5-5"))
+        self.assertEqual(self.run_of("runner", {}, "haiku")["model"], "haiku")
+        self.assertEqual(self.run_of("docs", {"3": {"effort": "low"}})["effort"], "low")
+
+    def test_a_spent_model_switches_to_the_fallback(self):
+        self.fable_spent("2")
+        settings = {"2": {"model": "claude-fable-5-1", "fallback": "claude-opus-5-5"}}
+        run = self.run_of("runner", settings)
+        self.assertEqual((run["slot"], run["model"], run["fallback"]), ("2", "claude-opus-5-5", ""))
+        settings["2"].pop("fallback")
+        self.assertEqual(self.run_of("runner", settings)["slot"], "1")
+
+    def test_another_models_limit_holds_no_run_of_this_one(self):
+        self.fable_spent("2")
+        self.assertEqual(self.run_of("runner", {"2": {"model": "claude-sonnet-5-5"}})["slot"], "2")
+        self.assertEqual(self.run_of("runner", {})["slot"], "1")
+
+    def test_paused_and_waiting_for_resume_sit_out(self):
+        self.assertEqual(self.run_of("runner", {"2": {"paused": True}})["slot"], "1")
+        pool.write(self.readings / "slot-2.run.json", record("2", 0.95, 0.1, resets=SOON))
+        waiting = {"2": {"resume": False}}
+        later = NOW + timedelta(hours=3)
+        settings = pool.parse_settings(json.dumps(waiting), lambda words: None)
+        found = pool.load(self.readings)
+        self.assertEqual(pool.pick_run(found, ["2"], settings, now=later)[1].year, 9999)
+        self.assertEqual(pool.pick_run(found, ["2"], now=later)[1], None)
+        waiting["2"]["resumedAt"] = pool.iso(NOW + timedelta(minutes=1))
+        settings = pool.parse_settings(json.dumps(waiting), lambda words: None)
+        self.assertEqual(pool.pick_run(found, ["2"], settings, now=later)[1], None)
+
+    def test_values_that_do_not_hold_together_are_left_out(self):
+        said = []
+        text = json.dumps({"1": {"model": "opus; rm -rf /", "effort": "huge", "fallback": "x y", "resume": "no",
+                                 "resumedAt": "soon"}, "9": {}, "2": "x"})
+        self.assertEqual(pool.parse_settings(text, said.append), {"1": {}})
+        self.assertEqual(len(said), 6)
+        # a name of the right shape that no model answers to, or one with a
+        # newline after it, is left out like any other
+        for model in ("claude-opus-55", "claude-opus-5-5\n", "opus"):
+            self.assertEqual(pool.parse_settings(json.dumps({"1": {"model": model}}), said.append), {"1": {}})
+        for text in ("not json", "[]", ""):
+            self.assertEqual(pool.parse_settings(text, said.append), {})
+
+    def test_the_workers_own_model_takes_no_newline(self):
+        with redirect_stdout(io.StringIO()) as printed, patch_stderr():
+            pool.main(["choose", "--worker", "docs", "--pool", "1", "--assignments", str(self.path),
+                       "--model", "haiku\nslot=8"])
+        self.assertEqual(printed.getvalue(), "slot=3\n")
+
+    def test_choose_prints_the_settings_as_step_outputs(self):
+        settings = json.dumps({"3": {"model": "claude-opus-5-5", "effort": "max", "fallback": "claude-sonnet-5-5"}})
+        with redirect_stdout(io.StringIO()) as printed, patch_stderr():
+            self.assertEqual(pool.main(["choose", "--worker", "docs", "--pool", "1", "--assignments", str(self.path),
+                                        "--settings", settings, "--model", "$(bad)"]), 0)
+        self.assertEqual(printed.getvalue(),
+                         "slot=3\nmodel=claude-opus-5-5\neffort=max\nfallback=claude-sonnet-5-5\n")
+
+
+class TheMainTokensSettings(unittest.TestCase):
+    """@claude and the coordinator run on main and take its tile's settings."""
+
+    def settings(self, text):
+        with redirect_stdout(io.StringIO()) as printed, patch_stderr():
+            self.assertEqual(pool.main(["settings", "--slot", "main", "--settings", text]), 0)
+        return printed.getvalue()
+
+    def test_mains_settings_as_step_outputs(self):
+        text = json.dumps({"main": {"model": "claude-opus-5-5", "effort": "high", "fallback": "claude-sonnet-5-5"}, "1": {"effort": "low"}})
+        self.assertEqual(self.settings(text), "model=claude-opus-5-5\neffort=high\nfallback=claude-sonnet-5-5\n")
+
+    def test_none_or_a_bad_variable_prints_nothing(self):
+        for text in ("", "not json", json.dumps({"main": {"model": "x; y", "effort": "huge"}})):
+            self.assertEqual(self.settings(text), "")
+
+
 def patch_stderr():
     from unittest.mock import patch
     return patch("sys.stderr", io.StringIO())

@@ -267,14 +267,20 @@ jobs:
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
         env:
           POOL: ${{ vars.SYMPHONY_CLAUDE_ACCOUNTS }}
+          SETTINGS: ${{ vars.SYMPHONY_CLAUDE_SETTINGS }}
+          MODEL: ${{ steps.next.outputs.model }}
           SPREAD: ${{ strategy.job-index }}
         run: |
           # .github/symphony/accounts.json names a slot, main or auto for the
           # worker (tools/pool.py); auto takes the pool's slot with the most
-          # room, read from the branch pool. A file that does not hold
-          # together leaves the worker on the main token, as before.
-          if ! python3 tools/pool.py choose --worker "$WORKER" --pool "$POOL" --spread "$SPREAD" >> "$GITHUB_OUTPUT"; then
+          # room, read from the branch pool. SYMPHONY_CLAUDE_SETTINGS, the
+          # Tokens tab's tiles, gives each slot's model, effort and fallback
+          # and keeps a paused slot out. A file that does not hold together
+          # leaves the worker on the main token with its own model, as before.
+          if ! python3 tools/pool.py choose --worker "$WORKER" --pool "$POOL" --spread "$SPREAD" \
+              --settings "$SETTINGS" --model "$MODEL" >> "$GITHUB_OUTPUT"; then
             echo "slot=main" >> "$GITHUB_OUTPUT"
+            echo "model=$MODEL" >> "$GITHUB_OUTPUT"
           fi
       - name: Whether the chosen account's secret is seen here
         id: secret
@@ -306,7 +312,7 @@ jobs:
         if: steps.account.outputs.wait == 'true'
         env:
           UNTIL: ${{ steps.account.outputs.until }}
-        run: echo "Every slot of SYMPHONY_CLAUDE_ACCOUNTS is at its limit; the first is free at $UNTIL, and the next run picks again (Run workflow on Pool reads them afresh). Doing nothing."
+        run: echo "Every slot of SYMPHONY_CLAUDE_ACCOUNTS is at its limit or paused; the first is free $UNTIL, and the next run picks again (Run workflow on Pool reads them afresh, Resume on a token's tile lets one back in). Doing nothing."
       - name: Point at the setup when the token is not there
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN != 'true'
         run: echo "The repository secret CLAUDE_CODE_OAUTH_TOKEN is not set; docs/setup/claude-action.md says how. Doing nothing."
@@ -335,7 +341,9 @@ jobs:
           allowed_bots: "github-actions,claude"
           claude_args: |
             --max-turns ${{ steps.next.outputs.max_turns }}
-            ${{ steps.next.outputs.model != '' && format('--model {0}', steps.next.outputs.model) || '' }}
+            ${{ steps.account.outputs.model != '' && format('--model {0}', steps.account.outputs.model) || '' }}
+            ${{ steps.account.outputs.effort != '' && format('--effort {0}', steps.account.outputs.effort) || '' }}
+            ${{ steps.account.outputs.fallback != '' && format('--fallback-model {0}', steps.account.outputs.fallback) || '' }}
             --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
           prompt: |
             You are the worker ${{ matrix.worker }} on the repository ${{ github.repository }}. Run `git fetch origin ${{ env.DEFAULT_BRANCH }} && git show origin/${{ env.DEFAULT_BRANCH }}:docs/agents/routines/worker.md` and do what the last fenced block of that page says, exactly and nothing else, as the worker ${{ matrix.worker }}. This run, ${{ steps.next.outputs.move }} issue #${{ steps.next.outputs.issue }}: the workflow chose it, so that the workers running at the same time each take a different issue.

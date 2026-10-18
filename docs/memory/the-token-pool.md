@@ -12,7 +12,9 @@ Refresh, never on a schedule (the owner's choice, 2026-10-17). pick takes the le
 seven-day window, passing over a slot held at 90 percent until its
 reset. .github/symphony/accounts.json gives each worker in Actions
 main, a slot or auto (no file: main), and workers.yml records each run's
-reading. coordbench's bench.yml takes auto in its accounts box from its
+reading. SYMPHONY_CLAUDE_SETTINGS, which the Tokens tab's tiles write, gives each slot a model, an effort, a
+fallback taken when the model's own weekly limit is spent, and resume or paused, which keep a slot out of auto
+(docs/setup/claude-tokens.md, "Each token's settings"). coordbench's bench.yml takes auto in its accounts box from its
 own branch pool (a copy of pool.py there), fed by its real jobs and by
 `tokens.py usage --also coordbench`. The site's
 /symphony/control/tokens.html shows the slots and proposes

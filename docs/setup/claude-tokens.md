@@ -16,6 +16,7 @@ account you have, without the token ever being shown.
 | SYMPHONY_CLAUDE_1 to SYMPHONY_CLAUDE_8 | account: one slot each | a benchmark in Actions, which spreads its agents over the slots, one account per job at a time (OpenSpineConsortium/coordbench's bench.yml); any workflow that names a slot |
 | SYMPHONY_CLAUDE_ACCOUNTS | the place | the slots in use, as a list such as `1,2,3`; the wizard keeps it equal to the slots whose secret exists. The bench stops a real run on any other word, such as `01` or `9`, so the wizard writes such a list again |
 | SYMPHONY_CLAUDE_<slot>_LABEL | slot, optional | nothing; a word of your own so that `status` can say which account a slot is. A variable is readable by anyone who can read the repository's workflows, so never an e-mail address |
+| SYMPHONY_CLAUDE_SETTINGS | the place, optional | the workers in Actions, and for main the coordinator, @claude and the assistant: each slot's model, effort, fallback model and whether it resumes by itself, as JSON by slot, which the control panel's token tiles write (below, "Each token's settings") |
 
 A secret on an organization reaches the repositories on its list (GitHub's
 "Selected repositories"), or all of them; a repository's own secret or
@@ -290,16 +291,87 @@ again. A slot whose secret this repository does not see falls back to
 the main token, and the run says so. The workers still need
 CLAUDE_CODE_OAUTH_TOKEN set, which turns them on at all.
 
+## Each token's settings
+
+The variable SYMPHONY_CLAUDE_SETTINGS says how each slot's runs go, and
+the control panel writes it when a token's tile is set; a slot it does
+not name runs as before:
+
+```
+{"1": {"model": "claude-fable-5-1", "effort": "high", "fallback": "claude-opus-5-5", "resume": true},
+ "2": {"paused": true}, "main": {"effort": "medium"}}
+```
+
+- model: the model the slot's runs take in place of the worker's own
+  (.github/symphony/workers/); empty, the worker's, else the plan's default.
+  It is one of the tile's models, claude-fable-5-1, claude-opus-5-5,
+  claude-sonnet-5-5 or claude-haiku-5-5, as is the fallback; any other name
+  is left out, since a name no model answers to would fail every run.
+- effort: Claude Code's `--effort`, one of low, medium, high, xhigh, max.
+- fallback: a lesser model. When a reading shows the model's own weekly
+  limit spent (Fable's, say) while the slot's five-hour and seven-day
+  windows have room, auto keeps the slot and runs the fallback on it; it
+  is also Claude Code's `--fallback-model`, which a run takes when the
+  model is busy. A five-hour or seven-day window at its limit holds the
+  slot whatever the model, since every model counts against it.
+- resume: true, or left out, lets a slot back in once its limit resets,
+  at the next run (the schedule runs every six hours); false keeps it out
+  of auto, once a reading after resumedAt shows it at its limit, until
+  Resume on its tile sets resumedAt anew.
+- paused: true keeps the slot out of auto whatever its readings say.
+
+A per-model limit holds a run only of that model's family (the name's
+fable, opus, sonnet or haiku); with no model named, any of them holds the
+slot, as before. main's model, effort and fallback reach the coordinator
+workflow and @claude's (claude.yml, the control panel's assistant included) too, which read them with `pool.py settings --slot main`. Pausing and resuming steer auto; a worker the file
+assigns a slot by number keeps it, with that slot's model and effort. A
+value that does not hold together, a model the tiles do not offer among
+them, is left out with a word in the run's log (tools/pool.py), so no
+setting can stop a run or reach Claude's command line as anything but one
+of those models or an effort. The variable
+says nothing secret, and anyone who can read the workflows can read it.
+
 ## Seeing it in the control panel
 
 The control panel's Tokens page, https://openspineconsortium.com/symphony/control/tokens.html,
 shows each slot's windows, resets and per-model limits from the branch
 pool, whether it is held, and which slot auto would take now. Its "Read
 every slot now" starts the workflow Pool, and its assignments open a pull
-request that sets .github/symphony/accounts.json. Its "Add or renew a
-slot" takes a token printed anywhere, seals it in the browser for GitHub
-and stores it as the slot's secret, and links a Codespace that runs this
-wizard for the repository (docs/setup/codespace.md).
+request that sets .github/symphony/accounts.json. Its "Paste a token
+instead" takes a token printed anywhere, seals it in the browser for
+GitHub and stores it as the slot's secret.
+
+## Add a Claude account, from the page
+
+The Tokens page's Add a Claude account mints a token on a GitHub Actions
+runner, which starts in seconds where a Codespace took minutes
+(.github/workflows/token.yml, tools/token_run.py):
+
+1. The page opens an issue on the repository and starts the workflow
+   Token with the issue's number and the secrets public key GitHub gives
+   for where the slots live, the organization's or the repository's.
+2. The run installs Claude Code and runs `claude setup-token` behind a
+   pseudo-terminal. With no browser on the runner, claude prints its
+   sign-in link and waits for a code; the run posts the link on the issue.
+3. The page shows the link as a button. You sign in to claude.ai as the
+   account for the slot, press **Authorize**, and paste the code claude.ai
+   shows into the page's box; the page posts it on the issue as you, and
+   the run deletes that comment once read. The code mints nothing on its
+   own: claude's sign-in is PKCE, so only the claude that printed the link
+   can exchange it, and only once, and the run takes a code only from the
+   person who started it.
+4. The run takes the token out of what claude prints with the wizard's own
+   mask, seals it for the page's key (tools/sealbox.py, a libsodium sealed
+   box in the standard library) and posts only the sealed value. The page
+   stores it as the next free SYMPHONY_CLAUDE_<slot>, and as
+   CLAUDE_CODE_OAUTH_TOKEN too when that secret is missing, adds the slot
+   to SYMPHONY_CLAUDE_ACCOUNTS and closes the issue.
+
+GitHub opens a sealed box made for its key and nobody else can, so the
+token is on no page, in no comment and in no log. The run holds no secret
+and GITHUB_TOKEN only comments; starting it needs write access here and,
+for the page, SymphonyBoard's Actions permission, read and write. In crowd
+mode it never runs.
 
 ## Renewing and removing
 

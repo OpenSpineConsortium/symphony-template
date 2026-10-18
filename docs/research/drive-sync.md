@@ -28,8 +28,8 @@ OneDrive. This design brings their folder to the repository and their comments t
 
 ## The flow the owner asked for
 
-One page of the control panel, Folders (/symphony/control/folders.html), signed in with GitHub as
-every panel page is:
+One tab of the control console, Folders, at https://openspineconsortium.com/symphony/control/
+(a tab, not a page of its own, since 2026-10-18), signed in with GitHub as every panel page is:
 
 1. Connect Google Drive, or Connect OneDrive: one press, the provider's own consent screen, back
    to the page.
@@ -46,7 +46,9 @@ every panel page is:
 
 From then on .github/workflows/drive-sync.yml keeps the two in step every half hour, and the
 page's Sync now button runs it at once. A new comment in a document becomes a task on the board,
-a worker answers it as tracked changes, and the revised file goes back to the drive.
+a worker answers it as tracked changes, and the revised file goes back to the drive as soon as
+its pull request merges: papers.yml starts the sync on any push that changes a document. A merge
+GITHUB_TOKEN makes starts no workflow, so such a revision waits for the half-hourly run.
 
 ## What this pull request builds
 
@@ -115,11 +117,12 @@ The owner's one-time clicks, given with their links when the page is built:
   Google counts as restricted and verifies, with a security assessment, before strangers may
   consent. That route is the owner's call and is not built. When it is chosen, the clicks are a
   Cloud project with the Drive API on, an OAuth client of type "Web application" whose redirect
-  URI is the Folders page, and a consent screen published "In production", since in Testing a
-  refresh token lapses after seven days.
+  URI is https://openspineconsortium.com/symphony/control/, and a consent screen published
+  "In production", since in Testing a refresh token lapses after seven days.
 - Microsoft: an app registration for "Accounts in any organizational directory and personal
-  Microsoft accounts", a web redirect URI of the Folders page, a client secret into Cloudflare,
-  and the delegated scopes Files.ReadWrite and offline_access.
+  Microsoft accounts", a web redirect URI of https://openspineconsortium.com/symphony/control/
+  (the console that holds the Folders tab), a client secret into Cloudflare, and the delegated
+  scopes Files.ReadWrite and offline_access.
 
 ## Limits and what is not yet known
 
