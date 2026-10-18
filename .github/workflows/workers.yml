@@ -300,6 +300,30 @@ jobs:
             (steps.account.outputs.slot == '6' && secrets.SYMPHONY_CLAUDE_6) ||
             (steps.account.outputs.slot == '7' && secrets.SYMPHONY_CLAUDE_7) ||
             (steps.account.outputs.slot == '8' && secrets.SYMPHONY_CLAUDE_8) ||
+            (steps.account.outputs.slot == '9' && secrets.SYMPHONY_CLAUDE_9) ||
+            (steps.account.outputs.slot == '10' && secrets.SYMPHONY_CLAUDE_10) ||
+            (steps.account.outputs.slot == '11' && secrets.SYMPHONY_CLAUDE_11) ||
+            (steps.account.outputs.slot == '12' && secrets.SYMPHONY_CLAUDE_12) ||
+            (steps.account.outputs.slot == '13' && secrets.SYMPHONY_CLAUDE_13) ||
+            (steps.account.outputs.slot == '14' && secrets.SYMPHONY_CLAUDE_14) ||
+            (steps.account.outputs.slot == '15' && secrets.SYMPHONY_CLAUDE_15) ||
+            (steps.account.outputs.slot == '16' && secrets.SYMPHONY_CLAUDE_16) ||
+            (steps.account.outputs.slot == '17' && secrets.SYMPHONY_CLAUDE_17) ||
+            (steps.account.outputs.slot == '18' && secrets.SYMPHONY_CLAUDE_18) ||
+            (steps.account.outputs.slot == '19' && secrets.SYMPHONY_CLAUDE_19) ||
+            (steps.account.outputs.slot == '20' && secrets.SYMPHONY_CLAUDE_20) ||
+            (steps.account.outputs.slot == '21' && secrets.SYMPHONY_CLAUDE_21) ||
+            (steps.account.outputs.slot == '22' && secrets.SYMPHONY_CLAUDE_22) ||
+            (steps.account.outputs.slot == '23' && secrets.SYMPHONY_CLAUDE_23) ||
+            (steps.account.outputs.slot == '24' && secrets.SYMPHONY_CLAUDE_24) ||
+            (steps.account.outputs.slot == '25' && secrets.SYMPHONY_CLAUDE_25) ||
+            (steps.account.outputs.slot == '26' && secrets.SYMPHONY_CLAUDE_26) ||
+            (steps.account.outputs.slot == '27' && secrets.SYMPHONY_CLAUDE_27) ||
+            (steps.account.outputs.slot == '28' && secrets.SYMPHONY_CLAUDE_28) ||
+            (steps.account.outputs.slot == '29' && secrets.SYMPHONY_CLAUDE_29) ||
+            (steps.account.outputs.slot == '30' && secrets.SYMPHONY_CLAUDE_30) ||
+            (steps.account.outputs.slot == '31' && secrets.SYMPHONY_CLAUDE_31) ||
+            (steps.account.outputs.slot == '32' && secrets.SYMPHONY_CLAUDE_32) ||
             ''
             }}
         run: |
@@ -336,6 +360,30 @@ jobs:
             (steps.secret.outputs.slot == '6' && secrets.SYMPHONY_CLAUDE_6) ||
             (steps.secret.outputs.slot == '7' && secrets.SYMPHONY_CLAUDE_7) ||
             (steps.secret.outputs.slot == '8' && secrets.SYMPHONY_CLAUDE_8) ||
+            (steps.secret.outputs.slot == '9' && secrets.SYMPHONY_CLAUDE_9) ||
+            (steps.secret.outputs.slot == '10' && secrets.SYMPHONY_CLAUDE_10) ||
+            (steps.secret.outputs.slot == '11' && secrets.SYMPHONY_CLAUDE_11) ||
+            (steps.secret.outputs.slot == '12' && secrets.SYMPHONY_CLAUDE_12) ||
+            (steps.secret.outputs.slot == '13' && secrets.SYMPHONY_CLAUDE_13) ||
+            (steps.secret.outputs.slot == '14' && secrets.SYMPHONY_CLAUDE_14) ||
+            (steps.secret.outputs.slot == '15' && secrets.SYMPHONY_CLAUDE_15) ||
+            (steps.secret.outputs.slot == '16' && secrets.SYMPHONY_CLAUDE_16) ||
+            (steps.secret.outputs.slot == '17' && secrets.SYMPHONY_CLAUDE_17) ||
+            (steps.secret.outputs.slot == '18' && secrets.SYMPHONY_CLAUDE_18) ||
+            (steps.secret.outputs.slot == '19' && secrets.SYMPHONY_CLAUDE_19) ||
+            (steps.secret.outputs.slot == '20' && secrets.SYMPHONY_CLAUDE_20) ||
+            (steps.secret.outputs.slot == '21' && secrets.SYMPHONY_CLAUDE_21) ||
+            (steps.secret.outputs.slot == '22' && secrets.SYMPHONY_CLAUDE_22) ||
+            (steps.secret.outputs.slot == '23' && secrets.SYMPHONY_CLAUDE_23) ||
+            (steps.secret.outputs.slot == '24' && secrets.SYMPHONY_CLAUDE_24) ||
+            (steps.secret.outputs.slot == '25' && secrets.SYMPHONY_CLAUDE_25) ||
+            (steps.secret.outputs.slot == '26' && secrets.SYMPHONY_CLAUDE_26) ||
+            (steps.secret.outputs.slot == '27' && secrets.SYMPHONY_CLAUDE_27) ||
+            (steps.secret.outputs.slot == '28' && secrets.SYMPHONY_CLAUDE_28) ||
+            (steps.secret.outputs.slot == '29' && secrets.SYMPHONY_CLAUDE_29) ||
+            (steps.secret.outputs.slot == '30' && secrets.SYMPHONY_CLAUDE_30) ||
+            (steps.secret.outputs.slot == '31' && secrets.SYMPHONY_CLAUDE_31) ||
+            (steps.secret.outputs.slot == '32' && secrets.SYMPHONY_CLAUDE_32) ||
             secrets.CLAUDE_CODE_OAUTH_TOKEN
             }}
           allowed_bots: "github-actions,claude"
@@ -366,6 +414,28 @@ jobs:
           name: symphony-usage-${{ github.run_id }}-${{ github.run_attempt }}-work-${{ matrix.worker }}
           path: ${{ runner.temp }}/symphony-usage/record.json
           if-no-files-found: ignore
+      # The issue is labelled token:<id> with the id of the token the run
+      # took, as the Tokens tab gives each token one, so the control panel's
+      # leaderboard credits the token and the person it belongs to with the
+      # issues it worked; a token with no id yet is credited from its next
+      # run after the Tokens tab gives it one.
+      - name: Credit the issue to the token the run took
+        if: always() && steps.claude.outcome != 'skipped' && steps.next.outputs.issue != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLOT: ${{ steps.secret.outputs.slot }}
+          SETTINGS: ${{ vars.SYMPHONY_CLAUDE_SETTINGS }}
+          ISSUE: ${{ steps.next.outputs.issue }}
+        run: |
+          id=$(python3 "$RUNNER_TEMP/pool.py" settings --slot "${SLOT:-main}" --settings "$SETTINGS" | sed -n 's/^id=//p')
+          if [ -z "$id" ]; then
+            echo "The token has no id yet, so issue #$ISSUE is not credited to it"
+            exit 0
+          fi
+          gh label create "token:$id" --repo "$GITHUB_REPOSITORY" --color 3cc2b1 \
+            --description "Worked by a Claude token; the control panel's leaderboard counts it" 2>/dev/null || true
+          gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --add-label "token:$id"
       # The reading goes to the job pool-publish as an artifact: Claude's
       # action points origin at its own token and revokes it when it ends,
       # so this job's checkout can no longer push.

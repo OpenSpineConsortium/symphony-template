@@ -8,7 +8,7 @@ name: Checks
 # "check" (docs/setup/github.md). A newer push to the same branch cancels
 # the run still going, so nobody waits on a result that is already stale.
 # The runner's own python3 is used (3.12 on ubuntu-latest); swap in
-# actions/setup-python@v5 if the image ever moves below what the tools need.
+# actions/setup-python@v7 if the image ever moves below what the tools need.
 # The file names no branch, so no placeholder is needed here and template-init
 # never writes a workflow file (GITHUB_TOKEN may not change one): the push
 # trigger leaves out the claim branches, whose pull request runs the check, so

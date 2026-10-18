@@ -51,6 +51,12 @@ KEY_ID_SHAPE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 WAIT_FOR_LINK = 90
 WAIT_FOR_CODE = 600
 WAIT_FOR_TOKEN = 60
+# claude asks for the code under the link, and a terminal switched to raw
+# mode after a key arrived throws that key away, so the code waits for the
+# question; past this long it is typed anyway, as the question may be worded
+# otherwise in a later claude.
+WAIT_FOR_PROMPT = 30
+PROMPT = "Paste code here"
 # claude's screen takes a chunk of input holding more than one key as a
 # paste, a line break in it included, so the code and the Enter that sends
 # it go in two writes with this pause between.
@@ -153,6 +159,12 @@ class Claude:
             self.read(0.1)
         self.type("\r")
 
+    def shows(self, words):
+        """Whether the screen holds the words, terminal codes and line
+        breaks between them folded to single spaces."""
+        plain = " ".join(re.sub(tokens.CODE, " ", self.seen).split())
+        return " ".join(words.split()) in plain
+
     def link(self):
         found = SIGN_IN_LINK.findall(self.seen)
         return found[0] if found else None
@@ -177,6 +189,12 @@ def wait_for_link(claude, clock=time.monotonic):
         if link:
             return link
     raise RunError("claude setup-token printed no sign-in link")
+
+
+def wait_for_prompt(claude, clock=time.monotonic):
+    deadline = clock() + WAIT_FOR_PROMPT
+    while clock() < deadline and not claude.ended and not claude.shows(PROMPT):
+        claude.read(0.5)
 
 
 def wait_for_code(github, claude, actor, clock=time.monotonic, sleep=time.sleep):
@@ -237,6 +255,7 @@ def run(environ, start=Claude):
         code, comment_id = wait_for_code(github, claude, actor)
         print(f"::add-mask::{code}", flush=True)
         github.delete_comment(comment_id)
+        wait_for_prompt(claude)
         claude.submit(code)
         try:
             token = wait_for_token(claude)
