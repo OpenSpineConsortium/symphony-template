@@ -43,12 +43,16 @@ print({TOKEN!r})
 # as a paste, so an Enter that arrives with the code is part of the paste
 # and sends nothing; only an Enter of its own sends the code.
 SCREEN_STAND_IN = f'''#!/usr/bin/env python3
-import os, sys, tty
+import os, sys, time, tty
 link = {LINK!r}
 sys.stdout.write("Browser didn't open? " + link + "\\r\\n")
+sys.stdout.flush()
+# The question comes a moment after the link, in raw mode, which throws
+# away any key typed before it: the run has to wait for the question.
+time.sleep(1)
+tty.setraw(0)
 sys.stdout.write("Paste code here if prompted > ")
 sys.stdout.flush()
-tty.setraw(0)
 typed = ""
 while True:
     chunk = os.read(0, 4096).decode()
