@@ -11,19 +11,23 @@ Source: the thread "Control panel sign-in", 2026-10-18, written at the owner's c
 
 ## Where the work stands
 
-Every branch is pushed, and each pull request opens with its own "Checkpoint 2026-10-18" line. None is merged.
+Updated by the same thread at 16:05 UTC on 2026-10-18, after the checkpoint above was carried on.
 
-- Site #36 (claude/graph-section): Dependencies, with master #48 merged; its review's folds partly applied.
-- Site #37 (claude/folders-page): Folders, with master #48 merged; its review's fold stopped partway.
-- symphony-app #19: the Dependencies checks, with mutants g45 and g46 not yet proved to bite.
-- symphony-app #20: the Worker's /drive routes.
-- symphony-app #21: the Folders checks.
-- symphony-start #51 and #52: the statement's lines for each tab.
-- symphony-protocol #51: the board's Dependencies section, a draft held until 0.5.1 is cut.
+- Dependencies is live: the Apps' privacy statement version 19 (symphony-start #51) and the tab (site #36) are merged; its checks, symphony-app #19 (37 checks, 49 mutants, every one caught), merge once the 79 sign-in mutants are confirmed caught against the merged script.
+- Folders: site #37 has master (with #36) merged and its review fixed; its checks, symphony-app #21 (50 checks), pass against it; the Worker's routes, symphony-app #20, pass their 27 tests; its statement, symphony-start #52, is version 21 once 20 lands. None of them merges before the owner's Microsoft and Cloudflare steps below, since the tab is of no use until the Worker answers /drive/config with a client id.
+- Version 20 (symphony-start #58) is the Control panel UI overhaul thread's (the Share tab's collaborators and invitations, the repository picker, the layout kept in the browser), written here since this thread owns the statement; it merges once its words are checked against that thread's site pull request.
+- symphony-protocol #51, the board's own Dependencies section, stays a held draft until 0.5.1 is cut.
 
-Site master moved on after #48 (site #49 to #54), so each site branch merges master again, is rebuilt against symphony-start main and has its checks rerun before it merges. The order is the statement first, then the site and the checks together; for Folders, the Worker's routes are deployed and the owner's Microsoft clicks are done before the tab is useful.
+## The fourth review, and what it changed
+
+One adversarial reviewer per tab, 2026-10-18.
+
+Dependencies. No injection and no divergence from the board's bytes: the page's label function matched the library's node_label on 20,000 random titles, control characters, fullwidth signs, combining marks and a lone surrogate among them. Fixed: the 100-call reserve was held to the count GitHub gave when the open issues were read, while the console's other reads spend from the same hour beside the draw, so a draw could make a read after GitHub had said fewer than 100 were left, against the statement; every answer the page receives now sets the newest count, which the draw checks before each read. An earlier draw's failure stayed in the summary after a later draw on the same state succeeded. The Board tab's gate let a raw "#" through, which the board never writes. A Board chart Mermaid could not draw lost its text. Left: a title holding an ASCII control character makes the board's chart show as text in the Board tab (the Dependencies tab still draws it); whether GitHub keeps such characters in a title was not checked.
+
+Folders. The OAuth and token handling held (PKCE, state, the two returns told apart, the code out of the address before the exchange, the Worker's origin checks and allow-listed answer). Fixed on the page: Track refused nothing about the folder's name but its shape, so a tracked folder named scripts or tools would let whoever can edit that OneDrive folder replace what the repository's checks run, and drive/sync merges by itself once the check passes; Track now refuses a name the default branch already holds at its top, unless it is the folder tracked already. An item tracked under another Microsoft account stopped every sync; Track refuses it by name, by the connected drive's id. The drive is bound to the GitHub login named when Connect was pressed. Handed to the Word revisions thread, which owns the repository side: drive_sync.py should carry on past one unreadable item, drive-sync.yml's gate should refuse the same folder names, and the run should print only Microsoft's error code, not its description, to a public log. Left: the Worker's optional rate limiter keys on the caller's address, which GitHub's runners share, if a RATE_LIMITER binding is ever set.
 
 ## The owner's one-time clicks, still to come
 
 1. Register the Microsoft app: https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade, press "New registration", name it SymphonyBoard Folders, choose personal and work or school accounts, set the Web redirect URI to https://openspineconsortium.com/symphony/control/ and press Register. Under "Certificates & secrets" press "New client secret"; under "API permissions" add Microsoft Graph's delegated Files.ReadWrite and offline_access. WSU's tenant may need IT's consent.
 2. In Cloudflare, https://dash.cloudflare.com/, open Workers & Pages, then symphony-signin, then Settings, then "Variables and Secrets": add MICROSOFT_CLIENT_ID as text and MICROSOFT_CLIENT_SECRET as a secret, then paste the merged worker.js from symphony-app #20 and press Deploy.
+3. In GitHub, https://github.com/organizations/OpenSpineConsortium/settings/apps/symphonyboard/permissions, under Repository permissions set Secrets to "Read and write" if it is not already, press "Save changes", then accept the new permission on each installation from the mail GitHub sends.
