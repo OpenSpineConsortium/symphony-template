@@ -9,7 +9,9 @@ name: Papers
 # workflow, so the drive sync queues what its own merges bring at its next
 # run instead; this workflow covers the rest, a person's push or a merge
 # by hand or by a worker. An issue GITHUB_TOKEN labels starts no workflow
-# either, so the run wakes the workers itself.
+# either, so the run wakes the workers itself. Where a drive is connected,
+# it also starts the drive sync, so a merged revision reaches the drive
+# straight away.
 
 on:
   push:
@@ -58,3 +60,15 @@ jobs:
             echo "queued: $(tr '\n' ' ' < "$RUNNER_TEMP/queued.txt")" >> "$GITHUB_STEP_SUMMARY"
             gh workflow run workers.yml --repo "$REPO" || echo "could not wake the workers" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      # A merge that changes a tracked document sends it up to the drive at
+      # once, rather than at the next half-hourly sync; a dispatch with
+      # GITHUB_TOKEN does start a workflow, where a push with it would not.
+      - name: Send the documents up to the connected drive now
+        if: always() && hashFiles('.github/symphony/drive.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh workflow run drive-sync.yml --repo "$REPO" ||
+            echo "could not start the drive sync; the half-hourly run sends them up" >> "$GITHUB_STEP_SUMMARY"

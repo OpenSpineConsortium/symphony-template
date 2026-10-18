@@ -46,7 +46,9 @@ One tab of the control console, Folders, at https://openspineconsortium.com/symp
 
 From then on .github/workflows/drive-sync.yml keeps the two in step every half hour, and the
 page's Sync now button runs it at once. A new comment in a document becomes a task on the board,
-a worker answers it as tracked changes, and the revised file goes back to the drive.
+a worker answers it as tracked changes, and the revised file goes back to the drive as soon as
+its pull request merges: papers.yml starts the sync on any push that changes a document. A merge
+GITHUB_TOKEN makes starts no workflow, so such a revision waits for the half-hourly run.
 
 ## What this pull request builds
 
