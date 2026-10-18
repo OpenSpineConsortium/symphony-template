@@ -12,9 +12,10 @@ Codespace, and scripts/codespace.sh is what runs in it.
 1. Open https://codespaces.new/OWNER/NAME, with your repository's owner and
    name, and press **Create codespace**. The control panel's Tokens page
    links it for the repository it shows.
-2. Wait for the editor to open. The terminal at the bottom starts the setup
-   by itself the first time; if it does not, type `bash scripts/codespace.sh`
-   there and press Enter.
+2. Wait for the editor to open. The task "Symphony setup"
+   (.vscode/tasks.json) starts the setup in a terminal by itself the first
+   time; if it does not, type `bash scripts/codespace.sh` in the terminal
+   and press Enter.
 3. Sign in to GitHub when asked: gh shows a one-time code and opens
    github.com/login/device in a new tab; paste the code there and press
    **Authorize**. The Codespace's own token cannot change settings or
@@ -32,6 +33,26 @@ Codespace, and scripts/codespace.sh is what runs in it.
 6. When you are done, delete the Codespace at https://github.com/codespaces
    (the three dots beside it, then **Delete**), which also drops the GitHub
    sign-in it held.
+
+## One button: the Tokens page
+
+The control panel's Tokens page has "Add with one press", which does the
+above for one account and one slot with no terminal to type in:
+
+1. The page saves three of your Codespaces secrets, seen by this repository
+   alone: SYMPHONY_GITHUB_TOKEN (the page's own GitHub sign-in, so the
+   Codespace needs no GitHub sign-in of its own), SYMPHONY_SLOT and
+   SYMPHONY_LABEL.
+2. It creates a Codespace on the repository and opens it in a new tab.
+3. The setup task sees the three and runs only `scripts/tokens.py add` for
+   that slot: claude.ai's sign-in opens in another tab, and you press
+   **Authorize** as the account the slot is for.
+4. The page watches the slot's secret; once GitHub lists it as updated, it
+   deletes the three Codespaces secrets and says so, and the Codespace can
+   be deleted.
+
+It needs the SymphonyBoard App's user permission Codespaces user secrets
+and its repository permission Codespaces, both read and write.
 
 ## What it costs and where it runs
 
