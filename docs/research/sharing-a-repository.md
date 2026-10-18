@@ -18,11 +18,13 @@ permission each endpoint needs). Nothing below was tried against a live invitati
 ## The answer in short
 
 GitHub never tells a service which Google or Microsoft account a GitHub user has linked, so the
-"if their GitHub is linked" test cannot be run as asked. What GitHub does do comes to the same
-thing by another road: a social login on GitHub is an email address on the account, and GitHub
-delivers an invitation sent to an email address to the account that holds it. So the console asks
-for the person's Google or Microsoft address (or their GitHub username), and GitHub does the
-matching when the person accepts.
+"if their GitHub is linked" test cannot be run as asked. A social login on GitHub is an email
+address on the account, so the nearest road is the address: GitHub's user search finds an account by
+an address its owner made public, and GitHub's own pages invite by address (an organization's
+invitation documents it; whether that invitation is bound to the account holding the address or can
+be accepted by any signed-in account is not documented and not tested here). So the console takes the
+person's GitHub username, or their Google or Microsoft address and looks it up, and falls back to
+GitHub's own Add people page where the address is private.
 
 1. Linked accounts are not visible. GitHub's social login is Google or Apple only; there is no
    Microsoft sign-in to link at all. A social login is kept as an email address on the account
@@ -89,10 +91,34 @@ Chromium against a stubbed GitHub API.
 - None of this is a Microsoft or Google login on GitHub's side: the person still needs a GitHub
   account, made with Google, Apple or a password, and accepts the invitation from it.
 
+## The owner's choice, and what was built
+
+On 2026-10-18 the owner chose "Direct collaborator" on the thread's card, over keeping GitHub's own
+page (recommended) and the organization invitation by email. That reverses the earlier rule that the
+main App never holds Administration on anyone's repository; the rule in CLAUDE.md now says the main
+App holds it only for the Share tab's invitation.
+
+- The Apps' privacy statement version 17 (symphony-start#56, merged 2026-10-18) lists SymphonyBoard's
+  ninth repository permission, Administration (read and write), used only by the Share tab, and the
+  tab's lookup of a typed address in GitHub's user search.
+- The Share tab (openspineconsortium.github.io#45, then #47, both merged 2026-10-18)
+  has Invite: a username goes straight to PUT /repos/{owner}/{repo}/collaborators/{username}, with the
+  role on an organization's repository; an email address is first looked up in GitHub's user search
+  (`<address> in:email`), which finds only an address its owner made public, and where it finds none
+  the tab says so and offers GitHub's own Add people page. The user-to-server token acts within the
+  App's permissions and the signed-in person's own access, so only someone who administers the
+  repository can invite.
+- An adversarial review of #45 found eight issues, none high: a blocked tab's warning overwritten by
+  the clipboard's message, the role offered on a personal repository, a username silently dropped
+  from the mail's To, the note saying "invited" before any invitation, the unverified claim that an
+  invitation to an address lands on the account that holds it (now dropped from the page), the work
+  Outlook link failing Outlook.com accounts (a second button), no word when no email app opens, and
+  the answer not announced to screen readers. Each is fixed in the follow-up.
+- Until the owner adds the permission on the App's page and the installation accepts it, Invite
+  answers that GitHub refused and points to Add people.
+
 ## Open
 
 - Whether GitHub's repository "Add people" search matches an email address that is not public,
   as the organization's page says it does, is inferred, not seen.
-- Whether Symphony Setup's adoption run should make a per-repository team, which the Members
-  route needs.
-- The owner's choice among the three routes.
+- No real invitation has been sent through the tab yet; the first is the owner's, after his two clicks.
