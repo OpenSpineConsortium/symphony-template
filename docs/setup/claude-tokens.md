@@ -178,6 +178,10 @@ columns wide, so it never wraps the token; were it ever to, the cut token
 would be refused rather than stored, and the wizard would say that the
 screen may show part of it.
 
+With no computer of your own to run it on, run it in a GitHub Codespace
+on the repository, from the browser alone: docs/setup/codespace.md, whose
+scripts/codespace.sh signs gh in as you and starts the wizard.
+
 ## By hand, where the wizard cannot run
 
 Each secret is one page; the values come from `claude setup-token`, run
@@ -292,7 +296,10 @@ The control panel's Tokens page, https://openspineconsortium.com/symphony/contro
 shows each slot's windows, resets and per-model limits from the branch
 pool, whether it is held, and which slot auto would take now. Its "Read
 every slot now" starts the workflow Pool, and its assignments open a pull
-request that sets .github/symphony/accounts.json.
+request that sets .github/symphony/accounts.json. Its "Add or renew a
+slot" takes a token printed anywhere, seals it in the browser for GitHub
+and stores it as the slot's secret, and links a Codespace that runs this
+wizard for the repository (docs/setup/codespace.md).
 
 ## Renewing and removing
 

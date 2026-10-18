@@ -27,3 +27,8 @@ page to delete it on, and reads the list as the bench does, only the
 words 1 to 8. Each slot's sign-in can open in a browser profile of its own: claude opens its link with the program BROWSER names, so the wizard hands it a launcher for the one run, and remembers the profile and the slot's cswap account number in tokens.json in the user's settings folder; cswap's logins are never reused, since they rotate and are full logins. On Windows each token stored is also kept in Credential Manager under symphony/<place>/<secret>, which `show N|main [--copy]` reads back (the owner chose it, 2026-10-17); `share REPO,REPO` adds a benchmark's repository to the slots' selected lists, since the bench reads only SYMPHONY_CLAUDE_<slot>, never CLAUDE_CODE_OAUTH_TOKEN. docs/setup/claude-tokens.md is the page, with the by-hand links;
 tests/test_tokens.py proves the token never reaches the screen at any
 chunk size. From symphony-template's token wizard thread, 2026-10-16.
+It also runs from the browser alone in a GitHub Codespace on the
+repository (.devcontainer/devcontainer.json, scripts/codespace.sh, docs/setup/codespace.md,
+2026-10-18): the Codespace's GITHUB_TOKEN cannot set settings or secrets, so gh
+signs in again as the person with a one-time code, then setup-repo.sh and the
+wizard run; the sign-in's return to claude in a browser Codespace is not yet measured.
