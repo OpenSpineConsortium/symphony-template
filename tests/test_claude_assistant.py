@@ -26,6 +26,12 @@ SETTINGS = ROOT / ".claude" / "settings.json"
 # A setting of the step is one line of claude_args whose value the label
 # chooses: the assistant's value, then what every other run gets.
 CHOICE = re.compile(r"\$\{\{ env\.ASSISTANT == 'true' && '(?P<assistant>[^']*)' \|\| (?P<other>.*?) \}\}")
+# A tile setting is one line of claude_args that passes the main token's
+# model, effort or fallback from the Tokens tab, only when the tile sets it,
+# to the assistant and every other run alike.
+TILE = re.compile(r"\$\{\{ steps\.main\.outputs\.(?P<name>model|effort|fallback) != '' && "
+                  r"format\('(?P<flag>--[a-z-]+) \{0\}', steps\.main\.outputs\.(?P=name)\) \|\| '' \}\}$")
+TILE_READ = 'python3 tools/pool.py settings --slot main --settings "$SETTINGS" >> "$GITHUB_OUTPUT" || true'
 TOOL_LIST = re.compile(r'--(?:allowedTools|disallowedTools) "([^"]*)"')
 BASH_RULE = re.compile(r"Bash\((.*?)(?::\*)?\)$")
 GH_COMMAND = re.compile(r"\bgh [a-z]+ [a-z]+\b")
@@ -68,6 +74,8 @@ def choices():
     read from the assistant's value where the whole line is chosen."""
     found = {}
     for line in claude_args():
+        if TILE.match(line):
+            continue
         match = CHOICE.search(line)
         assert match, line
         assistant, other = match.group("assistant"), match.group("other")
@@ -103,6 +111,20 @@ class TheLabel(unittest.TestCase):
         for flag, (assistant, other, line) in choices().items():
             if not line.startswith("--"):
                 self.assertEqual(other, "''", f"{flag}: a whole line the assistant alone gets is empty for the rest")
+
+
+class TheTileSettings(unittest.TestCase):
+    def test_the_main_tokens_model_effort_and_fallback_pass_only_when_the_tile_sets_them(self):
+        tiles = {m.group("name"): m.group("flag") for m in map(TILE.match, claude_args()) if m}
+        self.assertEqual(tiles, {"model": "--model", "effort": "--effort", "fallback": "--fallback-model"})
+
+    def test_the_settings_are_read_once_from_the_variable_and_a_failed_read_leaves_the_defaults(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        step = text.split("        id: main\n", 1)[1].split("      - uses: anthropics/claude-code-action", 1)[0]
+        self.assertEqual(text.count("        id: main\n"), 1)
+        self.assertIn("SETTINGS: ${{ vars.SYMPHONY_CLAUDE_SETTINGS }}", step)
+        self.assertIn(TILE_READ, step)
+        self.assertLess(text.index(TILE_READ), text.index("claude_args: |"))
 
 
 class TheTurns(unittest.TestCase):
