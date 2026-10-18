@@ -23,6 +23,11 @@ name: Drive organizer
 #             the tasks todo and their workers' labels, so no worker claims
 #             a task whose files are not here yet; no Claude. A failed
 #             accept is run again as it was
+#   open      opens the proposals in plan.json on drive-catalog, which a
+#             Claude session wrote there with its catalog after reading the
+#             drive through the Microsoft 365 connector
+#             (tools/drive_connector.py, .claude/skills/drive-organize), so the
+#             issues are the workflow's own, as accept requires; no Claude
 #
 # A catalog names a person's files and holds a little of what is in them,
 # so every step runs only in a private repository and the log carries
@@ -35,9 +40,9 @@ on:
   workflow_dispatch:
     inputs:
       step:
-        description: "catalog reads the drive; organize also has Claude propose projects; accept starts one project"
+        description: "catalog reads the drive; organize also has Claude propose projects; accept starts one project; open opens a session's plan"
         type: choice
-        options: [catalog, organize, accept]
+        options: [catalog, organize, accept, open]
         default: catalog
       epic:
         description: "With accept: the number of the project's issue"
@@ -48,8 +53,8 @@ permissions:
   contents: read
 
 # GitHub keeps one waiting run per group, so each accept has its own and
-# a second one queued never cancels the first; catalog and organize share
-# one, since both rewrite drive-catalog.
+# a second one queued never cancels the first; catalog, organize and open
+# share one, since each reads or rewrites drive-catalog.
 concurrency:
   group: drive-organize-${{ inputs.step == 'accept' && format('accept-{0}', inputs.epic) || 'read' }}
   cancel-in-progress: false
@@ -60,7 +65,7 @@ env:
 
 jobs:
   catalog:
-    if: vars.CLAUDE_CROWD != 'true' && inputs.step != 'accept' && github.event.repository.fork == false
+    if: vars.CLAUDE_CROWD != 'true' && (inputs.step == 'catalog' || inputs.step == 'organize') && github.event.repository.fork == false
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -205,6 +210,47 @@ jobs:
           printf '%s' "$PLAN" > "$RUNNER_TEMP/plan.json"
           python3 tools/drive_organize.py open --plan "$RUNNER_TEMP/plan.json" \
             --catalog .drive-catalog/catalog.json --config "$CONFIG" --registry "$REGISTRY" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  open:
+    if: vars.CLAUDE_CROWD != 'true' && inputs.step == 'open' && github.event.repository.fork == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Is this a private repository?
+        env:
+          PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [ "$PRIVATE" != "true" ]; then
+            echo "The drive organizer runs only in a private repository: its projects name the drive's files." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Bring the session's catalog and plan in
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          basic="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c http.extraheader="AUTHORIZATION: basic $basic" fetch --quiet origin drive-catalog
+          mkdir -p .drive-catalog
+          git archive FETCH_HEAD | tar -x -C .drive-catalog
+          if [ ! -f .drive-catalog/plan.json ] || [ ! -f .drive-catalog/catalog.json ]; then
+            echo "drive-catalog holds no plan.json beside its catalog.json; a session's drive-organize skill writes both." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Open the proposals
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if [ -f "$CONFIG" ]; then config="$CONFIG"; else config="$RUNNER_TEMP/drive.json"; echo '{"provider": "microsoft", "folder": "drive"}' > "$config"; fi
+          python3 tools/drive_organize.py open --plan .drive-catalog/plan.json \
+            --catalog .drive-catalog/catalog.json --config "$config" --registry .github/symphony/workers | tee -a "$GITHUB_STEP_SUMMARY"
 
   accept:
     if: vars.CLAUDE_CROWD != 'true' && inputs.step == 'accept' && github.event.repository.fork == false

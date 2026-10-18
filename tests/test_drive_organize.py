@@ -215,6 +215,29 @@ class OpenTest(unittest.TestCase):
         index = github.store[result["index"]]
         self.assertIn(f"- #{epic['number']} Household budget (accounting)", index["body"])
 
+    def test_a_project_for_a_team_links_a_repository_made_from_the_template(self):
+        plan = answer()
+        plan["projects"][0]["repository"] = {"name": "household-budget", "team": True, "why": "Students join."}
+        github = MemoryGitHub()
+        epic = github.store[drive_organize.open_plan(github, plan, catalog(), "drive")["opened"][0]]
+        self.assertIn("## A repository of its own\n\nStudents join.", epic["body"])
+        self.assertIn("https://github.com/new?template_owner=OpenSpineConsortium&template_name=symphony-template"
+                      "&name=household-budget", epic["body"])
+        self.assertIn("scripts/crowd.py setup", epic["body"])
+        plan["projects"][0]["repository"]["name"] = "a b)](https://evil.example"
+        self.assertEqual(drive_organize.repository_section(plan["projects"][0]["repository"]), "")
+
+    def test_a_plan_missing_a_field_opens_nothing_of_that_project(self):
+        plan = answer()
+        del plan["projects"][0]["directions"]
+        del plan["summary"]
+        github = MemoryGitHub()
+        result = drive_organize.open_plan(github, plan, catalog(), "drive")
+        self.assertEqual(result["opened"], [])
+        bad = answer()
+        bad["projects"][0]["domain"] = "other\n[x](https://evil.example)"
+        self.assertEqual(drive_organize.open_plan(MemoryGitHub(), bad, catalog(), "drive")["opened"], [])
+
     def test_a_second_run_opens_nothing_twice_and_rewrites_the_index(self):
         github = MemoryGitHub()
         first = drive_organize.open_plan(github, answer(), catalog(), "drive")
@@ -397,6 +420,13 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("vars.CLAUDE_CROWD != 'true'", organize)
         self.assertIn('--allowedTools "Read,Glob,Grep"', organize)
         self.assertIn("github.event.repository.private", self.text)
+
+    def test_open_needs_no_claude_and_reads_only_drive_catalog(self):
+        opening = self.text.split("\n  open:\n", 1)[1].split("\n  accept:\n", 1)[0]
+        self.assertIn("vars.CLAUDE_CROWD != 'true' && inputs.step == 'open'", opening)
+        self.assertIn("github.event.repository.private", opening)
+        self.assertNotIn("claude-code-action", opening)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", opening)
 
     def test_no_input_is_written_into_a_shell_line(self):
         for block in self.text.split("run: |")[1:]:

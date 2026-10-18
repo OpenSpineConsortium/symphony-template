@@ -144,3 +144,58 @@ accept running in a public repository, and a folder past the depth limit counted
   them; closing them is the owner's tidy.
 - How well Claude groups a real drive. The digests are the evidence it gets, and a domain
   outside the fifteen is "other".
+
+## Connector mode: the same from a Claude session
+
+Added the same day, answering the owner's message of 2026-10-18: "giving symphony through claude
+access to the entire onedrive for reorganizing into projects, repos, ect symphony repos that
+students can join". The Folders tab's token needs the account's administrator to consent to
+SymphonyBoard Folders, which Wayne State's has not; a Claude session with the Microsoft 365
+connector reads the same drive under the consent the organization gave Claude. So
+tools/drive_connector.py is the organizer's session side, and .claude/skills/drive-organize the
+procedure:
+
+- The walk is the session's loop: read_resource a folder, `add` its listing, `unlisted` names the
+  next. The connector writes a listing as entries one after another with no separator, each
+  "<name> (folder|file, <N> bytes) file:///<drive>/<item>", so an entry's id is read by its shape: a
+  business id is 01 and 32 capitals or digits, and the next name starts where it ends. An id of
+  any other shape, a personal drive's among them, has no length to end it and a name may begin
+  with a digit, so such a listing is read only where a line's end closes each id, and refused
+  otherwise rather than guessed. A path is not an address: the connector refused
+  `file:///<drive>/<folder name>` with Graph's invalidRequest, so every read is by id.
+- The folders Microsoft 365 keeps for its apps (Recordings, Microsoft Teams Chat Files and Data,
+  Microsoft Copilot Chat Files, Attachments, Meetings, Apps, and the known folders Desktop,
+  Documents and Pictures that Windows backs up) are listed but never read into or moved, since
+  moving one breaks the app that writes there.
+- `catalog` writes the workflow's own catalog.json and TREE.md, with each entry's parent, which the
+  moves need. A listing gives no date or link, so `found` keeps what pages of the connector's
+  sharepoint_search give (each document's lastModifiedDateTime and webUrl, 50 a page, offsets to
+  1,000, so a large drive is searched a date range at a time), and one link teaches the drive's
+  web address (https://<tenant>-my.sharepoint.com/personal/<user>/Documents), from which every
+  item's link is made; a date no search reached stays empty. The search also returns files
+  shared from other people's drives, which are dropped, since only the walk's items are kept.
+  catalog.json lands on drive-catalog at the same path and in the same shape as the workflow's,
+  so the control panel's Folders tab reads either with no Microsoft sign-in on the page. A
+  scheduled task may repeat the walk only with the connector attached at the owner's asking. The session reads a
+  sample of files itself through read_resource, which returns Word, PowerPoint and PDF as text.
+- The plan is the workflow's JSON, checked against the catalog by `check`. A project may name a
+  repository of its own, with whether a team will join it: its epic then links GitHub's new
+  repository page from the template and points at crowd mode, where each person works on their
+  own Claude account. Making the repository is the owner's click; pooling accounts is not built.
+- The proposals open through the workflow's step open, which reads plan.json and catalog.json
+  from drive-catalog, so its own token opens the issues and accept works on them as on any.
+- A plan a session wrote is held to the schema's required fields and domains before anything of
+  a project opens, as the workflow's run is held by --json-schema, and `moves` takes only a
+  catalog the walk wrote, since only it names each item's parent, which undo needs.
+- `moves` turns the plan into MOVES.md: one folder "Symphony projects" at the drive's top, one per
+  project, each item moved in, a name already taken renamed "name (2)", an item inside a folder
+  that moves left to move with it, an item two projects name given to the first, at most 600
+  steps. `next` refuses until `approve`, which the session runs only on the owner's own go, then
+  prints one connector call at a time with its ids filled in; `done` records the result. `undo`
+  writes the moves back to each item's old folder under its old name, and nothing ever deletes.
+- Moving keeps an item's id (Graph's move is a change of parent), so a project the drive sync
+  already tracks by id keeps syncing; the paths the issues name are the old ones.
+
+Not yet known: how many read_resource calls a real drive takes (one a folder, so a few thousand
+for a large drive, each spending usage), whether the connector pages a folder of thousands of
+children, and how it rate-limits a long run of moves.
