@@ -42,9 +42,11 @@ A window whose reset has passed counts as empty, since it is.
 
 Which account a worker in Actions runs on is the file
 .github/symphony/accounts.json, {"default": "main", "workers": {"NAME":
-"auto"}}: main is CLAUDE_CODE_OAUTH_TOKEN, a number from 1 to 8 is that
-slot's SYMPHONY_CLAUDE_<slot>, and auto is pick over the pool, the slots
-of SYMPHONY_CLAUDE_ACCOUNTS. With no file, or no line for the worker and
+"auto"}}: main is CLAUDE_CODE_OAUTH_TOKEN, a number from 1 to 32 is that
+slot's SYMPHONY_CLAUDE_<slot>, auto is pick over the pool, the slots
+of SYMPHONY_CLAUDE_ACCOUNTS, and a list of slots, ["2", "5"], is pick
+over those of them the pool holds, main only where the list names it, so
+the Tokens tab can give each worker or agent its own tokens. With no file, or no line for the worker and
 no default, the worker runs on main, as every worker did before.
 
 How each slot runs is the variable SYMPHONY_CLAUDE_SETTINGS, which the
@@ -516,11 +518,20 @@ def assignments(path):
         raise PoolError(f"{path} holds an object with default and workers, and nothing else")
     default = data.get("default", "main")
     workers = data.get("workers", {})
-    if default not in CHOICES:
-        raise PoolError(f"{path}: the default is main, auto or a slot from 1 to 8")
-    if not isinstance(workers, dict) or not all(isinstance(name, str) and choice in CHOICES for name, choice in workers.items()):
-        raise PoolError(f"{path}: each worker takes main, auto or a slot from 1 to 8")
+    if not is_choice(default):
+        raise PoolError(f"{path}: the default is main, auto, a slot from 1 to 32 or a list of slots")
+    if not isinstance(workers, dict) or not all(isinstance(name, str) and is_choice(choice) for name, choice in workers.items()):
+        raise PoolError(f"{path}: each worker takes main, auto, a slot from 1 to 32 or a list of slots")
     return workers, default
+
+
+def is_choice(choice):
+    """main, auto, one slot, or a list of slots, main among them perhaps,
+    each named once: the tokens a worker or an agent may take, which the
+    Tokens tab gives it per repository."""
+    if isinstance(choice, list):
+        return 0 < len(choice) == len(set(choice)) and all(isinstance(slot, str) and slot in SLOTS for slot in choice)
+    return isinstance(choice, str) and choice in CHOICES
 
 
 def branch_readings(folder, cwd=None):
@@ -548,7 +559,18 @@ def choose_run(worker, pool_text, path=ASSIGNMENTS, folder=None, now=None, sprea
     workers, default = assignments(path)
     choice = workers.get(worker, default)
     how = "assigned" if worker in workers else "default"
-    if choice == "auto":
+    if isinstance(choice, list):
+        # A list is auto over its own slots, those the pool holds, and
+        # falls back to main only where it names main.
+        pooled = parse_slots(pool_text)
+        slots = [slot for slot in choice if slot != "main" and slot in pooled]
+        if slots:
+            choice = "auto"
+        elif "main" in choice:
+            choice, how = "main", how + ", with none of its slots in SYMPHONY_CLAUDE_ACCOUNTS"
+        else:
+            raise PoolError(f"{worker} is given slots {', '.join(choice)}, and SYMPHONY_CLAUDE_ACCOUNTS holds none of them")
+    elif choice == "auto":
         slots = [slot for slot in parse_slots(pool_text) if slot != "main"]
         if not slots:
             choice, how = "main", "auto, with no slot in SYMPHONY_CLAUDE_ACCOUNTS"
