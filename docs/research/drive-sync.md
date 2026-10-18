@@ -33,8 +33,8 @@ every panel page is:
 
 1. Connect Google Drive, or Connect OneDrive: one press, the provider's own consent screen, back
    to the page.
-2. Pick: the provider's own picker (Google Picker; OneDrive's File Picker v8) chooses the files
-   and folders to track.
+2. Pick: OneDrive's own File Picker v8 chooses the files and folders to track. For Google Drive
+   there is no picker without an API key, which the owner declined (below).
 3. Create the repository: the page opens GitHub's own "new repository from a template" form,
    https://github.com/new?template_owner=OpenSpineConsortium&template_name=symphony-template,
    named and pressed by the person. That keeps the rule that a new repository's first commit is
@@ -107,14 +107,16 @@ next free version, or shares 13 with the Dependencies section).
 
 The owner's one-time clicks, given with their links when the page is built:
 
-- Google: a Cloud project with the Drive API and the Picker API on. An OAuth client of type "Web
-  application", whose redirect URI is the Folders page. A browser API key restricted to
-  openspineconsortium.com, which the Picker takes. It is public by design and is no secret, but
-  the owner's rule says "No API key ... anywhere", so it waits for the owner's word, and the page
-  waits with it. Without the key, the Picker is replaced by a list the page draws itself, which
-  needs a wider Drive scope than drive.file, and Google's verification for that scope. The consent screen published
-  "In production": the one scope, drive.file, is non-sensitive, so no verification is due, and in
-  Testing a refresh token lapses after seven days.
+- Google: the owner chose "No key" on 2026-10-18, asked whether to allow a Picker key restricted to
+  openspineconsortium.com. So the Google Picker, which needs a browser API key, is out, and no
+  Google API key is made. OneDrive, whose File Picker needs no key, is built first. Google Drive
+  waits for a route with no key. The one known is a list the page draws itself from the Drive API.
+  That needs a scope wider than drive.file (drive.readonly to list, drive to write back), which
+  Google counts as restricted and verifies, with a security assessment, before strangers may
+  consent. That route is the owner's call and is not built. When it is chosen, the clicks are a
+  Cloud project with the Drive API on, an OAuth client of type "Web application" whose redirect
+  URI is the Folders page, and a consent screen published "In production", since in Testing a
+  refresh token lapses after seven days.
 - Microsoft: an app registration for "Accounts in any organizational directory and personal
   Microsoft accounts", a web redirect URI of the Folders page, a client secret into Cloudflare,
   and the delegated scopes Files.ReadWrite and offline_access.
@@ -132,9 +134,8 @@ The owner's one-time clicks, given with their links when the page is built:
 - A Microsoft refresh token lasts 90 days. The run cannot write a secret, so it cannot keep the
   rotated one, and the person presses Connect again about every 90 days. The page shows when.
   Google's lasts until it goes unused for six months.
-- drive.file grants what the person picks. Whether picking a folder grants the files inside it is
-  not settled by Google's picker guide (read 2026-10-18). The first real connection tests it, and
-  if it does not, the person picks the files themselves.
+- drive.file grants only what the person picks in the Picker, so with no key it grants nothing
+  useful. That is why Google Drive waits.
 - Comments: a native Google Doc's comments are expected in its .docx export, which is not yet
   checked. Comments made in Drive's preview of a .docx file stay outside the file, so the tasks see
   only comments made in Word or in Docs' Office editing.
