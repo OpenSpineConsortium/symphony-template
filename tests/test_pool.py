@@ -362,6 +362,23 @@ class TheSettings(unittest.TestCase):
                          "slot=3\nmodel=claude-opus-5-5\neffort=max\nfallback=claude-sonnet-5-5\n")
 
 
+class TheMainTokensSettings(unittest.TestCase):
+    """@claude and the coordinator run on main and take its tile's settings."""
+
+    def settings(self, text):
+        with redirect_stdout(io.StringIO()) as printed, patch_stderr():
+            self.assertEqual(pool.main(["settings", "--slot", "main", "--settings", text]), 0)
+        return printed.getvalue()
+
+    def test_mains_settings_as_step_outputs(self):
+        text = json.dumps({"main": {"model": "claude-opus-5-5", "effort": "high", "fallback": "claude-sonnet-5-5"}, "1": {"effort": "low"}})
+        self.assertEqual(self.settings(text), "model=claude-opus-5-5\neffort=high\nfallback=claude-sonnet-5-5\n")
+
+    def test_none_or_a_bad_variable_prints_nothing(self):
+        for text in ("", "not json", json.dumps({"main": {"model": "x; y", "effort": "huge"}})):
+            self.assertEqual(self.settings(text), "")
+
+
 def patch_stderr():
     from unittest.mock import patch
     return patch("sys.stderr", io.StringIO())

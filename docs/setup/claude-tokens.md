@@ -319,7 +319,8 @@ not name runs as before:
 
 A per-model limit holds a run only of that model's family (the name's
 fable, opus, sonnet or haiku); with no model named, any of them holds the
-slot, as before. Pausing and resuming steer auto; a worker the file
+slot, as before. main's model, effort and fallback reach the coordinator
+workflow too, which reads them with `pool.py settings --slot main`. Pausing and resuming steer auto; a worker the file
 assigns a slot by number keeps it, with that slot's model and effort. A
 value that does not hold together is left out with a word in the run's
 log (tools/pool.py), so no setting can stop a worker or reach Claude's
