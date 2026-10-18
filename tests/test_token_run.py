@@ -39,6 +39,28 @@ print("Your OAuth token (valid for 1 year):")
 print({TOKEN!r})
 '''
 
+# claude's screen reads keys raw and takes a chunk holding more than one key
+# as a paste, so an Enter that arrives with the code is part of the paste
+# and sends nothing; only an Enter of its own sends the code.
+SCREEN_STAND_IN = f'''#!/usr/bin/env python3
+import os, sys, tty
+link = {LINK!r}
+sys.stdout.write("Browser didn't open? " + link + "\\r\\n")
+sys.stdout.write("Paste code here if prompted > ")
+sys.stdout.flush()
+tty.setraw(0)
+typed = ""
+while True:
+    chunk = os.read(0, 4096).decode()
+    if chunk == "\\r":
+        break
+    typed += chunk
+if typed != {CODE!r}:
+    print("Invalid code")
+    sys.exit(1)
+sys.stdout.write("Your OAuth token (valid for 1 year):\\r\\n" + {TOKEN!r} + "\\r\\n")
+'''
+
 
 class FakeGitHub(token_run.GitHub):
     def __init__(self, actor_code=None, poster="greg"):
@@ -59,14 +81,17 @@ class FakeGitHub(token_run.GitHub):
 
 class TokenRunTest(unittest.TestCase):
     def setUp(self):
-        folder = tempfile.mkdtemp()
-        self.claude = Path(folder) / "claude"
-        self.claude.write_text(STAND_IN)
-        self.claude.chmod(self.claude.stat().st_mode | stat.S_IEXEC)
+        self.folder = tempfile.mkdtemp()
+        self.use_stand_in(STAND_IN)
         self.environ = {"ISSUE": "7", "KEY": base64.b64encode(sealbox.public_key(SECRET)).decode(), "KEY_ID": "k1",
                         "ACTOR": "Greg", "GITHUB_REPOSITORY": "o/r", "GITHUB_TOKEN": "t"}
         token_run.WAIT_FOR_CODE = 5
         token_run.POLL_EVERY = 0.2
+
+    def use_stand_in(self, script):
+        self.claude = Path(self.folder) / "claude"
+        self.claude.write_text(script)
+        self.claude.chmod(self.claude.stat().st_mode | stat.S_IEXEC)
 
     def run_with(self, github):
         original = token_run.settings
@@ -85,6 +110,14 @@ class TokenRunTest(unittest.TestCase):
         self.assertEqual(sealbox.open_sealed(base64.b64decode(sealed), SECRET).decode(), TOKEN)
         self.assertNotIn(TOKEN, "".join(github.posted))
         self.assertEqual(github.deleted, [99])
+
+    def test_the_enter_that_sends_the_code_is_a_key_of_its_own(self):
+        self.use_stand_in(SCREEN_STAND_IN)
+        github = FakeGitHub(CODE)
+        self.run_with(github)
+        mark, _, sealed = github.posted[1].split("\n")
+        self.assertEqual(mark, token_run.SEALED_MARK)
+        self.assertEqual(sealbox.open_sealed(base64.b64decode(sealed), SECRET).decode(), TOKEN)
 
     def test_a_code_from_anyone_else_is_never_typed(self):
         github = FakeGitHub(CODE, poster="someone-else")

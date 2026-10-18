@@ -83,11 +83,18 @@ jobs:
         if: env.HAVE_TOKEN == 'true'
         with:
           fetch-depth: 0
-      - name: Keep a copy of the usage recorder, which the run cannot move
+      - name: Keep a copy of the usage recorder, which the run cannot move, and read the main token's settings
+        id: main
         if: env.HAVE_TOKEN == 'true'
+        env:
+          SETTINGS: ${{ vars.SYMPHONY_CLAUDE_SETTINGS }}
         run: |
           cp tools/usage.py "$RUNNER_TEMP/usage.py"
           cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
+          # the model, effort and fallback the Tokens tab's main tile sets (tools/pool.py), for
+          # @claude and the assistant alike, since the owner set them for wherever the token runs;
+          # a variable that does not hold together leaves Claude's own defaults
+          python3 tools/pool.py settings --slot main --settings "$SETTINGS" >> "$GITHUB_OUTPUT" || true
       - uses: anthropics/claude-code-action@v1
         id: claude
         if: env.HAVE_TOKEN == 'true'
@@ -97,6 +104,9 @@ jobs:
             ${{ env.ASSISTANT == 'true' && 'actions: read' || '' }}
           claude_args: |
             --max-turns ${{ env.ASSISTANT == 'true' && '10' || '50' }}
+            ${{ steps.main.outputs.model != '' && format('--model {0}', steps.main.outputs.model) || '' }}
+            ${{ steps.main.outputs.effort != '' && format('--effort {0}', steps.main.outputs.effort) || '' }}
+            ${{ steps.main.outputs.fallback != '' && format('--fallback-model {0}', steps.main.outputs.fallback) || '' }}
             --allowedTools "${{ env.ASSISTANT == 'true' && 'Read,Glob,Grep,Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git branch:*),Bash(git ls-files:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh run list:*),Bash(gh run view:*)' || (vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)') }}"
             ${{ env.ASSISTANT == 'true' && '--disallowedTools "Edit,Write,MultiEdit,NotebookEdit,Bash(git add:*),Bash(git commit:*),Bash(git rm:*),Bash(*/scripts/git-push.sh:*),Bash(git fetch:*),Bash(sed:*),Bash(python3:*),Bash(bash:*)"' || '' }}
             ${{ env.ASSISTANT == 'true' && '--permission-mode default' || '' }}

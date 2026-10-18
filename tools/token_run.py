@@ -51,6 +51,10 @@ KEY_ID_SHAPE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 WAIT_FOR_LINK = 90
 WAIT_FOR_CODE = 600
 WAIT_FOR_TOKEN = 60
+# claude's screen takes a chunk of input holding more than one key as a
+# paste, a line break in it included, so the code and the Enter that sends
+# it go in two writes with this pause between.
+PASTE_SETTLE = 1.0
 POLL_EVERY = 3
 API = "https://api.github.com"
 
@@ -141,6 +145,14 @@ class Claude:
     def type(self, text):
         os.write(self.master, text.encode())
 
+    def submit(self, code, clock=time.monotonic):
+        """The code, then Enter on its own, as a person pastes and presses it."""
+        self.type(code)
+        settled = clock() + PASTE_SETTLE
+        while clock() < settled and not self.ended:
+            self.read(0.1)
+        self.type("\r")
+
     def link(self):
         found = SIGN_IN_LINK.findall(self.seen)
         return found[0] if found else None
@@ -225,7 +237,7 @@ def run(environ, start=Claude):
         code, comment_id = wait_for_code(github, claude, actor)
         print(f"::add-mask::{code}", flush=True)
         github.delete_comment(comment_id)
-        claude.type(code + "\r")
+        claude.submit(code)
         try:
             token = wait_for_token(claude)
         except RunError as error:
