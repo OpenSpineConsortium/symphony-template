@@ -179,6 +179,17 @@ def wait_for_code(github, claude, actor, clock=time.monotonic, sleep=time.sleep)
     raise RunError("no code came within ten minutes; press Add a Claude account again")
 
 
+def claude_said(claude, code):
+    """The last words claude printed, as a line for the page: terminal codes
+    and blanks folded, the code taken out, and only what the mask let
+    through, so never a token."""
+    plain = re.sub(tokens.CODE, " ", claude.seen)
+    if code:
+        plain = plain.replace(code, "<code>")
+    words = " ".join(plain.split())
+    return words[-300:]
+
+
 def wait_for_token(claude, clock=time.monotonic):
     deadline = clock() + WAIT_FOR_TOKEN
     while clock() < deadline and not claude.ended:
@@ -215,7 +226,12 @@ def run(environ, start=Claude):
         print(f"::add-mask::{code}", flush=True)
         github.delete_comment(comment_id)
         claude.type(code + "\r")
-        token = wait_for_token(claude)
+        try:
+            token = wait_for_token(claude)
+        except RunError as error:
+            said = claude_said(claude, code)
+            print(f"claude's last words: {said}", flush=True)
+            raise RunError(f"{error}. claude said: {said}") from None
         sealed = base64.b64encode(sealbox.seal(token.encode(), key)).decode()
         github.comment(f"{SEALED_MARK}\n{key_id}\n{sealed}")
         print("Posted the sealed token.", flush=True)
