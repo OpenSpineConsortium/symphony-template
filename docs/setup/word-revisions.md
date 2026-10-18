@@ -33,10 +33,10 @@ the tool writes and the worker updates:
 1. `python3 tools/docx_review.py sheet papers/*.docx` writes the sheets.
 2. `python3 tools/docx_review.py tasks papers` prints one task per document
    with open comments, in the Task form's shape (Goal, Acceptance, Files
-   likely touched); `--gh` opens them as issues labelled todo, skipping a
-   title already open. One task per document, never per comment, since two
-   workers rewriting one .docx file would meet in it, and the board's Overlaps
-   would only order them.
+   likely touched); `--gh` opens or updates them as watch does, below. One
+   task per document, never per comment, since two workers rewriting one
+   .docx file would meet in it, and the board's Overlaps would only order
+   them.
 3. A worker claims the task as for any issue (docs/agents/PROTOCOL.md): a
    person's session, a routine, a worker in Actions (workers.yml, which an
    issue labelled todo wakes when one is registered), or @claude on the issue
@@ -47,6 +47,15 @@ the tool writes and the worker updates:
 4. The author opens the pull request's .docx in Word, or merges and opens it,
    and walks the tracked changes with Review, Next, Accept or Reject; each
    change is Claude's, dated, and each "why" sits beside its paragraph.
+
+A document's task is one issue for good. .github/workflows/papers.yml runs
+`python3 tools/docx_review.py watch` on each document a push brings to the
+default branch: new comments are told on the issue, which is reopened or
+queued again, and the workers are woken. A comment is known by its author,
+date and words, since Word renumbers comments on every save, and Claude's own
+comments, the answers, queue nothing. A connected Google Drive or OneDrive
+brings documents in and takes revisions back by itself
+(docs/research/drive-sync.md).
 
 `python3 tools/docx_review.py sample papers/sample.docx` writes a small paper
 with three comments to try the loop on.

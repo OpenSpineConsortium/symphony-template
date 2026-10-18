@@ -21,19 +21,28 @@ lands on another after the text moved.
   python3 tools/docx_review.py extract FILE.docx          the JSON it reads
   python3 tools/docx_review.py sheet FILE.docx [...]      write the review sheets
   python3 tools/docx_review.py tasks FOLDER [--gh]        one task per document
+  python3 tools/docx_review.py watch FILE.docx [...]      queue new comments (papers.yml)
   python3 tools/docx_review.py apply FILE.docx REVISIONS [--out OUT.docx]
   python3 tools/docx_review.py sample OUT.docx            a small paper to try
 
 A paragraph holding anything but plain text runs (a field, a picture, a
 hyperlink, a tracked change already there) is refused by apply, which names
 it, since rewriting it could lose what it holds; the author revises it by
-hand. Comments marked done in Word are left out of the sheet and the tasks.
+hand. Comments marked done in Word are left out of the sheet and the tasks,
+and so are Claude's own, which answer comments and are no new work.
+
+watch is what .github/workflows/papers.yml runs when a document changes on
+the default branch: a document's task is one issue for good, found by a
+marker in its body, which also lists the comments it has seen by a key that
+survives Word renumbering them; new ones are told on the issue, which is
+reopened or queued again, and the workflow then wakes the workers.
 """
 
 import argparse
 import copy
 import datetime
 import difflib
+import hashlib
 import io
 import json
 import re
@@ -302,31 +311,59 @@ def write_sheets(paths):
 
 # Tasks
 
-def task_for(path):
-    review = extract(path)
-    comments = open_comments(review)
-    if not comments:
-        return None
+# Comments a worker wrote are answers, never new work, or each revision
+# would queue the next.
+REVISER = "Claude"
+DOCUMENT_MARK = "<!-- symphony-document: {} -->"
+COMMENTS_MARK = re.compile(r"<!-- symphony-comments: ([0-9a-f ]*) -->")
+
+
+def comment_key(comment):
+    """A comment's identity across saves: Word renumbers w:id each time it
+    saves, while the author, the date and the words stay."""
+    text = "\x1f".join((comment["author"], comment["date"], comment["text"]))
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:12]
+
+
+def awaiting(path):
+    """The open comments of a document that a person wrote, by key."""
+    return {comment_key(c): c for c in open_comments(extract(path)) if c["author"] != REVISER}
+
+
+def task_title(path):
+    return f"Task: revise {Path(path).as_posix()}"
+
+
+def task_body(path, comments):
     path = Path(path)
-    stem = path.with_suffix("")
-    title = f"Task: revise {path.name} for {len(comments)} comment{'s' * (len(comments) != 1)}"
-    listed = "\n".join(f"- Comment {c['id']} by {c['author']}: {one_line(c['text'])}" for c in comments)
-    body = (
+    stem = path.with_suffix("").as_posix()
+    keys = " ".join(sorted(comments))
+    return (
         "### Goal\n\n"
         f"{path.name} answers its open review comments, as tracked changes the author can accept "
-        "or reject in Word:\n\n" + listed + "\n\n"
+        "or reject in Word:\n\n" + comment_list(comments.values()) + "\n\n"
         "### Acceptance\n\n"
-        f"Read {stem}.review.md (run `python3 tools/docx_review.py sheet {path}` if it is missing). "
-        f"Write {stem}.revisions.json, one entry per paragraph changed, with the paragraph's exact old "
-        f"text, the new text, the comment it answers and a one-line why; run "
-        f"`python3 tools/docx_review.py apply {path} {stem}.revisions.json` and then "
-        f"`python3 tools/docx_review.py sheet {path}`; commit all three. A comment that asks for "
-        "something the text cannot give (new data, a figure, the author's judgement) gets an entry "
-        "with no change, only its why, or is named in the pull request. `bash scripts/check.sh` passes.\n\n"
+        f"Read {stem}.review.md (run `python3 tools/docx_review.py sheet {path.as_posix()}` if it is "
+        f"missing or older than the document). Answer the comments this issue lists, the body's and "
+        f"those in later comments of this issue not answered yet. Write {stem}.revisions.json, one "
+        "entry per paragraph changed, with the paragraph's exact old text, the new text, the comment it "
+        f"answers and a one-line why; run `python3 tools/docx_review.py apply {path.as_posix()} "
+        f"{stem}.revisions.json` and then `python3 tools/docx_review.py sheet {path.as_posix()}`; commit "
+        "all three. A comment that asks for something the text cannot give (new data, a figure, the "
+        "author's judgement) gets an entry with no change, only its why. Where the document changed on "
+        "the default branch meanwhile, take that copy and apply the revisions again. "
+        "`bash scripts/check.sh` passes.\n\n"
         "### Files likely touched\n\n"
-        f"{path}\n{stem}.review.md\n{stem}.revisions.json\n"
+        f"{path.as_posix()}\n{stem}.review.md\n{stem}.revisions.json\n\n"
+        + DOCUMENT_MARK.format(path.as_posix()) + "\n"
+        + f"<!-- symphony-comments: {keys} -->\n"
     )
-    return {"title": title, "body": body, "file": str(path)}
+
+
+def comment_list(comments):
+    return "\n".join(f"- {c['author']}: {one_line(c['text'])}"
+                      + (f' (on "{one_line(c["anchor"])}")' if c["anchor"].strip() else "")
+                      for c in comments)
 
 
 def one_line(text):
@@ -334,25 +371,91 @@ def one_line(text):
     return flat if len(flat) <= 120 else flat[:117] + "..."
 
 
+def documents(folder):
+    return [p for p in sorted(Path(folder).rglob("*.docx")) if not p.name.startswith("~$")]
+
+
 def tasks(folder):
-    return [t for t in (task_for(p) for p in sorted(Path(folder).rglob("*.docx"))
-                        if not p.name.startswith("~$")) if t]
+    found = []
+    for path in documents(folder):
+        comments = awaiting(path)
+        if comments:
+            found.append({"title": task_title(path), "body": task_body(path, comments), "file": str(path)})
+    return found
 
 
-def open_issues(found):
-    """Open one issue per task, labelled todo, skipping a title already open."""
-    listing = subprocess.run(["gh", "issue", "list", "--state", "open", "--limit", "500",
-                              "--json", "title"], check=True, capture_output=True, text=True)
-    titles = {issue["title"] for issue in json.loads(listing.stdout)}
-    opened = []
-    for task in found:
-        if task["title"] in titles:
-            continue
-        result = subprocess.run(["gh", "issue", "create", "--title", task["title"],
-                                 "--body", task["body"], "--label", "todo"],
-                                check=True, capture_output=True, text=True)
-        opened.append(result.stdout.strip())
-    return opened
+def gh(*args):
+    result = subprocess.run(["gh", *args], check=True, capture_output=True, text=True)
+    return result.stdout
+
+
+TRUSTED = {"OWNER", "MEMBER", "COLLABORATOR"}
+WORKFLOW_BOT = "github-actions[bot]"
+HOLDING = {"claimed", "in-review"}
+
+
+def task_issues(run=gh):
+    """Every issue that may be a document's task: opened by this repository's
+    workflows or by someone who may write, so nobody else's issue, however
+    it is marked, can be taken for one and steer a worker."""
+    lines = run("api", "--paginate", "repos/{owner}/{repo}/issues?state=all&per_page=100", "--jq",
+                ".[] | select(.pull_request | not) | {number, state, body, author: .user.login, "
+                "association: .author_association, labels: [.labels[].name]}")
+    issues = [json.loads(line) for line in lines.splitlines() if line.strip()]
+    trusted = [i for i in issues if i["author"] == WORKFLOW_BOT or i["association"] in TRUSTED]
+    return sorted(trusted, key=lambda i: i["number"])
+
+
+def watch(paths, run=gh):
+    """Queue the new comments of each document: open its task, or tell its
+    task of the comments it has not listed yet and queue it again. Returns
+    the documents queued, so the caller can wake the workers; a document
+    that cannot be read is named on standard error and the rest go on."""
+    issues = task_issues(run)
+    queued = []
+    for path in paths:
+        try:
+            if Path(path).is_file() and queue_document(path, issues, run):
+                queued.append(str(path))
+        except (Refused, KeyError, zipfile.BadZipFile, ET.ParseError, subprocess.CalledProcessError) as problem:
+            print(f"docx_review: {path}: {problem}", file=sys.stderr)
+    return queued
+
+
+def queue_document(path, issues, run):
+    comments = awaiting(path)
+    mark = DOCUMENT_MARK.format(Path(path).as_posix())
+    issue = next((i for i in issues if mark in (i.get("body") or "").splitlines()), None)
+    if issue is None:
+        if not comments:
+            return False
+        run("issue", "create", "--title", task_title(path), "--body", task_body(path, comments), "--label", "todo")
+        return True
+    listed = COMMENTS_MARK.search(issue["body"])
+    known = set(listed.group(1).split()) if listed else set()
+    new = {k: c for k, c in comments.items() if k not in known}
+    if not new:
+        return False
+    keys = f"<!-- symphony-comments: {' '.join(sorted(known | set(new)))} -->"
+    body = COMMENTS_MARK.sub(keys, issue["body"]) if listed else issue["body"].rstrip("\n") + "\n" + keys + "\n"
+    number = str(issue["number"])
+    run("issue", "edit", number, "--body", body)
+    issue["body"] = body
+    run("issue", "comment", number, "--body", "New review comments on this document:\n\n"
+        + comment_list(new.values()))
+    labels = set(issue.get("labels", []))
+    if issue["state"].upper() == "CLOSED":
+        # A finished task still carries the labels of its last claim; a
+        # reopened one is queued afresh.
+        run("issue", "reopen", number)
+        stale = sorted(l for l in labels if l in HOLDING or l.startswith(("worker:", "account:", "agent:")))
+        for label in stale:
+            run("issue", "edit", number, "--remove-label", label)
+        labels -= set(stale)
+        issue["state"] = "OPEN"
+    if not labels & (HOLDING | {"todo"}):
+        run("issue", "edit", number, "--add-label", "todo")
+    return True
 
 
 # Applying revisions as tracked changes
@@ -665,7 +768,9 @@ def main(argv=None):
     sub.add_parser("sheet").add_argument("files", nargs="+")
     queue = sub.add_parser("tasks")
     queue.add_argument("folder")
-    queue.add_argument("--gh", action="store_true", help="open the issues with gh, labelled todo")
+    queue.add_argument("--gh", action="store_true", help="open or update the issues with gh")
+    watching = sub.add_parser("watch")
+    watching.add_argument("files", nargs="*")
     write = sub.add_parser("apply")
     write.add_argument("file")
     write.add_argument("revisions")
@@ -679,8 +784,12 @@ def main(argv=None):
         elif args.command == "sheet":
             print("\n".join(write_sheets(args.files)))
         elif args.command == "tasks":
-            found = tasks(args.folder)
-            print("\n".join(open_issues(found)) if args.gh else json.dumps(found, indent=2))
+            if args.gh:
+                print("\n".join(watch(documents(args.folder))))
+            else:
+                print(json.dumps(tasks(args.folder), indent=2))
+        elif args.command == "watch":
+            print("\n".join(watch(args.files)))
         elif args.command == "apply":
             revisions = json.loads(Path(args.revisions).read_text(encoding="utf-8"))
             apply(args.file, revisions, args.out, args.author)
