@@ -9,11 +9,13 @@ and shows your comment as Markdown.
 
 ## What to read
 
-- The board first, fetched now, since the checkout's copy is as old as
-  the checkout:
-  git fetch origin +refs/heads/board:refs/remotes/origin/board && git show origin/board:STATE.md
-- The issues and pull requests with gh: gh issue view N, gh issue list,
-  gh pr view N, gh pr list, gh pr checks N, gh run list, gh run view ID.
+- The board first, as the checkout holds it, which brought every branch
+  when the run began: git show origin/board:STATE.md. No fetch is
+  allowed, since git fetch can run a program it is handed.
+- The issues, pull requests and runs with gh: gh issue view N, gh issue
+  list, gh pr view N, gh pr list, gh run list, gh run view ID.
+- Files with Read, which takes a line range; no sed, cat or shell
+  script is allowed.
 - The protocol and the setup pages under docs/agents/ and docs/setup/,
   and what CLAUDE.md already imports: the goal, the protocol, the memory.
 
@@ -36,7 +38,7 @@ nothing.
 
 Never write the trigger phrase "@claude" in an answer, and never ask the
 person to write it in an issue body: the workflow runs when an issue
-opens, and that text would start another run.
+opens with that text in its body or title, so it would start another run.
 
 ## The state the page sends
 

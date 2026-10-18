@@ -61,37 +61,69 @@ the signed-in person (docs/memory/the-control-panel.md), asks through an
 issue: once per repository and person it opens "Assistant: <login>",
 labelled assistant, whose body says what the page is, and each question
 is a comment on it with the page's state in a fenced block, which the
-page polls for the answer. A person can open the same issue by hand. The
-label is not one template-init makes: the six it makes are the claim
+page polls for the answer. The page's side is not built yet; until it is,
+a person opens the same issue by hand, labels it assistant, asks on it
+with a comment that mentions @claude, and reads the answer on the issue.
+The label is not one template-init makes: the six it makes are the claim
 protocol's own list, held to the vendored library by the checks, so the
 page makes the label before it puts it on the issue, or a person makes
 it once at https://github.com/{{REPO}}/labels, any colour, since the
 workflow reads only the name.
 
-claude.yml tells the issue apart by that label alone, read from the
-event's issue, so a comment on it, or its opening, runs the same job on
-the same token, in the same five-hour window, with three settings
-changed: ten turns in place of fifty; a tool list that only reads (Read,
-Glob, Grep, and the git and gh commands that read), with Edit, Write,
-MultiEdit, NotebookEdit, git add, git commit and git rm denied as well,
-since the action's own tag mode would otherwise allow edits and commits
-whatever the allow list says, and no push allowed at all; and the file
-.github/symphony/assistant.md appended to the system prompt through the
-CLI's --append-system-prompt-file, which the action passes through
-untouched. The file says what the page is, what to read, how to answer
-and the few lines of a reply the page acts on (focus, open, filter,
-show). The job's permissions stay as they are: the tools list, not the
-token, is what keeps the assistant read-only. A question that asks for a
-change is answered with what the person would do and where, never done.
-No run has been made with the file yet, so the first answer should show
-it followed it; if not, the flag is the first thing to check.
+claude.yml tells the issue apart by that label alone, on an issue and
+never a pull request, so a comment on it that says @claude, or its
+opening with @claude in the body or title, runs the same job on the same
+token, in the same five-hour window, with the step's settings changed:
 
-A question costs one Actions run, tens of seconds to a few minutes, on
-the main account's usage like any mention. The workflow sets no
-concurrency group, so two people asking at once are two runs on the same
-window, and ten turns reached is a failed run, which the comment says
-("Claude encountered an error"), not a shorter answer. On a public
-repository the issue and its answers are public.
+- Ten turns in place of fifty.
+- A tool list that only reads: Read, Glob, Grep, git log, git show, git
+  diff, git branch and git ls-files, gh issue view and list, gh pr view
+  and list, gh run list and gh run view. Reading runs needs actions: read
+  on the token the action mints for gh, which carries none unless the
+  step asks (its docs/configuration.md, Enabling GitHub Actions Access),
+  so the step asks through additional_permissions for the assistant
+  alone; gh pr checks, which needs checks: read as well, is left out.
+  git fetch and sed are left out because each runs a program it is handed
+  (fetch's --upload-pack, sed's e command), and the board needs no fetch,
+  since the checkout brings every branch; Read takes a line range, and
+  cat needs no rule.
+- A deny list, since a deny holds over every allow, the repository's own
+  .claude/settings.json included, which the action loads too: Edit,
+  Write, MultiEdit and NotebookEdit; git add, git commit and git rm,
+  which the action's tag mode allows whatever the allow list says; the
+  action's own push script, scripts/git-push.sh under the action's path,
+  the one push the tag mode allows, denied by a wildcard for that path, so
+  the empty branch the action makes never reaches origin and its end-of-run
+  commit, which it makes only for a branch that is on origin, never
+  happens; and git fetch, sed, python3 and bash, each a way to run a
+  program, the two scripts the repository's settings allow among them.
+- The permission mode set back to default: the action's tag mode runs
+  in acceptEdits, which approves edits and the file commands mkdir, touch,
+  rm, mv, cp and sed inside the checkout with no rule at all, while in
+  default mode whatever no rule allows is refused, the run having nobody
+  to ask. The action takes the last --permission-mode it is given.
+- The file .github/symphony/assistant.md appended to the system prompt
+  through the CLI's --append-system-prompt-file, which the action passes
+  through untouched. The file says what the page is, what to read, how to
+  answer and the few lines of a reply the page acts on (focus, open,
+  filter, show).
+
+The job's permissions stay as they are: the tools, not the token, are
+what keeps the assistant read-only. A question that asks for a change is
+answered with what the person would do and where, never done. No run has
+been made with these settings yet, so the first answer should show it
+followed the file, and its run log a refusal should the session try the
+push script, a file command or git fetch; if not, the flags are the
+first thing to check, the wildcard deny of the push script and the
+permission mode first. tests/test_claude_assistant.py pins each setting,
+reading the workflow as text and running nothing.
+
+A question costs one Actions run, tens of seconds to a few minutes (no
+figure is measured yet), on the main account's usage like any mention.
+The workflow sets no concurrency group, so two people asking at once are
+two runs on the same window, and ten turns reached is a failed run,
+which the comment says ("Claude encountered an error"), not a shorter
+answer. On a public repository the issue and its answers are public.
 
 Who may ask: the action answers only a GitHub user whose permission on
 the repository is admin or write (checkActorWritePermissions in its
