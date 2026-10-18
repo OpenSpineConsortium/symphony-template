@@ -350,8 +350,18 @@ class TheSettings(unittest.TestCase):
                                  "resumedAt": "soon"}, "9": {}, "2": "x"})
         self.assertEqual(pool.parse_settings(text, said.append), {"1": {}})
         self.assertEqual(len(said), 6)
+        # a name of the right shape that no model answers to, or one with a
+        # newline after it, is left out like any other
+        for model in ("claude-opus-55", "claude-opus-5-5\n", "opus"):
+            self.assertEqual(pool.parse_settings(json.dumps({"1": {"model": model}}), said.append), {"1": {}})
         for text in ("not json", "[]", ""):
             self.assertEqual(pool.parse_settings(text, said.append), {})
+
+    def test_the_workers_own_model_takes_no_newline(self):
+        with redirect_stdout(io.StringIO()) as printed, patch_stderr():
+            pool.main(["choose", "--worker", "docs", "--pool", "1", "--assignments", str(self.path),
+                       "--model", "haiku\nslot=8"])
+        self.assertEqual(printed.getvalue(), "slot=3\n")
 
     def test_choose_prints_the_settings_as_step_outputs(self):
         settings = json.dumps({"3": {"model": "claude-opus-5-5", "effort": "max", "fallback": "claude-sonnet-5-5"}})

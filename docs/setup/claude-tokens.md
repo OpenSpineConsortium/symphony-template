@@ -304,6 +304,9 @@ not name runs as before:
 
 - model: the model the slot's runs take in place of the worker's own
   (.github/symphony/workers/); empty, the worker's, else the plan's default.
+  It is one of the tile's models, claude-fable-5-1, claude-opus-5-5,
+  claude-sonnet-5-5 or claude-haiku-5-5, as is the fallback; any other name
+  is left out, since a name no model answers to would fail every run.
 - effort: Claude Code's `--effort`, one of low, medium, high, xhigh, max.
 - fallback: a lesser model. When a reading shows the model's own weekly
   limit spent (Fable's, say) while the slot's five-hour and seven-day
@@ -322,9 +325,10 @@ fable, opus, sonnet or haiku); with no model named, any of them holds the
 slot, as before. main's model, effort and fallback reach the coordinator
 workflow and @claude's (claude.yml, the control panel's assistant included) too, which read them with `pool.py settings --slot main`. Pausing and resuming steer auto; a worker the file
 assigns a slot by number keeps it, with that slot's model and effort. A
-value that does not hold together is left out with a word in the run's
-log (tools/pool.py), so no setting can stop a worker or reach Claude's
-command line as anything but a model's name or an effort. The variable
+value that does not hold together, a model the tiles do not offer among
+them, is left out with a word in the run's log (tools/pool.py), so no
+setting can stop a run or reach Claude's command line as anything but one
+of those models or an effort. The variable
 says nothing secret, and anyone who can read the workflows can read it.
 
 ## Seeing it in the control panel
