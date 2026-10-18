@@ -1029,7 +1029,7 @@ class Wiring(unittest.TestCase):
                 self.assertIn("uses: actions/upload-artifact@v7", kept, path.name)
                 self.assertIn("name: symphony-usage-${{ github.run_id }}-${{ github.run_attempt }}-", kept, path.name)
                 self.assertIn("if-no-files-found: ignore", kept, path.name)
-        self.assertEqual(found, 7, "workers.yml's one, coordinator.yml's four, claude.yml's one and pool.yml's probe")
+        self.assertEqual(found, 8, "workers.yml's one, coordinator.yml's four, claude.yml's one, agents.yml's one and pool.yml's probe")
 
     def test_the_metrics_workflow_reads_the_records_and_keeps_what_it_read(self):
         text = (ROOT / ".github" / "workflows" / "metrics.yml").read_text(encoding="utf-8")
