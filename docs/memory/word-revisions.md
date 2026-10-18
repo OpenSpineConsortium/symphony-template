@@ -12,3 +12,11 @@ the research, with the OneDrive routes, docs/research/word-revisions-from-onedri
 the owner's own computer through the folder tools is the recommended sync,
 with no credential; Microsoft Graph in Actions would store one and is the
 owner's call.
+
+Since 2026-10-18 the design for a connected drive is docs/research/drive-sync.md:
+tools/drive_sync.py and .github/workflows/drive-sync.yml sync picked Google
+Drive or OneDrive items both ways on GITHUB_TOKEN, the drive's refresh token
+in the secret SYMPHONY_DRIVE_REFRESH traded at the sign-in service, which
+holds the client secrets; papers.yml and `docx_review.py watch` keep one task
+per document, keyed comments surviving Word's renumbering, Claude's own
+comments queueing nothing.

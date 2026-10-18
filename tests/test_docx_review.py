@@ -24,6 +24,20 @@ FIRST_NEW = ("We measured lumbar levels in forty radiographs and found the detec
              "agrees with readers (kappa 0.81).")
 
 
+def add_comment(path, author, text):
+    """A comment of a reviewer's on the first paragraph, as Word would add it."""
+    parts = docx_review.read_parts(path)
+    comments = parts[docx_review.COMMENTS].decode("utf-8")
+    comments = comments.replace("</w:comments>", f'<w:comment w:id="9" w:author="{author}" '
+                                f'w:date="2026-10-19T00:00:00Z"><w:p><w:r><w:t>{text}</w:t></w:r></w:p>'
+                                "</w:comment></w:comments>")
+    parts[docx_review.COMMENTS] = comments.encode("utf-8")
+    document = parts[docx_review.DOCUMENT].decode("utf-8")
+    document = document.replace("</w:p>", '<w:r><w:commentReference w:id="9"/></w:r></w:p>', 1)
+    parts[docx_review.DOCUMENT] = document.encode("utf-8")
+    docx_review.write_parts(path, parts, path)
+
+
 def texts(path, view):
     parts = docx_review.read_parts(path)
     root = docx_review.parse(parts[docx_review.DOCUMENT])
@@ -55,10 +69,74 @@ class DocxReviewTest(unittest.TestCase):
 
     def test_one_task_per_document_in_the_task_forms_shape(self):
         [task] = docx_review.tasks(self.folder)
-        self.assertEqual(task["title"], "Task: revise paper.docx for 3 comments")
+        self.assertEqual(task["title"], f"Task: revise {self.paper.as_posix()}")
         for heading in ("### Goal", "### Acceptance", "### Files likely touched"):
             self.assertIn(heading, task["body"])
-        self.assertIn(str(self.paper.with_suffix(".revisions.json")), task["body"])
+        self.assertIn(self.paper.with_suffix(".revisions.json").as_posix(), task["body"])
+
+    def fake_github(self, issues, calls):
+        def run(*args):
+            calls.append(args)
+            if args[0] == "api":
+                return "\n".join(json.dumps(i) for i in issues)
+            if args[:2] == ("issue", "create"):
+                issues.append({"number": 7, "state": "OPEN", "body": args[args.index("--body") + 1],
+                               "labels": ["todo"], "author": "github-actions[bot]", "association": "NONE"})
+            if args[:2] == ("issue", "edit") and "--body" in args:
+                next(i for i in issues if i["number"] == int(args[2]))["body"] = args[args.index("--body") + 1]
+            return ""
+        return run
+
+    def test_watch_opens_a_task_then_tells_it_only_of_new_comments(self):
+        issues, calls = [], []
+        run = self.fake_github(issues, calls)
+        self.assertEqual(docx_review.watch([self.paper], run), [str(self.paper)])
+        self.assertEqual(docx_review.watch([self.paper], run), [])
+        issues[0]["state"], issues[0]["labels"] = "CLOSED", ["in-review", "worker:papers"]
+        add_comment(self.paper, "Reviewer 3", "Cite the reader study.")
+        docx_review.apply(self.paper, [{"paragraph": 1, "old": FIRST, "text": FIRST, "why": "Noted."}])
+        calls.clear()
+        self.assertEqual(docx_review.watch([self.paper], run), [str(self.paper)])
+        told = [c for c in calls if c[:2] == ("issue", "comment")]
+        self.assertEqual(len(told), 1)
+        self.assertIn("Reviewer 3: Cite the reader study.", told[0][-1])
+        self.assertNotIn("Noted.", told[0][-1])
+        for call in (("issue", "reopen", "7"), ("issue", "edit", "7", "--remove-label", "in-review"),
+                     ("issue", "edit", "7", "--remove-label", "worker:papers"),
+                     ("issue", "edit", "7", "--add-label", "todo")):
+            self.assertIn(call, calls)
+        self.assertEqual(docx_review.watch([self.paper], run), [])
+
+    def test_watch_takes_no_issue_from_someone_who_may_not_write(self):
+        mark = docx_review.DOCUMENT_MARK.format(self.paper.as_posix())
+        issues = [{"number": 99, "state": "OPEN", "body": mark + "\n<!-- symphony-comments:  -->",
+                   "labels": [], "author": "stranger", "association": "NONE"}]
+        calls = []
+        docx_review.watch([self.paper], self.fake_github(issues, calls))
+        self.assertFalse([c for c in calls if "99" in c])
+        self.assertTrue([c for c in calls if c[:2] == ("issue", "create")])
+
+    def test_watch_appends_the_comments_mark_a_person_removed(self):
+        issues, calls = [], []
+        run = self.fake_github(issues, calls)
+        docx_review.watch([self.paper], run)
+        issues[0]["body"] = docx_review.COMMENTS_MARK.sub("", issues[0]["body"])
+        docx_review.watch([self.paper], run)
+        self.assertEqual(docx_review.watch([self.paper], run), [])
+
+    def test_watch_goes_on_past_a_document_it_cannot_read(self):
+        broken = self.folder / "papers" / "broken.docx"
+        broken.write_bytes(b"not a zip")
+        issues, calls = [], []
+        self.assertEqual(docx_review.watch([broken, self.paper], self.fake_github(issues, calls)), [str(self.paper)])
+
+    def test_a_comment_keeps_its_key_when_word_renumbers_it(self):
+        before = set(docx_review.awaiting(self.paper))
+        parts = docx_review.read_parts(self.paper)
+        for name in (docx_review.DOCUMENT, docx_review.COMMENTS):
+            parts[name] = parts[name].replace(b'w:id="0"', b'w:id="40"')
+        docx_review.write_parts(self.paper, parts, self.paper)
+        self.assertEqual(set(docx_review.awaiting(self.paper)), before)
 
     def test_apply_writes_tracked_changes_that_accept_and_reject(self):
         revisions = [
