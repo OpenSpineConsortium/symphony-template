@@ -77,6 +77,14 @@ change copied in (docs/start/protocol.md, step 7): 0.5.0 changes the
 board's Given to workers heading, which tests/fixtures/board-STATE.md
 pins in a copy made before symphony-template#78.
 
+The template's push guard hook, tools/guard_push.py, calls the library's
+simple_commands, push_arguments and refusal itself, never
+guard.refused_push, so a guard fix that lives in refused_push's readings
+(F21's clone, F24's substitutions, F25's here-document bodies and limits)
+does not reach the hook until the shim calls guard.refused_push; that
+switch is part of the template's follow-up for 0.5.1
+(docs/research/protocol-fixes-after-0-5-0/README.md).
+
 What is this repository's own changes here as usual: the shims
 tools/board.py, check_protocol.py, team.py, workers.py and guard_push.py,
 the workflows and the hooks. The owner's one-time setup for the sync is
