@@ -58,10 +58,9 @@ repository() {
 
 # Where the tokens go, as tokens.py takes it: an organization's secrets seen
 # by this repository, or a personal account's repository's own.
-token_place() { ( unset GITHUB_TOKEN GH_TOKEN; token_place_with "$1" ); }
-token_place_with() {
+token_place() {
   local repo=$1 kind
-  kind=$(env -u GITHUB_TOKEN gh api "repos/$repo" --jq .owner.type)
+  kind=$(as_you gh api "repos/$repo" --jq .owner.type)
   if [ "$kind" = "Organization" ]; then
     echo "--org ${repo%%/*} --repos ${repo#*/}"
   else
@@ -71,25 +70,20 @@ token_place_with() {
 
 as_you() { env -u GITHUB_TOKEN -u GH_TOKEN "$@"; }
 
-# The control panel's Tokens page starts this Codespace with three of your
-# Codespaces secrets: SYMPHONY_GITHUB_TOKEN, the page's own GitHub token,
-# SYMPHONY_SLOT and SYMPHONY_LABEL. With them the setup is one account into
-# one slot and nothing else: no question, no GitHub sign-in, the claude.ai
-# sign-in in a new tab, and the page deletes the three once the slot is saved.
-from_the_panel() {
-  local repo=$1 slot=${SYMPHONY_SLOT:-} label=${SYMPHONY_LABEL:-}
-  if ! [[ "$slot" =~ ^[1-8]$ ]]; then
-    echo "The Tokens page named no slot from 1 to 8; start again from its button." >&2
-    exit 1
-  fi
-  echo "Symphony: a Claude token for slot $slot of $repo, as the Tokens page asked."
-  echo "Sign in to claude.ai in the tab that opens, as the account for this slot, and press Authorize."
-  local args=(add --slot "$slot")
-  [ -n "$label" ] && args+=(--label "$label")
+# The control panel's Tokens page starts this Codespace with
+# .devcontainer/token/devcontainer.json, which sets SYMPHONY_SETUP=token: the
+# setup is then one account into the next free slot and nothing else, the
+# repository's settings left alone and no question asked. The page never
+# hands the Codespace a credential: gh signs in here as you, once per
+# Codespace, and the page watches for the slot's secret to appear.
+token_only() {
+  local repo=$1
+  echo "Symphony: a Claude token for the next free slot of $repo, as the Tokens page asked."
+  github_sign_in
+  echo "Now sign in to claude.ai in the tab that opens, as the account for the new slot, and press Authorize."
   # shellcheck disable=SC2046 # the place is two or four words, split on purpose
-  env -u GITHUB_TOKEN GH_TOKEN="$SYMPHONY_GITHUB_TOKEN" python3 scripts/tokens.py \
-    $(GH_TOKEN="$SYMPHONY_GITHUB_TOKEN" token_place_with "$repo") "${args[@]}"
-  echo "Done: the Tokens page sees slot $slot within a few seconds. You can close this tab."
+  as_you python3 scripts/tokens.py $(token_place "$repo") add
+  echo "Done: the Tokens page sees the new slot within a few seconds. You can close this tab."
 }
 
 # The setup task can open before the Codespace's postCreateCommand has put
@@ -117,8 +111,8 @@ setup() {
     echo "This Codespace does not say which repository it is on; run: bash scripts/codespace.sh OWNER/NAME" >&2
     exit 1
   fi
-  if [ -n "${SYMPHONY_GITHUB_TOKEN:-}" ]; then
-    from_the_panel "$repo"
+  if [ "${SYMPHONY_SETUP:-}" = "token" ]; then
+    token_only "$repo"
     return
   fi
   echo "Symphony setup for $repo: its GitHub settings, then its Claude tokens. Ctrl-C stops it; run 'bash scripts/codespace.sh' to start again."
