@@ -7,8 +7,9 @@
 #
 #   bash scripts/codespace.sh install   what .devcontainer/devcontainer.json
 #                                       runs once when the Codespace is made:
-#                                       Claude Code, and the first terminal
-#                                       that opens starts the setup
+#                                       Claude Code; .vscode/tasks.json then
+#                                       starts the setup in a terminal the
+#                                       first time the Codespace opens
 #   bash scripts/codespace.sh           the setup: a GitHub sign-in of your
 #                                       own, the repository's settings, then
 #                                       the token wizard, one account at a time
@@ -28,23 +29,10 @@ SCOPES="repo,workflow,admin:org"
 
 install() {
   # a Codespace's folder may belong to another user than the one its
-  # terminals run as, and git then refuses to read it ("dubious ownership"),
-  # which hid the repository from gh and the wizard on the owner's first run
+  # terminals run as, and git then refuses to read it ("dubious ownership")
   git config --global --add safe.directory "$ROOT"
   if ! command -v claude >/dev/null 2>&1; then
     npm install -g @anthropic-ai/claude-code
-  fi
-  # the first interactive terminal starts the setup once; later ones are
-  # ordinary shells, and the setup is run again by hand
-  if ! grep -q "scripts/codespace.sh" "$HOME/.bashrc" 2>/dev/null; then
-    cat >>"$HOME/.bashrc" <<HOOK
-
-# Symphony: start the setup in the first terminal of this Codespace
-if [ -t 0 ] && [ ! -e "$DONE_MARK" ]; then
-  touch "$DONE_MARK"
-  bash "$ROOT/scripts/codespace.sh"
-fi
-HOOK
   fi
 }
 
@@ -70,9 +58,10 @@ repository() {
 
 # Where the tokens go, as tokens.py takes it: an organization's secrets seen
 # by this repository, or a personal account's repository's own.
-token_place() {
+token_place() { ( unset GITHUB_TOKEN GH_TOKEN; token_place_with "$1" ); }
+token_place_with() {
   local repo=$1 kind
-  kind=$(as_you gh api "repos/$repo" --jq .owner.type)
+  kind=$(env -u GITHUB_TOKEN gh api "repos/$repo" --jq .owner.type)
   if [ "$kind" = "Organization" ]; then
     echo "--org ${repo%%/*} --repos ${repo#*/}"
   else
@@ -82,14 +71,55 @@ token_place() {
 
 as_you() { env -u GITHUB_TOKEN -u GH_TOKEN "$@"; }
 
+# The control panel's Tokens page starts this Codespace with three of your
+# Codespaces secrets: SYMPHONY_GITHUB_TOKEN, the page's own GitHub token,
+# SYMPHONY_SLOT and SYMPHONY_LABEL. With them the setup is one account into
+# one slot and nothing else: no question, no GitHub sign-in, the claude.ai
+# sign-in in a new tab, and the page deletes the three once the slot is saved.
+from_the_panel() {
+  local repo=$1 slot=${SYMPHONY_SLOT:-} label=${SYMPHONY_LABEL:-}
+  if ! [[ "$slot" =~ ^[1-8]$ ]]; then
+    echo "The Tokens page named no slot from 1 to 8; start again from its button." >&2
+    exit 1
+  fi
+  echo "Symphony: a Claude token for slot $slot of $repo, as the Tokens page asked."
+  echo "Sign in to claude.ai in the tab that opens, as the account for this slot, and press Authorize."
+  local args=(add --slot "$slot")
+  [ -n "$label" ] && args+=(--label "$label")
+  # shellcheck disable=SC2046 # the place is two or four words, split on purpose
+  env -u GITHUB_TOKEN GH_TOKEN="$SYMPHONY_GITHUB_TOKEN" python3 scripts/tokens.py \
+    $(GH_TOKEN="$SYMPHONY_GITHUB_TOKEN" token_place_with "$repo") "${args[@]}"
+  echo "Done: the Tokens page sees slot $slot within a few seconds. You can close this tab."
+}
+
+# The setup task can open before the Codespace's postCreateCommand has put
+# Claude Code in place, so it waits for it a while.
+wait_for_claude() {
+  local tries=0
+  until command -v claude >/dev/null 2>&1; do
+    [ "$tries" -eq 0 ] && echo "Waiting for Claude Code to finish installing..."
+    tries=$((tries + 1))
+    if [ "$tries" -gt 60 ]; then
+      echo "Claude Code is not installed yet; run 'bash scripts/codespace.sh install', then 'bash scripts/codespace.sh'." >&2
+      exit 1
+    fi
+    sleep 5
+  done
+}
+
 setup() {
   cd "$ROOT"
+  wait_for_claude
   git config --global --get-all safe.directory 2>/dev/null | grep -qx "$ROOT" || git config --global --add safe.directory "$ROOT"
   local repo place
   repo=$(repository)
   if [ -z "$repo" ]; then
     echo "This Codespace does not say which repository it is on; run: bash scripts/codespace.sh OWNER/NAME" >&2
     exit 1
+  fi
+  if [ -n "${SYMPHONY_GITHUB_TOKEN:-}" ]; then
+    from_the_panel "$repo"
+    return
   fi
   echo "Symphony setup for $repo: its GitHub settings, then its Claude tokens. Ctrl-C stops it; run 'bash scripts/codespace.sh' to start again."
   github_sign_in
@@ -107,6 +137,9 @@ setup() {
 case "${1:-}" in
   install) install ;;
   "") setup ;;
+  # the task in .vscode/tasks.json runs this each time the Codespace opens;
+  # the setup starts by itself only the first time
+  auto) [ -e "$DONE_MARK" ] && exit 0; touch "$DONE_MARK"; setup ;;
   */*) GITHUB_REPOSITORY=$1 setup ;;
   -h|--help) sed -n '2,22p' "${BASH_SOURCE[0]}" ;;
   *) echo "usage: bash scripts/codespace.sh [install | OWNER/NAME]" >&2; exit 2 ;;
