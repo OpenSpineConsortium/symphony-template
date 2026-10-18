@@ -74,11 +74,13 @@ from pathlib import Path
 VERSION = 1
 BRANCH = "pool"
 SOURCES = ("run", "probe", "cswap")
-SLOTS = tuple(str(slot) for slot in range(1, 9)) + ("main",)
+# An organization's pool holds every member's tokens, so it has room for 32;
+# the workflows name each slot's secret by its fixed name (workers.yml).
+SLOTS = tuple(str(slot) for slot in range(1, 33)) + ("main",)
 WINDOWS = ("five_hour", "seven_day")
 THRESHOLD = 0.9
 UNKNOWN_HOLD = timedelta(hours=5)
-FILE_NAME = re.compile(r"^slot-(main|[1-8])\.(run|probe|cswap)\.json$")
+FILE_NAME = re.compile(r"^slot-(main|[1-9]|[12][0-9]|3[0-2])\.(run|probe|cswap)\.json$")
 NAME_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$")
 PROBE = ("claude", "-p", "Reply with the one word ok.", "--model", "haiku", "--max-turns", "1",
          "--output-format", "stream-json", "--verbose")
@@ -94,6 +96,11 @@ EFFORTS = ("low", "medium", "high", "xhigh", "max")
 KNOWN_MODELS = ("claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5")
 # The worker's own model, as the registry takes it (tools/sdlc_protocol/workers.py).
 WORKER_MODEL = re.compile(r"[A-Za-z0-9._:\[\]-]{0,80}")
+# A token's own id, which stays when its slot changes, and the GitHub login
+# of the person it belongs to, as the Tokens tab writes them: the id labels
+# the issues the token worked (token:<id>) for the leaderboard.
+TOKEN_ID = re.compile(r"[0-9a-f]{8}")
+LOGIN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}")
 # The per-model weekly limits by the family a model's name holds.
 FAMILIES = ("fable", "opus", "sonnet", "haiku")
 
@@ -414,7 +421,7 @@ def parse_slots(text):
     slots = []
     for word in re.split(r"[,\s]+", text or ""):
         if word and word not in SLOTS:
-            raise PoolError(f"a slot is a number from 1 to 8 or main, not {word[:20]!r}")
+            raise PoolError(f"a slot is a number from 1 to 32 or main, not {word[:20]!r}")
         if word and word not in slots:
             slots.append(word)
     return slots
@@ -459,6 +466,14 @@ def setting_of(slot, each, complain):
             found["effort"] = effort
         else:
             complain(f"slot {slot}: the effort is one of {', '.join(EFFORTS)}; left out")
+    for key, shape in (("id", TOKEN_ID), ("owner", LOGIN)):
+        value = each.get(key)
+        if value in (None, ""):
+            continue
+        if isinstance(value, str) and shape.fullmatch(value):
+            found[key] = value
+        else:
+            complain(f"slot {slot}: the {key} is not of its shape; left out")
     for key in ("resume", "paused"):
         if isinstance(each.get(key), bool):
             found[key] = each[key]
@@ -553,7 +568,8 @@ def run_of(slot, how, until, model, settings):
     model = model or setting.get("model", "")
     fallback = setting.get("fallback", "")
     return {"slot": slot, "how": how, "until": until, "model": model or "",
-            "effort": setting.get("effort", ""), "fallback": fallback if fallback != model else ""}
+            "effort": setting.get("effort", ""), "fallback": fallback if fallback != model else "",
+            "id": setting.get("id", "")}
 
 
 def choose(worker, pool_text, path=ASSIGNMENTS, folder=None, now=None, spread=0):
@@ -674,7 +690,7 @@ def build_parser():
     choosing.add_argument("--spread", type=int, default=0, help="the worker's place in its run, from 0")
     choosing.add_argument("--settings", default="", help="SYMPHONY_CLAUDE_SETTINGS, the slots' settings as JSON")
     choosing.add_argument("--model", default="", help="the worker's own model, taken where the slot names none")
-    showing_settings = commands.add_parser("settings", help="one slot's model, effort and fallback, as step outputs")
+    showing_settings = commands.add_parser("settings", help="one slot's model, effort, fallback and id, as step outputs")
     showing_settings.add_argument("--slot", required=True, choices=SLOTS)
     showing_settings.add_argument("--settings", default="", help="SYMPHONY_CLAUDE_SETTINGS, the slots' settings as JSON")
     return parser
@@ -712,7 +728,7 @@ def main(argv=None):
             run = choose_run(args.worker, args.pool, args.assignments, spread=max(args.spread, 0),
                              settings=parse_settings(args.settings), model=model)
             print(f"slot={run['slot']}")
-            for key in ("model", "effort", "fallback"):
+            for key in ("model", "effort", "fallback", "id"):
                 if run[key]:
                     print(f"{key}={run[key]}")
             until = run["until"]
@@ -725,7 +741,7 @@ def main(argv=None):
                   + (", though every slot of the pool is held" if until else ""), file=sys.stderr)
         elif args.command == "settings":
             run = run_of(args.slot, "", None, "", parse_settings(args.settings))
-            for key in ("model", "effort", "fallback"):
+            for key in ("model", "effort", "fallback", "id"):
                 if run[key]:
                     print(f"{key}={run[key]}")
     except PoolError as error:
