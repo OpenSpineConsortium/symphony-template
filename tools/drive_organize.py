@@ -75,6 +75,8 @@ DOMAINS = ["data analysis", "accounting", "finance", "business", "marketing", "s
            "research", "writing", "teaching", "design and art", "media", "operations", "personal", "other"]
 SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 OWNER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,38}")
+REPO_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}")
+TEMPLATE = "OpenSpineConsortium/symphony-template"
 BOT = "github-actions[bot]"
 LABEL_DRIVE, LABEL_PROPOSED, LABEL_TRACKING = "drive", "proposed", "tracking"
 LABEL_EPIC, LABEL_TODO = "epic", "todo"
@@ -318,6 +320,11 @@ def schema(owners):
                               "summary": text, "folders": texts, "files": texts,
                               "directions": {**texts, "minItems": 1, "maxItems": 8},
                               "plan": text,
+                              "repository": {"type": "object",
+                                             "properties": {"name": {"type": "string",
+                                                                     "pattern": f"^{REPO_NAME.pattern}$"},
+                                                            "team": {"type": "boolean"}, "why": text},
+                                             "required": ["name", "team", "why"]},
                               "tasks": {"type": "array", "items": task, "minItems": 1, "maxItems": MAX_TASKS}},
                "required": ["slug", "title", "domain", "summary", "folders", "files", "directions", "plan",
                             "tasks"]}
@@ -466,14 +473,31 @@ def project_body(project, items, left_out, folder):
     directions = "\n".join(f"- {plain(line, 600)}" for line in project["directions"][:8])
     saved = [{k: item[k] for k in ("id", "name", "drive")} for item in items]
     return (f"<!-- symphony-drive-project: {project['slug']} -->\n<!-- symphony-drive-items: {hidden(saved)} -->\n"
-            f"Domain: {project['domain']}\n\n{plain(project['summary']).strip()}\n\n"
+            f"Domain: {plain(project['domain'], 40)}\n\n{plain(project['summary']).strip()}\n\n"
             f"## Where it lives in the drive\n\n{places}\n\n"
             f"## Directions you could take\n\n{directions}\n\n"
+            f"{repository_section(project.get('repository'))}"
             "## What happens next\n\n"
             "Proposed by the drive organizer: no worker takes its tasks yet. To go ahead, run the Drive "
             "organizer workflow with the step accept and this issue's number. The folders above then join "
             f"the drive sync, which brings them into `{folder}/`, and once they are there the tasks get todo "
             "and go to the workers. To say no, close this issue; the organizer never proposes it again.")
+
+
+def repository_section(repository):
+    """A Symphony repository of its own, where the project would sooner live
+    in one that people join than in this one: the link makes it from the
+    template, and a team's is opened to volunteers by crowd mode, each on
+    their own Claude account. The owner makes it; nothing here does."""
+    if not isinstance(repository, dict) or not REPO_NAME.fullmatch(str(repository.get("name", ""))):
+        return ""
+    owner, _, name = TEMPLATE.partition("/")
+    url = f"https://github.com/new?template_owner={owner}&template_name={name}&name={repository['name']}"
+    team = (" For people who join with their own Claude accounts, its owner then runs "
+            "`python3 scripts/crowd.py setup` in it (docs/setup/crowdsourcing.md).") if repository.get("team") else ""
+    return (f"## A repository of its own\n\n{plain(repository.get('why', ''), 600).strip()}\n\n"
+            f"Make it as {tick(repository['name'])} with [this link]({url}), choosing its owner there, then move "
+            f"this issue's tasks to it.{team}\n\n")
 
 
 def clean_task(task):
@@ -525,14 +549,26 @@ def open_project(github, project, catalog_lookup, folder, owners):
 
 
 def index_body(plan, numbers, folder):
-    rows = "\n".join(f"- #{number} {plain(title, 250)} ({domain}){' (proposed before)' if old else ''}"
+    rows = "\n".join(f"- #{number} {plain(title, 250)} ({plain(domain, 40)}){' (proposed before)' if old else ''}"
                      for number, title, domain, old in numbers)
     unsorted = "\n".join(f"- {tick(plain(path, 300))}" for path in plan.get("unsorted", [])[:100]) or "- nothing"
     directions = "\n".join(f"- {plain(line, 600)}" for line in plan.get("directions", [])[:20]) or "- none"
-    return (f"{INDEX_MARKER}\n{plain(plan['summary']).strip()}\n\n## Projects\n\n{rows}\n\n"
+    return (f"{INDEX_MARKER}\n{plain(plan.get('summary', '')).strip()}\n\n## Projects\n\n{rows}\n\n"
             "Each is an epic with its tasks under it, proposed: accept one with the Drive organizer "
             f"workflow's step accept and its number, and its folders join the sync into `{folder}/`.\n\n"
             f"## What fits no project\n\n{unsorted}\n\n## Directions across the drive\n\n{directions}\n")
+
+
+def whole(project):
+    """Whether a project has every field the schema requires, of its type,
+    before anything of it is opened: a plan a session wrote is held to the
+    schema here, as the workflow's Claude run is held by --json-schema."""
+    texts = ("title", "summary", "plan")
+    lists = ("folders", "files", "directions", "tasks")
+    return (all(isinstance(project.get(key), str) for key in texts)
+            and all(isinstance(project.get(key), list) for key in lists)
+            and project.get("domain") in DOMAINS and bool(project["tasks"]) and bool(project["directions"])
+            and all(isinstance(task, dict) for task in project["tasks"]))
 
 
 def open_plan(github, plan, catalog, folder, owners=()):
@@ -544,7 +580,7 @@ def open_plan(github, plan, catalog, folder, owners=()):
     projects, slugs = [], set()
     for project in plan.get("projects", [])[:MAX_PROJECTS]:
         slug = str(project.get("slug", ""))
-        if SLUG.fullmatch(slug) and slug not in slugs and project.get("tasks"):
+        if SLUG.fullmatch(slug) and slug not in slugs and whole(project):
             slugs.add(slug)
             projects.append(project)
     ensure_labels(github, sorted(slugs - set(known)))

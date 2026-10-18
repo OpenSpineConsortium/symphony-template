@@ -210,6 +210,80 @@ TEXT_BOX = ('<w:p><w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing
             '</mc:Fallback></mc:AlternateContent></w:r></w:p>')
 
 
+class PanelTest(unittest.TestCase):
+    """Several reviewers, each a lens with its own author name, on one paper."""
+
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.folder)
+        self.paper = self.folder / "paper.docx"
+        docx_review.sample(self.paper)
+
+    def authors(self, tag):
+        document = zipfile.ZipFile(self.paper).read(docx_review.DOCUMENT).decode("utf-8")
+        import re
+        return set(re.findall(rf'<w:{tag} w:id="\d+" w:author="([^"]+)"', document))
+
+    def test_each_lens_writes_under_its_own_name(self):
+        methods = [{"paragraph": 1, "old": FIRST, "text": FIRST_NEW, "why": "Report the agreement."}]
+        plain = [{"paragraph": 3, "old": "Results are shown in Table 1.",
+                  "text": "Table 1 shows the results.", "why": "Active voice."}]
+        report = docx_review.panel(self.paper, [("Methods reviewer", methods), ("Plain language", plain)])
+        self.assertEqual([(r["author"], r["revised"], r["suggested"]) for r in report],
+                         [("Methods reviewer", 1, 0), ("Plain language", 1, 0)])
+        self.assertEqual(self.authors("ins"), {"Methods reviewer", "Plain language"})
+        accepted = texts(self.paper, "accepted")
+        self.assertEqual((accepted[1], accepted[3]), (FIRST_NEW, "Table 1 shows the results."))
+        mine = {c["author"] for c in docx_review.extract(self.paper)["comments"]}
+        self.assertTrue({"Methods reviewer", "Plain language"} <= mine)
+
+    def test_a_later_lens_on_a_changed_paragraph_suggests_in_a_comment(self):
+        first = [{"paragraph": 1, "old": FIRST, "text": FIRST_NEW}]
+        second = [{"paragraph": 1, "old": FIRST, "text": FIRST.replace("forty", "40"), "why": "Numerals."}]
+        report = docx_review.panel(self.paper, [("Editor", first), ("Style", second)])
+        self.assertEqual((report[1]["revised"], report[1]["suggested"]), (0, 1))
+        self.assertEqual(self.authors("ins"), {"Editor"})
+        style = [c["text"] for c in docx_review.extract(self.paper)["comments"] if c["author"] == "Style"]
+        self.assertEqual(len(style), 1)
+        self.assertTrue(style[0].startswith("Suggests: We measured lumbar levels in 40 radiographs"))
+        self.assertIn("Why: Numerals.", style[0])
+
+    def test_a_later_lens_comments_on_a_changed_paragraph_without_a_revert(self):
+        first = [{"paragraph": 1, "old": FIRST, "text": FIRST_NEW}]
+        note = [{"paragraph": 1, "old": FIRST, "text": FIRST, "why": "Cite the readers."}]
+        same = [{"paragraph": 1, "old": FIRST, "text": FIRST_NEW, "why": "Agree."}]
+        report = docx_review.panel(self.paper, [("Editor", first), ("Methods", note), ("Domain", same)])
+        self.assertEqual([(r["revised"], r["suggested"], r["commented"]) for r in report],
+                         [(1, 0, 0), (0, 0, 1), (0, 0, 1)])
+        comments = {c["author"]: c["text"] for c in docx_review.extract(self.paper)["comments"]}
+        self.assertEqual((comments["Methods"], comments["Domain"]), ("Cite the readers.", "Agree."))
+        self.assertEqual(texts(self.paper, "accepted")[1], FIRST_NEW)
+
+    def test_a_bad_entry_is_skipped_and_the_rest_goes_on(self):
+        lens = [{"paragraph": 99, "old": "", "text": "x"},
+                {"paragraph": 1, "old": FIRST, "text": "two\nlines"},
+                {"paragraph": 1, "old": FIRST, "text": FIRST_NEW}]
+        report = docx_review.panel(self.paper, [("Editor", lens)])
+        self.assertEqual((report[0]["revised"], len(report[0]["skipped"])), (1, 2))
+
+    def test_an_author_name_must_be_one_plain_line(self):
+        for name in ("", "a\nb", "x" * 61, '<w:t>'):
+            with self.assertRaises(docx_review.Refused):
+                docx_review.panel(self.paper, [(name, [])])
+
+    def test_the_command_line_takes_one_lens_a_flag(self):
+        revisions = self.folder / "m.json"
+        revisions.write_text(json.dumps([{"paragraph": 1, "old": FIRST, "text": FIRST_NEW}]))
+        out = self.folder / "out.docx"
+        done = subprocess.run([sys.executable, str(ROOT / "tools/docx_review.py"), "panel", str(self.paper),
+                               "--lens", f"Methods={revisions}", "--out", str(out)],
+                              capture_output=True, text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)[0]["revised"], 1)
+        self.assertEqual(texts(out, "accepted")[1], FIRST_NEW)
+        self.assertEqual(texts(self.paper, "accepted")[1], FIRST)
+
+
 class WordShapesTest(unittest.TestCase):
     def shaped(self, body):
         folder, path = document_with(body)

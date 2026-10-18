@@ -20,3 +20,5 @@ in the secret SYMPHONY_DRIVE_REFRESH traded at the sign-in service, which
 holds the client secrets; papers.yml and `docx_review.py watch` keep one task
 per document, keyed comments surviving Word's renumbering, Claude's own
 comments queueing nothing.
+
+Several reviewers with different lenses revise one document with `docx_review.py panel FILE --lens "Name=revisions.json" ...`: each lens's changes and comments carry its own author name in Word, a lens that meets a paragraph an earlier one changed comments "Suggests: ..." instead, and the lens-review skill writes the copy back after each lens (docs/research/lens-review.md).
