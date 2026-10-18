@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       slots:
-        description: the slots to read, from 1 to 8 (default the variable SYMPHONY_CLAUDE_ACCOUNTS)
+        description: the slots to read, from 1 to 32 (default the variable SYMPHONY_CLAUDE_ACCOUNTS)
         required: false
         default: ""
 
@@ -75,6 +75,30 @@ jobs:
             (matrix.slot == '6' && secrets.SYMPHONY_CLAUDE_6) ||
             (matrix.slot == '7' && secrets.SYMPHONY_CLAUDE_7) ||
             (matrix.slot == '8' && secrets.SYMPHONY_CLAUDE_8) ||
+            (matrix.slot == '9' && secrets.SYMPHONY_CLAUDE_9) ||
+            (matrix.slot == '10' && secrets.SYMPHONY_CLAUDE_10) ||
+            (matrix.slot == '11' && secrets.SYMPHONY_CLAUDE_11) ||
+            (matrix.slot == '12' && secrets.SYMPHONY_CLAUDE_12) ||
+            (matrix.slot == '13' && secrets.SYMPHONY_CLAUDE_13) ||
+            (matrix.slot == '14' && secrets.SYMPHONY_CLAUDE_14) ||
+            (matrix.slot == '15' && secrets.SYMPHONY_CLAUDE_15) ||
+            (matrix.slot == '16' && secrets.SYMPHONY_CLAUDE_16) ||
+            (matrix.slot == '17' && secrets.SYMPHONY_CLAUDE_17) ||
+            (matrix.slot == '18' && secrets.SYMPHONY_CLAUDE_18) ||
+            (matrix.slot == '19' && secrets.SYMPHONY_CLAUDE_19) ||
+            (matrix.slot == '20' && secrets.SYMPHONY_CLAUDE_20) ||
+            (matrix.slot == '21' && secrets.SYMPHONY_CLAUDE_21) ||
+            (matrix.slot == '22' && secrets.SYMPHONY_CLAUDE_22) ||
+            (matrix.slot == '23' && secrets.SYMPHONY_CLAUDE_23) ||
+            (matrix.slot == '24' && secrets.SYMPHONY_CLAUDE_24) ||
+            (matrix.slot == '25' && secrets.SYMPHONY_CLAUDE_25) ||
+            (matrix.slot == '26' && secrets.SYMPHONY_CLAUDE_26) ||
+            (matrix.slot == '27' && secrets.SYMPHONY_CLAUDE_27) ||
+            (matrix.slot == '28' && secrets.SYMPHONY_CLAUDE_28) ||
+            (matrix.slot == '29' && secrets.SYMPHONY_CLAUDE_29) ||
+            (matrix.slot == '30' && secrets.SYMPHONY_CLAUDE_30) ||
+            (matrix.slot == '31' && secrets.SYMPHONY_CLAUDE_31) ||
+            (matrix.slot == '32' && secrets.SYMPHONY_CLAUDE_32) ||
             ''
             }}
         run: |
@@ -103,6 +127,30 @@ jobs:
             (matrix.slot == '6' && secrets.SYMPHONY_CLAUDE_6) ||
             (matrix.slot == '7' && secrets.SYMPHONY_CLAUDE_7) ||
             (matrix.slot == '8' && secrets.SYMPHONY_CLAUDE_8) ||
+            (matrix.slot == '9' && secrets.SYMPHONY_CLAUDE_9) ||
+            (matrix.slot == '10' && secrets.SYMPHONY_CLAUDE_10) ||
+            (matrix.slot == '11' && secrets.SYMPHONY_CLAUDE_11) ||
+            (matrix.slot == '12' && secrets.SYMPHONY_CLAUDE_12) ||
+            (matrix.slot == '13' && secrets.SYMPHONY_CLAUDE_13) ||
+            (matrix.slot == '14' && secrets.SYMPHONY_CLAUDE_14) ||
+            (matrix.slot == '15' && secrets.SYMPHONY_CLAUDE_15) ||
+            (matrix.slot == '16' && secrets.SYMPHONY_CLAUDE_16) ||
+            (matrix.slot == '17' && secrets.SYMPHONY_CLAUDE_17) ||
+            (matrix.slot == '18' && secrets.SYMPHONY_CLAUDE_18) ||
+            (matrix.slot == '19' && secrets.SYMPHONY_CLAUDE_19) ||
+            (matrix.slot == '20' && secrets.SYMPHONY_CLAUDE_20) ||
+            (matrix.slot == '21' && secrets.SYMPHONY_CLAUDE_21) ||
+            (matrix.slot == '22' && secrets.SYMPHONY_CLAUDE_22) ||
+            (matrix.slot == '23' && secrets.SYMPHONY_CLAUDE_23) ||
+            (matrix.slot == '24' && secrets.SYMPHONY_CLAUDE_24) ||
+            (matrix.slot == '25' && secrets.SYMPHONY_CLAUDE_25) ||
+            (matrix.slot == '26' && secrets.SYMPHONY_CLAUDE_26) ||
+            (matrix.slot == '27' && secrets.SYMPHONY_CLAUDE_27) ||
+            (matrix.slot == '28' && secrets.SYMPHONY_CLAUDE_28) ||
+            (matrix.slot == '29' && secrets.SYMPHONY_CLAUDE_29) ||
+            (matrix.slot == '30' && secrets.SYMPHONY_CLAUDE_30) ||
+            (matrix.slot == '31' && secrets.SYMPHONY_CLAUDE_31) ||
+            (matrix.slot == '32' && secrets.SYMPHONY_CLAUDE_32) ||
             ''
             }}
           claude_args: |
