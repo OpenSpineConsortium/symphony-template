@@ -87,11 +87,13 @@ PUSH_ATTEMPTS = 5
 ASSIGNMENTS = ".github/symphony/accounts.json"
 CHOICES = SLOTS + ("auto",)
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
-# A model's name lands in claude_args, so it is a plain word and nothing
-# a shell or the action's argument parser could read as more.
-MODEL_SHAPE = re.compile(r"^[a-z][a-z0-9.-]{0,63}(\[1m\])?$")
+# The models a token's tile offers. A setting names one of them or is
+# left out: a name of the right shape that no model answers to would fail
+# every run on the token, and a setting must never stop a run. The control
+# panel's tile list (assets/js/symphony-panel.js, TILE_MODELS) is the same.
+KNOWN_MODELS = ("claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5")
 # The worker's own model, as the registry takes it (tools/sdlc_protocol/workers.py).
-WORKER_MODEL = re.compile(r"^[A-Za-z0-9._:\[\]-]{0,80}$")
+WORKER_MODEL = re.compile(r"[A-Za-z0-9._:\[\]-]{0,80}")
 # The per-model weekly limits by the family a model's name holds.
 FAMILIES = ("fable", "opus", "sonnet", "haiku")
 
@@ -447,10 +449,10 @@ def setting_of(slot, each, complain):
         value = each.get(key)
         if value in (None, ""):
             continue
-        if isinstance(value, str) and MODEL_SHAPE.match(value):
+        if value in KNOWN_MODELS:
             found[key] = value
         else:
-            complain(f"slot {slot}: the {key} is a model's name such as claude-sonnet-5-5; left out")
+            complain(f"slot {slot}: the {key} is one of {', '.join(KNOWN_MODELS)}; left out")
     effort = each.get("effort")
     if effort not in (None, ""):
         if effort in EFFORTS:
@@ -706,7 +708,7 @@ def main(argv=None):
                 print(f"pool: every slot is held; slot {slot} is free first, at "
                       f"{iso(until)}", file=sys.stderr)
         elif args.command == "choose":
-            model = args.model if WORKER_MODEL.match(args.model or "") else ""
+            model = args.model if WORKER_MODEL.fullmatch(args.model or "") else ""
             run = choose_run(args.worker, args.pool, args.assignments, spread=max(args.spread, 0),
                              settings=parse_settings(args.settings), model=model)
             print(f"slot={run['slot']}")
