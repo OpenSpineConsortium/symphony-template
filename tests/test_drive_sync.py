@@ -1,9 +1,11 @@
 """tools/drive_sync.py: what each file of a connected drive does in a run,
 pulled, pushed, put beside or left waiting, decided from the drive, the
 default branch and the last run; a run end to end against a drive kept in
-memory, nothing either side wrote lost; and the two providers' calls, a
-redirect followed without the token and a drive's name kept to one path
-segment."""
+memory, nothing either side wrote lost, and one picked item the drive
+will not list failing only itself; the two providers' calls, a redirect
+followed without the token, a drive's name kept to one path segment and
+no drive's error message in the log; and the folder gate, which keeps the
+sync out of the repository's own files."""
 
 import io
 import json
@@ -11,6 +13,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import unittest.mock
 import urllib.error
 from pathlib import Path
 
@@ -207,6 +210,121 @@ class RunTest(unittest.TestCase):
         summary, staged = self.sync(MemoryDrive({"a.docx": ("1", b"same", False)}), {})
         self.assertEqual(summary["pulled"], [])
         self.assertFalse(staged.exists())
+
+
+class GoneItemDrive(MemoryDrive):
+    """A drive whose item "gone" was deleted or unshared."""
+
+    def listing(self, items):
+        if items[0]["id"] == "gone":
+            raise drive_sync.DriveError("GET https://graph.microsoft.com/x answered 404: itemNotFound")
+        yield from super().listing(items)
+
+
+class PartListingTest(unittest.TestCase):
+    setUp, sync = RunTest.setUp, RunTest.sync
+
+    def test_one_item_gone_still_syncs_the_others_and_forgets_nothing(self):
+        self.config["items"] = [{"id": "gone", "name": "Old folder"}, {"id": "x"}]
+        drive = GoneItemDrive({"a.docx": ("1", b"draft", False)})
+        state = {"files": {"old": record("1", "o", rel="old.docx")}}
+        summary, staged = self.sync(drive, state)
+        self.assertEqual(summary["pulled"], ["a.docx"])
+        self.assertEqual(len(summary["problems"]), 1)
+        self.assertTrue(summary["problems"][0].startswith("Old folder: "))
+        self.assertIn("old", state["files"])
+
+    def test_a_new_file_never_takes_the_path_of_one_it_could_not_see(self):
+        self.config["items"] = [{"id": "gone"}, {"id": "x"}]
+        (self.root / "papers" / "a.docx").write_bytes(b"theirs, from the gone item")
+        state = {"files": {"old": record("1", "o", rel="a.docx")}}
+        drive = GoneItemDrive({"new": ("1", b"new", False, "a.docx")})
+        summary, staged = self.sync(drive, state)
+        self.assertFalse(staged.exists())
+        self.assertEqual(drive.beside, {})
+        self.assertEqual(set(state["files"]), {"old"})
+
+    def test_every_item_gone_fails_the_run(self):
+        self.config["items"] = [{"id": "gone"}]
+        with self.assertRaises(drive_sync.DriveError):
+            self.sync(GoneItemDrive({}), {})
+
+    def test_another_folder_starts_afresh(self):
+        state = {"folder": "notes", "files": {"a.docx": record("1", "x")}}
+        summary, _ = self.sync(MemoryDrive({"a.docx": ("1", b"draft", False)}), state)
+        self.assertEqual(summary["pulled"], ["a.docx"])
+        self.assertEqual(state["folder"], "papers")
+
+
+class ReasonTest(unittest.TestCase):
+    def test_only_the_error_code_reaches_the_log(self):
+        graph = {"error": {"code": "itemNotFound", "message": "greg@example.edu's Thesis.docx is gone"}}
+        google = {"error": {"code": 404, "message": "File not found: 1AbC.", "status": "NOT_FOUND"}}
+        self.assertEqual(drive_sync.reason_in(json.dumps(graph).encode()), "itemNotFound")
+        self.assertEqual(drive_sync.reason_in(json.dumps(google).encode()), "NOT_FOUND")
+        self.assertEqual(drive_sync.reason_in(b'{"error": "invalid_grant"}'), "invalid_grant")
+        self.assertEqual(drive_sync.reason_in(b'{"error": "the token for greg@example.edu expired"}'),
+                         "no reason given")
+        self.assertEqual(drive_sync.reason_in(b"<html>secret page</html>"), "no reason given")
+
+    def test_a_refused_call_names_no_body(self):
+        body = json.dumps({"error": "invalid_grant", "error_description": "refresh token of greg"}).encode()
+        refused = urllib.error.HTTPError("https://signin.example/drive/token", 400, "Bad Request", {},
+                                         io.BytesIO(body))
+        with self.assertRaises(drive_sync.DriveError) as caught:
+            drive_sync.access_token("https://signin.example/drive/token", "microsoft", "r",
+                                    FakeOpener([("https://signin.example/", refused)]))
+        self.assertEqual(str(caught.exception), "POST https://signin.example/drive/token answered 400: invalid_grant")
+
+
+class FolderTest(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.root)
+        (self.root / "scripts").mkdir()
+        (self.root / "scripts" / "check.sh").write_text("true\n")
+        (self.root / "README.md").write_text("x\n")
+
+    def folder(self, name, state=None):
+        return drive_sync.checked_folder({"folder": name}, state or {}, self.root)
+
+    def test_a_new_folder_is_taken(self):
+        self.assertEqual(self.folder("papers"), "papers")
+        self.assertEqual(self.folder("papers/2026"), "papers/2026")
+
+    def test_the_repositorys_own_files_are_refused(self):
+        for name in ("scripts", "scripts/sub", "README.md", ".github", "../x", "a/../scripts", "/etc", ""):
+            with self.assertRaises(drive_sync.DriveError, msg=name):
+                self.folder(name)
+
+    def test_a_folder_the_sync_keeps_is_taken(self):
+        (self.root / "papers").mkdir()
+        (self.root / "papers" / "a.docx").write_bytes(b"a")
+        self.assertEqual(self.folder("papers", {"folder": "papers", "files": {}}), "papers")
+        with self.assertRaises(drive_sync.DriveError):
+            self.folder("scripts", {"folder": "papers", "files": {}})
+
+    def test_a_state_from_before_counts_only_where_the_sync_brought_every_file(self):
+        (self.root / "papers").mkdir()
+        (self.root / "papers" / "a.docx").write_bytes(b"a")
+        legacy = {"files": {"f1": record("1", "a")}}
+        self.assertEqual(self.folder("papers", legacy), "papers")
+        with self.assertRaises(drive_sync.DriveError):
+            self.folder("scripts", legacy)
+        with self.assertRaises(drive_sync.DriveError):
+            self.folder("scripts/drive", legacy)
+
+    def test_the_folder_command_prints_the_output_line_or_fails(self):
+        config, state = self.root / "drive.json", self.root / "state.json"
+        config.write_text(json.dumps({"folder": "papers"}))
+        out = io.StringIO()
+        with unittest.mock.patch("sys.stdout", out):
+            code = drive_sync.main(["folder", "--config", str(config), "--state", str(state), "--root", str(self.root)])
+        self.assertEqual((code, out.getvalue()), (0, "folder=papers\n"))
+        config.write_text(json.dumps({"folder": "scripts"}))
+        with unittest.mock.patch("sys.stderr", io.StringIO()):
+            self.assertEqual(drive_sync.main(["folder", "--config", str(config), "--state", str(state),
+                                              "--root", str(self.root)]), 1)
 
 
 class Answer:

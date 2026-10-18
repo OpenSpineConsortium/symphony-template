@@ -34,8 +34,16 @@ twice nor pushes the older copy up, and a copy it once staged that merges
 after the drive moved on is pulled over, never pushed. Files are known by
 the drive's id, so a rename or two files of one name mix nothing up.
 
+  python3 tools/drive_sync.py folder --config .github/symphony/drive.json \\
+      --state STATE.json --root .
   python3 tools/drive_sync.py run --config .github/symphony/drive.json \\
       --state STATE.json --root . --out STAGING --summary SUMMARY.json
+
+The first names the repository's folder the run may write, or refuses
+one that is no plain path inside the repository or that already holds
+the repository's own files, such as scripts or tools, since whoever may
+edit the drive's folder would then rewrite them and the sync's pull
+request merges by itself.
 
 Standard library only; every value read from the drive is data, never a
 path outside the folder: a name is cleaned to one path segment.
@@ -67,6 +75,8 @@ SIBLING = " (Symphony revisions)"
 MAX_DEPTH = 6
 # Graph's simple upload takes 4 MB; a larger file needs an upload session.
 SIMPLE_UPLOAD = 4 * 1024 * 1024
+FOLDER = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_. -]*(/[A-Za-z0-9_][A-Za-z0-9_. -]*)*")
+REASON = re.compile(r"[A-Za-z0-9_.-]{1,64}")
 
 
 class DriveError(Exception):
@@ -98,10 +108,23 @@ def call(method, url, token=None, data=None, headers=None, opener=None, hops=3):
         location = error.headers.get("Location") if error.headers else None
         if error.code in (301, 302, 303, 307, 308) and location and method == "GET" and hops > 0:
             return call("GET", urllib.parse.urljoin(url, location), None, None, None, opener, hops - 1)
-        body = error.read()[:200].decode("utf-8", "replace")
-        raise DriveError(f"{method} {url.split('?')[0]} answered {error.code}: {body}") from None
+        raise DriveError(f"{method} {url.split('?')[0]} answered {error.code}: {reason_in(error.read())}") from None
     except (urllib.error.URLError, OSError, ValueError) as error:
         raise DriveError(f"{method} {url.split('?')[0]} failed: {error}") from None
+
+
+def reason_in(body):
+    """The short error code of an answer, and nothing else of it: the log
+    of a public repository is public, and a drive's message can name a
+    file, a person or an address."""
+    try:
+        answer = json.loads(body) if isinstance(body, (bytes, str)) else body
+    except ValueError:
+        answer = None
+    found = answer.get("error") if isinstance(answer, dict) else None
+    if isinstance(found, dict):
+        found = found.get("status") or found.get("code")
+    return found if isinstance(found, str) and REASON.fullmatch(found) else "no reason given"
 
 
 def call_json(method, url, token=None, payload=None, opener=None):
@@ -118,7 +141,7 @@ def access_token(token_url, provider, refresh_token, opener=None):
     """Trade the refresh token for an access token at the sign-in service."""
     answer = call_json("POST", token_url, None, {"provider": provider, "refresh_token": refresh_token}, opener)
     if not answer.get("access_token"):
-        raise DriveError(f"the sign-in service gave no access token: {answer.get('error', 'no reason given')}")
+        raise DriveError(f"the sign-in service gave no access token: {reason_in(answer)}")
     return answer["access_token"]
 
 
@@ -363,12 +386,18 @@ def main_blobs(root, folder):
 
 
 def listing(provider, items):
-    """The drive's files by id, each at one path: an id two picked items
-    both reach is listed once, and two files of one name are told apart by
-    a hash of the id, in the same way whatever order the drive lists them."""
-    found = {}
-    for entry in provider.listing(items):
-        found.setdefault(entry["id"], entry)
+    """The drive's files by id, each at one path, and the picked items the
+    drive would not list: an id two picked items both reach is listed once,
+    and two files of one name are told apart by a hash of the id, in the
+    same way whatever order the drive lists them. One item deleted or no
+    longer shared is named and the others still sync."""
+    found, problems = {}, []
+    for item in items:
+        try:
+            for entry in provider.listing([item]):
+                found.setdefault(entry["id"], entry)
+        except DriveError as problem:
+            problems.append(f"{item.get('name') or item.get('id', '?')}: {problem}")
     taken = {}
     for file_id in sorted(found):
         rel = found[file_id]["rel"]
@@ -377,19 +406,40 @@ def listing(provider, items):
             rel = f"{path.with_suffix('').as_posix()}-{blob(file_id.encode())[:8]}{path.suffix}"
         taken[rel] = file_id
         found[file_id] = {**found[file_id], "rel": rel}
-    return found
+    return found, problems
+
+
+def held_back(action, entry, record, records):
+    """What a run with part of the drive unlisted leaves for the next: a
+    file it did not see may only sit in the item it could not list, and a
+    path may have moved, or a new file taken an unseen file's path, only
+    because a file of the same name went unseen."""
+    if action == "forget":
+        return True
+    if record is None:
+        return any(r.get("rel") == entry["rel"] for r in records.values())
+    return entry is not None and entry["rel"] != record["rel"]
 
 
 def run(config, state, root, out, provider):
     folder = config.get("folder", "papers")
     summary = {"pulled": [], "pushed": [], "beside": [], "waiting": [], "problems": []}
-    remote = listing(provider, config["items"])
+    remote, unlisted = listing(provider, config["items"])
+    summary["problems"] += unlisted
+    if unlisted and len(unlisted) == len(config["items"]):
+        raise DriveError("the drive listed none of the picked items: " + "; ".join(unlisted[:3]))
     main = main_blobs(root, folder)
     if "files" in state and any("rel" not in r for r in state["files"].values()):
         state["files"] = {}
+    # Records are paths inside one folder; another folder starts afresh.
+    if state.get("folder", folder) != folder:
+        state["files"] = {}
+    state["folder"] = folder
     records = state.setdefault("files", {})
     settle(records, main)
     for file_id, action in plan(remote, main, records).items():
+        if unlisted and held_back(action, remote.get(file_id), records.get(file_id), records):
+            continue
         try:
             act(action, file_id, remote.get(file_id), main, records, Path(root) / folder,
                 Path(out) / folder, provider, summary)
@@ -457,6 +507,31 @@ def stage(path, data):
     path.write_bytes(data)
 
 
+def checked_folder(config, state, root):
+    """The folder the run may write, or a DriveError saying why not."""
+    folder = config.get("folder", "papers")
+    if not isinstance(folder, str) or not FOLDER.fullmatch(folder) or ".." in folder:
+        raise DriveError(f"drive.json names a folder this run will not use: {folder!r}")
+    top = Path(root) / folder.split("/")[0]
+    if (top.exists() or top.is_symlink()) and not tracks(state, root, folder):
+        raise DriveError(f"drive.json names {folder!r}, but {top.name!r} already holds this repository's "
+                         "own files; pick a folder the repository does not have yet, or, to take back "
+                         "a folder the sync kept before, delete the branch drive-state")
+    return folder
+
+
+def tracks(state, root, folder):
+    """Whether the last run kept this folder. A state from before runs
+    wrote their folder counts only where every file under it is one the
+    sync brought in, and there is at least one."""
+    if "folder" in state:
+        return state["folder"] == folder
+    files = state.get("files")
+    records = {r.get("rel") for r in files.values() if isinstance(r, dict)} if isinstance(files, dict) else set()
+    here = set(main_blobs(root, folder))
+    return bool(here) and here <= records
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -466,10 +541,21 @@ def main(argv=None):
     go.add_argument("--root", default=".")
     go.add_argument("--out", required=True)
     go.add_argument("--summary", required=True)
+    gate = sub.add_parser("folder")
+    gate.add_argument("--config", required=True)
+    gate.add_argument("--state", required=True)
+    gate.add_argument("--root", default=".")
     args = parser.parse_args(argv)
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     state_path = Path(args.state)
     state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.is_file() else {}
+    if args.command == "folder":
+        try:
+            print(f"folder={checked_folder(config, state if isinstance(state, dict) else {}, args.root)}")
+        except DriveError as problem:
+            print(f"drive_sync: {problem}", file=sys.stderr)
+            return 1
+        return 0
     summary = {"pulled": [], "pushed": [], "beside": [], "waiting": [], "problems": []}
     code = 0
     try:

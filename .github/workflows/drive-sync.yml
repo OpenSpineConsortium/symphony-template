@@ -62,21 +62,31 @@ jobs:
         id: gate
         env:
           REFRESH: ${{ secrets.SYMPHONY_DRIVE_REFRESH }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ ! -f "$CONFIG" ] || [ -z "$REFRESH" ]; then
             echo "no drive connected: $CONFIG or the secret SYMPHONY_DRIVE_REFRESH is missing" >> "$GITHUB_STEP_SUMMARY"
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # The folder is a plain relative path inside the repository, or
-          # the run stops, since it reaches git and the outputs below.
-          python3 - "$CONFIG" >> "$GITHUB_OUTPUT" <<'EOF'
-          import json, re, sys
-          folder = json.load(open(sys.argv[1])).get("folder", "papers")
-          if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_. -]*(/[A-Za-z0-9_][A-Za-z0-9_. -]*)*", folder) or ".." in folder:
-              sys.exit(f"drive.json names a folder this run will not use: {folder!r}")
-          print(f"folder={folder}")
-          EOF
+          # What the last run saw, kept on drive-state, tells the gate below
+          # which folder the sync already keeps.
+          basic="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          if git -c http.extraheader="AUTHORIZATION: basic $basic" fetch --quiet origin drive-state 2>/dev/null; then
+            git show FETCH_HEAD:state.json > "$RUNNER_TEMP/state.json" || echo '{}' > "$RUNNER_TEMP/state.json"
+          else
+            echo '{}' > "$RUNNER_TEMP/state.json"
+          fi
+          # The folder is a plain relative path inside the repository that
+          # holds none of the repository's own files, such as scripts or
+          # tools, unless the sync already keeps it, or the run stops: the
+          # drive's editors would otherwise rewrite them through drive/sync,
+          # which merges by itself.
+          if ! python3 tools/drive_sync.py folder --config "$CONFIG" --state "$RUNNER_TEMP/state.json" \
+              --root . >> "$GITHUB_OUTPUT" 2> "$RUNNER_TEMP/gate.txt"; then
+            cat "$RUNNER_TEMP/gate.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
       - name: Queue the new comments of the documents on the default branch
         if: steps.gate.outputs.skip != 'true'
@@ -95,18 +105,6 @@ jobs:
             # An issue GITHUB_TOKEN labels starts no workflow, so wake the
             # workers here; with none registered their run ends at once.
             gh workflow run workers.yml --repo "$REPO" || echo "could not wake the workers" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Read what the last run saw
-        if: steps.gate.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          basic="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          if git -c http.extraheader="AUTHORIZATION: basic $basic" fetch --quiet origin drive-state 2>/dev/null; then
-            git show FETCH_HEAD:state.json > "$RUNNER_TEMP/state.json" || echo '{}' > "$RUNNER_TEMP/state.json"
-          else
-            echo '{}' > "$RUNNER_TEMP/state.json"
           fi
 
       - name: Ask the drive what changed, and send up what changed here
