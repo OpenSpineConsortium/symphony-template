@@ -16,7 +16,7 @@ account you have, without the token ever being shown.
 | SYMPHONY_CLAUDE_1 to SYMPHONY_CLAUDE_8 | account: one slot each | a benchmark in Actions, which spreads its agents over the slots, one account per job at a time (OpenSpineConsortium/coordbench's bench.yml); any workflow that names a slot |
 | SYMPHONY_CLAUDE_ACCOUNTS | the place | the slots in use, as a list such as `1,2,3`; the wizard keeps it equal to the slots whose secret exists. The bench stops a real run on any other word, such as `01` or `9`, so the wizard writes such a list again |
 | SYMPHONY_CLAUDE_<slot>_LABEL | slot, optional | nothing; a word of your own so that `status` can say which account a slot is. A variable is readable by anyone who can read the repository's workflows, so never an e-mail address |
-| SYMPHONY_CLAUDE_SETTINGS | the place, optional | the workers in Actions: each slot's model, effort, fallback model and whether it resumes by itself, as JSON by slot, which the control panel's token tiles write (below, "Each token's settings") |
+| SYMPHONY_CLAUDE_SETTINGS | the place, optional | the workers in Actions, and for main the coordinator, @claude and the assistant: each slot's model, effort, fallback model and whether it resumes by itself, as JSON by slot, which the control panel's token tiles write (below, "Each token's settings") |
 
 A secret on an organization reaches the repositories on its list (GitHub's
 "Selected repositories"), or all of them; a repository's own secret or
@@ -323,7 +323,7 @@ not name runs as before:
 A per-model limit holds a run only of that model's family (the name's
 fable, opus, sonnet or haiku); with no model named, any of them holds the
 slot, as before. main's model, effort and fallback reach the coordinator
-workflow too, which reads them with `pool.py settings --slot main`. Pausing and resuming steer auto; a worker the file
+workflow and @claude's (claude.yml, the control panel's assistant included) too, which read them with `pool.py settings --slot main`. Pausing and resuming steer auto; a worker the file
 assigns a slot by number keeps it, with that slot's model and effort. A
 value that does not hold together, a model the tiles do not offer among
 them, is left out with a word in the run's log (tools/pool.py), so no
