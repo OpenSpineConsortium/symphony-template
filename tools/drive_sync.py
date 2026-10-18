@@ -167,14 +167,15 @@ class Google:
         return call_json("GET", url, self.token, opener=self.opener)
 
     def meta(self, item_id):
-        fields = "id,name,mimeType,version,modifiedTime,parents"
+        fields = "id,name,mimeType,version,modifiedTime,parents,size,webViewLink"
         return self.get(f"{GOOGLE}/drive/v3/files/{q(item_id)}?fields={fields}&supportsAllDrives=true")
 
     def children(self, folder_id):
         query = q(f"'{folder_id}' in parents and trashed=false")
         return self.pages(f"{GOOGLE}/drive/v3/files?q={query}&pageSize=200&supportsAllDrives=true"
                           "&includeItemsFromAllDrives=true&corpora=allDrives&orderBy=name"
-                          "&fields=nextPageToken,files(id,name,mimeType,version,modifiedTime,parents)", "files")
+                          "&fields=nextPageToken,files(id,name,mimeType,version,modifiedTime,parents,size,"
+                          "webViewLink)", "files")
 
     def pages(self, url, key):
         token, found = "", []
@@ -269,10 +270,11 @@ class Microsoft:
 
     def meta(self, drive, item_id):
         return call_json("GET", self.item_url(drive, item_id) + "?$select=id,name,cTag,eTag,file,folder,"
-                         "parentReference", self.token, opener=self.opener)
+                         "parentReference,size,lastModifiedDateTime,webUrl", self.token, opener=self.opener)
 
     def children(self, drive, item_id):
-        url = self.item_url(drive, item_id) + "/children?$top=200&$select=id,name,cTag,eTag,file,folder,parentReference"
+        url = (self.item_url(drive, item_id) + "/children?$top=200&$select=id,name,cTag,eTag,file,folder,"
+               "parentReference,size,lastModifiedDateTime,webUrl")
         while url:
             page = call_json("GET", url, self.token, opener=self.opener)
             yield from page.get("value", [])

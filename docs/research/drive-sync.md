@@ -145,13 +145,18 @@ The owner's one-time clicks, given with their links when the page is built:
 - Microsoft: an app registration for "Accounts in any organizational directory and personal
   Microsoft accounts", a web redirect URI of https://openspineconsortium.com/symphony/control/
   (the console that holds the Folders tab), a client secret into Cloudflare, and the delegated
-  scopes Files.ReadWrite and offline_access.
+  scopes Files.ReadWrite and offline_access. Done: the registration is SymphonyBoard Folders
+  (client id 463afc21-8bbd-429b-a93d-3d3617966f0b), and on 2026-10-18 the owner granted it for
+  all of WSU with his admin role, after which OneDrive Connect on the Folders tab worked end to
+  end (the coordinator's word to the thread "Organize a whole OneDrive" that day).
 
 ## Limits and what is not yet known
 
 - OneDrive at WSU: a university tenant often lets users consent only to apps from a verified
   publisher, so the owner's WSU account may need IT's consent or a verified publisher (a free
-  Microsoft partner ID). Not tried. A personal Microsoft account has no such gate. Where neither
+  Microsoft partner ID). Settled on 2026-10-18: the owner granted SymphonyBoard Folders for the
+  whole WSU tenant as its admin, so WSU accounts consent with no IT request. A personal Microsoft
+  account has no such gate. Where neither
   goes, the owner's own computer is the fallback (word-revisions-from-onedrive.md), with no stored
   login.
 - Files.ReadWrite reaches all of the person's files, though the run reads only the picked items.
@@ -171,5 +176,5 @@ The owner's one-time clicks, given with their links when the page is built:
   free. A push from the drive itself would need the service to take Google's or Graph's change
   notifications and dispatch the run, which it cannot do without holding a GitHub token, so the
   schedule is the fallback and Sync now the button.
-- Nothing has run against a real drive yet: the first connection is the test, and it waits on the
-  clicks above.
+- The first connection, OneDrive at WSU, worked on 2026-10-18. A sync of real files is the next
+  test.
