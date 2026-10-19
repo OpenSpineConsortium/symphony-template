@@ -25,6 +25,22 @@ python3 tools/workers.py check
 # the file it was when it came, so a hand edit is a choice, not an accident.
 python3 tools/agents.py check
 python3 -m unittest discover -s tests -v
+# The workflows (issue #248; docs/research/rust-coordinator.md, section 8):
+# actionlint type-checks every expression against the contexts its event
+# carries and runs shellcheck over every run: block, at warning and above;
+# zizmor audits them for security, offline, at medium and above. Their
+# settings are .github/actionlint.yaml and .github/zizmor.yml. CI installs
+# both pinned by hash; a local check runs each only where it is installed.
+if command -v actionlint >/dev/null 2>&1; then
+  SHELLCHECK_OPTS=--severity=warning actionlint
+else
+  echo "actionlint is not installed here; CI runs it"
+fi
+if command -v zizmor >/dev/null 2>&1; then
+  zizmor --quiet --offline --config .github/zizmor.yml --min-severity medium .github/workflows
+else
+  echo "zizmor is not installed here; CI runs it"
+fi
 
 # The project's own checks go here: its linter, its test runner, its build.
 
