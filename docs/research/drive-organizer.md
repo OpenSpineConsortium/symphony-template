@@ -199,3 +199,7 @@ procedure:
 Not yet known: how many read_resource calls a real drive takes (one a folder, so a few thousand
 for a large drive, each spending usage), whether the connector pages a folder of thousands of
 children, and how it rate-limits a long run of moves.
+
+## The first connector run's proposals (2026-10-19)
+
+On the owner's word through the coordinator ("drive all this stuff to completion and make whatever the recommended decisions are"), a session read 24 of the owner's own files through the connector, read only, inside the skill's limit of about 40, and wrote the plan. Reading changed what file names had suggested: five groups became seven projects, two of them split out of the groups named from file names, a few files moved between groups, and a contact sheet left the teaching group for left_out; two projects whose files show co-authors are marked team. 82 files are placed and 44 stay out as personal records or files no project fits. The plan, the notebooks, each notebook's starting files and MOVES.md (26 items, 6 new folders) are on the private repository's branch drive-catalog; nothing on the drive has moved, and the moves wait for the owner's own go, as step 7 says. The notebook repositories are the owner's to make, since a new repository's first commit is the owner's.
