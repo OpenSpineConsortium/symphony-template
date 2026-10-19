@@ -180,6 +180,18 @@ class FakeOrg:
         base = "/orgs/acme/actions"
         if path.startswith("/users/"):
             return {"id": self.users.get(path.rsplit("/", 1)[1].lower(), 100)}
+        if path.startswith("/repositories/"):
+            # the organization's repositories by id, and one of another organization's
+            if path.endswith("/permission"):
+                # ashley writes to 77 and reads 78 alone
+                number, actor = int(path.split("/")[2]), path.split("/")[4]
+                return {"permission": "write" if (number, actor) == (77, "ashley") else "read", "role_name": "write" if (number, actor) == (77, "ashley") else "read"}
+            number = int(path.rsplit("/", 1)[1])
+            if number in (5, 11, 12, 42, 77, 78):
+                return {"id": number, "owner": {"login": "Acme"}}
+            if number == 99:
+                return {"id": 99, "owner": {"login": "other"}}
+            raise urllib.error.HTTPError(path, 404, "Not Found", {}, io.BytesIO())
         if path.startswith(base + "/secrets?"):
             return {"secrets": [{"name": n} for n in sorted(self.secrets)]}
         if path == base + "/secrets/public-key":
@@ -467,6 +479,9 @@ class IssueRunTest(unittest.TestCase):
             if token_run.no_say(environ):
                 keeper.targets = token_run.standing_list(keeper)
                 keeper.keeping = token_run.ORGANIZATION
+            target = token_run.lend_target(environ, keeper, environ.get("ACTOR", ""))
+            if target is not None:
+                keeper.targets = [target]
             return keeper
         token_run.keeper_of = keeper_of
 
@@ -542,6 +557,30 @@ class IssueRunTest(unittest.TestCase):
         self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5])
         token_run.manage(self.opened(f"{token_run.MANAGE_MARK}\ndelete"))
         self.assertNotIn("SYMPHONY_CLAUDE_2", self.org.secrets)
+
+    def dispatched(self, lend_to):
+        return {**self.environ, "GITHUB_EVENT_NAME": "workflow_dispatch", "LEND_TO": lend_to}
+
+    def test_a_dispatch_lends_to_the_repository_it_names(self):
+        # the Tokens page runs the workflow here for a repository of the organization without one
+        slot = token_run.look(self.dispatched("77"), call=lambda *a: None)
+        self.assertEqual(slot, "2")
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5, 77])
+        self.assertEqual(self.github.posted, [f"{token_run.LENT_MARK}\n2\n5,77"])
+        keeper = token_run.keeper_of(self.dispatched("77"))
+        self.assertEqual(keeper.store("x", "newcomer"), "1")
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_1"], [77])
+
+    def test_lend_to_counts_for_nothing_from_an_issue(self):
+        environ = {**self.opened(token_run.LEND_MARK), "LEND_TO": "77"}
+        token_run.look(environ, call=lambda *a: None)
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5, 42])
+
+    def test_lend_to_outside_the_organization_or_unknown_stops_the_run(self):
+        for wanted, why in (("99", "no repository of acme"), ("123456", "no repository of acme"), ("acme/private", "not a repository id"), ("78", "may not write to")):
+            with self.assertRaisesRegex(token_run.RunError, why):
+                token_run.keeper_of(self.dispatched(wanted))
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5])
 
     def test_a_plain_lend_issue_lends_here_alone(self):
         slot = token_run.look(self.opened(token_run.LEND_MARK), call=lambda *a: None)
