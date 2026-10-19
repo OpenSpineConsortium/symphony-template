@@ -495,6 +495,8 @@ class Keeper(Pool):
         """The two variables taken off each repository no slot reaches any more,
         so its workflows read no lender's name once no token of theirs runs
         there; a slot on in every repository or the private ones may reach any."""
+        if not repo_ids:
+            return
         wide, others = self.reach_of_others(slot)
         gone = [i for i in repo_ids if str(i) not in others]
         if wide or not gone:
@@ -568,7 +570,9 @@ class Keeper(Pool):
         self.write_variable(SETTINGS_VARIABLE, lambda text: without(text, slot, mine), reach=False)
         if self.read(self.secret_path(slot)) is None:
             self.write_variable(ACCOUNTS_VARIABLE, lambda text: ",".join(w for w in re.split(r"[,\s]+", text or "") if w and w != slot), reach=False)
-        self.unlend_variables(reached, slot)
+        # the deleted secret is gone from the list, and a store that refilled
+        # the slot since reaches what it reaches, so no slot is skipped here
+        self.unlend_variables(reached, None)
 
 
 def without(text, slot, mine=None):
@@ -577,7 +581,8 @@ def without(text, slot, mine=None):
     except json.JSONDecodeError:
         return text
     # a mark another token's store wrote since is that token's, and stays
-    theirs = isinstance(data, dict) and isinstance(data.get(slot), dict) and mine is not None and data[slot].get("id") != mine
+    # (a slot made before ids has none, so a mark with an id is a new store's)
+    theirs = isinstance(data, dict) and isinstance(data.get(slot), dict) and data[slot].get("id") != mine
     if isinstance(data, dict) and not theirs:
         data.pop(slot, None)
         return json.dumps(data, separators=(",", ":"))

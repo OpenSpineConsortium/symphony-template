@@ -451,8 +451,11 @@ class KeeperTest(unittest.TestCase):
         self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_ACCOUNTS"], [1])
         self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_SETTINGS"], [1])
 
-    def test_a_mark_a_store_wrote_into_the_freed_slot_stays(self):
-        settings = {"1": {"owner": "greg"}, "2": {"owner": "Ashley", "id": "aaaa"}}
+    def test_a_mark_a_store_wrote_into_a_freed_slot_made_before_ids_stays(self):
+        self.test_a_mark_a_store_wrote_into_the_freed_slot_stays(old={"owner": "Ashley"})
+
+    def test_a_mark_a_store_wrote_into_the_freed_slot_stays(self, old=None):
+        settings = {"1": {"owner": "greg"}, "2": old or {"owner": "Ashley", "id": "aaaa"}}
         self.org.variables["SYMPHONY_CLAUDE_SETTINGS"] = json.dumps(settings)
         original = self.org.call
         def call(method, path, body=None):
