@@ -92,6 +92,21 @@ jobs:
       - name: Clone symphony-protocol, the library the copy is held to
         run: git clone --quiet https://github.com/OpenSpineConsortium/symphony-protocol "$RUNNER_TEMP/symphony-protocol"
 
+      - name: Install the workflow linters, pinned by hash
+        # actionlint and zizmor, which scripts/check.sh runs (issue #248).
+        run: |
+          set -eu
+          v=1.7.12
+          curl -fsSLo "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/releases/download/v$v/actionlint_${v}_linux_amd64.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/lint/bin"
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/lint/bin" actionlint
+          python3 -m venv "$RUNNER_TEMP/lint/zizmor"
+          echo "zizmor==1.31.1 --hash=sha256:58e878eb2dbd2c6183c105e1ac28c14f7dd1eca44a783f1fe2a69647d012c410" > "$RUNNER_TEMP/lint/zizmor.txt"
+          "$RUNNER_TEMP/lint/zizmor/bin/pip" install --quiet --no-deps --require-hashes -r "$RUNNER_TEMP/lint/zizmor.txt"
+          ln -s "$RUNNER_TEMP/lint/zizmor/bin/zizmor" "$RUNNER_TEMP/lint/bin/zizmor"
+          echo "$RUNNER_TEMP/lint/bin" >> "$GITHUB_PATH"
+
       - name: Run the checks
         env:
           SDLC_PROTOCOL: ${{ runner.temp }}/symphony-protocol
