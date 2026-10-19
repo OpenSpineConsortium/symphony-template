@@ -113,7 +113,7 @@ class WorkflowPermissions(unittest.TestCase):
     since an organization's policy is no reason to leave the labels and the
     rest undone."""
 
-    def run_script(self, read, write=None, owner_type=None):
+    def run_script(self, read, write=None, owner_type=None, extra=None):
         """The whole script against the fake gh, every other call answered
         as a fresh repository would: its output and the calls it made.
         owner_type answers the read of the repository's owner, which the
@@ -140,6 +140,7 @@ class WorkflowPermissions(unittest.TestCase):
         }
         if owner_type:
             routes[f"GET repos/{REPO}"] = [answer(200, f"{owner_type}\n")]
+        routes.update(extra or {})
         env = dict(os.environ, **fake_gh.environment(Path(folder) / "gh", routes))
         done = subprocess.run(["bash", str(root / "scripts" / "setup-repo.sh"), REPO], cwd=root, env=env,
                               capture_output=True, text=True)
@@ -264,6 +265,91 @@ class WorkflowPermissions(unittest.TestCase):
                          "and run this again")
         self.assertEqual(len(self.puts(calls)), 1)
         self.assert_went_on(done, calls)
+
+
+RULESET_ID = 42
+CHECK_RUNS = f"repos/{REPO}/commits/main/check-runs?check_name=check&per_page=100"
+LISTED = f"repos/{REPO}/rulesets?includes_parents=false&per_page=100"
+
+
+def live_ruleset(check):
+    """The ruleset as GitHub reads it back, with fields a PUT does not take."""
+    ruleset = json.loads(MAIN.read_text())
+    for rule in ruleset["rules"]:
+        if rule["type"] == "required_status_checks":
+            rule["parameters"]["required_status_checks"] = [check]
+    return dict(ruleset, id=RULESET_ID, source_type="Repository", source=REPO, _links={})
+
+
+class CheckPin(unittest.TestCase):
+    """A required check named by its context alone takes a commit status of
+    that name from anyone with write access, so the script pins "check" to
+    GitHub Actions (app 15368) once Actions has reported it on the default
+    branch, and says to run it again when it has not, since GitHub refuses
+    a pin to an app that never reported the check."""
+
+    run_script = WorkflowPermissions.run_script
+
+    def pin(self, reported, check=None, write=None, listed=None, read=None):
+        name = json.loads(MAIN.read_text())["name"]
+        extra = {
+            f"GET {LISTED}": [listed or answer(200, [{"id": RULESET_ID, "name": name}])],
+            f"GET {CHECK_RUNS}": [answer(200, f"{reported}\n")],
+            f"GET repos/{REPO}/rulesets/{RULESET_ID}": [read or answer(200, live_ruleset(check or {"context": "check"}))],
+            f"PUT repos/{REPO}/rulesets/{RULESET_ID}": [write or answer(200, "")],
+        }
+        done, calls = self.run_script(workflow_answer("read", True), extra=extra)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        lines = [line for line in done.stdout.splitlines() if line.startswith("check pin:")]
+        self.assertEqual(len(lines), 1, done.stdout)
+        puts = [call for call in calls if call["key"] == f"PUT repos/{REPO}/rulesets/{RULESET_ID}"]
+        return lines[0], puts
+
+    def test_pins_the_check_once_actions_has_reported_it_keeping_every_rule(self):
+        line, puts = self.pin(1)
+        self.assertEqual(line, 'check pin: "check" now requires GitHub Actions as its source')
+        self.assertEqual(len(puts), 1)
+        sent = json.loads(puts[0]["stdin"])
+        wanted = json.loads(MAIN.read_text())
+        for rule in wanted["rules"]:
+            if rule["type"] == "required_status_checks":
+                rule["parameters"]["required_status_checks"] = [{"context": "check", "integration_id": 15368}]
+        self.assertEqual(sent, wanted)
+
+    def test_waits_for_actions_to_report_the_check(self):
+        line, puts = self.pin(0)
+        self.assertIn("not yet; GitHub Actions has not reported \"check\" on main", line)
+        self.assertIn("run this again after the first pull request's check", line)
+        self.assertEqual(puts, [])
+
+    def test_leaves_a_pinned_check_alone(self):
+        line, puts = self.pin(1, {"context": "check", "integration_id": 15368})
+        self.assertEqual(line, 'check pin: already pinned, or the ruleset requires no check named "check"')
+        self.assertEqual(puts, [])
+
+    def test_an_organizations_ruleset_is_left_to_its_owners(self):
+        # The list asks for the repository's own rulesets alone; with none of
+        # the name, the step names where an organization's is pinned.
+        line, puts = self.pin(1, listed=answer(200, []))
+        self.assertIn("the repository has no ruleset", line)
+        self.assertIn("organization's Settings, Rules", line)
+        self.assertEqual(puts, [])
+
+    def test_a_refused_list_says_so(self):
+        line, puts = self.pin(1, listed=answer(403))
+        self.assertIn("could not list the rulesets: gh: fake answer (HTTP 403)", line)
+        self.assertEqual(puts, [])
+
+    def test_a_ruleset_that_cannot_be_read_is_not_called_pinned(self):
+        line, puts = self.pin(1, read=answer(200, "not json"))
+        self.assertEqual(line, "check pin: not changed (the ruleset GitHub gave back could not be read)")
+        self.assertEqual(puts, [])
+
+    def test_a_refused_pin_names_the_rulesets_page_and_goes_on(self):
+        line, puts = self.pin(1, write=answer(422, {"message": "Validation Failed"}))
+        self.assertIn("not changed (gh: fake answer (HTTP 422))", line)
+        self.assertIn(f"https://github.com/{REPO}/settings/rules/{RULESET_ID}", line)
+        self.assertEqual(len(puts), 1)
 
 
 class EveryShippedRuleset(unittest.TestCase):
