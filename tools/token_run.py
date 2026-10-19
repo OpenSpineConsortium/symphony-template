@@ -714,14 +714,14 @@ def fail(environ):
     finish_issue(github, environ, False)
 
 
-def lend_target(environ, pool):
+def lend_target(environ, pool, actor):
     """The repository a dispatch asks the token lent to in place of this one,
     the input lend_to: another repository of the same organization, one with no
     workflow Token of its own, as the Tokens page asks when the repository it
     shows has none and runs the workflow in one of the organization's that has
     it. A run an issue started takes none, since its author may hold no role,
-    and the id is checked against the organization, so a mistyped one lends
-    nowhere."""
+    and the id is checked against the organization and the lender's right to
+    write there, so a mistyped one lends nowhere."""
     wanted = (environ.get("LEND_TO") or "").strip()
     if not wanted or started_by_issue(environ):
         return None
@@ -731,6 +731,11 @@ def lend_target(environ, pool):
     owner = str(((found or {}).get("owner") or {}).get("login") or "")
     if not found or owner.lower() != pool.org.lower():
         raise RunError(f"lend_to names no repository of {pool.org} that the App reaches; nothing was lent")
+    # the lender may write there, as a dispatch on that repository would have
+    # needed, so nobody plants a token in a repository that is not theirs
+    had = pool.read(f"/repositories/{wanted}/collaborators/{actor}/permission") or {}
+    if had.get("permission") not in ("admin", "write") and had.get("role_name") not in ("admin", "maintain", "write"):
+        raise RunError(f"lend_to names a repository {actor} may not write to; nothing was lent")
     return int(wanted)
 
 
@@ -742,7 +747,10 @@ def keeper_of(environ):
         # it names none, and kept as the organization's to place
         keeper.targets = standing_list(keeper)
         keeper.keeping = ORGANIZATION
-    target = lend_target(environ, keeper)
+    try:
+        target = lend_target(environ, keeper, environ.get("ACTOR", ""))
+    except urllib.error.HTTPError as error:
+        raise RunError(f"GitHub answered {error.code} when the run read the repository lend_to names; nothing was lent") from None
     if target is not None:
         keeper.targets = [target]
     return keeper

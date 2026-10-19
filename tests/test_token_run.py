@@ -182,8 +182,12 @@ class FakeOrg:
             return {"id": self.users.get(path.rsplit("/", 1)[1].lower(), 100)}
         if path.startswith("/repositories/"):
             # the organization's repositories by id, and one of another organization's
+            if path.endswith("/permission"):
+                # ashley writes to 77 and reads 78 alone
+                number, actor = int(path.split("/")[2]), path.split("/")[4]
+                return {"permission": "write" if (number, actor) == (77, "ashley") else "read", "role_name": "write" if (number, actor) == (77, "ashley") else "read"}
             number = int(path.rsplit("/", 1)[1])
-            if number in (5, 11, 12, 42, 77):
+            if number in (5, 11, 12, 42, 77, 78):
                 return {"id": number, "owner": {"login": "Acme"}}
             if number == 99:
                 return {"id": 99, "owner": {"login": "other"}}
@@ -475,7 +479,7 @@ class IssueRunTest(unittest.TestCase):
             if token_run.no_say(environ):
                 keeper.targets = token_run.standing_list(keeper)
                 keeper.keeping = token_run.ORGANIZATION
-            target = token_run.lend_target(environ, keeper)
+            target = token_run.lend_target(environ, keeper, environ.get("ACTOR", ""))
             if target is not None:
                 keeper.targets = [target]
             return keeper
@@ -550,7 +554,7 @@ class IssueRunTest(unittest.TestCase):
         self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5, 42])
 
     def test_lend_to_outside_the_organization_or_unknown_stops_the_run(self):
-        for wanted, why in (("99", "no repository of acme"), ("123456", "no repository of acme"), ("acme/private", "not a repository id")):
+        for wanted, why in (("99", "no repository of acme"), ("123456", "no repository of acme"), ("acme/private", "not a repository id"), ("78", "may not write to")):
             with self.assertRaisesRegex(token_run.RunError, why):
                 token_run.keeper_of(self.dispatched(wanted))
         self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5])
