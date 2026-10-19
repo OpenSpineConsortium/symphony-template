@@ -33,7 +33,15 @@ person's own and posts only the slot's number.
   python3 tools/token_run.py         with ISSUE, KEY, KEY_ID, ACTOR, GITHUB_REPOSITORY and GITHUB_TOKEN set,
                                      or STORE_ORG and TOKEN_FILE in place of KEY and KEY_ID
   python3 tools/token_run.py store   then, with APP_TOKEN and REPO_ID too, once claude has gone
+  python3 tools/token_run.py look    before the sign-in: lends the person's own token here if they have one
+  python3 tools/token_run.py manage  lists, revokes or deletes the person's own token (MANAGE, TARGET_REPO_ID)
   python3 tools/token_run.py fail    where a step before the script failed, FAIL_WHY saying why
+
+A run GitHub started on an issue (GITHUB_EVENT_NAME issues) takes the issue's
+author as its actor and the issue's first lines as its request: anyone who
+may open an issue can lend a token, with no write access and no page of
+ours, and the run closes the issue when it is done (the owner, 2026-10-19:
+"it can start on an issue anyone can open").
 """
 
 import base64
@@ -62,6 +70,17 @@ STORED_MARK = "<!-- symphony-token: stored -->"
 # to, never their names, which the issue's readers may not be allowed to see
 LENT_MARK = "<!-- symphony-token: lent -->"
 FAILED_MARK = "<!-- symphony-token: failed -->"
+# what an issue opened for a run says on its first line, since GitHub takes a
+# workflow dispatch only from someone who may write and an issue from anyone
+# who may read: lend, with "organization" on the second line for a lend with
+# no say, which goes where the organization's standing list says and names
+# no repository to the lender; manage, with the action and a repository id
+LEND_MARK = "<!-- symphony-token: lend -->"
+MANAGE_MARK = "<!-- symphony-token: manage -->"
+# the organization variable that lists, by id, the repositories a token lent
+# with no say runs on, which an owner sets once from the Tokens page
+LEND_TO_VARIABLE = "SYMPHONY_LEND_TO"
+ORGANIZATION = "organization"
 SIGN_IN_LINK = re.compile(r"https://claude\.(?:ai|com)/[A-Za-z0-9/._-]*oauth/authorize\?[A-Za-z0-9%&=._~+-]+")
 CODE_SHAPE = re.compile(r"^[A-Za-z0-9_.~#-]{8,512}$")
 ISSUE_SHAPE = re.compile(r"^[1-9][0-9]{0,8}$")
@@ -119,10 +138,22 @@ class GitHub:
         return self.call("POST", f"/repos/{self.repo}/issues/{self.issue}/comments", {"body": body})
 
     def comments(self):
-        return self.call("GET", f"/repos/{self.repo}/issues/{self.issue}/comments?per_page=100") or []
+        # every page, since on a public issue anyone can post a hundred comments
+        # before the author pastes the code
+        out, page = [], 1
+        while True:
+            got = self.call("GET", f"/repos/{self.repo}/issues/{self.issue}/comments?per_page=100&page={page}") or []
+            out += got
+            if len(got) < 100 or page >= 20:
+                return out
+            page += 1
 
     def delete_comment(self, comment_id):
         self.call("DELETE", f"/repos/{self.repo}/issues/comments/{comment_id}")
+
+    def close(self, done):
+        self.call("PATCH", f"/repos/{self.repo}/issues/{self.issue}",
+                  {"state": "closed", "state_reason": "completed" if done else "not_planned"})
 
 
 def code_from(comments, actor):
@@ -130,9 +161,10 @@ def code_from(comments, actor):
     for item in comments:
         login = (item.get("user") or {}).get("login", "")
         body = (item.get("body") or "").strip()
-        if login.lower() != actor.lower() or not body.startswith(CODE_MARK):
+        if login.lower() != actor.lower():
             continue
-        code = body[len(CODE_MARK):].strip()
+        # the page posts the code under its mark; a person on the issue page pastes it bare
+        code = body[len(CODE_MARK):].strip() if body.startswith(CODE_MARK) else body
         if CODE_SHAPE.match(code):
             return code, item["id"]
     return None, None
@@ -272,8 +304,12 @@ class Pool:
     """The organization's slots, written with the App's installation token,
     which may write the organization's secrets and variables."""
 
-    def __init__(self, org, token, repo_id, call=None):
+    def __init__(self, org, token, repo_id, call=None, targets=None, keeping=""):
         self.org, self.repo_id = org, repo_id
+        # where a stored or lent token goes: this repository, or for a lend with
+        # no say the organization's standing list, which may name none yet
+        self.targets = [repo_id] if targets is None else list(targets)
+        self.keeping = keeping
         self.base = f"/orgs/{org}/actions"
         self.api = call or GitHub("", token, "").call
 
@@ -306,19 +342,20 @@ class Pool:
         sealed = base64.b64encode(sealbox.seal(token.encode(), sealbox.key_from_base64(key["key"]))).decode()
         self.api("PUT", f"{self.base}/secrets/{SLOT_PREFIX}{slot}", {
             "encrypted_value": sealed, "key_id": key["key_id"],
-            "visibility": "selected", "selected_repository_ids": [self.repo_id]})
+            "visibility": "selected", "selected_repository_ids": self.targets})
 
     def write_variable(self, name, change):
         have = self.read(f"{self.base}/variables/{name}")
         value = change(have["value"] if have else "")
         if not have:
             self.api("POST", f"{self.base}/variables", {"name": name, "value": value,
-                     "visibility": "selected", "selected_repository_ids": [self.repo_id]})
+                     "visibility": "selected", "selected_repository_ids": self.targets})
             return
         if value != have["value"]:
             self.api("PATCH", f"{self.base}/variables/{name}", {"name": name, "value": value})
         if have.get("visibility") == "selected":
-            self.api("PUT", f"{self.base}/variables/{name}/repositories/{self.repo_id}")
+            for target in self.targets:
+                self.api("PUT", f"{self.base}/variables/{name}/repositories/{target}")
 
     def add_to_accounts(self, slot):
         # an owner's page may write the list at the same moment, so it is read
@@ -347,7 +384,7 @@ class Pool:
             # owner's mark is ever left on this token
             step = f"mark slot {slot} as yours in {SETTINGS_VARIABLE}"
             uid = self.read(f"/users/{actor}") or {}
-            self.write_variable(SETTINGS_VARIABLE, lambda text: with_owner(text, slot, actor, uid.get("id")))
+            self.write_variable(SETTINGS_VARIABLE, lambda text: with_owner(text, slot, actor, uid.get("id"), self.keeping))
             step = f"store the token in slot {slot}"
             self.put_secret(slot, token)
             step = f"add slot {slot} to {ACCOUNTS_VARIABLE}"
@@ -372,7 +409,12 @@ class Keeper(Pool):
             return {}
         return data if isinstance(data, dict) else {}
 
-    def own_slot(self, actor):
+    def own_slot(self, actor, trusted=True):
+        """The slot whose settings name the actor. A slot stored before the
+        account's id was kept matches by login alone, so a run anyone may start
+        (trusted False) refuses it, since a login passes to whoever takes it
+        after a rename; a run started by someone with write access, as the
+        page's dispatch is, keeps the id then, and the slot is safe from there."""
         taken = self.taken()
         for slot, setting in sorted(self.settings().items(), key=lambda item: POOL_SLOTS.index(item[0]) if item[0] in POOL_SLOTS else 99):
             owner = setting.get("owner", "") if isinstance(setting, dict) else ""
@@ -380,9 +422,26 @@ class Keeper(Pool):
                 # a login can pass to someone else once its account is renamed or
                 # deleted, so where the slot kept the account's id that must match too
                 kept = setting.get("uid")
-                if kept is None or str(kept) == self.user_id(actor):
+                if kept is None:
+                    if not trusted:
+                        raise RunError(f"slot {slot} is yours by login alone, from before the pool kept account ids; press Add Token on the control panel once, which keeps yours, and then lend from an issue")
+                    self.keep_uid(slot, actor)
+                    return slot
+                if str(kept) == self.user_id(actor):
                     return slot
         return ""
+
+    def keep_uid(self, slot, actor):
+        uid = (self.read(f"/users/{actor}") or {}).get("id")
+        if not isinstance(uid, int):
+            return
+        def marked(text):
+            data = json.loads(text) if (text or "").strip() else {}
+            if isinstance(data, dict) and isinstance(data.get(slot), dict):
+                data[slot]["uid"] = uid
+                return json.dumps(data, separators=(",", ":"))
+            return text
+        self.write_variable(SETTINGS_VARIABLE, marked)
 
     def user_id(self, login):
         return str((self.read(f"/users/{login}") or {}).get("id", ""))
@@ -411,6 +470,10 @@ class Keeper(Pool):
                 return ids
             page += 1
 
+    def lend_all(self, slot):
+        for target in self.targets:
+            self.lend(slot, target)
+
     def lend(self, slot, repo_id):
         if self.selected(slot):
             self.api("PUT", f"{self.secret_path(slot)}/repositories/{repo_id}")
@@ -430,6 +493,23 @@ class Keeper(Pool):
         except urllib.error.HTTPError as error:
             if error.code != 404:
                 raise
+
+    def kept_by_organization(self, slot):
+        setting = self.settings().get(slot)
+        return isinstance(setting, dict) and setting.get("keeping") == ORGANIZATION
+
+    def mark_keeping(self, slot):
+        """A lend with no say hands the slot to the organization for good: its
+        lender is told no repository from then on, and only delete stays theirs."""
+        if not self.keeping:
+            return
+        def marked(text):
+            data = json.loads(text) if (text or "").strip() else {}
+            if isinstance(data, dict) and isinstance(data.get(slot), dict):
+                data[slot]["keeping"] = self.keeping
+                return json.dumps(data, separators=(",", ":"))
+            return text
+        self.write_variable(SETTINGS_VARIABLE, marked)
 
     def delete(self, slot):
         # the owner's mark goes first and the secret last, so a run cut short
@@ -456,7 +536,7 @@ def with_slot(text, slot):
     return ",".join(words if slot in words else words + [slot])
 
 
-def with_owner(text, slot, actor, uid=None):
+def with_owner(text, slot, actor, uid=None, keeping=""):
     # a variable that is not an object by slot is left for an owner to mend,
     # since writing over it would take every other slot's settings away
     try:
@@ -468,6 +548,8 @@ def with_owner(text, slot, actor, uid=None):
     data[slot] = {"owner": actor, "id": os.urandom(4).hex()}
     if isinstance(uid, int):
         data[slot]["uid"] = uid
+    if keeping:
+        data[slot]["keeping"] = keeping
     return json.dumps(data, separators=(",", ":"))
 
 
@@ -492,6 +574,65 @@ def pool_of(environ):
     if not ORG_SHAPE.match(org) or not app_token or not re.fullmatch(r"[1-9][0-9]{0,15}", repo_id):
         raise RunError("the run was not given the organization, the App's token or the repository's id to store the token with")
     return Pool(org, app_token, int(repo_id))
+
+
+def request(environ):
+    """What the issue that started this run asks: its kind (lend, manage or
+    nothing) and the words of its second line. A run a dispatch started asks
+    nothing here; its inputs say."""
+    path = environ.get("GITHUB_EVENT_PATH", "")
+    if environ.get("GITHUB_EVENT_NAME") != "issues" or not path:
+        return "", []
+    try:
+        with open(path) as event:
+            body = str((json.load(event).get("issue") or {}).get("body") or "")
+    except (OSError, ValueError, AttributeError):
+        return "", []
+    lines = body.replace("\r\n", "\n").split("\n")
+    kinds = {LEND_MARK: "lend", MANAGE_MARK: "manage"}
+    kind = kinds.get(lines[0].strip(), "")
+    return kind, (lines[1].split()[:2] if kind and len(lines) > 1 else [])
+
+
+def started_by_issue(environ):
+    return environ.get("GITHUB_EVENT_NAME") == "issues"
+
+
+def no_say(environ):
+    """A lend with no say: the issue's second line says organization."""
+    kind, words = request(environ)
+    return kind == "lend" and words[:1] == [ORGANIZATION]
+
+
+def standing_list(pool):
+    have = pool.read(f"{pool.base}/variables/{LEND_TO_VARIABLE}") or {}
+    ids = [w for w in re.split(r"[,\s]+", have.get("value", "") or "") if w]
+    bad = [w for w in ids if not re.fullmatch(r"[1-9][0-9]{0,15}", w)]
+    if bad:
+        raise RunError(f"{LEND_TO_VARIABLE} holds something that is not a repository id; an owner mends it")
+    return [int(w) for w in ids]
+
+
+def asked(environ):
+    """The action and the repository id a manage run was asked for: the
+    dispatch's inputs, or the issue's second line."""
+    if environ.get("MANAGE"):
+        return environ["MANAGE"], environ.get("TARGET_REPO_ID", "")
+    kind, words = request(environ)
+    if kind != "manage":
+        return "", ""
+    return (words + ["", ""])[0], (words + ["", ""])[1]
+
+
+def finish_issue(github, environ, done):
+    """A run an issue started closes it, since no page will; a dispatch's issue
+    is the page's to close."""
+    if not started_by_issue(environ):
+        return
+    try:
+        github.close(done)
+    except Exception:
+        pass
 
 
 def held_file(environ):
@@ -557,6 +698,7 @@ def store(environ, pool=None):
     token = take_held(held_file(environ))
     slot = pool.store(token, actor)
     github.comment(f"{STORED_MARK}\n{slot}")
+    finish_issue(github, environ, True)
     print(f"Stored the token in the organization's slot {slot}.", flush=True)
 
 
@@ -567,14 +709,20 @@ def fail(environ):
     # the key is no matter here, and the step that failed may have been given none
     github, *_ = settings(environ, sealing=False)
     said = [c.get("body", "") for c in github.comments() if (c.get("user") or {}).get("login") == "github-actions[bot]"]
-    if any(body.startswith(FAILED_MARK) for body in said):
-        return
-    github.comment(f"{FAILED_MARK}\n{environ.get('FAIL_WHY') or 'the run stopped before the token was saved; see its log under Actions, workflow Token'}")
+    if not any(body.startswith(FAILED_MARK) for body in said):
+        github.comment(f"{FAILED_MARK}\n{environ.get('FAIL_WHY') or 'the run stopped before the token was saved; see its log under Actions, workflow Token'}")
+    finish_issue(github, environ, False)
 
 
 def keeper_of(environ):
     pool = pool_of(environ)
-    return Keeper(pool.org, environ.get("APP_TOKEN", ""), pool.repo_id)
+    keeper = Keeper(pool.org, environ.get("APP_TOKEN", ""), pool.repo_id)
+    if no_say(environ):
+        # lent where the organization's standing list says, nowhere yet when
+        # it names none, and kept as the organization's to place
+        keeper.targets = standing_list(keeper)
+        keeper.keeping = ORGANIZATION
+    return keeper
 
 
 def revoke_app_token(environ, call=None):
@@ -589,7 +737,10 @@ def revoke_app_token(environ, call=None):
 
 
 def say_lent(github, keeper, slot):
-    github.comment(f"{LENT_MARK}\n{slot}\n{','.join(keeper.lent(slot))}")
+    # a token in the organization's keeping names no repository to its lender,
+    # who may not be allowed to see them
+    where = ORGANIZATION if keeper.kept_by_organization(slot) else ",".join(keeper.lent(slot))
+    github.comment(f"{LENT_MARK}\n{slot}\n{where}")
 
 
 def look(environ, keeper=None, call=None):
@@ -599,11 +750,13 @@ def look(environ, keeper=None, call=None):
     try:
         github, _, _, actor = settings(environ, sealing=False)
         keeper = keeper or keeper_of(environ)
-        slot = keeper.own_slot(actor)
+        slot = keeper.own_slot(actor, trusted=not started_by_issue(environ))
         if slot:
-            keeper.lend(slot, keeper.repo_id)
+            keeper.lend_all(slot)
+            keeper.mark_keeping(slot)
             say_lent(github, keeper, slot)
-            print(f"Lent slot {slot}, already the person's own, to this repository.", flush=True)
+            finish_issue(github, environ, True)
+            print(f"Lent slot {slot}, already the person's own, where this run was asked to.", flush=True)
     except urllib.error.HTTPError as error:
         raise RunError(f"GitHub answered {error.code} when the run looked for your token in {environ.get('STORE_ORG', '')}'s pool") from None
     finally:
@@ -622,14 +775,14 @@ def manage(environ, keeper=None):
     """A person's own token: where it is lent, taken back from one repository,
     or deleted. A person without a token in the pool is told so."""
     github, _, _, actor = settings(environ, sealing=False)
-    action, target = environ.get("MANAGE", ""), environ.get("TARGET_REPO_ID", "")
+    action, target = asked(environ)
     if action not in MANAGE_ACTIONS:
         raise RunError(f"the run was asked to {action[:20]!r} a token; it lists, revokes or deletes one")
     if action == "revoke" and not re.fullmatch(r"[1-9][0-9]{0,15}", target):
         raise RunError("the run was not given the repository to take the token back from")
     keeper = keeper or keeper_of(environ)
     try:
-        slot = keeper.own_slot(actor)
+        slot = keeper.own_slot(actor, trusted=not started_by_issue(environ))
         if not slot:
             raise RunError(f"you have no token in {keeper.org}'s pool; Add Token makes one")
         if action == "revoke":
@@ -637,8 +790,9 @@ def manage(environ, keeper=None):
         if action == "delete":
             keeper.delete(slot)
             github.comment(f"{LENT_MARK}\n{slot}\n")
-            return
-        say_lent(github, keeper, slot)
+        else:
+            say_lent(github, keeper, slot)
+        finish_issue(github, environ, True)
     except urllib.error.HTTPError as error:
         raise RunError(f"GitHub answered {error.code} when the run tried to {action} your token in {keeper.org}'s pool") from None
 
@@ -663,6 +817,7 @@ def main(argv=None):
             try:
                 github, *_ = settings(os.environ, sealing=False)
                 github.comment(f"{FAILED_MARK}\n{why}")
+                finish_issue(github, os.environ, False)
             except Exception:
                 pass
         return 1
