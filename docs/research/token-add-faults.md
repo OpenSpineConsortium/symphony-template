@@ -99,6 +99,13 @@ What stops a stranger today is GitHub, not the page: a workflow dispatch is take
 
 A request to join is an issue whose first line is `<!-- symphony-access: request -->`, opened by the person asking; the Share tab lists the open ones at the top with Invite and, on the card's X, Decline, and either closes the issue with a word, which GitHub tells the author. Built on the site on 2026-10-19 beside this note: the Share tab shows "+ Ask to join" to someone it refuses to show the people to, and the Tokens page's Add Token offers the same to someone without write. In an organization, Invite gives Write on that repository; an owner who wants the person on the private work invites them there, or into the organization from GitHub's own page. Collaborator status is what shows the board: nothing hides it on purpose, and a private repository hides itself.
 
+### Keeping, and what the App's token can be narrowed to, 2026-10-19
+
+Two more findings of the review of the Apps' privacy statement version 30, taken as recommended while the owner slept.
+
+- A token in the organization's keeping was still lent by a plain lend to the repository its lender picked, and its lender could still revoke it from a repository, though mark_keeping's word is that only delete stays theirs. Now a plain lend of a kept token lends nothing more and answers "organization", a lend with no say still places it where the standing list says, and a revoke of it is refused with a word that delete is still theirs.
+- The review asked that token.yml's three App tokens be narrowed to organization secrets, organization variables and issues. GitHub's App permission list (the REST description's app-permissions schema, read on 2026-10-19) names organization_secrets but no permission for an organization's variables, so a token narrowed by permission-* inputs would lose the variables the run writes, as token.yml's comment on the store step already says. The steps stay as they are: the look's token is revoked before the sign-in, the store's is minted only after claude has gone, and both live in the environment token-store. Narrowing waits until GitHub names the variables permission for a token request.
+
 ### Still to build, in order
 
 1. The template (done 2026-10-19 on the owner's words): the issue trigger on token.yml with the author as actor, `SYMPHONY_LEND_TO` read for a no-say lend, and the no-say lend that posts no ids. Still the site's: the Tokens page's owner box that sets the standing list, and its words for a token in the organization's keeping. The Apps' privacy statement (symphony-start PRIVACY.md) gains a version naming what a lend issue carries, owed by the thread that owns it.

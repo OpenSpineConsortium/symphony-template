@@ -520,6 +520,29 @@ class IssueRunTest(unittest.TestCase):
         with self.assertRaisesRegex(token_run.RunError, "not a repository id"):
             token_run.keeper_of(self.opened(f"{token_run.LEND_MARK}\norganization"))
 
+    def kept(self):
+        self.org.variables["SYMPHONY_CLAUDE_SETTINGS"] = json.dumps({"2": {"owner": "ashley", "uid": 7, "keeping": "organization"}})
+
+    def test_a_kept_token_is_not_lent_where_its_lender_picks(self):
+        self.kept()
+        slot = token_run.look(self.opened(token_run.LEND_MARK), call=lambda *a: None)
+        self.assertEqual(slot, "2")
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5])
+        self.assertEqual(self.github.posted, [f"{token_run.LENT_MARK}\n2\norganization"])
+
+    def test_a_kept_token_is_still_placed_by_a_lend_with_no_say(self):
+        self.kept()
+        token_run.look(self.opened(f"{token_run.LEND_MARK}\norganization"), call=lambda *a: None)
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5, 11, 12])
+
+    def test_a_kept_token_is_not_revoked_but_may_be_deleted(self):
+        self.kept()
+        with self.assertRaisesRegex(token_run.RunError, "keeping"):
+            token_run.manage(self.opened(f"{token_run.MANAGE_MARK}\nrevoke 5"))
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5])
+        token_run.manage(self.opened(f"{token_run.MANAGE_MARK}\ndelete"))
+        self.assertNotIn("SYMPHONY_CLAUDE_2", self.org.secrets)
+
     def test_a_plain_lend_issue_lends_here_alone(self):
         slot = token_run.look(self.opened(token_run.LEND_MARK), call=lambda *a: None)
         self.assertEqual(slot, "2")

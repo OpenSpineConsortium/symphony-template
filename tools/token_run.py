@@ -752,7 +752,11 @@ def look(environ, keeper=None, call=None):
         keeper = keeper or keeper_of(environ)
         slot = keeper.own_slot(actor, trusted=not started_by_issue(environ))
         if slot:
-            keeper.lend_all(slot)
+            # a token the organization keeps is placed by its owners alone: a
+            # lend of it to a repository its lender picks lends nothing more,
+            # while a lend with no say places it where the standing list says
+            if keeper.keeping or not keeper.kept_by_organization(slot):
+                keeper.lend_all(slot)
             keeper.mark_keeping(slot)
             say_lent(github, keeper, slot)
             finish_issue(github, environ, True)
@@ -786,6 +790,8 @@ def manage(environ, keeper=None):
         if not slot:
             raise RunError(f"you have no token in {keeper.org}'s pool; Add Token makes one")
         if action == "revoke":
+            if keeper.kept_by_organization(slot):
+                raise RunError(f"your token is in {keeper.org}'s keeping, which you chose with a lend with no say, so its owners place it; you may still delete it")
             keeper.revoke(slot, int(target))
         if action == "delete":
             keeper.delete(slot)
