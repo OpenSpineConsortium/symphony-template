@@ -393,12 +393,20 @@ class Budgeted(GitHub):
     answer says how many requests are left, and the next call is refused
     before it is made once that is down to the reserve. GitHub's own
     refusal of a spent hour, a 403, is read the same way, so a run that
-    starts after the board spent the hour says so too."""
+    starts after the board spent the hour says so too. The calls it
+    reports are every call GitHub answered: the client's own count (made),
+    which holds each try it makes again after a rate limit's wait, and the
+    redirects location asks for itself (the first rate-limit review's sixth
+    finding: a count of this class's own requests left the tries out)."""
 
     def __init__(self, token, repo, reserve=RESERVE, **kwargs):
         super().__init__(token, repo, **kwargs)
-        self.reserve, self.calls, self.remaining, self.reset = reserve, 0, None, None
+        self.reserve, self.located, self.remaining, self.reset = reserve, 0, None, None
         self.unfollowed = kwargs.get("opener") or urllib.request.build_opener(Unfollowed)
+
+    @property
+    def calls(self):
+        return sum(self.made.values()) + self.located
 
     def request(self, method, url, body=None, missing_ok=False):
         if self.remaining is not None and self.remaining <= self.reserve:
@@ -409,16 +417,11 @@ class Budgeted(GitHub):
             if problem.status == 403 and "api rate limit exceeded" in problem.detail.lower():
                 self.remaining = 0
                 raise OutOfBudget(f"GitHub refused the call ({problem.detail}); {self.refusal()}") from None
-            # A call GitHub answered with an error still spent one of the
-            # hour's requests.
-            if problem.status:
-                self.calls += 1
             raise
         self.counted(headers)
         return data, headers
 
     def counted(self, headers):
-        self.calls += 1
         if (remaining := header_number(headers, REMAINING_HEADER)) is not None:
             self.remaining, self.reset = remaining, header_number(headers, RESET_HEADER)
 
@@ -439,7 +442,7 @@ class Budgeted(GitHub):
                 headers, target = answer.headers, None
         except urllib.error.HTTPError as problem:
             if problem.code not in REDIRECTS:
-                self.calls += 1
+                self.located += 1
                 detail = refusal_detail(problem)
                 if problem.code == 403 and "api rate limit exceeded" in detail.lower():
                     self.remaining = 0
@@ -450,6 +453,7 @@ class Budgeted(GitHub):
             raise GitHubError(f"GET {path}: {getattr(problem, 'reason', problem)}") from None
         except http.client.HTTPException as problem:
             raise GitHubError(f"GET {path}: {problem!r}") from None
+        self.located += 1
         self.counted(headers)
         return target
 
