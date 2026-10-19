@@ -131,7 +131,28 @@ class References(unittest.TestCase):
     def test_bibtex(self):
         [entry] = self.read(BIB, ".bib")
         self.assertEqual(entry, {"key": "smith2020", "title": "A Fast Matching", "authors": ["Smith, Ann", "Lee, Bo"],
-                                 "year": "2020", "doi": "10.1000/abc", "venue": "J. Graphs"})
+                                 "year": "2020", "doi": "10.1000/abc", "venue": "J. Graphs",
+                                 "url": "", "uri": ""})
+
+    def test_zotero_items_carry_their_library_uri(self):
+        items = [{"key": "ABCD1234", "data": {"key": "ABCD1234", "itemType": "journalArticle", "title": "T",
+                  "creators": [{"lastName": "Smith", "firstName": "Ann"}, {"name": "A Consortium"}],
+                  "date": "March 2021", "DOI": "10.1/X", "url": "https://example.test/t"}},
+                 {"key": "NOTE0001", "data": {"key": "NOTE0001", "itemType": "note"}},
+                 {"key": "ANNO0001", "data": {"key": "ANNO0001", "itemType": "annotation"}}]
+        [entry] = notebook.zotero(items, "users/42")
+        self.assertEqual((entry["authors"], entry["year"], entry["uri"], entry["url"]),
+                         (["Smith, Ann", "A Consortium"], "2021", "http://zotero.org/users/42/items/ABCD1234",
+                          "https://example.test/t"))
+        with self.assertRaises(notebook.NotebookError):
+            notebook.zotero(items, "users/../x")
+
+    def test_zotero_leaves_editors_out_and_finds_a_doi_in_extra(self):
+        items = [{"data": {"key": "K1", "itemType": "conferencePaper", "title": "P", "proceedingsTitle": "Proc",
+                  "creators": [{"creatorType": "author", "lastName": "A"}, {"creatorType": "editor", "lastName": "E"}],
+                  "extra": "Note\nDOI: 10.5/Y"}}]
+        [entry] = notebook.zotero(items, "groups/7")
+        self.assertEqual((entry["authors"], entry["doi"], entry["venue"]), (["A"], "10.5/y", "Proc"))
 
     def test_an_entry_closed_on_its_own_line_keeps_its_own_fields(self):
         text = "@article{a,\n  title={A}}\n@article{b,\n  title={B},\n  doi={10.1/b}\n  }\n@book(c, title = \"C\")\n"
