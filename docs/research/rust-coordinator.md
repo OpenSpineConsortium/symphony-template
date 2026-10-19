@@ -115,6 +115,16 @@ The owner's follow-up of 2026-10-19, 03:13 UTC: "I'm leaning toward A but I'd ra
 
 Recommendation: 1 and 2 together. They need no compiler of anyone's, keep Python as the one language of Symphony's logic, and leave only thin YAML that actionlint and zizmor check on every pull request. github-workflows-kt is the fallback if typed authoring is still wanted after that; a Rust core for the board's state machine (step 2 above) remains a separate choice about correctness, not about YAML.
 
+### Typed generators against linted YAML
+
+The owner asked next (03:22 UTC) whether gh-workflow or github-workflows-kt offers anything over YAML checked by actionlint and zizmor, for technical debt, the complexity of coordination and future proofing. Inferred from the sources above and the plan's counts, nothing measured:
+
+- Technical debt: a generator's one real gain is removing repeated text (the plan counted the usage recorder's three steps six times and the crowd guard twelve times) with ordinary functions. GitHub's own composite actions and reusable workflows remove the same repetition in YAML, and the public runtime is built from exactly those. Against that, a generator adds a second source of truth, a toolchain (Kotlin and a JVM, or Rust and cargo) for anyone who edits a workflow, and a drift check. Net debt is higher.
+- Coordination: neither helps. Symphony's coordination is in the Python protocol and in Actions' run-time behaviour (concurrency groups, event order, the lost-run case F12); a generator types the plumbing around it and checks none of that. The protocol's validation harness is what covers coordination.
+- Future proofing: plain YAML is GitHub's own format, so new syntax works the day it ships (board.yml uses `queue: max`, new this year); a generator must add it first or be bypassed by hand. The linters track GitHub closely and drop out without a trace. gh-workflow is one maintainer's young crate; github-workflows-kt is healthier but still a third party. Leaving either is cheap, since the generated YAML is committed, but it is churn.
+
+So for Symphony, linted YAML with the logic in Python is the better position on all three counts; a typed generator pays off for a repository with many large, hand-written workflows and no runtime to move their logic into, which is not Symphony's case.
+
 ## Sources read
 
 - GitHub REST API on OpenSpineConsortium/symphony-template: /events, /actions/runs, /actions/workflows/ci.yml/runs, /actions/runs/{id}/jobs (2026-10-19).
