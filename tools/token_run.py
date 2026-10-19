@@ -462,6 +462,9 @@ class Keeper(Pool):
     def lent(self, slot):
         if not self.selected(slot):
             return ["all"]
+        return self.lent_ids(slot)
+
+    def lent_ids(self, slot):
         ids, page = [], 1
         while True:
             got = (self.api("GET", f"{self.secret_path(slot)}/repositories?per_page=100&page={page}") or {}).get("repositories") or []
@@ -469,6 +472,33 @@ class Keeper(Pool):
             if len(got) < 100 or page >= 50:
                 return ids
             page += 1
+
+    def reached_by_another(self, repo_id, slot):
+        """Whether a slot other than this one still reaches the repository: one
+        on in every repository or in the private ones, which may be it, or one
+        whose list names it."""
+        for name in self.taken():
+            other = name[len(SLOT_PREFIX):] if name.startswith(SLOT_PREFIX) else ""
+            if other not in POOL_SLOTS or other == slot:
+                continue
+            seen = self.visibility(other)
+            if seen in ("all", "private") or (seen == "selected" and str(repo_id) in self.lent_ids(other)):
+                return True
+        return False
+
+    def unlend_variables(self, repo_id, slot):
+        """The two variables taken off a repository no slot reaches any more, so
+        its workflows read no lender's name once no token of theirs runs there."""
+        if self.reached_by_another(repo_id, slot):
+            return
+        for name in (ACCOUNTS_VARIABLE, SETTINGS_VARIABLE):
+            have = self.read(f"{self.base}/variables/{name}")
+            if have and have.get("visibility") == "selected":
+                try:
+                    self.api("DELETE", f"{self.base}/variables/{name}/repositories/{repo_id}")
+                except urllib.error.HTTPError as error:
+                    if error.code != 404:
+                        raise
 
     def lend_all(self, slot):
         for target in self.targets:
@@ -493,6 +523,7 @@ class Keeper(Pool):
         except urllib.error.HTTPError as error:
             if error.code != 404:
                 raise
+        self.unlend_variables(repo_id, slot)
 
     def kept_by_organization(self, slot):
         setting = self.settings().get(slot)
@@ -512,12 +543,18 @@ class Keeper(Pool):
         self.write_variable(SETTINGS_VARIABLE, marked)
 
     def delete(self, slot):
-        # the owner's mark goes first and the secret last, so a run cut short
-        # never leaves a free slot marked as someone's, which would hand them
-        # whoever's token went in next
+        # the secret goes first and the owner's mark after it: a run cut short
+        # between the two leaves a mark on an empty slot, which the next store
+        # into that slot writes over and which own_slot never returns, since it
+        # needs the secret too; the other order would leave a token nobody owns,
+        # which its lender could no longer delete. The repositories it reached
+        # are read first, to take the variables off the ones no slot reaches now
+        reached = self.lent_ids(slot) if self.visibility(slot) == "selected" else []
+        self.api("DELETE", self.secret_path(slot))
         self.write_variable(SETTINGS_VARIABLE, lambda text: without(text, slot))
         self.write_variable(ACCOUNTS_VARIABLE, lambda text: ",".join(w for w in re.split(r"[,\s]+", text or "") if w and w != slot))
-        self.api("DELETE", self.secret_path(slot))
+        for repo_id in reached:
+            self.unlend_variables(repo_id, slot)
 
 
 def without(text, slot):
