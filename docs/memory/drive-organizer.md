@@ -17,3 +17,5 @@ the Microsoft 365 connector does the same with no consent to our app (tools/driv
 with a Symphony repository of their own that people join, opens them through the workflow's
 step open, and moves the files into "Symphony projects/" only on the owner's go, one connector
 call at a time, every move undoable. The design is docs/research/drive-organizer.md.
+
+Wayne State approved the SymphonyBoard Folders app for its accounts on 2026-10-19, as the owner reported that day, so a WSU OneDrive can be read natively through Microsoft Graph with the panel's sign-in; the connector path stays until each piece switches, and both run one code path (docs/start/capabilities.md).
