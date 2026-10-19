@@ -165,6 +165,7 @@ class FakeOrg:
         self.secrets = {name: None for name in secrets}
         self.variables = dict(variables or {})
         self.reached = {}
+        self.lent = {}
         self.refuse = refuse
         self.calls = []
 
@@ -177,13 +178,28 @@ class FakeOrg:
             return {"secrets": [{"name": n} for n in sorted(self.secrets)]}
         if path == base + "/secrets/public-key":
             return {"key": base64.b64encode(sealbox.public_key(SECRET)).decode(), "key_id": "org-key"}
+        if "/secrets/" in path and "/repositories" in path:
+            name = path.split("/secrets/")[1].split("/")[0]
+            lent = self.lent.setdefault(name, [])
+            if method == "GET":
+                return {"repositories": [{"id": i} for i in lent]}
+            repo = int(path.rsplit("/", 1)[1])
+            if method == "PUT" and repo not in lent:
+                lent.append(repo)
+            if method == "DELETE" and repo in lent:
+                lent.remove(repo)
+            return None
+        if path.startswith(base + "/secrets/") and method == "DELETE":
+            self.secrets.pop(path.rsplit("/", 1)[1], None)
+            return None
         if path.startswith(base + "/secrets/") and method == "PUT":
             self.secrets[path.rsplit("/", 1)[1]] = body
+            self.lent[path.rsplit("/", 1)[1]] = list(body["selected_repository_ids"])
             return None
         if path.startswith(base + "/secrets/") and method == "GET":
             if path.rsplit("/", 1)[1] not in self.secrets:
                 raise urllib.error.HTTPError(path, 404, "Not Found", {}, io.BytesIO())
-            return {"name": path.rsplit("/", 1)[1]}
+            return {"name": path.rsplit("/", 1)[1], "visibility": "selected"}
         if path == base + "/variables" and method == "POST":
             self.variables[body["name"]] = body["value"]
             self.reached[body["name"]] = body["selected_repository_ids"]
@@ -334,6 +350,67 @@ class PoolStoreTest(unittest.TestCase):
                 else:
                     os.environ[k] = v
         self.assertIn("gh=none app=none", claude.seen)
+
+
+class KeeperTest(unittest.TestCase):
+    """One token per person, lent to the repositories they choose."""
+
+    def setUp(self):
+        self.org = FakeOrg(secrets=["SYMPHONY_CLAUDE_1", "SYMPHONY_CLAUDE_2"],
+                           variables={"SYMPHONY_CLAUDE_ACCOUNTS": "1,2",
+                                      "SYMPHONY_CLAUDE_SETTINGS": json.dumps({"1": {"owner": "greg"}, "2": {"owner": "Ashley"}})})
+        self.org.lent = {"SYMPHONY_CLAUDE_1": [1], "SYMPHONY_CLAUDE_2": [5]}
+        self.keeper = token_run.Keeper("acme", "app", 42, call=self.org.call)
+        self.github = FakeGitHub()
+        self.folder = tempfile.mkdtemp()
+        self.environ = {"ISSUE": "7", "ACTOR": "ashley", "GITHUB_REPOSITORY": "acme/r", "GITHUB_TOKEN": "t",
+                        "STORE_ORG": "acme", "APP_TOKEN": "app", "REPO_ID": "42",
+                        "GITHUB_OUTPUT": os.path.join(self.folder, "out")}
+        self.original = token_run.settings
+        token_run.settings = lambda environ, **how: (self.github, *self.original(environ, **how)[1:])
+
+    def tearDown(self):
+        token_run.settings = self.original
+
+    def test_a_person_with_a_token_has_it_lent_here_and_makes_no_other(self):
+        revoked = []
+        slot = token_run.look(self.environ, keeper=self.keeper, call=lambda *a: revoked.append(a))
+        self.assertEqual(slot, "2")
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5, 42])
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_1"], [1])
+        self.assertEqual(self.github.posted, [f"{token_run.LENT_MARK}\n2\n5,42"])
+        self.assertEqual(revoked, [("DELETE", "/installation/token")])
+        self.assertIn("found=true", Path(self.environ["GITHUB_OUTPUT"]).read_text())
+
+    def test_a_person_with_none_goes_on_to_the_sign_in(self):
+        slot = token_run.look({**self.environ, "ACTOR": "newcomer"}, keeper=self.keeper, call=lambda *a: None)
+        self.assertEqual(slot, "")
+        self.assertEqual(self.github.posted, [])
+        self.assertIn("found=false", Path(self.environ["GITHUB_OUTPUT"]).read_text())
+
+    def test_a_token_is_taken_back_from_one_repository(self):
+        self.org.lent["SYMPHONY_CLAUDE_2"] = [5, 42]
+        token_run.manage({**self.environ, "MANAGE": "revoke", "TARGET_REPO_ID": "5"}, keeper=self.keeper)
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [42])
+        self.assertEqual(self.github.posted, [f"{token_run.LENT_MARK}\n2\n42"])
+
+    def test_deleting_takes_the_token_and_its_place_away(self):
+        token_run.manage({**self.environ, "MANAGE": "delete"}, keeper=self.keeper)
+        self.assertNotIn("SYMPHONY_CLAUDE_2", self.org.secrets)
+        self.assertIn("SYMPHONY_CLAUDE_1", self.org.secrets)
+        self.assertEqual(self.org.variables["SYMPHONY_CLAUDE_ACCOUNTS"], "1")
+        self.assertEqual(json.loads(self.org.variables["SYMPHONY_CLAUDE_SETTINGS"]), {"1": {"owner": "greg"}})
+
+    def test_nobody_reaches_a_token_that_is_not_their_own(self):
+        with self.assertRaisesRegex(token_run.RunError, "no token in acme"):
+            token_run.manage({**self.environ, "ACTOR": "mallory", "MANAGE": "delete"}, keeper=self.keeper)
+        self.assertEqual(sorted(self.org.secrets), ["SYMPHONY_CLAUDE_1", "SYMPHONY_CLAUDE_2"])
+
+    def test_only_list_revoke_and_delete_are_taken(self):
+        with self.assertRaisesRegex(token_run.RunError, "lists, revokes or deletes"):
+            token_run.manage({**self.environ, "MANAGE": "lend-all"}, keeper=self.keeper)
+        with self.assertRaisesRegex(token_run.RunError, "take the token back from"):
+            token_run.manage({**self.environ, "MANAGE": "revoke", "TARGET_REPO_ID": "x"}, keeper=self.keeper)
 
 
 if __name__ == "__main__":

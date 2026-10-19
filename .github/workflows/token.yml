@@ -34,7 +34,13 @@ on:
         description: that key's id
         required: false
       store:
-        description: pool, for the run to store the token in the organization's pool itself
+        description: pool, for the run to store the token in the organization's pool itself; manage, to list, revoke or delete the person's own
+        required: false
+      manage:
+        description: with store manage, list, revoke or delete
+        required: false
+      target:
+        description: with manage revoke, the id of the repository to take the token back from
         required: false
 
 permissions: {}
@@ -44,7 +50,7 @@ concurrency:
 
 jobs:
   mint:
-    if: vars.CLAUDE_CROWD != 'true' && inputs.store != 'pool'
+    if: vars.CLAUDE_CROWD != 'true' && inputs.store != 'pool' && inputs.store != 'manage'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -87,9 +93,28 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      # A person who has a token in the pool already gets it lent here and no
+      # new one: one token per person, lent to the repositories they choose
+      # (the owner's choice of 2026-10-19). The App's token for this look is
+      # revoked by the script before claude ever starts.
+      - uses: actions/create-github-app-token@v3
+        id: look-token
+        with:
+          app-id: ${{ vars.SDLC_APP_ID }}
+          private-key: ${{ secrets.SDLC_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          skip-token-revoke: true
+      - name: Lend the person's token here if they have one
+        id: look
+        env:
+          APP_TOKEN: ${{ steps.look-token.outputs.token }}
+          REPO_ID: ${{ github.repository_id }}
+        run: python3 tools/token_run.py look
       - name: Install Claude Code
+        if: steps.look.outputs.found != 'true'
         run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code
       - name: Sign in
+        if: steps.look.outputs.found != 'true'
         env:
           TOKEN_FILE: ${{ runner.temp }}/claude-token
         run: python3 tools/token_run.py
@@ -97,11 +122,13 @@ jobs:
       # installation has, since the action names no variables permission
       - uses: actions/create-github-app-token@v3
         id: app-token
+        if: steps.look.outputs.found != 'true'
         with:
           app-id: ${{ vars.SDLC_APP_ID }}
           private-key: ${{ secrets.SDLC_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
       - name: Store the token in a free slot
+        if: steps.look.outputs.found != 'true'
         env:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO_ID: ${{ github.repository_id }}
@@ -115,6 +142,42 @@ jobs:
         env:
           TOKEN_FILE: ${{ runner.temp }}/claude-token
         run: rm -f "$TOKEN_FILE"
+
+  # A person's own token: where it is lent, taken back from one repository,
+  # or deleted; no sign-in, and only the token whose settings name them.
+  manage:
+    if: vars.CLAUDE_CROWD != 'true' && inputs.store == 'manage'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: token-store
+    permissions:
+      contents: read
+      issues: write
+    env:
+      ISSUE: ${{ inputs.issue }}
+      ACTOR: ${{ github.triggering_actor }}
+      GITHUB_TOKEN: ${{ github.token }}
+      STORE_ORG: ${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.SDLC_APP_ID }}
+          private-key: ${{ secrets.SDLC_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      - name: List, revoke or delete the person's token
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO_ID: ${{ github.repository_id }}
+          MANAGE: ${{ inputs.manage }}
+          TARGET_REPO_ID: ${{ inputs.target }}
+        run: python3 tools/token_run.py manage
+      - name: Say that the run stopped
+        if: failure()
+        run: python3 tools/token_run.py fail
 
   # in crowd mode the repository holds no Claude token, and the page hears so
   crowd:

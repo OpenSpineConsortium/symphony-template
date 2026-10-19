@@ -57,6 +57,10 @@ LINK_MARK = "<!-- symphony-token: sign-in -->"
 CODE_MARK = "<!-- symphony-token: code -->"
 SEALED_MARK = "<!-- symphony-token: sealed -->"
 STORED_MARK = "<!-- symphony-token: stored -->"
+# what the run says once it has lent, revoked or deleted a person's token, or
+# listed where it is lent: the slot, then the ids of the repositories it is lent
+# to, never their names, which the issue's readers may not be allowed to see
+LENT_MARK = "<!-- symphony-token: lent -->"
 FAILED_MARK = "<!-- symphony-token: failed -->"
 SIGN_IN_LINK = re.compile(r"https://claude\.(?:ai|com)/[A-Za-z0-9/._-]*oauth/authorize\?[A-Za-z0-9%&=._~+-]+")
 CODE_SHAPE = re.compile(r"^[A-Za-z0-9_.~#-]{8,512}$")
@@ -348,6 +352,80 @@ class Pool:
         return slot
 
 
+class Keeper(Pool):
+    """A person's own token in the pool: one slot whose settings name them as its
+    owner, lent to the repositories they choose and taken back whenever they
+    like (the owner's choice of 2026-10-19). Only the slot's owner gets here,
+    since every call first finds the slot by the person's login."""
+
+    def settings(self):
+        have = self.read(f"{self.base}/variables/{SETTINGS_VARIABLE}") or {}
+        try:
+            data = json.loads(have.get("value") or "{}")
+        except json.JSONDecodeError:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def own_slot(self, actor):
+        taken = self.taken()
+        for slot, setting in sorted(self.settings().items(), key=lambda item: POOL_SLOTS.index(item[0]) if item[0] in POOL_SLOTS else 99):
+            owner = setting.get("owner", "") if isinstance(setting, dict) else ""
+            if slot in POOL_SLOTS and owner.lower() == actor.lower() and SLOT_PREFIX + slot in taken:
+                return slot
+        return ""
+
+    def secret_path(self, slot):
+        return f"{self.base}/secrets/{SLOT_PREFIX}{slot}"
+
+    def selected(self, slot):
+        return (self.read(self.secret_path(slot)) or {}).get("visibility") == "selected"
+
+    def lent(self, slot):
+        if not self.selected(slot):
+            return ["all"]
+        ids, page = [], 1
+        while True:
+            got = (self.api("GET", f"{self.secret_path(slot)}/repositories?per_page=100&page={page}") or {}).get("repositories") or []
+            ids += [str(r.get("id")) for r in got if r.get("id")]
+            if len(got) < 100 or page >= 50:
+                return ids
+            page += 1
+
+    def lend(self, slot, repo_id):
+        if self.selected(slot):
+            self.api("PUT", f"{self.secret_path(slot)}/repositories/{repo_id}")
+        # the workers there read the slot's name and settings from these two
+        for name in (ACCOUNTS_VARIABLE, SETTINGS_VARIABLE):
+            have = self.read(f"{self.base}/variables/{name}")
+            if have and have.get("visibility") == "selected":
+                self.api("PUT", f"{self.base}/variables/{name}/repositories/{repo_id}")
+
+    def revoke(self, slot, repo_id):
+        if not self.selected(slot):
+            raise RunError(f"slot {slot} is on in every repository of {self.org}, which an owner set; an owner narrows it")
+        try:
+            self.api("DELETE", f"{self.secret_path(slot)}/repositories/{repo_id}")
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise
+
+    def delete(self, slot):
+        self.api("DELETE", self.secret_path(slot))
+        self.write_variable(ACCOUNTS_VARIABLE, lambda text: ",".join(w for w in re.split(r"[,\s]+", text or "") if w and w != slot))
+        self.write_variable(SETTINGS_VARIABLE, lambda text: without(text, slot))
+
+
+def without(text, slot):
+    try:
+        data = json.loads(text) if (text or "").strip() else {}
+    except json.JSONDecodeError:
+        return text
+    if isinstance(data, dict):
+        data.pop(slot, None)
+        return json.dumps(data, separators=(",", ":"))
+    return text
+
+
 def with_slot(text, slot):
     words = [w for w in re.split(r"[,\s]+", text or "") if w]
     return ",".join(words if slot in words else words + [slot])
@@ -467,7 +545,76 @@ def fail(environ):
     github.comment(f"{FAILED_MARK}\n{environ.get('FAIL_WHY') or 'the run stopped before the token was saved; see its log under Actions, workflow Token'}")
 
 
-STAGES = {"sign-in": run, "store": store, "fail": fail}
+def keeper_of(environ):
+    pool = pool_of(environ)
+    return Keeper(pool.org, environ.get("APP_TOKEN", ""), pool.repo_id)
+
+
+def revoke_app_token(environ, call=None):
+    """The App's token given up at once, so a step that comes after, as claude's
+    sign-in does, finds only a dead one where the action kept it."""
+    try:
+        (call or GitHub("", environ.get("APP_TOKEN", ""), "").call)("DELETE", "/installation/token")
+    except Exception:
+        print("The App's token could not be revoked; it lapses within the hour.", flush=True)
+
+
+def say_lent(github, keeper, slot):
+    github.comment(f"{LENT_MARK}\n{slot}\n{','.join(keeper.lent(slot))}")
+
+
+def look(environ, keeper=None, call=None):
+    """Before any sign-in: a person who already has a token in the pool has it
+    lent to this repository, and no new one is made. Says found=true to the
+    workflow so the sign-in steps are skipped."""
+    github, _, _, actor = settings(environ, sealing=False)
+    keeper = keeper or keeper_of(environ)
+    try:
+        slot = keeper.own_slot(actor)
+        if slot:
+            keeper.lend(slot, keeper.repo_id)
+            say_lent(github, keeper, slot)
+            print(f"Lent slot {slot}, already the person's own, to this repository.", flush=True)
+    except urllib.error.HTTPError as error:
+        raise RunError(f"GitHub answered {error.code} when the run looked for your token in {keeper.org}'s pool") from None
+    finally:
+        revoke_app_token(environ, call)
+    output = environ.get("GITHUB_OUTPUT")
+    if output:
+        with open(output, "a") as found:
+            found.write(f"found={'true' if slot else 'false'}\n")
+    return slot
+
+
+MANAGE_ACTIONS = ("list", "revoke", "delete")
+
+
+def manage(environ, keeper=None):
+    """A person's own token: where it is lent, taken back from one repository,
+    or deleted. A person without a token in the pool is told so."""
+    github, _, _, actor = settings(environ, sealing=False)
+    action, target = environ.get("MANAGE", ""), environ.get("TARGET_REPO_ID", "")
+    if action not in MANAGE_ACTIONS:
+        raise RunError(f"the run was asked to {action[:20]!r} a token; it lists, revokes or deletes one")
+    if action == "revoke" and not re.fullmatch(r"[1-9][0-9]{0,15}", target):
+        raise RunError("the run was not given the repository to take the token back from")
+    keeper = keeper or keeper_of(environ)
+    try:
+        slot = keeper.own_slot(actor)
+        if not slot:
+            raise RunError(f"you have no token in {keeper.org}'s pool; Add Token makes one")
+        if action == "revoke":
+            keeper.revoke(slot, int(target))
+        if action == "delete":
+            keeper.delete(slot)
+            github.comment(f"{LENT_MARK}\n{slot}\n")
+            return
+        say_lent(github, keeper, slot)
+    except urllib.error.HTTPError as error:
+        raise RunError(f"GitHub answered {error.code} when the run tried to {action} your token in {keeper.org}'s pool") from None
+
+
+STAGES = {"sign-in": run, "store": store, "fail": fail, "look": look, "manage": manage}
 
 
 def main(argv=None):
