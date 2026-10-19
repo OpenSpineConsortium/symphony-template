@@ -30,6 +30,12 @@
 # owner, 2026-10-19: "it can start on an issue anyone can open"). The
 # issue's author is the run's actor, only their own comment counts as the
 # code, and the run closes the issue when it is done.
+#
+# A repository of an organization that has no workflow Token of its own, as
+# one adopted for the protocol alone has not, still takes a token: the page
+# runs this workflow in a repository of the organization that has it, with
+# lend_to naming the one it shows, and the run lends the token there. Only
+# a dispatch carries lend_to, so a run an issue started lends only here.
 name: Token
 
 on:
@@ -54,6 +60,9 @@ on:
         required: false
       target:
         description: with manage revoke, the id of the repository to take the token back from
+        required: false
+      lend_to:
+        description: with store pool, the id of the organization's repository to lend the token to in place of this one, which has the workflow where that one has not
         required: false
 
 permissions: {}
@@ -127,6 +136,7 @@ jobs:
         env:
           APP_TOKEN: ${{ steps.look-token.outputs.token }}
           REPO_ID: ${{ github.repository_id }}
+          LEND_TO: ${{ inputs.lend_to }}
         run: python3 tools/token_run.py look
       - name: Install Claude Code
         if: steps.look.outputs.found != 'true'
@@ -150,6 +160,7 @@ jobs:
         env:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO_ID: ${{ github.repository_id }}
+          LEND_TO: ${{ inputs.lend_to }}
           TOKEN_FILE: ${{ runner.temp }}/claude-token
         run: python3 tools/token_run.py store
       - name: Say that the run stopped
