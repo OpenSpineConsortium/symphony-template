@@ -621,9 +621,30 @@ class Collect(unittest.TestCase):
             with self.assertRaises(metrics.OutOfBudget) as caught:
                 metrics.collect(args, {"GITHUB_TOKEN": "t"}, opener=SpentHour(), sleep=lambda seconds: None)
             self.assertFalse(out.exists())
+        # GitHub answered the call it refused, so it is one of the hour's.
         self.assertIn("GitHub refused the call (API rate limit exceeded for installation ID 1.); stopped after "
-                      "0 calls, with 0 of GITHUB_TOKEN's", str(caught.exception))
+                      "1 calls, with 0 of GITHUB_TOKEN's", str(caught.exception))
         self.assertIn("comes back within the hour", str(caught.exception))
+
+    def test_a_try_made_again_after_a_rate_limit_counts_as_a_call(self):
+        """The first rate-limit review's sixth finding: Budgeted counted its
+        own requests, one for a call the client made twice after GitHub's
+        wait; the count is now the client's, every answer counted."""
+        class LimitedOnce:
+            def __init__(self):
+                self.opened = 0
+
+            def open(self, request, timeout=None):
+                self.opened += 1
+                if self.opened == 1:
+                    body = io.BytesIO(b'{"message": "You have exceeded a secondary rate limit."}')
+                    raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests",
+                                                 {"Retry-After": "1"}, body)
+                return Answer(b"[]", {"X-RateLimit-Remaining": "900"})
+        opener = LimitedOnce()
+        api = metrics.Budgeted("t", REPO, opener=opener, sleep=lambda seconds: None)
+        self.assertEqual(api.get(f"/repos/{REPO}/labels"), [])
+        self.assertEqual((opener.opened, api.calls), (2, 2))
 
     def test_a_run_that_fits_says_how_many_calls_it_took(self):
         opener = FakeGitHub(ROUTES, remaining=1000)

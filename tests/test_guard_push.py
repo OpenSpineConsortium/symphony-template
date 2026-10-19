@@ -158,10 +158,24 @@ class MainTest(unittest.TestCase):
         self.assertEqual(self.run_main("git commit -F - <<'EOF'\nClaim #7\n\nThe board first.\nEOF\n"
                                        "git push -u origin claude/7"), (0, ""))
 
-    def test_the_claim_file_reader_is_handed_to_the_library_when_the_vendored_copy_has_one(self):
-        """The fence on a lease onto another worker's claim (symphony-protocol
-        0.5.0): main() passes the reader the library makes
-        for the clone, and until the vendored copy has one, nothing."""
+    def test_the_library_s_whole_reading_reaches_the_hook(self):
+        """main() makes the library's full check (guard.refused_push), so a
+        push the library refuses for how bash builds or hands its text is
+        refused here too; the hook read each simple command's words alone
+        until symphony-protocol 0.5.1, and each of these passed it."""
+        for command in ('git pu""sh origin main', "bash -c 'git push origin main'",
+                        "cat <(git push origin main)", "echo 'git push origin main' | sh",
+                        "git push origin $'main'"):
+            with self.subTest(command=command):
+                code, message = self.run_main(command)
+                self.assertEqual(code, 2)
+                self.assertIn("pull requests", message)
+        self.assertEqual(self.run_main("bash -c 'git push -u origin claude/7'"), (0, ""))
+
+    def test_an_older_library_is_read_by_its_words_with_the_claim_file_reader_when_it_has_one(self):
+        """A copy whose vendored library has no refused_push, 0.5.0 and older,
+        keeps the words-alone check: main() hands refusal the reader the
+        library makes for the clone, and nothing where the library has none."""
         handed = []
 
         def spy(args, current, default, *reader):
@@ -169,22 +183,22 @@ class MainTest(unittest.TestCase):
             return None
         payload = json.dumps({"tool_input": {"command": "git push --force-with-lease origin claude/7"},
                               "cwd": str(ROOT)})
-        with mock.patch.object(sys, "stdin", io.StringIO(payload)), \
-             mock.patch.object(guard_push, "branches", return_value=("claude/7", "main")), \
-             mock.patch.object(guard_push, "refusal", spy), \
-             mock.patch.object(guard_push.guard, "claim_file_reader", lambda where: ("reader for", where),
-                               create=True):
-            self.assertEqual(guard_push.main(), 0)
-        self.assertEqual(handed, [(("reader for", str(ROOT)),)])
-        handed.clear()
-        with mock.patch.object(sys, "stdin", io.StringIO(payload)), \
-             mock.patch.object(guard_push, "branches", return_value=("claude/7", "main")), \
-             mock.patch.object(guard_push, "refusal", spy):
-            older = types.SimpleNamespace(**{name: value for name, value in vars(guard_push.guard).items()
-                                             if name != "claim_file_reader" and not name.startswith("__")})
-            with mock.patch.object(guard_push, "guard", older):
+
+        def older(drop):
+            return types.SimpleNamespace(**{name: value for name, value in vars(guard_push.guard).items()
+                                            if name not in drop and not name.startswith("__")})
+        for drop, expected in ((("refused_push",), [(("reader for", str(ROOT)),)]),
+                               (("refused_push", "claim_file_reader"), [()])):
+            handed.clear()
+            library = older(drop)
+            if "claim_file_reader" not in drop:
+                library.claim_file_reader = lambda where: ("reader for", where)
+            with mock.patch.object(sys, "stdin", io.StringIO(payload)), \
+                 mock.patch.object(guard_push, "branches", return_value=("claude/7", "main")), \
+                 mock.patch.object(guard_push, "refusal", spy), \
+                 mock.patch.object(guard_push, "guard", library):
                 self.assertEqual(guard_push.main(), 0)
-        self.assertEqual(handed, [()])
+            self.assertEqual(handed, expected, drop)
 
     def test_command_without_push_passes_without_git(self):
         payload = json.dumps({"tool_input": {"command": "git status"}})
