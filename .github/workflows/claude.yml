@@ -44,7 +44,14 @@ name: Claude
 # none unless asked, so the assistant asks through additional_permissions.
 # The action answers only an actor with write access on the repository
 # (checkActorWritePermissions in its src/github/validation/permissions.ts)
-# and fails the run for anyone else before it posts anything.
+# and fails the run for anyone else before it posts anything. The job
+# itself starts only for the repository's owner, a member of its
+# organization or a collaborator, read from the author association GitHub
+# puts on the comment, the review or the issue that woke it: on a public
+# repository anyone may open an issue or comment, as a lend of a Claude
+# token is (token.yml), and without this a stranger's @claude would start
+# a runner and hand the token to the action for every such comment, to be
+# refused there. A member who may only read still fails at the action.
 
 on:
   issue_comment:
@@ -59,7 +66,8 @@ on:
 jobs:
   claude:
     if: |
-      vars.CLAUDE_CROWD != 'true' && (
+      vars.CLAUDE_CROWD != 'true' &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association || github.event.issue.author_association) && (
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
