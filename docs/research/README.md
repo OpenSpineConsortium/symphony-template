@@ -76,7 +76,7 @@ Written before this folder existed and left where its links point:
 - OpenSpineConsortium/coordbench: docs/research.md (CooperBench's paper, read and verified), PARITY.md, bench/cooperbench/PLAN.md (the pre-registered run) and bench/cooperbench/results/curse-of-coordination-notes/ (the experiment's notes and figures).
 - OpenSpineConsortium/flowbench: DESIGN.md, PLAN.md (the pre-registered run) and PARITY.md, with the harness they describe; the programme's notes are docs/research/flowbench/ here.
 - OpenSpineConsortium/symphony-protocol: validation/ (DESIGN.md, GUARANTEES.md and the harness's findings).
-- OpenSpineConsortium/spine-program: 01_carm_level_detection/grants/aidas_2027/ (the grant's record, evidence and review notes), with SUBMITTED_2026-10-16.md (spine-program#119): the proposal went to the AIDaS office on 2026-10-16 before the deadline, its narrative main.tex at 88871de, Elsevier's update of that day leaving ScienceDirect's text and data mining amendment pending, and the changes proposed for the next venues, none made.
+- OpenSpineConsortium/spine-program: 01_carm_level_detection/grants/aidas_2027/ (the grant's record, evidence and review notes), with SUBMITTED_2026-10-16.md (spine-program#119): the proposal went to the AIDaS office on 2026-10-16 before the deadline, its narrative main.tex at 88871de, Elsevier's update of that day leaving ScienceDirect's text and data mining amendment pending (since settled: Elsevier granted ScienceDirect and Scopus on 2026-10-18, and on 2026-10-19 the Wayne State library and Elsevier confirmed that Claude may read Elsevier text for academic use while the token and the text stay private, spine-program#209), and the changes proposed for the next venues, none made.
 
 ## Outside git, by link
 
