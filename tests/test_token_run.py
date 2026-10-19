@@ -224,7 +224,13 @@ class FakeOrg:
             return None
         if "/repositories/" in path and method == "PUT":
             name = path.split("/variables/")[1].split("/")[0]
-            self.reached.setdefault(name, []).append(int(path.rsplit("/", 1)[1]))
+            if int(path.rsplit("/", 1)[1]) not in self.reached.setdefault(name, []):
+                self.reached[name].append(int(path.rsplit("/", 1)[1]))
+            return None
+        if "/repositories/" in path and method == "DELETE":
+            name = path.split("/variables/")[1].split("/")[0]
+            if int(path.rsplit("/", 1)[1]) in self.reached.get(name, []):
+                self.reached[name].remove(int(path.rsplit("/", 1)[1]))
             return None
         if path.startswith(base + "/variables/"):
             name = path.rsplit("/", 1)[1]
@@ -419,6 +425,50 @@ class KeeperTest(unittest.TestCase):
         self.assertIn("SYMPHONY_CLAUDE_1", self.org.secrets)
         self.assertEqual(self.org.variables["SYMPHONY_CLAUDE_ACCOUNTS"], "1")
         self.assertEqual(json.loads(self.org.variables["SYMPHONY_CLAUDE_SETTINGS"]), {"1": {"owner": "greg"}})
+        # the secret went before the mark, so a run cut short leaves no token nobody owns
+        gone = self.org.calls.index(("DELETE", "/orgs/acme/actions/secrets/SYMPHONY_CLAUDE_2"))
+        unmarked = max(i for i, c in enumerate(self.org.calls) if c == ("PATCH", "/orgs/acme/actions/variables/SYMPHONY_CLAUDE_SETTINGS"))
+        self.assertLess(gone, unmarked)
+
+    def test_a_repository_no_slot_reaches_loses_the_two_variables(self):
+        # the variables reach every repository a slot was lent to; 1 is slot 1's too, so it keeps them
+        self.org.reached = {"SYMPHONY_CLAUDE_ACCOUNTS": [1, 5, 42], "SYMPHONY_CLAUDE_SETTINGS": [1, 5, 42]}
+        self.org.lent["SYMPHONY_CLAUDE_2"] = [1, 5, 42]
+        token_run.manage({**self.environ, "MANAGE": "revoke", "TARGET_REPO_ID": "5"}, keeper=self.keeper)
+        self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_ACCOUNTS"], [1, 42])
+        self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_SETTINGS"], [1, 42])
+        token_run.manage({**self.environ, "MANAGE": "revoke", "TARGET_REPO_ID": "1"}, keeper=self.keeper)
+        self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_ACCOUNTS"], [1, 42])
+        token_run.manage({**self.environ, "MANAGE": "delete"}, keeper=self.keeper)
+        # 42 was slot 2's alone, so it loses them too; 1 stays slot 1's
+        self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_ACCOUNTS"], [1])
+        self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_SETTINGS"], [1])
+
+    def test_a_delete_from_a_repository_the_token_never_reached_adds_it_nowhere(self):
+        self.org.reached = {"SYMPHONY_CLAUDE_ACCOUNTS": [1, 5], "SYMPHONY_CLAUDE_SETTINGS": [1, 5]}
+        # the run is in 42, which slot 2 (lent to 5) never reached
+        token_run.manage({**self.environ, "MANAGE": "delete"}, keeper=self.keeper)
+        self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_ACCOUNTS"], [1])
+        self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_SETTINGS"], [1])
+
+    def test_a_mark_a_store_wrote_into_a_freed_slot_made_before_ids_stays(self):
+        self.test_a_mark_a_store_wrote_into_the_freed_slot_stays(old={"owner": "Ashley"})
+
+    def test_a_mark_a_store_wrote_into_the_freed_slot_stays(self, old=None):
+        settings = {"1": {"owner": "greg"}, "2": old or {"owner": "Ashley", "id": "aaaa"}}
+        self.org.variables["SYMPHONY_CLAUDE_SETTINGS"] = json.dumps(settings)
+        original = self.org.call
+        def call(method, path, body=None):
+            answer = original(method, path, body)
+            # another run's store takes slot 2 the moment its secret is gone
+            if method == "DELETE" and path.endswith("/secrets/SYMPHONY_CLAUDE_2"):
+                self.org.variables["SYMPHONY_CLAUDE_SETTINGS"] = json.dumps({**settings, "2": {"owner": "newcomer", "id": "bbbb"}})
+                self.org.secrets["SYMPHONY_CLAUDE_2"] = {}
+            return answer
+        self.keeper.api = call
+        self.keeper.delete("2")
+        self.assertEqual(json.loads(self.org.variables["SYMPHONY_CLAUDE_SETTINGS"])["2"]["owner"], "newcomer")
+        self.assertEqual(self.org.variables["SYMPHONY_CLAUDE_ACCOUNTS"], "1,2")
 
     def test_nobody_reaches_a_token_that_is_not_their_own(self):
         with self.assertRaisesRegex(token_run.RunError, "no token in acme"):
