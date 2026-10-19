@@ -54,11 +54,14 @@ TRIGGER_SECRET = re.compile(r"secrets\.COORDINATOR_TRIGGER_[A-Z]+\s*\}\}")
 # the worker's and the lead's.
 OLD_CONDITIONS = {
     ("claude.yml", "claude"): (
+        "contains(fromJSON('[\"OWNER\", \"MEMBER\", \"COLLABORATOR\"]'), "
+        "github.event.comment.author_association || github.event.review.author_association || "
+        "github.event.issue.author_association) && ("
         "(github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) || "
         "(github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) || "
         "(github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) || "
         "(github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || "
-        "contains(github.event.issue.title, '@claude')))"
+        "contains(github.event.issue.title, '@claude'))))"
     ),
     ("workers.yml", "registry"): (
         "github.event_name != 'issues' "
