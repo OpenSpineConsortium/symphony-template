@@ -7,6 +7,10 @@ carry the board, what each costs and buys, and the choices that are the owner's.
 about Apple's or GitHub's rules is named, its source is linked; what is not linked is the
 author's reading of the panel's own code, as it is on 2026-10-19.
 
+Corrected on 2026-10-19: the device flow under "Signing in from a native app" said a sign-in by
+code lasts eight hours because refreshing needs the secret; GitHub's documentation says a
+device-flow token renews with the client id alone, so it lasts until it is revoked.
+
 ## What a phone has today
 
 The control panel is one web page, /symphony/control/ on the site, read in Safari. After the
@@ -90,9 +94,17 @@ Two routes, both without a secret in the app:
   in the Worker. The smaller change, since nothing new is minted.
 - GitHub's device flow, which a GitHub App may turn on and which needs no secret
   ([GitHub's page on authorizing users for GitHub Apps](https://docs.github.com/en/enterprise-server@3.2/developers/apps/building-github-apps/identifying-and-authorizing-users-for-github-apps)):
-  the app shows a code, the person types it at github.com/login/device. Refreshing an expiring
-  token needs the secret, so a device-flow app signs in again every eight hours unless the App
-  turns token expiry off for everyone, which the panel's sign-in does not want.
+  the app shows a code, the person types it at github.com/login/device. The token it earns
+  renews without the secret too: of the refresh's client secret, GitHub says "Required unless the
+  user access token was generated using the device flow"
+  ([GitHub's page on refreshing user access tokens](https://raw.githubusercontent.com/github/docs/main/content/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens.md)),
+  and each refresh gives a new eight-hour token and a new six-month refresh token, so a sign-in
+  by code needs no second sign-in and lasts until it is revoked, for whoever holds it. The
+  control panel ships a code way switched off (site #88, symphony-app #46, 2026-10-19) because
+  anyone can start a code and talk a person into typing it: the App's client id is public, and
+  the token a code earns goes to whoever started it and renews for as long as they like;
+  symphony-app's signin/README.md, "The device routes", says what turning it on opens and what
+  ends such a token.
 
 The app would hold a GitHub token in the Keychain, as the page holds one in the browser; it never
 holds a Claude credential, which the rule "no API key and no Claude credential anywhere" keeps
