@@ -18,6 +18,8 @@ How they fit: symphony-protocol holds the rules, and its sync workflow carries e
 
 symphony-template is internal to its enterprise, so only the enterprise's members can open it and press "Use this template". Anyone else comes in through the front door, the public repository [OpenSpineConsortium/symphony-start](https://github.com/OpenSpineConsortium/symphony-start): they install its App on a repository of their own, press Create on the form GitHub sends them to, and within about two minutes a pull request is open there with the whole template filled in (an empty repository) or the protocol alone (one with files), as its README says, once the template's owner has set it up (its README, For the owner); with its Setup App installed on the repository too, the same run applies the settings `scripts/setup-repo.sh` would, so nothing is left by hand, except what the policy of their organization or enterprise holds off, which the pull request names; the files land in their repository and are theirs to read. The other way is a public copy, which the template's owner publishes with `python3 scripts/crowd.py publish-template` ([crowdsourcing.md](../setup/crowdsourcing.md), Part 1, step 2, route A); it publishes the template's files and history, so it is made only with the owner's agreement. Below, TEMPLATE_OWNER/TEMPLATE_NAME is that copy, or OpenSpineConsortium/symphony-template itself for a member; where a step says to make the repository from it, the front door's form does the same for anyone else.
 
+[capabilities.md](capabilities.md) lists everything a project can do today, what sets it apart, and worked examples to hand to someone new.
+
 ## Pick your path
 
 | You want | Page | You need |
