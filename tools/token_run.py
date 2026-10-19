@@ -335,17 +335,23 @@ class Pool:
         the person named as its owner; the slot's number back."""
         step = "read which slots are free"
         try:
+            if isinstance(self, Keeper) and self.own_slot(actor):
+                raise RunError("you made a token in another run a moment ago; press Add Token again to lend that one here")
             slot = self.free_slot()
             step = f"store the token in slot {slot}"
             # asked once more just before the write, so a slot another run took
             # since the list is never written over
             if self.read(f"{self.base}/secrets/{SLOT_PREFIX}{slot}") is not None:
                 raise RunError(f"slot {slot} was taken while the run looked; press Add Token again")
+            # marked as the person's before the secret goes in, so no earlier
+            # owner's mark is ever left on this token
+            step = f"mark slot {slot} as yours in {SETTINGS_VARIABLE}"
+            uid = self.read(f"/users/{actor}") or {}
+            self.write_variable(SETTINGS_VARIABLE, lambda text: with_owner(text, slot, actor, uid.get("id")))
+            step = f"store the token in slot {slot}"
             self.put_secret(slot, token)
             step = f"add slot {slot} to {ACCOUNTS_VARIABLE}"
             self.add_to_accounts(slot)
-            step = f"mark slot {slot} as yours in {SETTINGS_VARIABLE}"
-            self.write_variable(SETTINGS_VARIABLE, lambda text: with_owner(text, slot, actor))
         except urllib.error.HTTPError as error:
             # the page waits for a word from the run, so GitHub's refusal becomes one
             raise RunError(f"GitHub answered {error.code} when the run tried to {step} in {self.org}'s pool") from None
@@ -371,14 +377,28 @@ class Keeper(Pool):
         for slot, setting in sorted(self.settings().items(), key=lambda item: POOL_SLOTS.index(item[0]) if item[0] in POOL_SLOTS else 99):
             owner = setting.get("owner", "") if isinstance(setting, dict) else ""
             if slot in POOL_SLOTS and owner.lower() == actor.lower() and SLOT_PREFIX + slot in taken:
-                return slot
+                # a login can pass to someone else once its account is renamed or
+                # deleted, so where the slot kept the account's id that must match too
+                kept = setting.get("uid")
+                if kept is None or str(kept) == self.user_id(actor):
+                    return slot
         return ""
+
+    def user_id(self, login):
+        return str((self.read(f"/users/{login}") or {}).get("id", ""))
 
     def secret_path(self, slot):
         return f"{self.base}/secrets/{SLOT_PREFIX}{slot}"
 
+    def visibility(self, slot):
+        return (self.read(self.secret_path(slot)) or {}).get("visibility", "")
+
     def selected(self, slot):
-        return (self.read(self.secret_path(slot)) or {}).get("visibility") == "selected"
+        seen = self.visibility(slot)
+        if seen == "private":
+            # private repositories only: a public one would never get the token
+            raise RunError(f"slot {slot} is on in {self.org}'s private repositories, which an owner set; an owner switches it to selected repositories")
+        return seen == "selected"
 
     def lent(self, slot):
         if not self.selected(slot):
@@ -397,6 +417,8 @@ class Keeper(Pool):
         # the workers there read the slot's name and settings from these two
         for name in (ACCOUNTS_VARIABLE, SETTINGS_VARIABLE):
             have = self.read(f"{self.base}/variables/{name}")
+            if have and have.get("visibility") == "private":
+                raise RunError(f"{name} is on in {self.org}'s private repositories only; an owner switches it to selected repositories or all")
             if have and have.get("visibility") == "selected":
                 self.api("PUT", f"{self.base}/variables/{name}/repositories/{repo_id}")
 
@@ -410,9 +432,12 @@ class Keeper(Pool):
                 raise
 
     def delete(self, slot):
-        self.api("DELETE", self.secret_path(slot))
-        self.write_variable(ACCOUNTS_VARIABLE, lambda text: ",".join(w for w in re.split(r"[,\s]+", text or "") if w and w != slot))
+        # the owner's mark goes first and the secret last, so a run cut short
+        # never leaves a free slot marked as someone's, which would hand them
+        # whoever's token went in next
         self.write_variable(SETTINGS_VARIABLE, lambda text: without(text, slot))
+        self.write_variable(ACCOUNTS_VARIABLE, lambda text: ",".join(w for w in re.split(r"[,\s]+", text or "") if w and w != slot))
+        self.api("DELETE", self.secret_path(slot))
 
 
 def without(text, slot):
@@ -431,7 +456,7 @@ def with_slot(text, slot):
     return ",".join(words if slot in words else words + [slot])
 
 
-def with_owner(text, slot, actor):
+def with_owner(text, slot, actor, uid=None):
     # a variable that is not an object by slot is left for an owner to mend,
     # since writing over it would take every other slot's settings away
     try:
@@ -441,6 +466,8 @@ def with_owner(text, slot, actor):
     if not isinstance(data, dict):
         raise RunError(f"the token is in slot {slot}, but {SETTINGS_VARIABLE} is not JSON by slot, so it is not marked as yours yet; an owner mends it")
     data[slot] = {"owner": actor, "id": os.urandom(4).hex()}
+    if isinstance(uid, int):
+        data[slot]["uid"] = uid
     return json.dumps(data, separators=(",", ":"))
 
 
@@ -526,7 +553,7 @@ def run(environ, start=Claude):
 def store(environ, pool=None):
     """The token the sign-in held, into the organization's pool with the App's token."""
     github, _, _, actor = settings(environ)
-    pool = pool or pool_of(environ)
+    pool = pool or keeper_of(environ)
     token = take_held(held_file(environ))
     slot = pool.store(token, actor)
     github.comment(f"{STORED_MARK}\n{slot}")
@@ -556,7 +583,9 @@ def revoke_app_token(environ, call=None):
     try:
         (call or GitHub("", environ.get("APP_TOKEN", ""), "").call)("DELETE", "/installation/token")
     except Exception:
-        print("The App's token could not be revoked; it lapses within the hour.", flush=True)
+        # claude must never start beside a live App token, so the step fails
+        # and the sign-in after it is skipped
+        raise RunError("the run could not give up the App's token before the sign-in, so it stopped; press Add Token again") from None
 
 
 def say_lent(github, keeper, slot):
@@ -567,16 +596,16 @@ def look(environ, keeper=None, call=None):
     """Before any sign-in: a person who already has a token in the pool has it
     lent to this repository, and no new one is made. Says found=true to the
     workflow so the sign-in steps are skipped."""
-    github, _, _, actor = settings(environ, sealing=False)
-    keeper = keeper or keeper_of(environ)
     try:
+        github, _, _, actor = settings(environ, sealing=False)
+        keeper = keeper or keeper_of(environ)
         slot = keeper.own_slot(actor)
         if slot:
             keeper.lend(slot, keeper.repo_id)
             say_lent(github, keeper, slot)
             print(f"Lent slot {slot}, already the person's own, to this repository.", flush=True)
     except urllib.error.HTTPError as error:
-        raise RunError(f"GitHub answered {error.code} when the run looked for your token in {keeper.org}'s pool") from None
+        raise RunError(f"GitHub answered {error.code} when the run looked for your token in {environ.get('STORE_ORG', '')}'s pool") from None
     finally:
         revoke_app_token(environ, call)
     output = environ.get("GITHUB_OUTPUT")

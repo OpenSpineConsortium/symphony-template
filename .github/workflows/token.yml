@@ -96,14 +96,14 @@ jobs:
       # A person who has a token in the pool already gets it lent here and no
       # new one: one token per person, lent to the repositories they choose
       # (the owner's choice of 2026-10-19). The App's token for this look is
-      # revoked by the script before claude ever starts.
+      # revoked by the script before claude ever starts, and the step fails
+      # where it cannot be, so the sign-in never runs beside a live one.
       - uses: actions/create-github-app-token@v3
         id: look-token
         with:
           app-id: ${{ vars.SDLC_APP_ID }}
           private-key: ${{ secrets.SDLC_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          skip-token-revoke: true
       - name: Lend the person's token here if they have one
         id: look
         env:

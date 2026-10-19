@@ -166,6 +166,7 @@ class FakeOrg:
         self.variables = dict(variables or {})
         self.reached = {}
         self.lent = {}
+        self.users = {}
         self.refuse = refuse
         self.calls = []
 
@@ -174,6 +175,8 @@ class FakeOrg:
         if self.refuse and self.refuse in path and method != "GET":
             raise urllib.error.HTTPError(path, 403, "Forbidden", {}, io.BytesIO())
         base = "/orgs/acme/actions"
+        if path.startswith("/users/"):
+            return {"id": self.users.get(path.rsplit("/", 1)[1].lower(), 100)}
         if path.startswith(base + "/secrets?"):
             return {"secrets": [{"name": n} for n in sorted(self.secrets)]}
         if path == base + "/secrets/public-key":
@@ -258,6 +261,7 @@ class PoolStoreTest(unittest.TestCase):
         self.assertEqual(settings["1"], {"model": "claude-opus-5-5"})
         self.assertEqual(settings["3"]["owner"], "ashley")
         self.assertRegex(settings["3"]["id"], r"^[0-9a-f]{8}$")
+        self.assertEqual(settings["3"]["uid"], 100)
         self.assertNotIn(TOKEN, "".join(github.posted))
         self.assertFalse(os.path.exists(self.environ["TOKEN_FILE"]))
 
@@ -404,6 +408,27 @@ class KeeperTest(unittest.TestCase):
     def test_nobody_reaches_a_token_that_is_not_their_own(self):
         with self.assertRaisesRegex(token_run.RunError, "no token in acme"):
             token_run.manage({**self.environ, "ACTOR": "mallory", "MANAGE": "delete"}, keeper=self.keeper)
+        self.assertEqual(sorted(self.org.secrets), ["SYMPHONY_CLAUDE_1", "SYMPHONY_CLAUDE_2"])
+
+    def test_a_login_that_passed_to_another_account_owns_nothing(self):
+        self.org.variables["SYMPHONY_CLAUDE_SETTINGS"] = json.dumps({"2": {"owner": "ashley", "uid": 7}})
+        self.org.users["ashley"] = 8
+        with self.assertRaisesRegex(token_run.RunError, "no token in acme"):
+            token_run.manage({**self.environ, "MANAGE": "delete"}, keeper=self.keeper)
+        self.org.users["ashley"] = 7
+        token_run.manage({**self.environ, "MANAGE": "list"}, keeper=self.keeper)
+        self.assertEqual(self.github.posted, [f"{token_run.LENT_MARK}\n2\n5"])
+
+    def test_the_look_stops_when_the_apps_token_cannot_be_given_up(self):
+        def refuse(*_):
+            raise OSError("no answer")
+        with self.assertRaisesRegex(token_run.RunError, "could not give up the App's token"):
+            token_run.look(self.environ, keeper=self.keeper, call=refuse)
+        self.assertFalse(Path(self.environ["GITHUB_OUTPUT"]).exists())
+
+    def test_a_second_sign_in_at_the_same_time_makes_no_second_token(self):
+        with self.assertRaisesRegex(token_run.RunError, "made a token in another run"):
+            self.keeper.store("x", "ashley")
         self.assertEqual(sorted(self.org.secrets), ["SYMPHONY_CLAUDE_1", "SYMPHONY_CLAUDE_2"])
 
     def test_only_list_revoke_and_delete_are_taken(self):
