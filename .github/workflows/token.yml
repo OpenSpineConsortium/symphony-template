@@ -9,7 +9,15 @@
 # token is never on the page, in the issue or in the log
 # (tools/token_run.py, docs/setup/claude-tokens.md). The run holds no
 # secret and needs none: GITHUB_TOKEN only comments, and only someone who
-# may write here can start it. In crowd mode it never runs, since the
+# may write here can start it. For someone who may write here but is not
+# an owner of the organization, whom GitHub lets write no organization
+# secret, the page asks for store: pool, and the job store does the saving
+# itself with the SymphonyBoard App's key, into a free slot of the
+# organization's pool only, marked as theirs (the owner's choice of
+# 2026-10-18). That job runs in the environment token-store, which an owner
+# limits to the default branch, so only the default branch's script ever
+# holds the App's token, and mints it only once claude has gone, so no
+# process of claude's can read it. In crowd mode it never runs, since the
 # repository then holds no Claude token (docs/setup/crowdsourcing.md).
 name: Token
 
@@ -21,10 +29,13 @@ on:
         required: true
       key:
         description: the secrets public key, in base64, to seal the token for
-        required: true
+        required: false
       key_id:
         description: that key's id
-        required: true
+        required: false
+      store:
+        description: pool, for the run to store the token in the organization's pool itself
+        required: false
 
 permissions: {}
 
@@ -33,21 +44,93 @@ concurrency:
 
 jobs:
   mint:
-    if: vars.CLAUDE_CROWD != 'true'
+    if: vars.CLAUDE_CROWD != 'true' && inputs.store != 'pool'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
       issues: write
+    env:
+      ISSUE: ${{ inputs.issue }}
+      ACTOR: ${{ github.triggering_actor }}
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Install Claude Code
         run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code
       - name: Sign in and seal the token
         env:
-          ISSUE: ${{ inputs.issue }}
           KEY: ${{ inputs.key }}
           KEY_ID: ${{ inputs.key_id }}
+        run: python3 tools/token_run.py
+      # a step that failed before the script could say so, so the page is told at once
+      - name: Say that the run stopped
+        if: failure()
+        run: python3 tools/token_run.py fail
+
+  store:
+    if: vars.CLAUDE_CROWD != 'true' && inputs.store == 'pool'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: token-store
+    permissions:
+      contents: read
+      issues: write
+    env:
+      ISSUE: ${{ inputs.issue }}
+      ACTOR: ${{ github.triggering_actor }}
+      GITHUB_TOKEN: ${{ github.token }}
+      STORE_ORG: ${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install Claude Code
+        run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code
+      - name: Sign in
+        env:
+          TOKEN_FILE: ${{ runner.temp }}/claude-token
+        run: python3 tools/token_run.py
+      # minted only now, once claude has gone, and with every permission the
+      # installation has, since the action names no variables permission
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.SDLC_APP_ID }}
+          private-key: ${{ secrets.SDLC_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      - name: Store the token in a free slot
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO_ID: ${{ github.repository_id }}
+          TOKEN_FILE: ${{ runner.temp }}/claude-token
+        run: python3 tools/token_run.py store
+      - name: Say that the run stopped
+        if: failure()
+        run: python3 tools/token_run.py fail
+      - name: Remove the held token
+        if: always()
+        env:
+          TOKEN_FILE: ${{ runner.temp }}/claude-token
+        run: rm -f "$TOKEN_FILE"
+
+  # in crowd mode the repository holds no Claude token, and the page hears so
+  crowd:
+    if: vars.CLAUDE_CROWD == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Say that crowd mode holds no token
+        env:
+          ISSUE: ${{ inputs.issue }}
           ACTOR: ${{ github.triggering_actor }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: python3 tools/token_run.py
+          FAIL_WHY: the repository is in crowd mode (its variable CLAUDE_CROWD is true), so it holds no Claude token
+        run: python3 tools/token_run.py fail
