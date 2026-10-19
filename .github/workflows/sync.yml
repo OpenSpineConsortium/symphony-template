@@ -11,7 +11,8 @@ name: Sync
 # own to walk.
 #
 # The script mints SymphonyBoard's JWT itself, with openssl, and from it
-# one installation token at a time, Contents and Pull requests alone, each
+# one installation token at a time, Contents, Pull requests and Workflows
+# (since the files include workflows) and Metadata alone, each
 # revoked once its repositories are offered; GITHUB_TOKEN only reads. The
 # whole history is fetched, since a file is replaced only where the
 # repository holds a version the default branch once held there. The log
@@ -46,7 +47,7 @@ concurrency:
 
 jobs:
   offer:
-    if: github.repository == 'OpenSpineConsortium/symphony-template' && vars.SDLC_APP_ID != ''
+    if: github.repository == 'OpenSpineConsortium/symphony-template' && github.ref == 'refs/heads/main' && vars.SDLC_APP_ID != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

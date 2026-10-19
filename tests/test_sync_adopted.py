@@ -98,12 +98,17 @@ class ThePlan(unittest.TestCase):
         self.assertNotIn(".github/workflows/board.yml", changes)
         self.assertEqual({name for name, _ in kept}, {LIB, BOARD})
 
-    def test_a_copy_with_its_own_protocol_workflow_keeps_its_library(self):
-        mine = theirs(VENDORED="v1", a="l1", token=None, token_run=None)
-        mine[".github/workflows/protocol.yml"] = ("100644", "q", "blob")
+    def test_a_file_where_a_folder_goes_holds_the_unit_back(self):
+        mine = theirs(token=None, token_run=None)
+        mine["tools"] = ("160000", "sub", "commit")
         changes, kept = sync.plan(mine, TREE, HELD, UNITS)
-        self.assertEqual(set(changes), {".github/workflows/token.yml", "tools/token_run.py"})
-        self.assertEqual(kept, [])
+        self.assertEqual(changes, {})
+        self.assertIn("`tools`", kept[-1][1])
+
+    def test_a_merge_made_version_is_known(self):
+        # history() reads merges too, so a version a merge resolution made counts
+        known = sync.history({"tools/token_run.py"})["tools/token_run.py"]
+        self.assertTrue(known)
 
 
 class FakeGitHub:
@@ -124,7 +129,9 @@ class FakeGitHub:
                 (200, {"tree": [{"path": p, "mode": m, "sha": s, "type": k} for p, (m, s, k) in self.files.items()]}),
             ("GET", f"{repo}/git/ref/heads/symphony/sync"):
                 (200, {"object": {"sha": "tip"}}) if self.branch else (404, {}),
-            ("GET", f"{repo}/commits/tip"): (200, self.branch or {}),
+            ("GET", f"{repo}/compare/main...symphony/sync"):
+                (200, {"ahead_by": 1, "commits": [self.branch or {}]}),
+            ("GET", f"{repo}/git/commits/tip"): (200, {"parents": [{"sha": "head"}]}),
             ("POST", f"{repo}/git/blobs"): (201, {"sha": "blob-" + str(len(self.calls))}),
             ("POST", f"{repo}/git/trees"): (201, {"sha": "newtree"}),
             ("POST", f"{repo}/git/commits"): (201, {"sha": "newcommit"}),
@@ -144,6 +151,13 @@ class FakeGitHub:
 
 REPO = {"full_name": "o/r", "default_branch": "main"}
 BOT = "symphonyboard[bot]"
+OFFER = sync.digest({".github/workflows/token.yml": TREE[".github/workflows/token.yml"],
+                     "tools/token_run.py": TREE["tools/token_run.py"]})
+
+
+def pull(state, number, body="", merged=None, by=BOT, base="main"):
+    return {"state": state, "number": number, "body": body, "merged_at": merged, "user": {"login": by},
+            "base": {"ref": base}}
 
 
 def offer(fake):
@@ -154,12 +168,13 @@ class TheOffer(unittest.TestCase):
     def test_a_repository_missing_the_token_unit_gets_a_pull_request(self):
         fake = FakeGitHub(theirs(token=None, token_run=None))
         self.assertEqual(offer(fake), "offered")
-        blobs = fake.made("POST", "/git/blobs")
-        self.assertEqual(sorted(base64.b64decode(b["content"]) for b in blobs), [b"bytes of r2", b"bytes of t2"])
+        entries = fake.made("POST", "/git/trees")[0]["tree"]
+        self.assertEqual(sorted(e["content"] for e in entries), ["bytes of r2", "bytes of t2"])
+        self.assertEqual(fake.made("POST", "/git/blobs"), [])
         self.assertEqual(fake.made("POST", "/git/refs"), [{"ref": "refs/heads/symphony/sync", "sha": "newcommit"}])
-        pull = fake.made("POST", "/pulls")[0]
-        self.assertEqual((pull["head"], pull["base"]), ("symphony/sync", "main"))
-        self.assertIn(sync.MARK + "newtree -->", pull["body"])
+        opened = fake.made("POST", "/pulls")[0]
+        self.assertEqual((opened["head"], opened["base"]), ("symphony/sync", "main"))
+        self.assertIn(sync.MARK + OFFER + " -->", opened["body"])
 
     def test_an_unadopted_repository_is_left_alone(self):
         files = theirs(token=None)
@@ -169,19 +184,42 @@ class TheOffer(unittest.TestCase):
         self.assertEqual(fake.made("POST", ""), [])
 
     def test_a_branch_someone_else_pushed_is_not_taken(self):
-        fake = FakeGitHub(theirs(token=None, token_run=None), branch={"author": {"login": "someone"}, "committer": {"login": "web-flow"}})
+        fake = FakeGitHub(theirs(token=None, token_run=None), branch={"author": {"login": "someone"}, "parents": [{}]})
         self.assertEqual(offer(fake), "branch theirs")
-        self.assertEqual(fake.made("POST", "/git/blobs"), [])
+        self.assertEqual(fake.made("POST", "/git/trees"), [])
+
+    def test_a_merge_of_the_default_branch_on_the_branch_is_no_obstacle(self):
+        fake = FakeGitHub(theirs(token=None, token_run=None), branch={"author": {"login": "someone"}, "parents": [{}, {}]},
+                          pulls=[pull("open", 3, "old")])
+        self.assertEqual(offer(fake), "updated")
 
     def test_a_pull_request_closed_for_the_same_files_is_not_opened_again(self):
-        closed = {"state": "closed", "merged_at": None, "number": 2, "body": sync.MARK + "newtree -->\n"}
+        closed = pull("closed", 2, sync.MARK + OFFER + " -->\n")
         fake = FakeGitHub(theirs(token=None, token_run=None), pulls=[closed])
         self.assertEqual(offer(fake), "declined")
-        self.assertEqual(fake.made("POST", "/git/commits"), [])
+        self.assertEqual(fake.made("POST", "/git/trees"), [])
+
+    def test_a_pull_request_someone_else_opened_from_the_branch_is_not_ours(self):
+        theirs_pull = pull("open", 3, "mine", by="someone")
+        fake = FakeGitHub(theirs(token=None, token_run=None), pulls=[theirs_pull])
+        self.assertEqual(offer(fake), "offered")
+        self.assertEqual(fake.made("PATCH", "/pulls/3"), [])
+
+    def test_an_offer_standing_on_the_head_is_not_made_again(self):
+        tip = {"author": {"login": BOT}, "parents": [{}]}
+        fake = FakeGitHub(theirs(token=None, token_run=None), branch=tip,
+                          pulls=[pull("open", 3, sync.MARK + OFFER + " -->\n")])
+        self.assertEqual(offer(fake), "offered already")
+        self.assertEqual(fake.made("POST", "/git/trees"), [])
+
+    def test_a_whole_templates_copy_is_left_to_its_own_route(self):
+        files = theirs(token=None, token_run=None)
+        files[".github/workflows/protocol.yml"] = ("100644", "q", "blob")
+        self.assertEqual(offer(FakeGitHub(files)), "whole template")
 
     def test_an_open_pull_request_is_updated_in_place(self):
-        tip = {"author": {"login": BOT}, "commit": {"tree": {"sha": "older"}}}
-        fake = FakeGitHub(theirs(token=None, token_run=None), branch=tip, pulls=[{"state": "open", "number": 3}])
+        tip = {"author": {"login": BOT}, "parents": [{}]}
+        fake = FakeGitHub(theirs(token=None, token_run=None), branch=tip, pulls=[pull("open", 3, "older")])
         self.assertEqual(offer(fake), "updated")
         self.assertEqual(fake.made("PATCH", "/git/refs/heads/symphony/sync"), [{"sha": "newcommit", "force": True}])
         self.assertEqual(fake.made("POST", "/pulls"), [])
@@ -210,6 +248,8 @@ class TheTemplate(unittest.TestCase):
         self.assertEqual(set(found[TOKEN]), {".github/workflows/token.yml", "tools/token_run.py", "tools/sealbox.py",
                                              "scripts/tokens.py", "tools/pool.py"})
         self.assertIn("tools/VENDORED", found[LIB])
+        # tools/usage.py loads tools/profile.py by its path
+        self.assertIn("tools/profile.py", found[METRICS])
 
 
 if __name__ == "__main__":

@@ -25,7 +25,8 @@ removed them or never took them: the metrics workflow shares aggregates,
 and only an adoption's switch says whether it may. A pull request closed
 without its merge is not opened again for the same files, so a no stays a
 no until the template changes them; `off` in .github/symphony-sync stops
-the offers for good.
+the offers for good. A whole template's copy, which runs the template's
+tests on these scripts, is left to its own update route.
 
 The log names no repository: an installation's repositories may be private
 and belong to anyone, so the run prints counts alone.
@@ -36,8 +37,10 @@ and belong to anyone, so the run prints counts alone.
 
 import ast
 import base64
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -49,7 +52,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 API = "https://api.github.com"
 BRANCH = "symphony/sync"
-MARK = "<!-- symphony-sync: tree "
+MARK = "<!-- symphony-sync: files "
 PROTOCOL_TEXT = "docs/agents/PROTOCOL.md"
 OPT_OUTS = (".github/symphony-sync", ".github/symphony-adopt", ".github/sdlc-adopt")
 LIBRARY = "tools/sdlc_protocol"
@@ -70,12 +73,16 @@ WORKFLOWS = (
 )
 LIBRARY_UNIT = "the vendored library and its record"
 ADDED = {".github/workflows/token.yml"}
+# A whole template's copy, which holds the template's own update workflow.
+WHOLE_TEMPLATE = ".github/workflows/protocol.yml"
 # GitHub's modes for a file that is no link and no submodule.
 FILE_MODES = {"100644", "100755"}
 
 
 class SyncError(Exception):
-    pass
+    def __init__(self, text, status=0):
+        super().__init__(text)
+        self.status = status
 
 
 # ---------- the template's side ----------
@@ -100,7 +107,9 @@ def template_tree():
 def history(paths):
     """path -> every blob sha the default branch's history held at it."""
     held = {path: set() for path in paths}
-    raw = git("log", "--raw", "--no-abbrev", "--no-renames", "--format=", "-z", "HEAD", "--", *sorted(paths))
+    # -m shows a merge's changes against each parent, so a version a merge
+    # made is known too
+    raw = git("log", "-m", "--raw", "--no-abbrev", "--no-renames", "--format=", "-z", "HEAD", "--", *sorted(paths))
     fields = raw.split(b"\0")
     i = 0
     while i < len(fields) - 1:
@@ -127,6 +136,11 @@ def imported(source):
     return names
 
 
+# A module a script loads by its path rather than imports, as tools/usage.py
+# loads tools/profile.py: the folder's name, a slash and a file name.
+LOADED = re.compile(rb'TOOLS\s*/\s*"([A-Za-z_][A-Za-z0-9_]*)\.py"')
+
+
 def closure(tree, script, folders, read):
     """The script and every module of the template it imports, in turn, as
     Python finds them in folders; and whether any of them imports the
@@ -137,8 +151,11 @@ def closure(tree, script, folders, read):
         if rel in files:
             continue
         files.append(rel)
-        names = imported(read(rel))
+        source = read(rel)
+        names = imported(source)
         needs = needs or LIBRARY_PACKAGE in names
+        loaded = f"{rel.rsplit('/', 1)[0]}/"
+        waiting += [loaded + n.decode() + ".py" for n in LOADED.findall(source) if loaded + n.decode() + ".py" in tree]
         for name in sorted(names - {LIBRARY_PACKAGE}):
             for folder in folders:
                 found = sorted(p for p in tree if p == f"{folder}/{name}.py" or p.startswith(f"{folder}/{name}/"))
@@ -181,11 +198,9 @@ def plan(theirs, tree, held, unit_list):
         elif states.get(key) == "absent" and not may_add:
             # a unit the repository never took, or removed: not ours to add
             verdict = "missing"
-        elif name == LIBRARY_UNIT and ".github/workflows/protocol.yml" in theirs:
-            # a whole template's copy takes each release by its own workflow
-            verdict = "theirs to update"
         else:
             foreign = next((rel for rel, s in states.items() if s == "theirs"), None)
+            foreign = foreign or first_in_the_way(theirs, [rel for rel, s in states.items() if s == "absent"])
             shadow = first_shadow(theirs, files)
             verdict = (f"`{foreign}` is this repository's own, and {name} come together or not at all" if foreign
                        else f"`{shadow}` is this repository's own, and Python would import it in place of the"
@@ -203,9 +218,21 @@ def plan(theirs, tree, held, unit_list):
     for name, files, needs, states, verdict in decided:
         if verdict == "land":
             changes.update({rel: tree[rel] for rel, s in states.items() if s != "same"})
-        elif verdict not in ("same", "missing", "theirs to update"):
+        elif verdict not in ("same", "missing"):
             kept.append((name, verdict))
     return changes, kept
+
+
+def first_in_the_way(theirs, paths):
+    """The first entry of theirs that stands where a folder of one of paths
+    goes, a file, a link or a submodule, or None."""
+    for rel in paths:
+        parts = rel.split("/")
+        for depth in range(1, len(parts)):
+            entry = theirs.get("/".join(parts[:depth]))
+            if entry and entry[2] != "tree":
+                return "/".join(parts[:depth])
+    return None
 
 
 def first_shadow(theirs, files):
@@ -272,7 +299,7 @@ class GitHub:
         if status in ok:
             return None
         if status >= 300:
-            raise SyncError(f"{method} answered {status}")
+            raise SyncError(f"{method} answered {status}", status)
         return json.loads(raw) if raw else None
 
     def pages(self, path, key=None, limit=50):
@@ -337,8 +364,15 @@ def quote(text):
     return urllib.parse.quote(text, safe="/")
 
 
-def body_of(changes, kept, tree_sha):
-    lines = [MARK + tree_sha + " -->",
+def digest(changes):
+    """What the pull request offers, as one value: each path with the
+    template's mode and blob, so the repository's own commits change it not."""
+    text = "".join(f"{rel}\0{mode}\0{sha}\n" for rel, (mode, sha) in sorted(changes.items()))
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def body_of(changes, kept, offered):
+    lines = [MARK + offered + " -->",
              "This pull request brings the files Symphony's board and control panel run on up to date with the"
              " Symphony template, as the template's own sync offers them to every adopted repository. Each file"
              " it replaces holds a version the template itself once held; none of this repository's own files"
@@ -351,10 +385,29 @@ def body_of(changes, kept, tree_sha):
     return "\n".join(lines) + "\n"
 
 
+def ours_to_move(gh, repo, bot):
+    """Whether the branch symphony/sync holds nothing a person would lose when
+    it is moved: every commit it has beyond the default branch is the App's,
+    or a merge, as GitHub's Update branch makes."""
+    name = repo["full_name"]
+    compared = gh.call("GET", f"/repos/{name}/compare/{quote(repo['default_branch'])}...{quote(BRANCH)}")
+    ahead = compared.get("commits") or []
+    if compared.get("ahead_by", 0) > len(ahead):
+        return False
+    return all(((c.get("author") or {}).get("login") == bot) or len(c.get("parents") or []) > 1 for c in ahead)
+
+
+def branch_on(gh, name, tip, head):
+    """Whether the branch's tip is one commit straight on the default
+    branch's head, as the run's own commit is."""
+    commit = gh.call("GET", f"/repos/{name}/git/commits/{tip}")
+    return [p.get("sha") for p in commit.get("parents") or []] == [head]
+
+
 def offer(gh, repo, bot, read_blob, tree, held, unit_list):
     """Offer one repository its pull request; the outcome as one word."""
     name = repo["full_name"]
-    if name.lower() in OWN or repo.get("archived") or repo.get("disabled"):
+    if name.lower() in OWN or repo.get("archived") or repo.get("disabled") or repo.get("fork"):
         return "skipped"
     got = their_tree(gh, repo)
     if not got:
@@ -364,28 +417,38 @@ def offer(gh, repo, bot, read_blob, tree, held, unit_list):
         return "not adopted"
     if opted_out(gh, repo, theirs):
         return "opted out"
+    if WHOLE_TEMPLATE in theirs:
+        # a whole template's copy runs the template's tests on its scripts,
+        # which the files alone would leave behind, and has every workflow
+        return "whole template"
     changes, kept = plan(theirs, tree, held, unit_list)
     if not changes:
         return "up to date"
+    offered = digest(changes)
+    marker = MARK + offered + " -->"
+    pulls = [p for p in gh.call("GET", f"/repos/{name}/pulls?state=all&head={quote(name.split('/')[0] + ':' + BRANCH)}"
+                                "&sort=created&direction=desc&per_page=20")
+             if ((p.get("user") or {}).get("login") == bot and (p.get("base") or {}).get("ref") == repo["default_branch"])]
+    open_pull = next((p for p in pulls if p["state"] == "open"), None)
+    said = (open_pull or (pulls[0] if pulls else {})).get("body") or ""
+    if not open_pull and pulls and not pulls[0].get("merged_at") and marker in said:
+        return "declined"
     branch = gh.call("GET", f"/repos/{name}/git/ref/heads/{quote(BRANCH)}", ok=(404,))
-    tip = None
     if branch:
-        tip = gh.call("GET", f"/repos/{name}/commits/{branch['object']['sha']}")
-        if bot not in (((tip.get("author") or {}).get("login") or ""), ((tip.get("committer") or {}).get("login") or "")):
+        if not ours_to_move(gh, repo, bot):
             return "branch theirs"
+        if open_pull and marker in said and branch_on(gh, name, branch["object"]["sha"], head):
+            return "offered already"
     entries = []
     for rel, (mode, sha) in sorted(changes.items()):
-        blob = gh.call("POST", f"/repos/{name}/git/blobs",
-                       {"content": base64.b64encode(read_blob(sha)).decode(), "encoding": "base64"})
-        entries.append({"path": rel, "mode": mode, "type": "blob", "sha": blob["sha"]})
+        raw = read_blob(sha)
+        try:
+            entries.append({"path": rel, "mode": mode, "type": "blob", "content": raw.decode("utf-8")})
+        except UnicodeDecodeError:
+            blob = gh.call("POST", f"/repos/{name}/git/blobs",
+                           {"content": base64.b64encode(raw).decode(), "encoding": "base64"})
+            entries.append({"path": rel, "mode": mode, "type": "blob", "sha": blob["sha"]})
     new_tree = gh.call("POST", f"/repos/{name}/git/trees", {"base_tree": base_tree, "tree": entries})["sha"]
-    pulls = gh.call("GET", f"/repos/{name}/pulls?state=all&head={quote(name.split('/')[0] + ':' + BRANCH)}"
-                    "&sort=created&direction=desc&per_page=10")
-    open_pull = next((p for p in pulls if p["state"] == "open"), None)
-    if not open_pull and pulls and not pulls[0].get("merged_at") and MARK + new_tree + " -->" in (pulls[0].get("body") or ""):
-        return "declined"
-    if open_pull and tip and tip["commit"]["tree"]["sha"] == new_tree:
-        return "offered already"
     commit = gh.call("POST", f"/repos/{name}/git/commits",
                      {"message": "Bring Symphony's board files up to date\n\nOffered by the Symphony template's sync.",
                       "tree": new_tree, "parents": [head]})
@@ -393,7 +456,7 @@ def offer(gh, repo, bot, read_blob, tree, held, unit_list):
         gh.call("PATCH", f"/repos/{name}/git/refs/heads/{quote(BRANCH)}", {"sha": commit["sha"], "force": True})
     else:
         gh.call("POST", f"/repos/{name}/git/refs", {"ref": "refs/heads/" + BRANCH, "sha": commit["sha"]})
-    body = body_of(changes, kept, new_tree)
+    body = body_of(changes, kept, offered)
     if open_pull:
         gh.call("PATCH", f"/repos/{name}/pulls/{open_pull['number']}", {"body": body})
         return "updated"
@@ -429,7 +492,7 @@ def run(environ, transport=None):
         if only and owner != only:
             continue
         token = as_app().call("POST", f"/app/installations/{installation['id']}/access_tokens",
-                              {"permissions": {"contents": "write", "pull_requests": "write", "metadata": "read"}},
+                              {"permissions": {"contents": "write", "pull_requests": "write", "workflows": "write", "metadata": "read"}},
                               ok=(403, 404, 422))
         if not token:
             tally["installation refused"] = tally.get("installation refused", 0) + 1
@@ -437,16 +500,32 @@ def run(environ, transport=None):
         gh = GitHub(token["token"], transport)
         try:
             for repo in gh.pages("/installation/repositories", "repositories"):
-                try:
-                    word = offer(gh, repo, bot, read_blob, tree, held, unit_list)
-                except SyncError:
-                    word = "failed"
+                word = offer_counted(gh, repo, bot, read_blob, tree, held, unit_list)
                 tally[word] = tally.get(word, 0) + 1
+        except Exception:  # noqa: BLE001 - one installation never stops the others
+            tally["installation failed"] = tally.get("installation failed", 0) + 1
         finally:
-            gh.call("DELETE", "/installation/token", ok=(401, 404))
+            try:
+                gh.call("DELETE", "/installation/token", ok=(401, 404))
+            except Exception:  # noqa: BLE001 - the token lasts an hour at most
+                pass
     for word in sorted(tally):
         print(f"{word}: {tally[word]}")
+    for word in ("installation refused", "installation failed", "refused"):
+        if tally.get(word):
+            print(f"::warning::{word}: {tally[word]}")
     return 1 if tally.get("failed") else 0
+
+
+def offer_counted(gh, repo, bot, read_blob, tree, held, unit_list):
+    """offer(), with a refusal GitHub gives for good, a 4xx, apart from a
+    failure that may pass, so one repository's ruleset never reddens the run."""
+    try:
+        return offer(gh, repo, bot, read_blob, tree, held, unit_list)
+    except SyncError as error:
+        return "refused" if 400 <= error.status < 500 and error.status != 429 else "failed"
+    except Exception:  # noqa: BLE001 - one repository never stops the others
+        return "failed"
 
 
 def main(argv):
