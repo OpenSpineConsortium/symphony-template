@@ -102,7 +102,7 @@ class TokenRunTest(unittest.TestCase):
 
     def run_with(self, github):
         original = token_run.settings
-        token_run.settings = lambda environ: (github, *original(environ)[1:])
+        token_run.settings = lambda environ, **how: (github, *original(environ, **how)[1:])
         try:
             token_run.run(self.environ, start=lambda: token_run.Claude(command=(str(self.claude),)))
         finally:
@@ -180,6 +180,10 @@ class FakeOrg:
         if path.startswith(base + "/secrets/") and method == "PUT":
             self.secrets[path.rsplit("/", 1)[1]] = body
             return None
+        if path.startswith(base + "/secrets/") and method == "GET":
+            if path.rsplit("/", 1)[1] not in self.secrets:
+                raise urllib.error.HTTPError(path, 404, "Not Found", {}, io.BytesIO())
+            return {"name": path.rsplit("/", 1)[1]}
         if path == base + "/variables" and method == "POST":
             self.variables[body["name"]] = body["value"]
             self.reached[body["name"]] = body["selected_repository_ids"]
@@ -207,17 +211,19 @@ class PoolStoreTest(unittest.TestCase):
         claude.chmod(claude.stat().st_mode | stat.S_IEXEC)
         self.command = (str(claude),)
         self.environ = {"ISSUE": "7", "ACTOR": "ashley", "GITHUB_REPOSITORY": "acme/r", "GITHUB_TOKEN": "t",
-                        "STORE_ORG": "acme", "APP_TOKEN": "app", "REPO_ID": "42"}
+                        "STORE_ORG": "acme", "APP_TOKEN": "app", "REPO_ID": "42",
+                        "TOKEN_FILE": os.path.join(self.folder, "held")}
         token_run.WAIT_FOR_CODE = 5
         token_run.POLL_EVERY = 0.2
 
     def store(self, org, poster="ashley"):
         github = FakeGitHub(CODE, poster=poster)
         original = token_run.settings
-        token_run.settings = lambda environ: (github, *original(environ)[1:])
+        token_run.settings = lambda environ, **how: (github, *original(environ, **how)[1:])
         try:
-            token_run.run(self.environ, start=lambda: token_run.Claude(command=self.command),
-                          pool=token_run.Pool("acme", "app", 42, call=org.call))
+            token_run.run(self.environ, start=lambda: token_run.Claude(command=self.command))
+            self.assertEqual(oct(os.stat(self.environ["TOKEN_FILE"]).st_mode & 0o777), "0o600")
+            token_run.store(self.environ, pool=token_run.Pool("acme", "app", 42, call=org.call))
         finally:
             token_run.settings = original
         return github
@@ -237,6 +243,22 @@ class PoolStoreTest(unittest.TestCase):
         self.assertEqual(settings["3"]["owner"], "ashley")
         self.assertRegex(settings["3"]["id"], r"^[0-9a-f]{8}$")
         self.assertNotIn(TOKEN, "".join(github.posted))
+        self.assertFalse(os.path.exists(self.environ["TOKEN_FILE"]))
+
+    def test_a_slot_taken_while_the_run_looked_is_never_written_over(self):
+        org = FakeOrg()
+        listed = org.call
+
+        def another_run_takes_slot_1(method, path, body=None):
+            got = listed(method, path, body)
+            if path.startswith("/orgs/acme/actions/secrets?"):
+                org.secrets["SYMPHONY_CLAUDE_1"] = "theirs"
+            return got
+        org.call = another_run_takes_slot_1
+        with self.assertRaisesRegex(token_run.RunError, "slot 1 was taken"):
+            self.store(org)
+        self.assertEqual(org.secrets["SYMPHONY_CLAUDE_1"], "theirs")
+        self.assertFalse(os.path.exists(self.environ["TOKEN_FILE"]))
 
     def test_no_slot_that_holds_a_token_is_ever_written(self):
         org = FakeOrg(secrets=[f"SYMPHONY_CLAUDE_{n}" for n in range(1, 33)])
@@ -265,6 +287,34 @@ class PoolStoreTest(unittest.TestCase):
         for name, value in (("STORE_ORG", "-bad"), ("APP_TOKEN", ""), ("REPO_ID", "042")):
             with self.assertRaises(token_run.RunError):
                 token_run.pool_of({**self.environ, name: value})
+
+    def test_a_run_that_stopped_early_tells_the_page_once(self):
+        github = FakeGitHub()
+        github.comments = lambda: [{"user": {"login": "github-actions[bot]"}, "body": c} for c in github.posted]
+        original = token_run.settings
+        token_run.settings = lambda environ, **how: (github, *original(environ, **how)[1:])
+        try:
+            token_run.fail({**self.environ, "FAIL_WHY": "crowd mode"})
+            token_run.fail(self.environ)
+        finally:
+            token_run.settings = original
+        self.assertEqual(github.posted, [f"{token_run.FAILED_MARK}\ncrowd mode"])
+
+    def test_an_unforeseen_failure_reaches_the_page_by_its_kind_alone(self):
+        github = FakeGitHub()
+        original_settings, original_store = token_run.settings, token_run.STAGES["store"]
+        token_run.settings = lambda environ, **how: (github, None, "", "ashley")
+
+        def broken(environ):
+            raise KeyError("sk-" + "x" * 10)
+        token_run.STAGES["store"] = broken
+        try:
+            self.assertEqual(token_run.main(["store"]), 1)
+        finally:
+            token_run.settings, token_run.STAGES["store"] = original_settings, original_store
+        self.assertEqual(len(github.posted), 1)
+        self.assertIn("(KeyError)", github.posted[0])
+        self.assertNotIn("sk-", github.posted[0])
 
     def test_claude_never_sees_the_runs_tokens(self):
         script = Path(self.folder) / "env"
