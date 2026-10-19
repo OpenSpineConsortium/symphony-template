@@ -72,7 +72,7 @@ sys.stdout.write("Your OAuth token (valid for 1 year):\\r\\n" + {TOKEN!r} + "\\r
 class FakeGitHub(token_run.GitHub):
     def __init__(self, actor_code=None, poster="greg"):
         super().__init__("o/r", "t", "7")
-        self.posted, self.deleted = [], []
+        self.posted, self.deleted, self.closed = [], [], []
         self.waiting = [{"id": 99, "user": {"login": poster}, "body": f"{token_run.CODE_MARK}\n{actor_code}"}] if actor_code else []
 
     def comment(self, body):
@@ -84,6 +84,9 @@ class FakeGitHub(token_run.GitHub):
 
     def delete_comment(self, comment_id):
         self.deleted.append(comment_id)
+
+    def close(self, done):
+        self.closed.append(done)
 
 
 class TokenRunTest(unittest.TestCase):
@@ -436,6 +439,147 @@ class KeeperTest(unittest.TestCase):
             token_run.manage({**self.environ, "MANAGE": "lend-all"}, keeper=self.keeper)
         with self.assertRaisesRegex(token_run.RunError, "take the token back from"):
             token_run.manage({**self.environ, "MANAGE": "revoke", "TARGET_REPO_ID": "x"}, keeper=self.keeper)
+
+
+class IssueRunTest(unittest.TestCase):
+    """A run GitHub started on an issue anyone may open: the author is the
+    actor, the issue's first lines are the request, and the run closes it."""
+
+    def setUp(self):
+        self.org = FakeOrg(secrets=["SYMPHONY_CLAUDE_2"],
+                           variables={"SYMPHONY_CLAUDE_ACCOUNTS": "2",
+                                      "SYMPHONY_CLAUDE_SETTINGS": json.dumps({"2": {"owner": "ashley", "uid": 7}}),
+                                      "SYMPHONY_LEND_TO": "11, 12"})
+        self.org.lent = {"SYMPHONY_CLAUDE_2": [5]}
+        self.org.users["ashley"] = 7
+        self.github = FakeGitHub()
+        self.folder = tempfile.mkdtemp()
+        self.environ = {"ISSUE": "7", "ACTOR": "ashley", "GITHUB_REPOSITORY": "acme/r", "GITHUB_TOKEN": "t",
+                        "STORE_ORG": "acme", "APP_TOKEN": "app", "REPO_ID": "42",
+                        "GITHUB_EVENT_NAME": "issues", "GITHUB_OUTPUT": os.path.join(self.folder, "out")}
+        self.original = token_run.settings
+        token_run.settings = lambda environ, **how: (self.github, *self.original(environ, **how)[1:])
+        self.original_keeper_of = token_run.keeper_of
+        org = self.org
+        # the keeper the run builds itself talks to the fake organization
+        def keeper_of(environ):
+            keeper = token_run.Keeper("acme", "app", 42, call=org.call)
+            if token_run.no_say(environ):
+                keeper.targets = token_run.standing_list(keeper)
+                keeper.keeping = token_run.ORGANIZATION
+            return keeper
+        token_run.keeper_of = keeper_of
+
+    def tearDown(self):
+        token_run.settings = self.original
+        token_run.keeper_of = self.original_keeper_of
+
+    def opened(self, body):
+        path = os.path.join(self.folder, "event.json")
+        Path(path).write_text(json.dumps({"issue": {"number": 7, "body": body}}))
+        return {**self.environ, "GITHUB_EVENT_PATH": path}
+
+    def test_the_issues_first_lines_are_the_request(self):
+        self.assertEqual(token_run.request(self.opened(f"{token_run.LEND_MARK}\r\norganization\r\n")), ("lend", ["organization"]))
+        self.assertEqual(token_run.request(self.opened(f"{token_run.MANAGE_MARK}\nrevoke 5 extra words")), ("manage", ["revoke", "5"]))
+        self.assertEqual(token_run.request(self.opened("Hello, I have a bug")), ("", []))
+        self.assertEqual(token_run.request({**self.environ, "GITHUB_EVENT_NAME": "workflow_dispatch"}), ("", []))
+        self.assertEqual(token_run.asked(self.opened(f"{token_run.MANAGE_MARK}\ndelete")), ("delete", ""))
+
+    def test_a_lend_with_no_say_goes_where_the_standing_list_says(self):
+        environ = self.opened(f"{token_run.LEND_MARK}\norganization")
+        slot = token_run.look(environ, call=lambda *a: None)
+        self.assertEqual(slot, "2")
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5, 11, 12])
+        # the lender is told nothing of the repositories, and the issue is closed as done
+        self.assertEqual(self.github.posted, [f"{token_run.LENT_MARK}\n2\norganization"])
+        self.assertEqual(json.loads(self.org.variables["SYMPHONY_CLAUDE_SETTINGS"])["2"]["keeping"], "organization")
+        self.assertEqual(self.github.closed, [True])
+
+    def test_a_new_token_lent_with_no_say_is_kept_by_the_organization(self):
+        environ = self.opened(f"{token_run.LEND_MARK}\norganization")
+        environ["ACTOR"] = "newcomer"
+        keeper = token_run.keeper_of(environ)
+        slot = keeper.store("x", "newcomer")
+        self.assertEqual(slot, "1")
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_1"], [11, 12])
+        self.assertEqual(json.loads(self.org.variables["SYMPHONY_CLAUDE_SETTINGS"])["1"]["keeping"], "organization")
+        token_run.say_lent(self.github, keeper, "1")
+        self.assertEqual(self.github.posted, [f"{token_run.LENT_MARK}\n1\norganization"])
+
+    def test_a_lend_with_no_say_and_no_standing_list_goes_nowhere_yet(self):
+        del self.org.variables["SYMPHONY_LEND_TO"]
+        environ = self.opened(f"{token_run.LEND_MARK}\norganization")
+        environ["ACTOR"] = "newcomer"
+        keeper = token_run.keeper_of(environ)
+        keeper.store("x", "newcomer")
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_1"], [])
+
+    def test_a_standing_list_that_is_not_ids_stops_the_run(self):
+        self.org.variables["SYMPHONY_LEND_TO"] = "11, acme/private"
+        with self.assertRaisesRegex(token_run.RunError, "not a repository id"):
+            token_run.keeper_of(self.opened(f"{token_run.LEND_MARK}\norganization"))
+
+    def test_a_plain_lend_issue_lends_here_alone(self):
+        slot = token_run.look(self.opened(token_run.LEND_MARK), call=lambda *a: None)
+        self.assertEqual(slot, "2")
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5, 42])
+        self.assertEqual(self.github.posted, [f"{token_run.LENT_MARK}\n2\n5,42"])
+
+    def test_a_manage_issue_is_answered_and_closed(self):
+        token_run.manage(self.opened(f"{token_run.MANAGE_MARK}\ndelete"))
+        self.assertNotIn("SYMPHONY_CLAUDE_2", self.org.secrets)
+        self.assertEqual(self.github.closed, [True])
+        with self.assertRaisesRegex(token_run.RunError, "lists, revokes or deletes"):
+            token_run.manage(self.opened(f"{token_run.MANAGE_MARK}\n"))
+
+    def test_a_dispatched_run_closes_no_issue(self):
+        environ = {**self.environ, "GITHUB_EVENT_NAME": "workflow_dispatch", "MANAGE": "list"}
+        token_run.manage(environ)
+        self.assertEqual(self.github.closed, [])
+
+    def test_a_failed_issue_run_is_closed_as_not_done(self):
+        token_run.fail(self.opened(token_run.LEND_MARK))
+        self.assertTrue(self.github.posted[0].startswith(token_run.FAILED_MARK))
+        self.assertEqual(self.github.closed, [False])
+
+    def test_a_slot_kept_by_login_alone_waits_for_a_run_with_write_access(self):
+        # a slot with no uid: an issue anyone may open cannot take it, a dispatch keeps its id
+        self.org.variables["SYMPHONY_CLAUDE_SETTINGS"] = json.dumps({"2": {"owner": "ashley"}})
+        with self.assertRaisesRegex(token_run.RunError, "by login alone"):
+            token_run.look(self.opened(token_run.LEND_MARK), call=lambda *a: None)
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5])
+        self.org.users["ashley"] = 7
+        token_run.look({**self.environ, "GITHUB_EVENT_NAME": "workflow_dispatch"}, call=lambda *a: None)
+        self.assertEqual(json.loads(self.org.variables["SYMPHONY_CLAUDE_SETTINGS"])["2"]["uid"], 7)
+        self.github.posted = []
+        token_run.look(self.opened(token_run.LEND_MARK), call=lambda *a: None)
+        self.assertEqual(self.github.posted, [f"{token_run.LENT_MARK}\n2\n5,42"])
+
+    def test_a_run_that_fails_in_the_script_closes_its_issue_as_not_done(self):
+        environ = self.opened(f"{token_run.MANAGE_MARK}\nlend-all")
+        saved = dict(os.environ)
+        os.environ.update(environ)
+        try:
+            self.assertEqual(token_run.main(["manage"]), 1)
+        finally:
+            os.environ.clear()
+            os.environ.update(saved)
+        self.assertTrue(self.github.posted[-1].startswith(token_run.FAILED_MARK))
+        self.assertEqual(self.github.closed, [False])
+
+    def test_the_code_is_found_past_a_hundred_comments(self):
+        pages = {1: [{"id": i, "user": {"login": "x"}, "body": "noise"} for i in range(100)],
+                 2: [{"id": 200, "user": {"login": "ashley"}, "body": CODE}]}
+        github = token_run.GitHub("acme/r", "t", "7")
+        github.call = lambda method, path, body=None: pages.get(int(path.rsplit("page=", 1)[1]), [])
+        self.assertEqual(token_run.code_from(github.comments(), "ashley"), (CODE, 200))
+
+    def test_a_code_pasted_bare_on_the_issue_counts(self):
+        comments = [{"id": 1, "user": {"login": "Ashley"}, "body": "thanks, signing in"},
+                    {"id": 2, "user": {"login": "mallory"}, "body": CODE},
+                    {"id": 3, "user": {"login": "ashley"}, "body": f"  {CODE}  "}]
+        self.assertEqual(token_run.code_from(comments, "ashley"), (CODE, 3))
 
 
 if __name__ == "__main__":
