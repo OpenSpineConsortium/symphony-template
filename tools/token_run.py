@@ -138,7 +138,15 @@ class GitHub:
         return self.call("POST", f"/repos/{self.repo}/issues/{self.issue}/comments", {"body": body})
 
     def comments(self):
-        return self.call("GET", f"/repos/{self.repo}/issues/{self.issue}/comments?per_page=100") or []
+        # every page, since on a public issue anyone can post a hundred comments
+        # before the author pastes the code
+        out, page = [], 1
+        while True:
+            got = self.call("GET", f"/repos/{self.repo}/issues/{self.issue}/comments?per_page=100&page={page}") or []
+            out += got
+            if len(got) < 100 or page >= 20:
+                return out
+            page += 1
 
     def delete_comment(self, comment_id):
         self.call("DELETE", f"/repos/{self.repo}/issues/comments/{comment_id}")
@@ -401,7 +409,12 @@ class Keeper(Pool):
             return {}
         return data if isinstance(data, dict) else {}
 
-    def own_slot(self, actor):
+    def own_slot(self, actor, trusted=True):
+        """The slot whose settings name the actor. A slot stored before the
+        account's id was kept matches by login alone, so a run anyone may start
+        (trusted False) refuses it, since a login passes to whoever takes it
+        after a rename; a run started by someone with write access, as the
+        page's dispatch is, keeps the id then, and the slot is safe from there."""
         taken = self.taken()
         for slot, setting in sorted(self.settings().items(), key=lambda item: POOL_SLOTS.index(item[0]) if item[0] in POOL_SLOTS else 99):
             owner = setting.get("owner", "") if isinstance(setting, dict) else ""
@@ -409,9 +422,26 @@ class Keeper(Pool):
                 # a login can pass to someone else once its account is renamed or
                 # deleted, so where the slot kept the account's id that must match too
                 kept = setting.get("uid")
-                if kept is None or str(kept) == self.user_id(actor):
+                if kept is None:
+                    if not trusted:
+                        raise RunError(f"slot {slot} is yours by login alone, from before the pool kept account ids; press Add Token on the control panel once, which keeps yours, and then lend from an issue")
+                    self.keep_uid(slot, actor)
+                    return slot
+                if str(kept) == self.user_id(actor):
                     return slot
         return ""
+
+    def keep_uid(self, slot, actor):
+        uid = (self.read(f"/users/{actor}") or {}).get("id")
+        if not isinstance(uid, int):
+            return
+        def marked(text):
+            data = json.loads(text) if (text or "").strip() else {}
+            if isinstance(data, dict) and isinstance(data.get(slot), dict):
+                data[slot]["uid"] = uid
+                return json.dumps(data, separators=(",", ":"))
+            return text
+        self.write_variable(SETTINGS_VARIABLE, marked)
 
     def user_id(self, login):
         return str((self.read(f"/users/{login}") or {}).get("id", ""))
@@ -720,7 +750,7 @@ def look(environ, keeper=None, call=None):
     try:
         github, _, _, actor = settings(environ, sealing=False)
         keeper = keeper or keeper_of(environ)
-        slot = keeper.own_slot(actor)
+        slot = keeper.own_slot(actor, trusted=not started_by_issue(environ))
         if slot:
             keeper.lend_all(slot)
             keeper.mark_keeping(slot)
@@ -752,7 +782,7 @@ def manage(environ, keeper=None):
         raise RunError("the run was not given the repository to take the token back from")
     keeper = keeper or keeper_of(environ)
     try:
-        slot = keeper.own_slot(actor)
+        slot = keeper.own_slot(actor, trusted=not started_by_issue(environ))
         if not slot:
             raise RunError(f"you have no token in {keeper.org}'s pool; Add Token makes one")
         if action == "revoke":

@@ -448,9 +448,10 @@ class IssueRunTest(unittest.TestCase):
     def setUp(self):
         self.org = FakeOrg(secrets=["SYMPHONY_CLAUDE_2"],
                            variables={"SYMPHONY_CLAUDE_ACCOUNTS": "2",
-                                      "SYMPHONY_CLAUDE_SETTINGS": json.dumps({"2": {"owner": "ashley"}}),
+                                      "SYMPHONY_CLAUDE_SETTINGS": json.dumps({"2": {"owner": "ashley", "uid": 7}}),
                                       "SYMPHONY_LEND_TO": "11, 12"})
         self.org.lent = {"SYMPHONY_CLAUDE_2": [5]}
+        self.org.users["ashley"] = 7
         self.github = FakeGitHub()
         self.folder = tempfile.mkdtemp()
         self.environ = {"ISSUE": "7", "ACTOR": "ashley", "GITHUB_REPOSITORY": "acme/r", "GITHUB_TOKEN": "t",
@@ -541,6 +542,38 @@ class IssueRunTest(unittest.TestCase):
         token_run.fail(self.opened(token_run.LEND_MARK))
         self.assertTrue(self.github.posted[0].startswith(token_run.FAILED_MARK))
         self.assertEqual(self.github.closed, [False])
+
+    def test_a_slot_kept_by_login_alone_waits_for_a_run_with_write_access(self):
+        # a slot with no uid: an issue anyone may open cannot take it, a dispatch keeps its id
+        self.org.variables["SYMPHONY_CLAUDE_SETTINGS"] = json.dumps({"2": {"owner": "ashley"}})
+        with self.assertRaisesRegex(token_run.RunError, "by login alone"):
+            token_run.look(self.opened(token_run.LEND_MARK), call=lambda *a: None)
+        self.assertEqual(self.org.lent["SYMPHONY_CLAUDE_2"], [5])
+        self.org.users["ashley"] = 7
+        token_run.look({**self.environ, "GITHUB_EVENT_NAME": "workflow_dispatch"}, call=lambda *a: None)
+        self.assertEqual(json.loads(self.org.variables["SYMPHONY_CLAUDE_SETTINGS"])["2"]["uid"], 7)
+        self.github.posted = []
+        token_run.look(self.opened(token_run.LEND_MARK), call=lambda *a: None)
+        self.assertEqual(self.github.posted, [f"{token_run.LENT_MARK}\n2\n5,42"])
+
+    def test_a_run_that_fails_in_the_script_closes_its_issue_as_not_done(self):
+        environ = self.opened(f"{token_run.MANAGE_MARK}\nlend-all")
+        saved = dict(os.environ)
+        os.environ.update(environ)
+        try:
+            self.assertEqual(token_run.main(["manage"]), 1)
+        finally:
+            os.environ.clear()
+            os.environ.update(saved)
+        self.assertTrue(self.github.posted[-1].startswith(token_run.FAILED_MARK))
+        self.assertEqual(self.github.closed, [False])
+
+    def test_the_code_is_found_past_a_hundred_comments(self):
+        pages = {1: [{"id": i, "user": {"login": "x"}, "body": "noise"} for i in range(100)],
+                 2: [{"id": 200, "user": {"login": "ashley"}, "body": CODE}]}
+        github = token_run.GitHub("acme/r", "t", "7")
+        github.call = lambda method, path, body=None: pages.get(int(path.rsplit("page=", 1)[1]), [])
+        self.assertEqual(token_run.code_from(github.comments(), "ashley"), (CODE, 200))
 
     def test_a_code_pasted_bare_on_the_issue_counts(self):
         comments = [{"id": 1, "user": {"login": "Ashley"}, "body": "thanks, signing in"},
