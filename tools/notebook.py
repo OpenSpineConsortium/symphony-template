@@ -263,7 +263,7 @@ def bibtex(text):
         fields = bib_fields(body)
         authors = [" ".join(name.split()) for name in fields.get("author", "").split(" and ") if name.strip()]
         references.append(reference(key.strip(), fields.get("title"), authors, fields.get("year"), fields.get("doi"),
-                                    fields.get("journal") or fields.get("booktitle")))
+                                    fields.get("journal") or fields.get("booktitle"), fields.get("url")))
     return references
 
 
@@ -280,7 +280,7 @@ def ris(text):
             continue
         elif tag == "ER":
             references.append(reference(entry.get("ID"), entry.get("TI"), entry["authors"], entry.get("PY"),
-                                        entry.get("DO"), entry.get("JO")))
+                                        entry.get("DO"), entry.get("JO"), entry.get("UR")))
             entry = None
         elif tag in ("AU", "A1"):
             entry["authors"].append(value.strip())
@@ -289,10 +289,47 @@ def ris(text):
     return references
 
 
-def reference(key, title, authors, year, doi, venue):
+def reference(key, title, authors, year, doi, venue, url=None, uri=""):
+    """One reference: url is where it was found, uri the item in a Zotero
+    library, so a citation written from it names its own source."""
     year = re.search(r"\d{4}", year or "")
     return {"key": key or "", "title": title or "", "authors": authors, "year": year.group() if year else "",
-            "doi": (doi or "").strip().lower(), "venue": venue or ""}
+            "doi": (doi or "").strip().lower(), "venue": venue or "", "url": (url or "").strip(), "uri": uri}
+
+
+def zotero(items, library):
+    """References from a Zotero web API answer (GET /users/<id>/items, the
+    default JSON), each with the item's URI in the library, which a Zotero
+    field in Word names: library is users/<id> or groups/<id>."""
+    if not re.fullmatch(r"(users|groups)/\d{1,12}", library or ""):
+        raise NotebookError("the Zotero library is users/<id> or groups/<id>")
+    if not isinstance(items, list):
+        raise NotebookError("the Zotero answer is not a list of items")
+    found = []
+    for item in items:
+        data = item.get("data") if isinstance(item, dict) else None
+        if not isinstance(data, dict) or data.get("itemType") in ("attachment", "note", "annotation", None):
+            continue
+        authors = [creator_name(each) for each in data.get("creators", [])
+                   if isinstance(each, dict) and each.get("creatorType", "author") == "author"]
+        doi = data.get("DOI") or extra_doi(data.get("extra"))
+        venue = data.get("publicationTitle") or data.get("bookTitle") or data.get("proceedingsTitle")
+        found.append(reference(data.get("key"), data.get("title"), [a for a in authors if a], data.get("date"),
+                               doi, venue or data.get("conferenceName"),
+                               data.get("url"), f"http://zotero.org/{library}/items/{data.get('key')}"))
+    return found
+
+
+def extra_doi(extra):
+    """A DOI Zotero keeps in Extra for an item type with no DOI field."""
+    match = re.search(r"^DOI:\s*(\S+)", str(extra or ""), re.M | re.I)
+    return match.group(1) if match else ""
+
+
+def creator_name(creator):
+    if creator.get("name"):
+        return str(creator["name"])
+    return ", ".join(str(part) for part in (creator.get("lastName"), creator.get("firstName")) if part)
 
 
 def read_references(path):
@@ -325,7 +362,10 @@ def main(argv=None):
             command.add_argument("--slug", required=True)
             command.add_argument("--out", required=True)
     refs = commands.add_parser("refs")
-    refs.add_argument("--export", required=True)
+    source = refs.add_mutually_exclusive_group(required=True)
+    source.add_argument("--export", help="a BibTeX or RIS file")
+    source.add_argument("--zotero", help="a Zotero web API answer, saved as JSON")
+    refs.add_argument("--library", help="users/<id> or groups/<id>, with --zotero")
     refs.add_argument("--out", required=True)
     args = parser.parse_args(argv)
     try:
@@ -338,7 +378,7 @@ def main(argv=None):
 
 def run(args):
     if args.command == "refs":
-        found = read_references(args.export)
+        found = zotero(load(args.zotero), args.library) if args.zotero else read_references(args.export)
         Path(args.out).write_text(json.dumps(found, indent=1, ensure_ascii=True) + "\n", encoding="utf-8")
         return {"references": len(found), "with_doi": sum(1 for each in found if each["doi"])}
     made = load(args.catalog)
