@@ -132,20 +132,41 @@ done
 # has reported "check" on the default branch and the ruleset does not name
 # a source for it yet. Every failure is reported and the run goes on.
 ACTIONS_APP=15368
+# One read for the step: GitHub's body on standard output, and on a failure
+# gh's first line of standard error alone, since gh prints a refused call's
+# body on standard output too.
+pin_read() {
+  local error answer
+  error=$(mktemp)
+  if answer=$(gh api "$@" 2>"$error"); then
+    rm -f "$error"
+    printf '%s' "$answer"
+  else
+    head -n 1 "$error"
+    rm -f "$error"
+    return 1
+  fi
+}
 pin_check() {
-  local name=$1 id reported ruleset body answer
-  id=$(gh api "repos/$REPO/rulesets" | python3 -c 'import json, sys
+  local name=$1 id rulesets reported ruleset body answer status
+  # The repository's own rulesets alone: an organization's ruleset of the
+  # same name is listed too by default, and only its owners edit it.
+  if ! rulesets=$(pin_read "repos/$REPO/rulesets?includes_parents=false&per_page=100"); then
+    echo "check pin: not changed (could not list the rulesets: $rulesets)"
+    return 0
+  fi
+  id=$(printf '%s' "$rulesets" | python3 -c 'import json, sys
 try:
     rulesets = json.load(sys.stdin)
 except ValueError:
     rulesets = []
 print(next((str(r["id"]) for r in rulesets if isinstance(r, dict) and r.get("name") == sys.argv[1]), ""))' "$name") || id=""
   if [ -z "$id" ]; then
-    echo "check pin: not changed (the ruleset \"$name\" was not found to pin; run this again)"
+    echo "check pin: not changed (the repository has no ruleset \"$name\" of its own; an organization's ruleset is pinned by its owners under the organization's Settings, Rules)"
     return 0
   fi
-  if ! reported=$(gh api "repos/$REPO/commits/$DEFAULT_BRANCH/check-runs?check_name=check&per_page=100" \
-      --jq "[.check_runs[] | select(.app.id == $ACTIONS_APP)] | length" 2>&1); then
+  if ! reported=$(pin_read "repos/$REPO/commits/$DEFAULT_BRANCH/check-runs?check_name=check&per_page=100" \
+      --jq "[.check_runs[] | select(.app.id == $ACTIONS_APP)] | length"); then
     echo "check pin: not changed (could not read the default branch's checks: $reported)"
     return 0
   fi
@@ -153,11 +174,12 @@ print(next((str(r["id"]) for r in rulesets if isinstance(r, dict) and r.get("nam
     echo "check pin: not yet; GitHub Actions has not reported \"check\" on $DEFAULT_BRANCH, so run this again after the first pull request's check"
     return 0
   fi
-  if ! ruleset=$(gh api "repos/$REPO/rulesets/$id" 2>&1); then
+  if ! ruleset=$(pin_read "repos/$REPO/rulesets/$id"); then
     echo "check pin: not changed (could not read the ruleset: $ruleset)"
     return 0
   fi
-  if ! body=$(printf '%s' "$ruleset" | python3 -c 'import json, sys
+  status=0
+  body=$(printf '%s' "$ruleset" | python3 -c 'import json, sys
 ruleset, app = json.load(sys.stdin), int(sys.argv[1])
 checks = [check for rule in ruleset.get("rules") or [] if rule.get("type") == "required_status_checks"
           for check in (rule.get("parameters") or {}).get("required_status_checks") or [] if check.get("context") == "check"]
@@ -166,8 +188,12 @@ if not checks or all(check.get("integration_id") for check in checks):
 for check in checks:
     check["integration_id"] = check.get("integration_id") or app
 keys = ("name", "target", "enforcement", "conditions", "rules", "bypass_actors")
-json.dump({key: ruleset[key] for key in keys if key in ruleset}, sys.stdout)' "$ACTIONS_APP"); then
+json.dump({key: ruleset[key] for key in keys if key in ruleset}, sys.stdout)' "$ACTIONS_APP") || status=$?
+  if [ "$status" = 3 ]; then
     echo "check pin: already pinned, or the ruleset requires no check named \"check\""
+    return 0
+  elif [ "$status" != 0 ]; then
+    echo "check pin: not changed (the ruleset GitHub gave back could not be read)"
     return 0
   fi
   if answer=$(printf '%s' "$body" | gh api --method PUT "repos/$REPO/rulesets/$id" --input - --silent 2>&1); then

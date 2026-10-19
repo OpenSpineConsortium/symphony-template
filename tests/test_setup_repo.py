@@ -269,6 +269,7 @@ class WorkflowPermissions(unittest.TestCase):
 
 RULESET_ID = 42
 CHECK_RUNS = f"repos/{REPO}/commits/main/check-runs?check_name=check&per_page=100"
+LISTED = f"repos/{REPO}/rulesets?includes_parents=false&per_page=100"
 
 
 def live_ruleset(check):
@@ -289,12 +290,12 @@ class CheckPin(unittest.TestCase):
 
     run_script = WorkflowPermissions.run_script
 
-    def pin(self, reported, check=None, write=None):
+    def pin(self, reported, check=None, write=None, listed=None, read=None):
         name = json.loads(MAIN.read_text())["name"]
         extra = {
-            f"GET repos/{REPO}/rulesets": [answer(200, [{"id": RULESET_ID, "name": name}])],
+            f"GET {LISTED}": [listed or answer(200, [{"id": RULESET_ID, "name": name}])],
             f"GET {CHECK_RUNS}": [answer(200, f"{reported}\n")],
-            f"GET repos/{REPO}/rulesets/{RULESET_ID}": [answer(200, live_ruleset(check or {"context": "check"}))],
+            f"GET repos/{REPO}/rulesets/{RULESET_ID}": [read or answer(200, live_ruleset(check or {"context": "check"}))],
             f"PUT repos/{REPO}/rulesets/{RULESET_ID}": [write or answer(200, "")],
         }
         done, calls = self.run_script(workflow_answer("read", True), extra=extra)
@@ -324,6 +325,24 @@ class CheckPin(unittest.TestCase):
     def test_leaves_a_pinned_check_alone(self):
         line, puts = self.pin(1, {"context": "check", "integration_id": 15368})
         self.assertEqual(line, 'check pin: already pinned, or the ruleset requires no check named "check"')
+        self.assertEqual(puts, [])
+
+    def test_an_organizations_ruleset_is_left_to_its_owners(self):
+        # The list asks for the repository's own rulesets alone; with none of
+        # the name, the step names where an organization's is pinned.
+        line, puts = self.pin(1, listed=answer(200, []))
+        self.assertIn("the repository has no ruleset", line)
+        self.assertIn("organization's Settings, Rules", line)
+        self.assertEqual(puts, [])
+
+    def test_a_refused_list_says_so(self):
+        line, puts = self.pin(1, listed=answer(403))
+        self.assertIn("could not list the rulesets: gh: fake answer (HTTP 403)", line)
+        self.assertEqual(puts, [])
+
+    def test_a_ruleset_that_cannot_be_read_is_not_called_pinned(self):
+        line, puts = self.pin(1, read=answer(200, "not json"))
+        self.assertEqual(line, "check pin: not changed (the ruleset GitHub gave back could not be read)")
         self.assertEqual(puts, [])
 
     def test_a_refused_pin_names_the_rulesets_page_and_goes_on(self):
