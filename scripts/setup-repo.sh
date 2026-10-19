@@ -27,7 +27,11 @@
 #   2. creates the ruleset docs/setup/ruleset-main.json unless one of that
 #      name is already listed for the repository; on GitHub Free a private
 #      repository's ruleset is written but not enforced (docs/setup/tiers.md),
-#      and the script says so when the repository is private;
+#      and the script says so when the repository is private; then pins
+#      its check "check" to GitHub Actions, once Actions has reported that
+#      check on the default branch, so a commit status anyone with write
+#      access sets cannot stand in for it (run it again after the first
+#      pull request's check to pin a new copy);
 #   3. turns on "Automatically delete head branches" and "Allow auto-merge"
 #      (auto-merge does nothing until a pull request asks for it, and team
 #      mode needs it), and adds the repository topic symphony, the sign on
@@ -124,6 +128,55 @@ for pair in ${VARIABLES[@]+"${VARIABLES[@]}"}; do
   esac
 done
 
+# The check's pin: the step's one line, and a PUT only where GitHub Actions
+# has reported "check" on the default branch and the ruleset does not name
+# a source for it yet. Every failure is reported and the run goes on.
+ACTIONS_APP=15368
+pin_check() {
+  local name=$1 id reported ruleset body answer
+  id=$(gh api "repos/$REPO/rulesets" | python3 -c 'import json, sys
+try:
+    rulesets = json.load(sys.stdin)
+except ValueError:
+    rulesets = []
+print(next((str(r["id"]) for r in rulesets if isinstance(r, dict) and r.get("name") == sys.argv[1]), ""))' "$name") || id=""
+  if [ -z "$id" ]; then
+    echo "check pin: not changed (the ruleset \"$name\" was not found to pin; run this again)"
+    return 0
+  fi
+  if ! reported=$(gh api "repos/$REPO/commits/$DEFAULT_BRANCH/check-runs?check_name=check&per_page=100" \
+      --jq "[.check_runs[] | select(.app.id == $ACTIONS_APP)] | length" 2>&1); then
+    echo "check pin: not changed (could not read the default branch's checks: $reported)"
+    return 0
+  fi
+  if [ "$reported" = "0" ] || [ -z "$reported" ]; then
+    echo "check pin: not yet; GitHub Actions has not reported \"check\" on $DEFAULT_BRANCH, so run this again after the first pull request's check"
+    return 0
+  fi
+  if ! ruleset=$(gh api "repos/$REPO/rulesets/$id" 2>&1); then
+    echo "check pin: not changed (could not read the ruleset: $ruleset)"
+    return 0
+  fi
+  if ! body=$(printf '%s' "$ruleset" | python3 -c 'import json, sys
+ruleset, app = json.load(sys.stdin), int(sys.argv[1])
+checks = [check for rule in ruleset.get("rules") or [] if rule.get("type") == "required_status_checks"
+          for check in (rule.get("parameters") or {}).get("required_status_checks") or [] if check.get("context") == "check"]
+if not checks or all(check.get("integration_id") for check in checks):
+    sys.exit(3)
+for check in checks:
+    check["integration_id"] = check.get("integration_id") or app
+keys = ("name", "target", "enforcement", "conditions", "rules", "bypass_actors")
+json.dump({key: ruleset[key] for key in keys if key in ruleset}, sys.stdout)' "$ACTIONS_APP"); then
+    echo "check pin: already pinned, or the ruleset requires no check named \"check\""
+    return 0
+  fi
+  if answer=$(printf '%s' "$body" | gh api --method PUT "repos/$REPO/rulesets/$id" --input - --silent 2>&1); then
+    echo "check pin: \"check\" now requires GitHub Actions as its source"
+  else
+    echo "check pin: not changed ($answer); pick GitHub Actions as the check's source under https://github.com/$REPO/settings/rules/$id"
+  fi
+}
+
 # 1. The repository and its default branch, in one call. gh reads the
 # clone's remote when no repository is named.
 if [ -n "$REPO" ]; then
@@ -176,6 +229,14 @@ fi
 if [ "$VISIBILITY" = "private" ]; then
   echo "  note: on GitHub Free a private repository's ruleset is written but not enforced (docs/setup/tiers.md)"
 fi
+
+# 2b. The pin. A required check named by its context alone takes a commit
+# status of that name from anyone with write access, whatever CI said, so
+# the check "check" is pinned to GitHub Actions, the app its check runs
+# report under. GitHub takes the pin only once that app has reported the
+# check in the repository, so a new copy is pinned by a run of this script
+# after its first pull request's check; until then the step says so.
+pin_check "$name"
 
 # 3. The two toggles under General. Both are idempotent PATCHes.
 gh repo edit "$REPO" --delete-branch-on-merge --enable-auto-merge

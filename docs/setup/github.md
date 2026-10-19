@@ -4,12 +4,12 @@ A template repository copies files only. The new repository gets none of the tem
 
 ## 1. Protect the default branch
 
-{{DEFAULT_BRANCH}} takes only pull requests, and the template ships the whole rule as a file: under Rules, Rulesets, New ruleset, Import a ruleset, pick docs/setup/ruleset-main.json from your clone. It targets ~DEFAULT_BRANCH (whatever yours is named), requires a pull request and the check named "check" on an up-to-date branch, and blocks force pushes and deletions. Imported, you are done with this step.
+{{DEFAULT_BRANCH}} takes only pull requests, and the template ships the whole rule as a file: under Rules, Rulesets, New ruleset, Import a ruleset, pick docs/setup/ruleset-main.json from your clone. It targets ~DEFAULT_BRANCH (whatever yours is named), requires a pull request and the check named "check" on an up-to-date branch, and blocks force pushes and deletions. Once the first pull request has run the check, pin it to its source: edit the ruleset, and beside "check" under "Require status checks to pass" pick GitHub Actions, or run scripts/setup-repo.sh again, which does the same. Unpinned, the rule takes a commit status named check from anyone with write access, whatever CI said; GitHub accepts the pin only once GitHub Actions has reported the check, which is why the file cannot carry it.
 
 Writing the same rule by hand, under Branches or Rules, for {{DEFAULT_BRANCH}} and that branch only:
 
 - Require a pull request before merging.
-- Require status checks to pass, and pick the check named "check", the job .github/workflows/ci.yml runs on every pull request. It appears in the list once the first pull request has run it; if it is not in the list yet, type the name check, which both a ruleset and a branch protection rule accept.
+- Require status checks to pass, and pick the check named "check", the job .github/workflows/ci.yml runs on every pull request. It appears in the list once the first pull request has run it; if it is not in the list yet, type the name check, which both a ruleset and a branch protection rule accept. Once it has run, pick GitHub Actions as its source, for the reason above.
 - Require branches to be up to date before merging, so a pull request the board called "main moved" is rebased before it lands.
 - Do not allow force pushes and do not allow deletions.
 
