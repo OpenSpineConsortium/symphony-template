@@ -32,7 +32,8 @@
 # code, and the run closes the issue when it is done.
 #
 # A repository of an organization that has no workflow Token of its own, as
-# one adopted for the protocol alone has not, still takes a token: the page
+# one adopted for the protocol alone had none before the template's sync
+# (sync.yml) and symphony-start's adoption brought it, still takes a token: the page
 # runs this workflow in a repository of the organization that has it, with
 # lend_to naming the one it shows, and the run lends the token there. Only
 # a dispatch carries lend_to, so a run an issue started lends only here.
@@ -102,7 +103,7 @@ jobs:
 
   store:
     if: >-
-      vars.CLAUDE_CROWD != 'true' && (
+      vars.CLAUDE_CROWD != 'true' && vars.SDLC_APP_ID != '' && (
         (github.event_name == 'workflow_dispatch' && inputs.store == 'pool') ||
         (github.event_name == 'issues' && startsWith(github.event.issue.body, '<!-- symphony-token: lend -->')))
     runs-on: ubuntu-latest
@@ -176,7 +177,7 @@ jobs:
   # or deleted; no sign-in, and only the token whose settings name them.
   manage:
     if: >-
-      vars.CLAUDE_CROWD != 'true' && (
+      vars.CLAUDE_CROWD != 'true' && vars.SDLC_APP_ID != '' && (
         (github.event_name == 'workflow_dispatch' && inputs.store == 'manage') ||
         (github.event_name == 'issues' && startsWith(github.event.issue.body, '<!-- symphony-token: manage -->')))
     runs-on: ubuntu-latest
@@ -209,6 +210,30 @@ jobs:
         run: python3 tools/token_run.py manage
       - name: Say that the run stopped
         if: failure()
+        run: python3 tools/token_run.py fail
+
+  # where the App's settings are not, the pool's two jobs skip, so no run
+  # makes their environment, and the page and the issue hear why
+  no-app:
+    if: >-
+      vars.CLAUDE_CROWD != 'true' && vars.SDLC_APP_ID == '' && (
+        (github.event_name == 'workflow_dispatch' && (inputs.store == 'pool' || inputs.store == 'manage')) ||
+        startsWith(github.event.issue.body, '<!-- symphony-token: lend -->') ||
+        startsWith(github.event.issue.body, '<!-- symphony-token: manage -->'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Say that the pool is not kept here
+        env:
+          ISSUE: ${{ inputs.issue || github.event.issue.number }}
+          ACTOR: ${{ github.event_name == 'issues' && github.event.issue.user.login || github.triggering_actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+          FAIL_WHY: this repository does not hold the SymphonyBoard App's settings (the variable SDLC_APP_ID and its key), which only the App's own organization keeps, so it stores no token into a pool; an owner of the organization adds one with Add Token
         run: python3 tools/token_run.py fail
 
   # in crowd mode the repository holds no Claude token, and the page hears so
