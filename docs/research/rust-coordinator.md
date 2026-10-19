@@ -101,6 +101,20 @@ What would give the protocol's properties: model checking. stateright is a Rust 
 
 Nothing above is built; outside code bases wait for the owner's choice (docs/research/outside-code-bases.md).
 
+## 8. Candidate A's goal without writing a compiler
+
+The owner's follow-up of 2026-10-19, 03:13 UTC: "I'm leaning toward A but I'd rather [not] build my own compiler." Three ways to get the checks Candidate A was for without writing one, best first:
+
+1. A checker in place of a compiler. actionlint already type-checks every `${{ }}` expression against the contexts an event carries, the `needs` and `matrix` objects, the inputs and outputs of well-known actions, and runs shellcheck over every `run:` block; zizmor adds the security checks (unpinned actions, credentials left in checkouts, injection from event text). The plan of 2026-10-14 already ran both by hand (one actionlint finding, 44 zizmor findings). Making them part of `bash scripts/check.sh` and CI gives most of the "compiler" guarantee for the YAML as written, with nothing generated. They are single binaries, a dependency the writing rule makes an issue first.
+2. Less YAML to check. The one public runtime the owner chose on 2026-10-13 moves Symphony's logic into tested Python behind a dispatcher workflow and a composite action, leaving each repository a few thin caller files (about 38 for a whole-template copy, 8 for a protocol-only one). Logic in Python is covered by the protocol's tests and its validation harness, which no YAML compiler reaches. The less logic left in YAML, the less a typed generator can add.
+3. An existing typed generator, if the owner still wants to write workflows in a typed language:
+   - github-workflows-kt (typesafegithub, Kotlin scripts, Apache-2.0, release 4.0.0 of 2026-07-03, about 650 stars): typed bindings for actions' inputs, generated from the actions' own metadata. It is the mature choice; it adds a JVM and Kotlin to the toolchain. From memory and not re-read this session: its generated files carry a job that fails when the committed YAML differs from the script, the drift check Candidate A planned.
+   - gh-workflow (tailcallhq, Rust, 0.9.0 of 2026-07-22, about 176 stars): workflows built in Rust and written out by `cargo test`. Rust's types, but young: half its items are documented, and no drift check or typed action inputs are shown.
+   - gaji (TypeScript compiled to YAML by a Rust binary, typed action wrappers from action.yml): early, several 0.x releases in weeks.
+   - gh-aw stays a pilot for the Claude workflows only, for the reasons in docs/research/workflow-languages.md.
+
+Recommendation: 1 and 2 together. They need no compiler of anyone's, keep Python as the one language of Symphony's logic, and leave only thin YAML that actionlint and zizmor check on every pull request. github-workflows-kt is the fallback if typed authoring is still wanted after that; a Rust core for the board's state machine (step 2 above) remains a separate choice about correctness, not about YAML.
+
 ## Sources read
 
 - GitHub REST API on OpenSpineConsortium/symphony-template: /events, /actions/runs, /actions/workflows/ci.yml/runs, /actions/runs/{id}/jobs (2026-10-19).
@@ -111,4 +125,5 @@ Nothing above is built; outside code bases wait for the owner's choice (docs/res
 - Cloudflare: Workers pricing page; changelog 2025-04-07, Durable Objects on the free plan.
 - Fly.io: resource pricing page.
 - Claude Code docs: legal and compliance, authentication and credential use.
+- docs.rs: gh-workflow 0.9.0, gaji 0.2.2; dev.co's page on github-workflows-kt.
 - docs.rs: stateright 0.31 (model checker, linearizability tester); octocrab 0.54 (App JWT and installation tokens).
