@@ -714,6 +714,26 @@ def fail(environ):
     finish_issue(github, environ, False)
 
 
+def lend_target(environ, pool):
+    """The repository a dispatch asks the token lent to in place of this one,
+    the input lend_to: another repository of the same organization, one with no
+    workflow Token of its own, as the Tokens page asks when the repository it
+    shows has none and runs the workflow in one of the organization's that has
+    it. A run an issue started takes none, since its author may hold no role,
+    and the id is checked against the organization, so a mistyped one lends
+    nowhere."""
+    wanted = (environ.get("LEND_TO") or "").strip()
+    if not wanted or started_by_issue(environ):
+        return None
+    if not re.fullmatch(r"[1-9][0-9]{0,15}", wanted):
+        raise RunError("lend_to is not a repository id; nothing was lent")
+    found = pool.read(f"/repositories/{wanted}")
+    owner = str(((found or {}).get("owner") or {}).get("login") or "")
+    if not found or owner.lower() != pool.org.lower():
+        raise RunError(f"lend_to names no repository of {pool.org} that the App reaches; nothing was lent")
+    return int(wanted)
+
+
 def keeper_of(environ):
     pool = pool_of(environ)
     keeper = Keeper(pool.org, environ.get("APP_TOKEN", ""), pool.repo_id)
@@ -722,6 +742,9 @@ def keeper_of(environ):
         # it names none, and kept as the organization's to place
         keeper.targets = standing_list(keeper)
         keeper.keeping = ORGANIZATION
+    target = lend_target(environ, keeper)
+    if target is not None:
+        keeper.targets = [target]
     return keeper
 
 
