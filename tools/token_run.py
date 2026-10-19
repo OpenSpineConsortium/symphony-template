@@ -344,7 +344,9 @@ class Pool:
             "encrypted_value": sealed, "key_id": key["key_id"],
             "visibility": "selected", "selected_repository_ids": self.targets})
 
-    def write_variable(self, name, change):
+    def write_variable(self, name, change, reach=True):
+        # reach False changes the value alone, as a delete or a mark does, so
+        # no repository is added to the variable's list by a run that lends nothing
         have = self.read(f"{self.base}/variables/{name}")
         value = change(have["value"] if have else "")
         if not have:
@@ -353,7 +355,7 @@ class Pool:
             return
         if value != have["value"]:
             self.api("PATCH", f"{self.base}/variables/{name}", {"name": name, "value": value})
-        if have.get("visibility") == "selected":
+        if reach and have.get("visibility") == "selected":
             for target in self.targets:
                 self.api("PUT", f"{self.base}/variables/{name}/repositories/{target}")
 
@@ -441,7 +443,7 @@ class Keeper(Pool):
                 data[slot]["uid"] = uid
                 return json.dumps(data, separators=(",", ":"))
             return text
-        self.write_variable(SETTINGS_VARIABLE, marked)
+        self.write_variable(SETTINGS_VARIABLE, marked, reach=False)
 
     def user_id(self, login):
         return str((self.read(f"/users/{login}") or {}).get("id", ""))
@@ -473,27 +475,35 @@ class Keeper(Pool):
                 return ids
             page += 1
 
-    def reached_by_another(self, repo_id, slot):
-        """Whether a slot other than this one still reaches the repository: one
-        on in every repository or in the private ones, which may be it, or one
-        whose list names it."""
+    def reach_of_others(self, slot):
+        """What the slots other than this one reach, read once a run: whether
+        any is on in every repository or in the private ones, and the ids the
+        others' lists name."""
+        wide, ids = False, set()
         for name in self.taken():
             other = name[len(SLOT_PREFIX):] if name.startswith(SLOT_PREFIX) else ""
             if other not in POOL_SLOTS or other == slot:
                 continue
             seen = self.visibility(other)
-            if seen in ("all", "private") or (seen == "selected" and str(repo_id) in self.lent_ids(other)):
-                return True
-        return False
+            if seen in ("all", "private"):
+                wide = True
+            elif seen == "selected":
+                ids.update(self.lent_ids(other))
+        return wide, ids
 
-    def unlend_variables(self, repo_id, slot):
-        """The two variables taken off a repository no slot reaches any more, so
-        its workflows read no lender's name once no token of theirs runs there."""
-        if self.reached_by_another(repo_id, slot):
+    def unlend_variables(self, repo_ids, slot):
+        """The two variables taken off each repository no slot reaches any more,
+        so its workflows read no lender's name once no token of theirs runs
+        there; a slot on in every repository or the private ones may reach any."""
+        wide, others = self.reach_of_others(slot)
+        gone = [i for i in repo_ids if str(i) not in others]
+        if wide or not gone:
             return
         for name in (ACCOUNTS_VARIABLE, SETTINGS_VARIABLE):
             have = self.read(f"{self.base}/variables/{name}")
-            if have and have.get("visibility") == "selected":
+            if not have or have.get("visibility") != "selected":
+                continue
+            for repo_id in gone:
                 try:
                     self.api("DELETE", f"{self.base}/variables/{name}/repositories/{repo_id}")
                 except urllib.error.HTTPError as error:
@@ -523,7 +533,7 @@ class Keeper(Pool):
         except urllib.error.HTTPError as error:
             if error.code != 404:
                 raise
-        self.unlend_variables(repo_id, slot)
+        self.unlend_variables([repo_id], slot)
 
     def kept_by_organization(self, slot):
         setting = self.settings().get(slot)
@@ -547,22 +557,28 @@ class Keeper(Pool):
         # between the two leaves a mark on an empty slot, which the next store
         # into that slot writes over and which own_slot never returns, since it
         # needs the secret too; the other order would leave a token nobody owns,
-        # which its lender could no longer delete. The repositories it reached
-        # are read first, to take the variables off the ones no slot reaches now
+        # which its lender could no longer delete. A store may take the freed
+        # slot between the two, so the mark goes only while it is still this
+        # token's (its id), and the slot leaves the accounts list only while no
+        # secret is in it again. The repositories it reached are read first, to
+        # take the variables off the ones no slot reaches now
+        mine = (self.settings().get(slot) or {}).get("id")
         reached = self.lent_ids(slot) if self.visibility(slot) == "selected" else []
         self.api("DELETE", self.secret_path(slot))
-        self.write_variable(SETTINGS_VARIABLE, lambda text: without(text, slot))
-        self.write_variable(ACCOUNTS_VARIABLE, lambda text: ",".join(w for w in re.split(r"[,\s]+", text or "") if w and w != slot))
-        for repo_id in reached:
-            self.unlend_variables(repo_id, slot)
+        self.write_variable(SETTINGS_VARIABLE, lambda text: without(text, slot, mine), reach=False)
+        if self.read(self.secret_path(slot)) is None:
+            self.write_variable(ACCOUNTS_VARIABLE, lambda text: ",".join(w for w in re.split(r"[,\s]+", text or "") if w and w != slot), reach=False)
+        self.unlend_variables(reached, slot)
 
 
-def without(text, slot):
+def without(text, slot, mine=None):
     try:
         data = json.loads(text) if (text or "").strip() else {}
     except json.JSONDecodeError:
         return text
-    if isinstance(data, dict):
+    # a mark another token's store wrote since is that token's, and stays
+    theirs = isinstance(data, dict) and isinstance(data.get(slot), dict) and mine is not None and data[slot].get("id") != mine
+    if isinstance(data, dict) and not theirs:
         data.pop(slot, None)
         return json.dumps(data, separators=(",", ":"))
     return text

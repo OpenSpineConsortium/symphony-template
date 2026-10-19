@@ -432,6 +432,29 @@ class KeeperTest(unittest.TestCase):
         self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_ACCOUNTS"], [1])
         self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_SETTINGS"], [1])
 
+    def test_a_delete_from_a_repository_the_token_never_reached_adds_it_nowhere(self):
+        self.org.reached = {"SYMPHONY_CLAUDE_ACCOUNTS": [1, 5], "SYMPHONY_CLAUDE_SETTINGS": [1, 5]}
+        # the run is in 42, which slot 2 (lent to 5) never reached
+        token_run.manage({**self.environ, "MANAGE": "delete"}, keeper=self.keeper)
+        self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_ACCOUNTS"], [1])
+        self.assertEqual(self.org.reached["SYMPHONY_CLAUDE_SETTINGS"], [1])
+
+    def test_a_mark_a_store_wrote_into_the_freed_slot_stays(self):
+        settings = {"1": {"owner": "greg"}, "2": {"owner": "Ashley", "id": "aaaa"}}
+        self.org.variables["SYMPHONY_CLAUDE_SETTINGS"] = json.dumps(settings)
+        original = self.org.call
+        def call(method, path, body=None):
+            answer = original(method, path, body)
+            # another run's store takes slot 2 the moment its secret is gone
+            if method == "DELETE" and path.endswith("/secrets/SYMPHONY_CLAUDE_2"):
+                self.org.variables["SYMPHONY_CLAUDE_SETTINGS"] = json.dumps({**settings, "2": {"owner": "newcomer", "id": "bbbb"}})
+                self.org.secrets["SYMPHONY_CLAUDE_2"] = {}
+            return answer
+        self.keeper.api = call
+        self.keeper.delete("2")
+        self.assertEqual(json.loads(self.org.variables["SYMPHONY_CLAUDE_SETTINGS"])["2"]["owner"], "newcomer")
+        self.assertEqual(self.org.variables["SYMPHONY_CLAUDE_ACCOUNTS"], "1,2")
+
     def test_nobody_reaches_a_token_that_is_not_their_own(self):
         with self.assertRaisesRegex(token_run.RunError, "no token in acme"):
             token_run.manage({**self.environ, "ACTOR": "mallory", "MANAGE": "delete"}, keeper=self.keeper)
