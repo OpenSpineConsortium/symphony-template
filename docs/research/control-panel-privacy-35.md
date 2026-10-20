@@ -27,8 +27,22 @@ what is really missing; it needed no statement version.
 
 ## Statement 36
 
-Collected for it so far: the direct Microsoft Graph switch for Folders, Notebooks and the drive
-walk; the Folders tab as a native explorer of OneDrive, which no longer reads catalog.json on
-drive-catalog (correct the statement's lines on the Folders and Notebooks catalogs and the version
-26 note); the Explore tab's live job log and re-run and cancel buttons if greg keeps them; and the
-panel's own section changed in the same release.
+Published on 2026-10-20 (symphony-start #82, site #100). It adds the Folders tab's actions on
+OneDrive, checked against the site branch claude/folders-actions at 5cf7960 (new folder, rename,
+delete into the recycle bin, upload in one request up to 4 MB or in 3.3 MB pieces, download through
+Microsoft's short-lived address, cut, copy, paste and drag to move, sharing links whose kinds follow
+the drive's type, properties, a preview pane, a whole-drive search of up to 2,000 results, file
+pictures), all under the Files.ReadWrite access the sign-in already asked for, so no new consent
+and no App permission changed. It drops the Folders tab's catalog read and describes the drive
+organizer's workflow on Graph as symphony-template #261 left it: one commit on top of drive-catalog,
+the Microsoft 365 top folders listed and not read, texts of up to 1,500 characters from at most 400
+sampled files, and the step organize giving them to Claude on the repository's own token. Two
+reviews against the code found what the first draft missed: the organize step's Claude run and
+issues, the scope and limits of the walk, the search words that Ask in claude.ai carries, and how
+New folder, Properties, the preview and name clashes really behave. Moves through Graph, planned
+and not built, need a statement after 37 before they ship; so would a Claude run added to the onedrive
+repository's own catalog workflow.
+
+Statement 37 (symphony-start#84, site #101, 2026-10-20) adds the environment token-store, limited
+to the default branch, which Symphony Setup makes in an adoption run (symphony-start#83); it raised
+the statement's count of Setup's settings from seven to eight, which tests/test_form.py checks.

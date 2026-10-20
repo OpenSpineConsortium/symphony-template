@@ -41,6 +41,7 @@ GH_CALLS = (
 )
 REPO = "octo/widgets"
 WORKFLOW = f"repos/{REPO}/actions/permissions/workflow"
+STORE = f"repos/{REPO}/environments/token-store"
 SETTING = "workflow permissions: allow GitHub Actions to create and approve pull requests"
 # What the script reads from the tree it runs in, copied to a tree of the
 # test's own whose docs/project.md says crowd mode is off: a crowd
@@ -103,6 +104,55 @@ def fields(call):
     return found
 
 
+class TokenStore(unittest.TestCase):
+    """The environment token-store, limited to the default branch, so a
+    workflow pushed to another branch never runs the Token workflow's job
+    that holds the App's token; one the repository has already is left as
+    it is, and a refusal names the page and stops nothing."""
+
+    def run_script(self, extra):
+        runner = WorkflowPermissions()
+        runner.addCleanup = self.addCleanup
+        return runner.run_script(workflow_answer("read", True), extra=extra)
+
+    def store_line(self, done):
+        found = [line for line in done.stdout.splitlines() if line.startswith("environment token-store:")]
+        self.assertEqual(len(found), 1, done.stdout)
+        return found[0]
+
+    def test_makes_it_for_the_default_branch_alone(self):
+        done, calls = self.run_script({})
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(self.store_line(done), "environment token-store: made, main only")
+        put = next(call for call in calls if call["key"] == f"PUT {STORE}")
+        self.assertEqual(fields(put), {"deployment_branch_policy[protected_branches]": ("-F", "false"),
+                                       "deployment_branch_policy[custom_branch_policies]": ("-F", "true")})
+        rule = next(call for call in calls if call["key"] == f"POST {STORE}/deployment-branch-policies")
+        self.assertEqual(fields(rule), {"name": ("-f", "main"), "type": ("-f", "branch")})
+
+    def test_leaves_one_there_already_alone(self):
+        done, calls = self.run_script({f"GET {STORE}": [answer(200, "")]})
+        self.assertEqual(self.store_line(done), "environment token-store: exists, left as it is")
+        self.assertNotIn(f"PUT {STORE}", [call["key"] for call in calls])
+
+    def test_a_refusal_names_the_page_and_goes_on(self):
+        done, calls = self.run_script({f"PUT {STORE}": [answer(403, {"message": "Forbidden"})]})
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn(f"https://github.com/{REPO}/settings/environments/new", self.store_line(done))
+        self.assertNotIn(f"POST {STORE}/deployment-branch-policies", [call["key"] for call in calls])
+        self.assertIn("label create", [call["key"] for call in calls])
+
+    def test_a_refused_branch_rule_says_the_environment_stands_closed(self):
+        done, _ = self.run_script({f"POST {STORE}/deployment-branch-policies": [answer(422, {"message": "x"})]})
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("made with no branch allowed", self.store_line(done))
+
+    def test_a_refused_read_writes_nothing(self):
+        done, calls = self.run_script({f"GET {STORE}": [answer(403, {"message": "Forbidden"})]})
+        self.assertIn("not made", self.store_line(done))
+        self.assertNotIn(f"PUT {STORE}", [call["key"] for call in calls])
+
+
 class WorkflowPermissions(unittest.TestCase):
     """.github/workflows/protocol.yml and add-worker.yml open their pull
     requests with GITHUB_TOKEN, which GitHub allows only once "Allow GitHub
@@ -135,6 +185,9 @@ class WorkflowPermissions(unittest.TestCase):
             f"PUT {WORKFLOW}": [write or answer(599, {"message": "not expected"})],
             "label create": [answer(200, "")],
             f"GET repos/{REPO}/codeowners/errors": [answer(200, "")],
+            f"GET {STORE}": [answer(404, {"message": "Not Found"})],
+            f"PUT {STORE}": [answer(200, "")],
+            f"POST {STORE}/deployment-branch-policies": [answer(200, "")],
             # Read only when a flag is unknown, so it names a gh that old.
             "--version": [answer(200, "gh version 1.14.0 (2021-08-04)\n")],
         }

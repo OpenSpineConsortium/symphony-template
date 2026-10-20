@@ -50,6 +50,10 @@
 #      offer an issue or a link instead; where the organization or its
 #      enterprise holds it off, it prints GitHub's answer and where an
 #      owner turns it on, and carries on;
+#      then makes the environment token-store, limited to the default
+#      branch, unless the repository has one of that name, so only the
+#      default branch's Token workflow ever holds the SymphonyBoard App's
+#      token there (Symphony Setup makes it in an adoption too);
 #   6. creates or updates the labels, read from LABELS in
 #      tools/template_init.py, so the list lives in one place;
 #   7. sets each repository variable given as --var NAME=VALUE; the one
@@ -365,6 +369,42 @@ else
   else
     workflow_setting_refused "$(<"$refusal")"
   fi
+fi
+rm -f "$refusal"
+
+# 5b. The environment token-store, limited to the default branch. The Token
+# workflow (.github/workflows/token.yml) saves a lent Claude token there
+# with the SymphonyBoard App's key, and GitHub would make the environment
+# on its first run open to every branch, so a workflow pushed to any branch
+# could run the job that holds the App's token. An environment of that name
+# the repository has already is left as it is; a refusal is reported with
+# the page to make it on, and the run goes on.
+STORE=token-store
+store_refused() {
+  printf 'environment %s: not made (%s); make it at https://github.com/%s/settings/environments/new and, under Deployment branches and tags, choose %s alone\n' \
+    "$STORE" "$(head -n 1 <<<"$1")" "$REPO" "$DEFAULT_BRANCH"
+}
+refusal=$(mktemp)
+# An empty repository has no default branch, and read then shifts the
+# visibility into its place, so the branch must look like one.
+if [ -z "$VISIBILITY" ] || ! git check-ref-format --branch "$DEFAULT_BRANCH" >/dev/null 2>&1; then
+  echo "environment $STORE: not made, since the default branch is not known yet; run this again after the first commit"
+elif gh api "repos/$REPO/environments/$STORE" --silent 2>"$refusal"; then
+  echo "environment $STORE: exists, left as it is"
+elif ! grep -q '(HTTP 404)' "$refusal"; then
+  store_refused "$(<"$refusal")"
+elif ! gh api --method PUT "repos/$REPO/environments/$STORE" --silent \
+       -F 'deployment_branch_policy[protected_branches]=false' \
+       -F 'deployment_branch_policy[custom_branch_policies]=true' 2>"$refusal"; then
+  store_refused "$(<"$refusal")"
+elif ! gh api --method POST "repos/$REPO/environments/$STORE/deployment-branch-policies" --silent \
+       -f name="$DEFAULT_BRANCH" -f type=branch 2>"$refusal"; then
+  # the environment stands with no branch allowed, so nothing runs there
+  # until the rule is added by hand
+  printf 'environment %s: made with no branch allowed (%s); open https://github.com/%s/settings/environments, press %s and, under Deployment branches and tags, add %s\n' \
+    "$STORE" "$(head -n 1 "$refusal")" "$REPO" "$STORE" "$DEFAULT_BRANCH"
+else
+  echo "environment $STORE: made, $DEFAULT_BRANCH only"
 fi
 rm -f "$refusal"
 
