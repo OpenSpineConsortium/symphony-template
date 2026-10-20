@@ -15,6 +15,10 @@ author's knowledge, to be checked before it is relied on.
 
 ## The short answer
 
+Updated the same evening: the owner's test showed Globus's web app browses and plays the grid's files
+with no VPN (section "Globus works", below), so Globus, not the tunnel, is the recommended route; what
+follows is the first answer, kept as written.
+
 Three ways already exist on Wayne State's side, and none needs a new server of ours:
 
 1. Today, on the VPN: Grid OnDemand's Files menu (https://ondemand.grid.wayne.edu, Files, Home
@@ -142,6 +146,24 @@ and dropped the same minute). The one native link that might exist is Globus's O
 add-on to an institution's Globus subscription; whether Wayne State's wsugrid#globus has it is a question
 for hpc@wayne.edu. So the tunnel is the route, the VPN the fallback. The black frame is not yet explained:
 the video's own letterbox, or OnDemand's viewer page.
+
+## Globus works, 2026-10-20
+
+At 21:43 UTC the owner searched Globus's collections: Wayne State lists OSIRIS Data collection, WSU-TMP
+Data collection, wsugrid#globus and Share_wsugrid#globus, all on the endpoint "wsugrid#globus GCSv5.4",
+subscribed, and no OneDrive collection, so Wayne State has no Globus OneDrive connector. At 21:46 UTC he
+opened wsugrid#globus at https://app.globus.org/file-manager, went to a cut clip's preview.mp4 and played
+it in the browser with no VPN, after one click to authenticate to the collection. So the collection has
+HTTPS access switched on, and Globus's web app is a native, VPN-free browser and player for the grid's
+files, under Wayne State's own setup and the owner's own sign-in, with nothing built.
+
+This moves the recommendation. The Folders tab's "WSU grid" place becomes a link that opens Globus's file
+manager at a folder (the file manager takes the collection and the path in its address), which needs no
+token, no App and no step from the owner; the VS Code tunnel, built and tested in hpcworker on the same
+day, adds only editing and a terminal over it, and waits on the owner's choice. Chrome still plays no
+.mkv through Globus or any route, so an MP4 copy of the raw downloads remains a grid job for the owner's
+word. Whether Globus's HTTPS access is allowed for PHI depends on the collection being High Assurance,
+which is not known; until then the same rule holds as for the tunnel: public and de-identified data only.
 
 ## PHI and the patent
 
