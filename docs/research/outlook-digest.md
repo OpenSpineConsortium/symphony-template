@@ -22,8 +22,8 @@ Wayne State's consent of 2026-10-19 is for SymphonyBoard Folders' delegated File
 
 Two ways to send, both drawing the same card (tools/outlook_digest.py):
 
-- A, self-sent. The digest goes from the owner's mailbox to itself through Graph, under the sealed refresh token the Folders tab already keeps, with Mail.Send added. No registration and no signing. Costs a second Wayne State consent; and since the reply lands in the owner's own mailbox, a plain reply reaches Claude only with Mail.Read too, so in this route only the card's text box talks to Claude.
-- B, from Symphony's own address (recommended). The digest goes from an address of Symphony's, such as digest@openspineconsortium.com, as a signed card, under a provider the owner registers at the dashboard with Test Users scope and the owner's own Wayne State address, which Microsoft approves at once with no administrator. Wayne State's consent is untouched. A reply goes to Symphony's address, not the owner's mailbox, so reading it needs no permission of the owner's at all. For other people later, each organization's administrator approves an Organization registration, or Microsoft a Global one.
+- A, self-sent (the owner's choice, 2026-10-20 15:08 UTC: "I want to use as much Wayne state based onedrive/microsoft 365 native support ecosystem as possible"). The digest goes from the owner's mailbox to itself through Graph, under the sealed refresh token the Folders tab already keeps, with Mail.Send added. No registration and no signing. Costs a second Wayne State consent; and since the reply lands in the owner's own mailbox, a plain reply reaches Claude only with Mail.Read too, so in this route only the card's text box talks to Claude.
+- B, from Symphony's own address. The digest goes from an address of Symphony's, such as digest@openspineconsortium.com, as a signed card, under a provider the owner registers at the dashboard with Test Users scope and the owner's own Wayne State address, which Microsoft approves at once with no administrator. Wayne State's consent is untouched. A reply goes to Symphony's address, not the owner's mailbox, so reading it needs no permission of the owner's at all. For other people later, each organization's administrator approves an Organization registration, or Microsoft a Global one.
 
 In B the moving parts are the sign-in service the control panel already has, a Cloudflare Worker, with three new routes and no store:
 
@@ -43,7 +43,7 @@ The next step. When the coordinator integrates a finished epic, and when the dri
 
 ## What waits on the owner
 
-- The route: B (recommended) or A. A needs a new Wayne State consent for Mail.Send; B needs the provider registered with Test Users scope by the owner, signed in with the Wayne State account, and a sending address.
-- Whether openspineconsortium.com's DNS is on Cloudflare, for Email Routing; else another sender.
+- The route is A, chosen by the owner. What waits: Mail.Send and Mail.Read added to SymphonyBoard Folders' API permissions in Entra by the owner, then C&IT's admin consent for them (the owner sends the request to help@wayne.edu; Mail.Send alone if C&IT refuses Mail.Read, the card's text box then carrying the prompts), then the panel's sign-in asking for the two scopes (the Control panel sign-in thread's) and the owner signing in once more on the Folders tab. In route A the compose workflow sends through Graph under the sealed refresh token, and reads replies by the digest's conversation; the Worker keeps only the action route.
+- Route B stays the fallback should C&IT refuse Mail.Send: then whether openspineconsortium.com's DNS is on Cloudflare, for Email Routing, matters.
 - Then the Worker's three routes (the symphony-app repository, the Control panel sign-in thread's), the workflow, and one test digest to the owner's own address; sending it, and any schedule, waits for the owner's word.
 - Each phone and desktop Outlook the owner uses gets one test card before anything relies on it, given the iOS reports above.
