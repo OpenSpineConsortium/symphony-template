@@ -266,6 +266,7 @@ class ReasonTest(unittest.TestCase):
         self.assertEqual(drive_sync.reason_in(b'{"error": "the token for greg@example.edu expired"}'),
                          "no reason given")
         self.assertEqual(drive_sync.reason_in(b"<html>secret page</html>"), "no reason given")
+        self.assertEqual(drive_sync.reason_in(b"error code: 1010"), "cloudflare_1010")
 
     def test_a_refused_call_names_no_body(self):
         body = json.dumps({"error": "invalid_grant", "error_description": "refresh token of greg"}).encode()
@@ -450,6 +451,11 @@ class ProviderTest(unittest.TestCase):
         opener = FakeOpener([("https://signin.example/", {"access_token": "a"})])
         self.assertEqual(drive_sync.access_token("https://signin.example/drive/token", "google", "r", opener), "a")
         self.assertEqual(json.loads(opener.requests[0].data), {"provider": "google", "refresh_token": "r"})
+
+    def test_every_call_names_this_program_not_urllib(self):
+        opener = FakeOpener([("https://signin.example/", {"access_token": "a"})])
+        drive_sync.access_token("https://signin.example/drive/token", "microsoft", "r", opener)
+        self.assertEqual(opener.requests[0].get_header("User-agent"), drive_sync.USER_AGENT)
 
 
 if __name__ == "__main__":
