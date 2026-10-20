@@ -244,16 +244,19 @@ class GuardStep(unittest.TestCase):
     no code of the repository's, tells it which secrets exist by name."""
 
     def test_it_runs_after_the_checks_in_the_job_check(self):
-        names = [step[0].strip() for step in ci_steps()]
-        self.assertLess(names.index("- name: Run the checks"),
-                        names.index("- name: Hold a crowd repository to its rules"))
+        # The checks run in the job parts, which check needs, so the guard
+        # runs after them, as it did when both were one job.
+        self.assertIn("parts", needs_of(jobs_of("ci.yml")["check"]))
+        names = [step[0].strip() for step in ci_steps("parts")]
+        self.assertIn("- name: Run the checks but the tests", names)
         self.assertIn("        run: python3 tools/crowd_check.py guard", guard_step())
 
-    def test_the_job_that_runs_the_repositorys_code_names_no_secret(self):
+    def test_the_jobs_that_run_the_repositorys_code_name_no_secret(self):
         # GitHub hands a job's runner every secret the job names, and the
-        # checks and tests a pull request brings run in check.
-        for line in jobs_of("ci.yml")["check"]:
-            self.assertNotIn("secrets.", line)
+        # checks and tests a pull request brings run in parts and check.
+        for job in ("parts", "check"):
+            for line in jobs_of("ci.yml")[job]:
+                self.assertNotIn("secrets.", line)
 
     def test_values_compares_each_secret_with_nothing_and_runs_nothing_of_the_repositorys(self):
         lines = jobs_of("ci.yml")["values"]
@@ -288,7 +291,7 @@ class GuardStep(unittest.TestCase):
 
     def test_check_needs_values_and_runs_whatever_values_did(self):
         lines = jobs_of("ci.yml")["check"]
-        self.assertEqual(needs_of(lines), ["values"])
+        self.assertEqual(needs_of(lines), ["values", "parts"])
         self.assertEqual(key_of(lines, "if"), "${{ !cancelled() }}")
         env = step_env(guard_step())
         self.assertEqual(env["SECRETS_SET"], "${{ needs.values.outputs.secrets }}")
