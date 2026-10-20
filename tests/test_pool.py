@@ -428,8 +428,24 @@ def patch_stderr():
     return patch("sys.stderr", io.StringIO())
 
 
+def pinned_clock():
+    """The command line reads the clock itself, so a test of it pins the
+    clock to NOW, which the readings' reset times are set from: on the real
+    clock the test flipped at 2026-10-20 22:00 UTC, when LATER passed and
+    every window read as reset, so the slots tied and the first was picked."""
+    from unittest.mock import patch
+
+    class Pinned(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW if tz else NOW.replace(tzinfo=None)
+
+    return patch.object(pool, "datetime", Pinned)
+
+
 class TheCommandLine(unittest.TestCase):
     def test_observe_show_and_pick(self):
+        self.enterContext(pinned_clock())
         folder = Path(tempfile.mkdtemp(prefix="pool-cli-"))
         self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
         execution = folder / "execution.json"
@@ -444,7 +460,7 @@ class TheCommandLine(unittest.TestCase):
         with redirect_stdout(io.StringIO()):
             pool.main(["observe", "--execution-file", str(execution), "--slot", "1", "--source", "probe", "--out", str(fresh)])
         self.assertEqual([path.name for path in fresh.iterdir()], ["slot-1.probe.json"])
-        pool.write(readings / "slot-2.probe.json", record("2", 0.1, 0.1, source="probe", at=datetime.now(timezone.utc)))
+        pool.write(readings / "slot-2.probe.json", record("2", 0.1, 0.1, source="probe", at=NOW))
         with redirect_stdout(io.StringIO()) as printed:
             self.assertEqual(pool.main(["pick", str(readings), "--slots", "1,2"]), 0)
         self.assertEqual(printed.getvalue().strip(), "2")

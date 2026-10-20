@@ -1,0 +1,5 @@
+A test of code that reads the real clock pins the clock, since a fixture dated from a fixed moment expires and the test flips on the day it does.
+
+tests/test_pool.py sets its readings' reset times from a fixed NOW (2026-10-17 22:00 UTC): SOON two hours on, LATER three days on. Every test of the library's functions passes `now=NOW`, but the command line test ran `pool.main` on the real clock, and at 2026-10-20 22:00 UTC, when LATER passed, every window read as reset, the slots tied, the first was picked and the required check failed on every open pull request of this repository, the sync pull request #308 among them, with no change to any code.
+
+So a test that drives a command line, a workflow step or anything else that calls `datetime.now` itself patches the module's `datetime` with a subclass whose `now` returns the fixed moment (`pinned_clock` in tests/test_pool.py), and a fixture never carries an absolute time that the code compares with the real clock. A check that fails on every pull request at once, with no change to the code, is read first as a clock that moved: the first look is for a date in the tests.
