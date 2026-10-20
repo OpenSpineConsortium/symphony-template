@@ -134,6 +134,14 @@ at 22:26:34 UTC (its #59, Settings run 39508115798), the last of the
 seven repositories; its 0.6.0 release, which carries the overlap check,
 was tagged at 22:14:33 UTC.
 
+The overlap check went live on symphony-template's main when #315 merged
+at 23:04:45 UTC, at advise. Until symphony-protocol 0.6.1 is vendored, the
+library's protocol check still fails a pull request pushed, marked ready
+or edited while behind main, so catch-up merges between 23:04 UTC and that
+sync are the protocol check's, not the up-to-date rule's; the clean
+"after" starts with the 0.6.1 sync (docs/research/overlap-check-instead-of-up-to-date.md,
+section 5).
+
 ## What history can and cannot recover
 
 Recovered: each pull request's commits with their parents (so a catch-up
