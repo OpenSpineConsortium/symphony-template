@@ -624,7 +624,9 @@ class UpToDateRule(unittest.TestCase):
         self.assertIn("not yet", pin)
         self.assertEqual(rule, "up-to-date rule: turned off")
         self.assertEqual(len(puts), 1)
-        self.assertEqual(json.loads(puts[0]["stdin"]), json.loads(MAIN.read_text()))
+        sent_back = {key: value for key, value in live_ruleset({"context": "check"}).items()
+                     if key in ("name", "target", "enforcement", "conditions", "rules", "bypass_actors")}
+        self.assertEqual(json.loads(puts[0]["stdin"]), sent_back)
 
     def test_turns_it_off_and_pins_in_one_put(self):
         (pin, rule), puts = self.pin(1, strict=True, both=True)
