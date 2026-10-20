@@ -1,0 +1,50 @@
+# The Colab notebooks run end to end, as a reader's Colab would run them
+# (tools/run_notebook.py): every code cell in order, each against the public
+# symphony-protocol it clones. The required check already holds each lesson's
+# notebook to its lesson's commands; this runs the notebooks themselves, so a
+# notebook that would stop with an error in Colab is caught here first. It
+# runs on a pull request or push (any branch: the file names none, as
+# ci.yml explains) that changes a notebook or the runner, by
+# hand, and weekly, since the lessons' notebooks clone the library's newest
+# release and a new release could break one without any change here. It
+# needs no secret and no Claude credential, and is not a required check, so
+# a GitHub outage while cloning never blocks a merge.
+name: Notebooks
+
+on:
+  pull_request:
+    paths:
+      - "docs/**/*.ipynb"
+      - "tools/run_notebook.py"
+      - ".github/workflows/notebooks.yml"
+  push:
+    paths:
+      - "docs/**/*.ipynb"
+      - "tools/run_notebook.py"
+      - ".github/workflows/notebooks.yml"
+  schedule:
+    - cron: "37 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notebooks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Run every notebook's cells, as Colab would
+        run: python3 tools/run_notebook.py docs/start/demo.ipynb docs/learn/notebooks/*.ipynb
