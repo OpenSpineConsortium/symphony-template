@@ -24,11 +24,9 @@ python3 tools/workers.py check
 # must hold together (docs/agents/AGENTS.md), and an imported agent must be
 # the file it was when it came, so a hand edit is a choice, not an accident.
 python3 tools/agents.py check
-# The lessons under docs/learn/ are run, command by command, and their
-# outputs compared with the pages; every module and script must carry the
-# documentation the Reference page is made from, and each lesson's notebook
-# must match its lesson (tools/living_docs.py).
-python3 tools/living_docs.py test
+# Every module and script must carry the documentation the Reference page
+# is made from (tools/living_docs.py); the lessons, whose commands a check
+# runs, live in symphony-protocol's lessons/ and are tested there.
 python3 tools/living_docs.py check
 # The tests, every module of them here and by hand; CI runs them as parts
 # side by side, each in a job of its own, and sets CHECK_TESTS=none for the

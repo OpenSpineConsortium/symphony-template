@@ -1,36 +1,20 @@
-"""The living documents: lessons whose commands the required check runs,
-notebooks generated from them, and a site built from the lessons, the
-guides, the code's own docstrings and the test suite's results.
+"""The living documents: a site built from the guides, the code's own
+docstrings and the test suite's results, and a check that holds the code to
+its documentation.
 
-A lesson is a Markdown file under docs/learn/ whose fenced blocks marked
-"bash run" are commands and whose blocks marked "output" say what the block
-before them prints. `test` runs every lesson in a practice folder of its own
-and fails when an output no longer appears, so a lesson cannot drift from
-the code it teaches: what a reader sees on the page is what the vendored
-release does today. The comparison is by lines, in order, each expected line
-found within an actual one, so a lesson quotes the part that matters and not
-a hash or a date.
+The lessons that teach the protocol by running it live in the public
+OpenSpineConsortium/symphony-protocol, under lessons/, where its required
+check runs every command they show and its Colab notebooks are made from
+them (docs/learn/README.md links them); this repository carries no copy, so
+there is one source and it is public.
 
-Each block runs in a bash of its own and opens with `cd "$LAB"`, the
-practice folder, written on the page so a reader pasting it gets the same,
-because that is how a notebook's %%bash cells run; the notebook made from a
-lesson (`notebooks`) is then the same commands, cell for cell, and `check`
-fails when a notebook is out of date with its lesson. A lesson's one block
-marked "bash setup" makes $LAB for a reader at a terminal; the check makes
-its own, and a notebook's first cell takes its place. In the check the
-library is tools/sdlc_protocol; in a notebook it is the public library's
-newest release, found and cloned by that first cell, so a notebook needs no
-access to this repository and does not go stale when a release is vendored.
+`check` holds the code to its own documentation, as Javadoc's lint does:
+every module under tools/ and scripts/ opens with a docstring and every
+shell script with a comment, since the Reference page is made from them.
+`report` runs the test suite and writes each test's result as JSON, and
+`site` builds the static site that .github/workflows/docs.yml publishes.
 
-`check` also holds the code to its own documentation, as Javadoc's lint
-does: every module under tools/ and scripts/ opens with a docstring and
-every shell script with a comment, since the Reference page is made from
-them. `report` runs the test suite and writes each test's result as JSON,
-and `site` builds the static site that .github/workflows/docs.yml publishes.
-
-    python3 tools/living_docs.py test
     python3 tools/living_docs.py check
-    python3 tools/living_docs.py notebooks
     python3 tools/living_docs.py report results.json
     python3 tools/living_docs.py site _site --tests results.json --repo OWNER/NAME --sha SHA
 """
@@ -42,38 +26,19 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
-import tempfile
 import time
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-LESSONS = ROOT / "docs" / "learn"
-NOTEBOOKS = LESSONS / "notebooks"
-LIBRARY_URL = "https://github.com/OpenSpineConsortium/symphony-protocol"
 FENCE = re.compile(r"^```(.*)$")
-BLOCK_SECONDS = 60
 
-# git reads none of the reader's settings and leaves no background job
-# behind in a practice folder that is about to be deleted
-GIT_ENV = {
-    "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
-    "GIT_AUTHOR_DATE": "2026-10-20T09:00:00Z", "GIT_COMMITTER_DATE": "2026-10-20T09:00:00Z",
-    "GIT_CONFIG_COUNT": "4",
-    "GIT_CONFIG_KEY_0": "gc.auto", "GIT_CONFIG_VALUE_0": "0",
-    "GIT_CONFIG_KEY_1": "gc.autoDetach", "GIT_CONFIG_VALUE_1": "false",
-    "GIT_CONFIG_KEY_2": "maintenance.auto", "GIT_CONFIG_VALUE_2": "false",
-    "GIT_CONFIG_KEY_3": "maintenance.autoDetach", "GIT_CONFIG_VALUE_3": "false",
-}
-
-
-# Reading a lesson
+# Reading Markdown
 
 def parse(text):
-    """The lesson as segments in order: ("md", text), ("run", code),
-    ("output", text), or ("code", text) for any other fenced block."""
+    """A Markdown page as segments in order: ("md", text), or a fenced block
+    as ("run", code), ("setup", code), ("output", text) or ("code", text)."""
     segments, prose, lines = [], [], text.splitlines()
     i = 0
     while i < len(lines):
@@ -106,172 +71,11 @@ def kind_of(info):
     return "code"
 
 
-def lessons():
-    return sorted(p for p in LESSONS.glob("[0-9]*.md"))
-
-
-def steps(path):
-    """Each command of a lesson with the output it promises, or None."""
-    segments = parse(path.read_text(encoding="utf-8"))
-    found = []
-    for k, (kind, body, _) in enumerate(segments):
-        if kind != "run":
-            continue
-        after = segments[k + 1] if k + 1 < len(segments) else None
-        found.append((body, after[1] if after and after[0] == "output" else None))
-    return found
-
-
-# Running a lesson
-
-def run_block(code, lab, library):
-    # a caller's GIT_DIR or GIT_INDEX_FILE, as a hook has, would point the
-    # lesson's git at the real repository
-    inherited = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-    env = dict(inherited, **GIT_ENV, LAB=str(lab), PYTHONPATH=str(library))
-    try:
-        done = subprocess.run(["bash", "-c", code], env=env, text=True,
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=BLOCK_SECONDS)
-    except subprocess.TimeoutExpired as stopped:
-        return f"{stopped.output or ''}\n(stopped after {BLOCK_SECONDS} seconds)"
-    return done.stdout
-
-
-def missing_lines(expected, actual):
-    """The first expected line not found, in order, within the actual lines;
-    a line may match the same actual line as the one before it."""
-    got = [line.strip() for line in actual.splitlines()]
-    at = 0
-    for want in (line.strip() for line in expected.splitlines()):
-        if not want:
-            continue
-        while at < len(got) and want not in got[at]:
-            at += 1
-        if at == len(got):
-            return want
-    return None
-
-
-def shown(path):
-    try:
-        return path.relative_to(ROOT).as_posix()
-    except ValueError:
-        return str(path)
-
-
-def test_lesson(path, library):
-    problems = []
-    with tempfile.TemporaryDirectory(prefix="symphony-lesson-") as lab:
-        for n, (code, expected) in enumerate(steps(path), 1):
-            actual = run_block(code, Path(lab), library)
-            if expected is None:
-                continue
-            lost = missing_lines(expected, actual)
-            if lost:
-                printed = "\n    ".join(actual.splitlines()[-12:])
-                problems.append(f"{shown(path)}: block {n} never printed {lost!r}; it printed:\n    {printed}")
-    return problems
-
-
-def test(_args):
-    problems, count = [], 0
-    for path in lessons():
-        problems += test_lesson(path, ROOT / "tools")
-        count += len(steps(path))
-    for line in problems:
-        print(line)
-    if problems:
-        return 1
-    print(f"lessons ok ({len(lessons())} lessons, {count} blocks)")
-    return 0
-
-
-# Notebooks made from the lessons
+# The vendored release, which the site names
 
 def vendored_tag():
     first = (ROOT / "tools" / "VENDORED").read_text(encoding="utf-8").split()
     return "v" + first[1]
-
-
-def setup_cell():
-    return f'''# The practice folder, and the newest release of the public claim-protocol library.
-import os, re, subprocess, tempfile
-tags = subprocess.run(["git", "ls-remote", "--tags", "{LIBRARY_URL}"], capture_output=True, text=True, check=True).stdout
-releases = sorted({{tuple(map(int, m)) for m in re.findall(r"refs/tags/v(\\d+)\\.(\\d+)\\.(\\d+)$", tags, re.M)}})
-TAG = "v%d.%d.%d" % releases[-1]
-LAB = tempfile.mkdtemp(prefix="symphony-lesson-")
-LIBRARY = os.path.join(tempfile.mkdtemp(), "symphony-protocol")
-subprocess.run(["git", "-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1",
-                "--branch", TAG, "{LIBRARY_URL}", LIBRARY], check=True)
-os.environ.update({json.dumps(GIT_ENV)})
-os.environ.update(LAB=LAB, PYTHONPATH=LIBRARY)
-print("symphony-protocol", TAG, "; practice folder:", LAB)'''
-
-
-def cell(kind, text):
-    made = {"cell_type": kind, "metadata": {}, "source": text.splitlines(True)}
-    if kind == "code":
-        made.update(execution_count=None, outputs=[])
-    return made
-
-
-def notebook_of(path):
-    cells = []
-    for kind, body, _ in parse(path.read_text(encoding="utf-8")):
-        if kind == "md" and body.strip():
-            cells.append(cell("markdown", rewrite_links_for_notebook(body.strip("\n"))))
-        elif kind == "setup":
-            cells.append(cell("code", setup_cell()))
-        elif kind == "run":
-            cells.append(cell("code", f"%%bash\n{body}"))
-        elif kind == "output":
-            cells.append(cell("markdown", "You should see lines like these:\n\n```\n" + body + "\n```"))
-        else:
-            cells.append(cell("markdown", f"```{_}\n{body}\n```"))
-    for n, made in enumerate(cells):
-        made["id"] = f"cell-{n}"
-    return {"cells": cells, "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
-                                         "language_info": {"name": "python"}},
-            "nbformat": 4, "nbformat_minor": 5}
-
-
-def rewrite_links_for_notebook(text):
-    """A lesson's neighbours are notebooks too; any other relative link is
-    one folder deeper from docs/learn/notebooks/ than from the lesson."""
-    def moved(match):
-        label, target = match.groups()
-        if re.match(r"^(0\d-[a-z0-9-]+)\.md$", target):
-            return f"[{label}]({target[:-3]}.ipynb)"
-        if re.match(r"^([a-z]+:|#)", target):
-            return match.group(0)
-        return f"[{label}](../{target})"
-    return re.sub(r"(?<!!)\[([^\]]+)\]\(([^)\s]+)\)", moved, text)
-
-
-def notebook_text(path):
-    return json.dumps(notebook_of(path), indent=1, ensure_ascii=True) + "\n"
-
-
-def notebooks(args):
-    stale = []
-    NOTEBOOKS.mkdir(exist_ok=True)
-    for path in lessons():
-        target = NOTEBOOKS / (path.stem + ".ipynb")
-        text = notebook_text(path)
-        if target.exists() and target.read_text(encoding="utf-8") == text:
-            continue
-        if args.check:
-            stale.append(target)
-        else:
-            target.write_text(text, encoding="utf-8")
-            print(f"wrote {target.relative_to(ROOT)}")
-    for target in stale:
-        print(f"{target.relative_to(ROOT)}: out of date with its lesson; run python3 tools/living_docs.py notebooks")
-    names = {p.stem for p in lessons()}
-    orphans = [p for p in NOTEBOOKS.glob("*.ipynb") if p.stem not in names]
-    for target in orphans:
-        print(f"{target.relative_to(ROOT)}: no lesson of that name; delete it with its lesson")
-    return 1 if stale or orphans else 0
 
 
 # Holding the code to its documentation
@@ -296,20 +100,6 @@ def script_comment(path):
     return "\n".join(kept).strip()
 
 
-def lesson_shape(path):
-    """A lesson has one setup block, before its first command, and every
-    command opens in the practice folder, as a notebook cell does."""
-    segments = parse(path.read_text(encoding="utf-8"))
-    kinds = [kind for kind, _, _ in segments]
-    problems = []
-    if kinds.count("setup") != 1 or ("run" in kinds and kinds.index("setup") > kinds.index("run")):
-        problems.append(f"{path.relative_to(ROOT)}: one block marked bash setup, before the first bash run block")
-    for n, (kind, body, _) in enumerate(s for s in segments if s[0] == "run"):
-        if not body.startswith('cd "$LAB"\n'):
-            problems.append(f'{path.relative_to(ROOT)}: block {n + 1} does not open with cd "$LAB"')
-    return problems
-
-
 def check(args):
     problems = []
     for path in documented_modules():
@@ -318,21 +108,12 @@ def check(args):
     for path in shell_scripts():
         if not script_comment(path):
             problems.append(f"{path.relative_to(ROOT)}: no comment under its first line saying what it does and why")
-    index = (LESSONS / "README.md").read_text(encoding="utf-8")
-    for path in lessons():
-        if f"({path.name})" not in index:
-            problems.append(f"docs/learn/README.md: lesson {path.name} is not in the table")
-        if not steps(path):
-            problems.append(f"{path.relative_to(ROOT)}: no block marked bash run, so the check tests nothing")
-        problems += lesson_shape(path)
     for line in problems:
         print(line)
     if problems:
         return 1
-    stale = notebooks(argparse.Namespace(check=True))
-    if not stale:
-        print(f"living docs ok ({len(documented_modules())} modules, {len(shell_scripts())} scripts documented)")
-    return stale
+    print(f"living docs ok ({len(documented_modules())} modules, {len(shell_scripts())} scripts documented)")
+    return 0
 
 
 # The test suite's results, for the site
@@ -623,24 +404,6 @@ def nav_html(sections, here):
     return "".join(out)
 
 
-def lesson_actions(path, site):
-    if not site.repo:
-        return ""
-    notebook = f"docs/learn/notebooks/{path.stem}.ipynb"
-    colab = f"https://colab.research.google.com/github/{site.repo}/blob/{site.sha or 'main'}/{notebook}"
-    codespace = (f"https://codespaces.new/{site.repo}?quickstart=1"
-                 "&devcontainer_path=.devcontainer%2Fdemo%2Fdevcontainer.json")
-    return (f'<div class="actions"><a class="button" href="{colab}">Open in Colab</a>'
-            f'<a class="button" href="{codespace}">Open a Codespace</a></div>')
-
-
-def verified_note(path, site):
-    blocks = len(steps(path))
-    commit = f" at commit {site.sha[:7]}" if site.sha else ""
-    return (f'<div class="verified">Every one of the {blocks} commands on this page ran in CI{commit} against '
-            f"symphony-protocol {vendored_tag()}, and printed what the page says it prints.</div>")
-
-
 def reference_html(site):
     out = ["<h1>Reference</h1><p>Made from the code's own docstrings and script comments when the site is built, "
            "so it describes the code on this commit. <code>python3 tools/living_docs.py check</code> fails a pull "
@@ -703,21 +466,15 @@ def site(args):
     out.mkdir(parents=True, exist_ok=True)
     built = Site(out, args.repo, args.sha)
     guides = [("docs/learn/README.md", "index.html"), ("docs/start/capabilities.md", "capabilities.html")]
-    learn = [(p.relative_to(ROOT).as_posix(), p.stem + ".html") for p in lessons()]
-    for source, name in guides + learn:
+    for source, name in guides:
         built.add(source, name)
     sections = [("Start", [("index.html", "Learn by doing"), ("capabilities.html", "What Symphony can do")]),
-                ("Lessons", [(name, title_of((ROOT / source).read_text(encoding="utf-8"))) for source, name in learn]),
                 ("Reference", [("reference.html", "Code reference"), ("tests.html", "Tests")])]
     commit = f"commit {args.sha[:7]}, " if args.sha else ""
     meta = html.escape(f"built from {commit}symphony-protocol {vendored_tag()}")
-    for source, name in guides + learn:
+    for source, name in guides:
         text = (ROOT / source).read_text(encoding="utf-8")
         body = markdown_html(text, built.linker(source))
-        path = ROOT / source
-        if path.parent == LESSONS and path.name != "README.md":
-            head, _, rest = body.partition("\n")
-            body = head + lesson_actions(path, built) + verified_note(path, built) + rest
         (out / name).write_text(page(title_of(text), body, nav_html(sections, name), meta), encoding="utf-8")
     results = json.loads(Path(args.tests).read_text(encoding="utf-8")) if args.tests else None
     extras = {"reference.html": ("Code reference", reference_html(built)),
@@ -732,19 +489,16 @@ def site(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("test", help="run every lesson's commands and compare their outputs")
-    sub.add_parser("check", help="every module documented, every lesson listed, the notebooks up to date")
-    made = sub.add_parser("notebooks", help="write each lesson's notebook under docs/learn/notebooks/")
-    made.add_argument("--check", action="store_true", help="fail, writing nothing, when one is out of date")
+    sub.add_parser("check", help="every module and script documented")
     reported = sub.add_parser("report", help="run the test suite and write each test's result as JSON")
     reported.add_argument("out")
     built = sub.add_parser("site", help="build the static documentation site")
     built.add_argument("out")
     built.add_argument("--tests", help="the JSON report to show on the Tests page")
-    built.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""), help="OWNER/NAME, for links to files and Colab")
+    built.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""), help="OWNER/NAME, for links to files")
     built.add_argument("--sha", default="", help="the commit the site describes")
     args = parser.parse_args(argv)
-    return {"test": test, "check": check, "notebooks": notebooks, "report": report, "site": site}[args.command](args)
+    return {"check": check, "report": report, "site": site}[args.command](args)
 
 
 if __name__ == "__main__":

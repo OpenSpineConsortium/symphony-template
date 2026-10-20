@@ -2,12 +2,9 @@
 the second push of a claim branch is refused, the push guard refuses the
 five pushes the page names and allows a fresh claim, and the board renders
 from its snapshot. It runs here in the required check, so the demo cannot
-drift from the code it demonstrates; docs/start/demo.ipynb, which runs the
-same parts from the public library, is checked to stay valid JSON with its
-code cells parsing as Python, since its clone needs the network."""
+drift from the code it demonstrates. The notebook that runs the same parts
+in Colab lives in symphony-protocol's notebooks/, which runs it there."""
 
-import ast
-import json
 import os
 import re
 import subprocess
@@ -16,7 +13,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "demo.sh"
-NOTEBOOK = ROOT / "docs" / "start" / "demo.ipynb"
 
 
 def demo(*part):
@@ -58,14 +54,6 @@ class DemoTest(unittest.TestCase):
     def test_an_unknown_part_is_refused(self):
         code, _ = demo("everything")
         self.assertEqual(code, 64)
-
-    def test_the_notebook_parses(self):
-        notebook = json.loads(NOTEBOOK.read_text(encoding="ascii"))
-        cells = [c for c in notebook["cells"] if c["cell_type"] == "code"]
-        self.assertTrue(cells)
-        for cell in cells:
-            self.assertEqual(cell["outputs"], [], "commit the notebook without outputs")
-            ast.parse("".join(cell["source"]))
 
 
 if __name__ == "__main__":
