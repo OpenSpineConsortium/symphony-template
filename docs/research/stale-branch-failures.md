@@ -119,6 +119,20 @@ few days have passed is the same table split at each switch: catch-ups and
 stale-after-green should fall towards symphony-app's level, and the default
 branch's own failed checks are the price to watch.
 
+## A second failure class: one cause that stops every pull request
+
+From 22:00 UTC on 2026-10-20 tests/test_pool.py failed on every pull
+request in symphony-template, since a test pinned a reset time that the
+clock then passed; the thread "Fine-grained locking on" fixed it. This is
+not staleness: no landing caused it and no catch-up cures it, yet it
+blocks all open work at once, as a blocker issue does under the protocol.
+The record shows it as failed check runs on the pull requests' own heads
+and on the default branch's own runs (default_branch_checks) on the same
+day, and it is kept apart from the catch-up counts, which count only runs
+on catch-up heads. Separately, symphony-protocol's up-to-date rule still
+stood at 22:20 UTC; its 0.6.0 release, which carries the overlap check,
+was tagged at 22:14:33 UTC.
+
 ## What history can and cannot recover
 
 Recovered: each pull request's commits with their parents (so a catch-up
