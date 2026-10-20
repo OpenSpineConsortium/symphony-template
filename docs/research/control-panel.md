@@ -561,6 +561,33 @@ Checks Read-only, Contents Read and write, Issues Read and write, Pull requests 
   page's Add a slot box, which takes a pasted Claude token, is built elsewhere since the owner
   dropped the no-token rule on 2026-10-18 (decision 3 above).
 
+## The usual repository in a browser that keeps none (2026-10-20)
+
+Source: the thread "OneDrive kept across sign-ins, org-wide Track", greg's message of 2026-10-20
+16:50 UTC with a screenshot of a guest window that opened on the Repositories picker after sign-in.
+
+- Why it happened: the panel kept the repository last opened only in the browser's own storage
+  (symphony_panel_repo), which a guest window or a new browser does not have, so every first
+  sign-in there opened the picker. GitHub gives a GitHub App's user token no place of its own to
+  keep a person's choice, so a default that follows the person across browsers has to be read
+  from GitHub's own data.
+- What it does now (site #115, checks symphony-app #63): with nothing kept, the panel opens the
+  repository with Symphony set up (topic symphony, not archived) that was pushed most recently, of
+  those the picker lists, which costs no extra GitHub call. The picker opens by itself only where
+  none has Symphony or GitHub does not list them. A repository the browser kept, or ?repo= in the
+  address, still comes first. A picker the person opened meanwhile is not overruled, and the
+  Folders tab opens neither.
+- The review found two stalls, both fixed before the merge: a sign-out keeps the last repository's
+  name in the page's state, which read as a repository chosen meanwhile, and a token renewed while
+  GitHub listed them stopped the lookup for good.
+- Found on the way: Folders check E8 failed about half its runs since the tab switches the sync on
+  as it opens a tracked repository (site #108), a write that raced the check's count of Track's
+  writes (fixed in symphony-app #65); and mutant f43 had survived since site #111 kept the OneDrive
+  connection on the browser, re-aimed in symphony-app #61.
+- The sign-in's 429 greg saw the same afternoon came from GitHub's token exchange
+  (github.com/login/oauth/access_token), not from the Folders tab's calls, which go to
+  api.github.com on the person's own token; it went to the Control panel sign-in thread.
+
 ## Sources
 
 - The owner's handoff: docs/checkpoints/2026-10-15b/handoff.md, item 7; the shape of the panel:
