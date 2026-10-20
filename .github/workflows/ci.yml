@@ -174,10 +174,13 @@ jobs:
           echo "the parts: $PARTS_RESULT"
           [ "$PARTS_RESULT" = success ]
 
-  # Whether the change must bring the default branch in (the header above).
-  # The checkout is GitHub's test merge, one commit deep: the tool reads the
-  # branch's own side of it and fetches the default branch and what else it
-  # needs itself. The job is named for the check run it leaves on the head.
+  # Whether the change must bring the branch it is onto in (the header
+  # above), the default branch for nearly every pull request here, since a
+  # pull request onto another branch meets what that branch did, not what
+  # the default branch did. The checkout is GitHub's test merge, one commit
+  # deep: the tool reads the branch's own side of it and fetches the base
+  # branch and what else it needs itself. The job is named for the check
+  # run it leaves on the head.
   overlap:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -185,10 +188,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Say whether the change must bring the default branch in
+      - name: Say whether the change must bring its base branch in
         env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: python3 tools/locks.py overlap --base "origin/$DEFAULT_BRANCH"
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+        run: python3 tools/locks.py overlap --base "origin/$BASE_BRANCH"
 
   values:
     runs-on: ubuntu-latest

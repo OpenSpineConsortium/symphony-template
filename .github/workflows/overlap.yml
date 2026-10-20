@@ -16,8 +16,12 @@ name: Overlap
 # run still going, whose answers would be stale. The push trigger names no
 # branch, since a workflow file carries no placeholder (template-init never
 # writes one): the job's own condition keeps it to the default branch, and
-# the branches left out are the ones .github/workflows/ci.yml leaves out,
-# so no run of this name is left on a pull request's head by a skipped job.
+# the branches left out, the claim branches, the sync's and the tables the
+# workflows keep, start no run here at all. A push to any other branch
+# starts one whose job is skipped, which leaves a skipped run of this name
+# on the head, as .github/workflows/ci.yml's own job of this name leaves on
+# such a push; a pull request from that branch gets the real one from its
+# own run, and GitHub reads a skipped run as passing, so neither holds it.
 # The token reads pull requests and writes check runs, and nothing else.
 
 on:

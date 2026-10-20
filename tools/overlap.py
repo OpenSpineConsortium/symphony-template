@@ -23,11 +23,14 @@ requests that must bring the default branch in. The switch is
 .github/symphony-locks, or SYMPHONY_LOCKS in the environment (off, advise,
 enforce); off, the tool writes nothing, as the check it fronts does nothing.
 
-A head the pull request has moved past since the list was read is left
-alone, since the pull request's own run judges the new one. The tool reads
-the pull requests and writes the check runs through GitHub's REST API with
-the workflow's own token (pull-requests: read, checks: write), and judges
-in the clone it runs in.
+A pull request onto another branch is left to its own run, since this
+tool asks about the default branch's move, and so is a head the pull
+request has moved past since the list was read. A refusal or a fault on
+one head is said in the log and the next head is judged, and the run
+fails at the end, so no head waits on another's fault and the log says
+which got no word. The tool reads the pull requests and writes the check
+runs through GitHub's REST API with the workflow's own token
+(pull-requests: read, checks: write), and judges in the clone it runs in.
 """
 
 import io
@@ -49,7 +52,8 @@ PAGE = 100
 SUMMARY_LIMIT = 60000  # GitHub takes 65535 characters of a check run's summary
 SWITCH_FILE = ".github/symphony-locks"
 MODES = ("off", "advise", "enforce")
-NEED_NOTHING = "need not bring it in"
+UNWRITTEN = "unwritten"
+FAULTS = (urllib.error.URLError, TimeoutError, subprocess.SubprocessError)
 
 
 def switch_mode(environ, repo_dir):
@@ -79,12 +83,27 @@ def api(token, method, path, payload=None):
     return json.loads(body) if body.strip() else None
 
 
-def open_pulls(call, repository):
-    """Every open pull request, as (number, head sha), page by page."""
+def why_of(problem):
+    """One line on what went wrong, in GitHub's words where it answered."""
+    if isinstance(problem, urllib.error.HTTPError):
+        return f"GitHub refused {problem.code}: {problem.read().decode('utf-8', 'replace')[:500]}"
+    if isinstance(problem, urllib.error.URLError):
+        return f"GitHub could not be reached: {problem.reason}"
+    if isinstance(problem, subprocess.TimeoutExpired):
+        return f"git took more than {problem.timeout:.0f} s"
+    return f"{problem.__class__.__name__}: {problem}"
+
+
+def open_pulls(call, repository, default_branch):
+    """Every open pull request onto the default branch, as (number, head
+    sha), page by page. One onto another branch is left to its own run,
+    which judges it against that branch: this tool asks what the default
+    branch's move means."""
     pulls = []
     for page in range(1, 1000):
         listed = call("GET", f"repos/{repository}/pulls?state=open&per_page={PAGE}&page={page}") or []
-        pulls += [(pull["number"], pull["head"]["sha"]) for pull in listed]
+        pulls += [(pull["number"], pull["head"]["sha"]) for pull in listed
+                  if pull["base"]["ref"] == default_branch]
         if len(listed) < PAGE:
             break
     return pulls
@@ -93,8 +112,12 @@ def open_pulls(call, repository):
 def fetch_head(repo_dir, number, sha):
     """Bring the pull request's head into the clone, by the ref GitHub keeps
     for every pull request, a fork's too, and say whether it is still the
-    head the list named."""
-    done = subprocess.run(["git", "fetch", "--quiet", "--no-tags", "--depth=1", "origin",
+    head the list named. The head comes one commit deep where the clone is
+    shallow, as actions/checkout leaves it, and whole otherwise, so a
+    person's own clone is not made shallow by a run of this tool."""
+    shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"],
+                             cwd=repo_dir, capture_output=True, text=True, timeout=60).stdout.strip() == "true"
+    done = subprocess.run(["git", "fetch", "--quiet", "--no-tags", *(["--depth=1"] if shallow else []), "origin",
                            f"+refs/pull/{number}/head:refs/remotes/pull/{number}/head"],
                           cwd=repo_dir, capture_output=True, text=True, timeout=300)
     if done.returncode != 0:
@@ -114,12 +137,19 @@ def judge(repo_dir, base, sha):
     return code, out.getvalue() + err.getvalue()
 
 
-def conclusion_of(code, text):
+def nothing_line(base):
+    """The library's one line for a change that need not bring the base in,
+    its last line then; matched whole, since a meeting line carries a key,
+    a path that could hold any words."""
+    return f"locks: nothing {base} changed since the base meets this change; it need not bring it in"
+
+
+def conclusion_of(code, text, base):
     """The check run's conclusion from the tool's answer: it exits 1 only
     where enforce fails the change, and at advise says what it found."""
     if code != 0:
         return "failure"
-    if NEED_NOTHING in text:
+    if text.rstrip().splitlines()[-1:] == [nothing_line(base)]:
         return "success"
     return "neutral"
 
@@ -143,26 +173,49 @@ def check_run(repository, sha, conclusion, title, summary, details_url):
     return f"repos/{repository}/check-runs", payload
 
 
-def run(repository, base, repo_dir, details_url, call, mode, judge_head=judge, fetch=fetch_head, out=sys.stdout):
-    """Judge every open pull request and write its check run; the
-    conclusions by number, for the log."""
+def write_one(repository, base, repo_dir, details_url, call, number, sha, judge_head, fetch, out):
+    """One head's check run and its conclusion, or None for a head the pull
+    request has moved past, which its own run judges."""
+    if not fetch(repo_dir, number, sha):
+        print(f"#{number}: head {sha[:7]} is not the head any more, or could not be fetched; left to its own run",
+              file=out)
+        return None
+    code, text = judge_head(repo_dir, base, sha)
+    conclusion = conclusion_of(code, text, base)
+    title = title_of(conclusion, text, base)
+    path, payload = check_run(repository, sha, conclusion, title, text, details_url)
+    call("POST", path, payload)
+    print(f"#{number} at {sha[:7]}: {conclusion}: {title}", file=out)
+    return conclusion
+
+
+def run(repository, default_branch, repo_dir, details_url, call, mode, judge_head=None, fetch=None, out=None):
+    """Judge every open pull request onto the default branch and write its
+    check run; the conclusions by number, for the log, UNWRITTEN where a
+    fault or a refusal left a head without one. Any fault on one head is
+    caught, since no head should wait on another's."""
+    judge_head = judge if judge_head is None else judge_head
+    fetch = fetch_head if fetch is None else fetch
+    out = sys.stdout if out is None else out
     if mode == "off":
         print("locks are off; nothing is asked or written", file=out)
         return {}
+    base = f"origin/{default_branch}"
     written = {}
-    for number, sha in open_pulls(call, repository):
-        if not fetch(repo_dir, number, sha):
-            print(f"#{number}: head {sha[:7]} is not the head any more, or could not be fetched; left to its own run",
-                  file=out)
-            continue
-        code, text = judge_head(repo_dir, base, sha)
-        conclusion = conclusion_of(code, text)
-        title = title_of(conclusion, text, base)
-        path, payload = check_run(repository, sha, conclusion, title, text, details_url)
-        call("POST", path, payload)
-        written[number] = conclusion
-        print(f"#{number} at {sha[:7]}: {conclusion}: {title}", file=out)
+    for number, sha in open_pulls(call, repository, default_branch):
+        try:
+            conclusion = write_one(repository, base, repo_dir, details_url, call, number, sha, judge_head, fetch, out)
+        except Exception as problem:  # whatever it is: one head's fault must not keep the others from their word
+            conclusion = UNWRITTEN
+            print(f"#{number} at {sha[:7]}: no check run written: {why_of(problem)}", file=out)
+        if conclusion:
+            written[number] = conclusion
     return written
+
+
+def unwritten_of(written):
+    """The pull requests a run left without a check run, by number."""
+    return sorted(number for number, conclusion in written.items() if conclusion == UNWRITTEN)
 
 
 def main(environ=None):
@@ -183,10 +236,13 @@ def main(environ=None):
         return api(token, method, path, payload)
 
     try:
-        run(repository, f"origin/{default_branch}", repo_dir, environ.get("RUN_URL", ""), call, mode)
-    except urllib.error.HTTPError as refusal:
-        print(f"overlap: GitHub refused {refusal.code}: {refusal.read().decode('utf-8', 'replace')[:500]}",
-              file=sys.stderr)
+        written = run(repository, default_branch, repo_dir, environ.get("RUN_URL", ""), call, mode)
+    except FAULTS as problem:
+        print(f"overlap: {why_of(problem)}", file=sys.stderr)
+        return 1
+    unwritten = unwritten_of(written)
+    if unwritten:
+        print(f"overlap: no check run was written for {', '.join(f'#{n}' for n in unwritten)}", file=sys.stderr)
         return 1
     return 0
 
