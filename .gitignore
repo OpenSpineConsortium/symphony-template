@@ -23,3 +23,7 @@ Thumbs.db
 # commits it onto metrics without touching the checkout (docs/setup/metrics.md)
 /JUDGE.json
 /METRICS.json
+
+# The documentation site tools/living_docs.py builds; the Docs workflow
+# publishes it and nothing commits it
+/_site/
