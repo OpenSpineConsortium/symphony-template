@@ -14,15 +14,15 @@ files as one pull request from the branch symphony/sync, which belongs to
 this run alone. Nobody's default branch changes until they merge it.
 
 The files come in units, as an adoption brings them (symphony-start's
-scripts/adopt.py): a workflow with its script and every module of the
-template that script imports, and the vendored library with its record. A
-file is replaced only where the repository holds a version the template
-itself once held at that path, so a file of their own is never overwritten:
-such a file holds its unit back whole, and the pull request says which file
-and why. A unit is added where it is missing only when ADDED names it, the
-Token workflow alone, since a repository without the board or the metrics
-removed them or never took them: the metrics workflow shares aggregates,
-and only an adoption's switch says whether it may. A pull request closed
+scripts/adopt.py): a workflow with its scripts and every module of the
+template they import, and the vendored library with its record. A file is
+replaced only where the repository holds a version the template itself
+once held at that path, so a file of their own is never overwritten: such
+a file holds its unit back whole, and the pull request says which file and
+why. A unit is added where it is missing only when ADDED names it, the
+Token workflow and the drive sync, since a repository without the board or
+the metrics removed them or never took them: the metrics workflow shares
+aggregates, and only an adoption's switch says whether it may. A pull request closed
 without its merge is not opened again for the same files, so a no stays a
 no until the template changes them; `off` in .github/symphony-sync stops
 the offers for good. A whole template's copy, which runs the template's
@@ -61,18 +61,25 @@ VENDORED = "tools/VENDORED"
 # The front door and the template take no offer of themselves.
 OWN = {"openspineconsortium/symphony-template", "openspineconsortium/symphony-start",
        "openspineconsortium/sdlc-template", "openspineconsortium/sdlc-start"}
-# Each workflow and the script it runs, with the folders Python finds the
-# template's modules in for that script, in its order: tools/token_run.py
+# Each workflow and the scripts it runs, with the folders Python finds the
+# template's modules in for those scripts, in its order: tools/token_run.py
 # puts scripts/ on its path after its own folder.
 WORKFLOWS = (
-    ("the board's workflow and its script", ".github/workflows/board.yml", "tools/board.py", ("tools",)),
-    ("the workflow that tidies closed claims", ".github/workflows/tidy.yml", None, ()),
-    ("the metrics workflow and the scripts it runs", ".github/workflows/metrics.yml", "tools/metrics.py", ("tools",)),
-    ("the Token workflow and the scripts it runs", ".github/workflows/token.yml", "tools/token_run.py",
+    ("the board's workflow and its script", ".github/workflows/board.yml", ("tools/board.py",), ("tools",)),
+    ("the workflow that tidies closed claims", ".github/workflows/tidy.yml", (), ()),
+    ("the metrics workflow and the scripts it runs", ".github/workflows/metrics.yml", ("tools/metrics.py",), ("tools",)),
+    ("the Token workflow and the scripts it runs", ".github/workflows/token.yml", ("tools/token_run.py",),
      ("tools", "scripts")),
+    ("the drive sync and the scripts it runs", ".github/workflows/drive-sync.yml",
+     ("tools/drive_sync.py", "tools/docx_review.py", "tools/drive_organize.py"), ("tools",)),
 )
 LIBRARY_UNIT = "the vendored library and its record"
-ADDED = {".github/workflows/token.yml"}
+# The Token workflow and the drive sync are added where they are missing:
+# the control panel's Tokens page and its Folders page's Track need them in
+# whichever repository a person picks (the Folders tab refused Track in a
+# repository with no drive-sync.yml, 2026-10-20), and neither shares
+# anything or acts until the person connects something.
+ADDED = {".github/workflows/token.yml", ".github/workflows/drive-sync.yml"}
 # A whole template's copy holds the template's own check beside its update
 # workflow. The update workflow alone marks nothing: a repository adopted
 # for the protocol alone may take protocol.yml by hand, as spine-program
@@ -144,11 +151,11 @@ def imported(source):
 LOADED = re.compile(rb'TOOLS\s*/\s*"([A-Za-z_][A-Za-z0-9_]*)\.py"')
 
 
-def closure(tree, script, folders, read):
-    """The script and every module of the template it imports, in turn, as
+def closure(tree, scripts, folders, read):
+    """The scripts and every module of the template they import, in turn, as
     Python finds them in folders; and whether any of them imports the
     vendored library, which is a unit of its own."""
-    files, waiting, needs = [], [script], False
+    files, waiting, needs = [], list(scripts), False
     while waiting:
         rel = waiting.pop(0)
         if rel in files:
@@ -173,10 +180,10 @@ def units(tree, read):
     template holds, the library first."""
     library = sorted(p for p in tree if p.startswith(LIBRARY + "/") or p == VENDORED)
     out = [(LIBRARY_UNIT, library, False, False)]
-    for name, workflow, script, folders in WORKFLOWS:
-        if workflow not in tree or (script and script not in tree):
+    for name, workflow, scripts, folders in WORKFLOWS:
+        if workflow not in tree or any(script not in tree for script in scripts):
             continue
-        files, needs = closure(tree, script, folders, read) if script else ([], False)
+        files, needs = closure(tree, scripts, folders, read)
         out.append((name, [workflow] + files, needs, workflow in ADDED))
     return out
 
