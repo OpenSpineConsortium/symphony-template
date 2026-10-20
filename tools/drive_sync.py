@@ -55,6 +55,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -77,6 +78,12 @@ MAX_DEPTH = 6
 SIMPLE_UPLOAD = 4 * 1024 * 1024
 FOLDER = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_. -]*(/[A-Za-z0-9_][A-Za-z0-9_. -]*)*")
 REASON = re.compile(r"[A-Za-z0-9_.-]{1,64}")
+# Graph throttles a long walk with 429 (and a read with 503), as Google does
+# with 429 (its 403 rateLimitExceeded is not asked again),
+# naming the wait in Retry-After; a call is asked again that many times, so a
+# throttled folder is listed late instead of left out of the catalog.
+THROTTLE_TRIES = 4
+THROTTLE_WAIT_MOST = 120
 
 
 class DriveError(Exception):
@@ -93,24 +100,42 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 OPENER = urllib.request.build_opener(NoRedirect)
 
 
-def call(method, url, token=None, data=None, headers=None, opener=None, hops=3):
+def call(method, url, token=None, data=None, headers=None, opener=None, hops=3, sleep=time.sleep):
     """One request; a redirect is followed without the token, since urllib
     would send the Authorization header to whatever host it names, and only
     for a GET, so a write is never turned into a read that looks like it
-    worked. Every failure the network or the drive gives is a DriveError."""
-    request = urllib.request.Request(url, data=data, method=method, headers=dict(headers or {}))
-    if token:
-        request.add_header("Authorization", f"Bearer {token}")
-    try:
-        with (opener or OPENER).open(request, timeout=60) as response:
-            return response.status, dict(response.headers), response.read()
-    except urllib.error.HTTPError as error:
-        location = error.headers.get("Location") if error.headers else None
-        if error.code in (301, 302, 303, 307, 308) and location and method == "GET" and hops > 0:
-            return call("GET", urllib.parse.urljoin(url, location), None, None, None, opener, hops - 1)
-        raise DriveError(f"{method} {url.split('?')[0]} answered {error.code}: {reason_in(error.read())}") from None
-    except (urllib.error.URLError, OSError, ValueError) as error:
-        raise DriveError(f"{method} {url.split('?')[0]} failed: {error}") from None
+    worked. A throttled answer is asked again after the wait it names (see
+    throttled). Every failure the network or the drive gives is a DriveError."""
+    for attempt in range(THROTTLE_TRIES):
+        request = urllib.request.Request(url, data=data, method=method, headers=dict(headers or {}))
+        if token:
+            request.add_header("Authorization", f"Bearer {token}")
+        try:
+            with (opener or OPENER).open(request, timeout=60) as response:
+                return response.status, dict(response.headers), response.read()
+        except urllib.error.HTTPError as error:
+            location = error.headers.get("Location") if error.headers else None
+            if error.code in (301, 302, 303, 307, 308) and location and method == "GET" and hops > 0:
+                return call("GET", urllib.parse.urljoin(url, location), None, None, None, opener, hops - 1, sleep)
+            wait = throttled(method, error)
+            if wait is not None and attempt + 1 < THROTTLE_TRIES:
+                sleep(wait)
+                continue
+            raise DriveError(f"{method} {url.split('?')[0]} answered {error.code}: {reason_in(error.read())}") from None
+        except (urllib.error.URLError, OSError, ValueError) as error:
+            raise DriveError(f"{method} {url.split('?')[0]} failed: {error}") from None
+
+
+def throttled(method, error):
+    """The seconds to wait before asking again, or None when the answer is
+    not one to ask again. A 429 did nothing, so any call is asked again; a
+    503 is asked again only for a read, since a write it answered may have
+    been done. The wait is Retry-After's, bounded, else a few seconds."""
+    if error.code != 429 and not (error.code == 503 and method == "GET"):
+        return None
+    named = str(error.headers.get("Retry-After", "") if error.headers else "").strip()
+    seconds = int(named) if re.fullmatch(r"[0-9]{1,6}", named) else 5
+    return min(max(seconds, 1), THROTTLE_WAIT_MOST)
 
 
 def reason_in(body):
@@ -269,7 +294,7 @@ class Microsoft:
         return f"{GRAPH}/drives/{q(drive)}/items/{q(item_id)}" if drive else f"{GRAPH}/me/drive/items/{q(item_id)}"
 
     def meta(self, drive, item_id):
-        return call_json("GET", self.item_url(drive, item_id) + "?$select=id,name,cTag,eTag,file,folder,"
+        return call_json("GET", self.item_url(drive, item_id) + "?$select=id,name,cTag,eTag,file,folder,root,"
                          "parentReference,size,lastModifiedDateTime,webUrl", self.token, opener=self.opener)
 
     def children(self, drive, item_id):
