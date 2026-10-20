@@ -134,7 +134,7 @@ def why_the_library_cannot_compare(commit):
 
 
 def ci_steps():
-    """The steps of ci.yml's job check, the first, each as its lines with
+    """The steps of ci.yml's first job, parts, each as its lines with
     the indent stripped. The workflow is read as text, the standard library
     having no YAML parser; each step starts with a dash six spaces in, and
     the next job starts two spaces in."""
@@ -262,7 +262,7 @@ class TheVerification(unittest.TestCase):
     def test_check_sh_verifies_the_copy_before_the_tests(self):
         lines = [line.strip() for line in (ROOT / "scripts" / "check.sh").read_text(encoding="utf-8").splitlines()]
         self.assertIn(VERIFY, lines)
-        tests = next(number for number, line in enumerate(lines) if line.startswith("python3 -m unittest"))
+        tests = next(number for number, line in enumerate(lines) if line.startswith("python3 tools/test_shard.py run"))
         self.assertLess(lines.index(VERIFY), tests)
 
     def test_the_copy_matches_its_record(self):
