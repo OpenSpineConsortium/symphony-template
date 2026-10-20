@@ -1,6 +1,6 @@
 # The Explore and Folders tabs redesigned
 
-Source: the thread "Explorer modernization", 2026-10-20, from handoff part 6.2 (docs/checkpoints/2026-10-19/handoff.md) and the owner's word of 03:50 UTC in the OneDrive thread, relayed by the coordinator. The code is in OpenSpineConsortium/openspineconsortium.github.io (branches claude/explore-modern and claude/folders-native) and its checks in OpenSpineConsortium/symphony-app (signin/panel-checks/e2e2, branches of the same names).
+Source: the thread "Explorer modernization", 2026-10-20, from handoff part 6.2 (docs/checkpoints/2026-10-19/handoff.md) and the owner's word of 03:50 UTC in the OneDrive thread, relayed by the coordinator. The code is in OpenSpineConsortium/openspineconsortium.github.io (Explore merged in #98, Folders in #99) and its checks in OpenSpineConsortium/symphony-app (signin/panel-checks/e2e2; #50 and #51).
 
 ## Which explorer
 
@@ -21,7 +21,8 @@ The handoff's "Explorer" was read first as the Explore tab, the goal to epic to 
 - The right side column is gone. Its steps (what is ticked, Make the repository, Track) are in a dialog, Track in a repository, with every element id kept, so the tracking code is unchanged.
 - The saved catalog (catalog.json on a private repository's drive-catalog branch, written by the drive organizer through the connector) is no longer read or shown by the tab, and no text offers it; with no drive the explorer says only to connect OneDrive. The Notebooks tab still reads catalog.json, which is that tab's design and the sign-in thread's.
 - No new read or write: the layout change needs no privacy statement change.
-- Checks: folders.test.mjs drops CAT1 to CAT9 and their mutants f56 to f63, and adds NC1 (no catalog read or word), NC2 (no side column, the explorer fills the tab, the page does not scroll) and NC3 (the Track dialog); mutants f64 to f66 hold them, and f45 follows the steps' new names.
+- An adversarial review found that the modal dialog hid Track's answers at the foot, that words still pointed at "this tab" and "step 1", that the panes grew without bound where the page scrolls, and that what is ticked in other folders could no longer be seen; Track's answers now show in a status line in the dialog too, Connect first closes the dialog, the words name Track in a repository, the explorer keeps a height of its own on a phone, and the head's button counts the ticks. It also found that the Apps' privacy statement still lists the catalog read the tab no longer makes, which over-states and leaks nothing; that was passed to the thread that writes the statement, for version 36.
+- Checks: folders.test.mjs drops CAT1 to CAT9 and their mutants f56 to f63, and adds NC1 (no catalog read or word), NC2 (no side column, the explorer fills the tab, the page does not scroll), NC3 (the Track dialog), NC4 (Track's answers in the dialog, the ticks counted) and NC5 (bounded panes on a phone); all 59 pass, and the 61 mutants f01 to f69 that remain are killed.
 
 ## Proposed next, waiting for the owner
 
