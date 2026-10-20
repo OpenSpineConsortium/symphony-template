@@ -107,6 +107,18 @@ What changes:
 - New: while both the edge and the fallback can write, there are two writers again, so the board branch must be updated with an expected-head check (git's own compare-and-swap on a ref) and the fallback must not write while the edge is healthy.
 - To be re-specified: the Release section dates a push by "the run that a push to the branch started" and by the run's start; an edge has no run, so those rules need their edge equivalent, written into symphony-protocol and checked by its harness before the edge is trusted to release a claim.
 
+### Realistic latency, path by path
+
+The owner asked next (20:00 UTC) for realistic reductions. The board's job in the copy, step by step over its last eight successful runs: set up and checkout 1 to 3 s, fetching the old board 0 to 1 s, rendering (the GitHub API calls that read issues, branches and pull requests and write renames and comments) 4 to 13 s, median 5, and writing the board branch 1 to 2 s. An edge still makes those API calls, so it saves the queue, the runner and the setup, not the rendering. Webhook delivery is taken as about a second, which is typical but not measured here and carries no promise from GitHub.
+
+| Path | Today, measured | Free fix (no queue build-up, in Actions) | Webhook edge, estimated |
+| --- | --- | --- | --- |
+| Act on GitHub to the board showing it (claim, label, merge) | median about 38 s (21 queued, 3 runner, 13.5 job); 15 to 87 s | median about 17 s; 13 to 30 s | about 7 to 9 s; up to about 15 s |
+| A label to a worker's Claude session starting | about 5 to 10 s before Claude's own start-up | the same | saves the same 5 to 10 s, invisible beside a session of minutes |
+| A push to the required check's result | 100 s in the copy, 300 s in the template | about 30 to 60 s if split into parallel jobs (inferred from the copy's six standards groups, 14 to 18 s each) | no change: the check stays in Actions |
+
+So the edge's real gain is on one path, the board, from about 38 s to about 8 s at the median and from 87 s to about 15 s at worst, and most of the worst case is removed already by the free fix. Making the rendering itself faster (fewer calls, GraphQL batching, reading only what an event changed) would help either host equally.
+
 So the move is a few days of thread work if Python Workers run the library, and it loses no guarantee GitHub enforces. The protocol's own guarantees carry over only if the same library runs and the harness is extended to the edge's delivery and timing.
 
 ## 6. The owner's decisions
