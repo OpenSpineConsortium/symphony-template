@@ -106,7 +106,7 @@ reported and a poll of rules/branches/main every 30 seconds confirmed:
 SchwingNet at about 21:08 UTC, coordbench at 21:17:06, symphony-start at
 21:17:08 and symphony-template at 21:31:55 (Settings run 39501080936);
 symphony-app and symphony-marketplace had it off already, and
-symphony-protocol's change (its #59) was still waiting at 21:40. The
+symphony-protocol's followed at 22:26:34 (below). The
 first pull request to land under the new rule here, symphony-template
 #304, was green at 21:15, called behind after #301 landed at about 21:19,
 and merged at about 21:32 as it stood, with no catch-up and no second run;
@@ -129,8 +129,9 @@ blocks all open work at once, as a blocker issue does under the protocol.
 The record shows it as failed check runs on the pull requests' own heads
 and on the default branch's own runs (default_branch_checks) on the same
 day, and it is kept apart from the catch-up counts, which count only runs
-on catch-up heads. Separately, symphony-protocol's up-to-date rule still
-stood at 22:20 UTC; its 0.6.0 release, which carries the overlap check,
+on catch-up heads. Separately, symphony-protocol's up-to-date rule went off
+at 22:26:34 UTC (its #59, Settings run 39508115798), the last of the
+seven repositories; its 0.6.0 release, which carries the overlap check,
 was tagged at 22:14:33 UTC.
 
 ## What history can and cannot recover
