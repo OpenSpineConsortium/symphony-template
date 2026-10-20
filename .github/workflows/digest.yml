@@ -1,0 +1,83 @@
+name: Digest
+
+# The digest through GitHub alone (tools/github_digest.py): once a day it
+# comments what was done and what waits on the owner on one issue labelled
+# digest, mentioning the owner, so GitHub's own notification email carries
+# it; the owner answers by replying to that email, which GitHub posts back
+# as a comment, and this workflow does what the reply asks: "12 Accept" on
+# a decision, anything else as a new issue for Claude. The owner's choice
+# of 2026-10-20, in place of sending from the Wayne State mailbox through
+# Microsoft Graph: no Graph permission, no mail server, no secret and no
+# Claude, only GITHUB_TOKEN, whose own comments start no workflow, so the
+# digest never answers itself. Nothing is posted on a day with nothing done
+# and no new decision. The recipient is the repository variable
+# SYMPHONY_DIGEST_TO when set, else .github/CODEOWNERS' first user, else a
+# user's repository's owner; their GitHub notification settings decide
+# whether the mention reaches them by email (on by default).
+
+on:
+  schedule:
+    - cron: "17 13 * * *"
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  post:
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: digest-post
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Post the digest, when there is something new
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TO: ${{ vars.SYMPHONY_DIGEST_TO }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -eu
+          kind=$(gh api "users/$OWNER" --jq .type)
+          to="${TO:-$(python3 tools/github_digest.py recipient --owner-type "$kind")}"
+          python3 tools/github_digest.py post --repo "$REPO" --to "$to" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  answer:
+    if: >-
+      github.event_name == 'issue_comment' && github.event.issue.pull_request == null
+      && contains(github.event.issue.labels.*.name, 'digest')
+      && github.event.comment.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Do what the reply asks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TO: ${{ vars.SYMPHONY_DIGEST_TO }}
+          OWNER_TYPE: ${{ github.event.repository.owner.type }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -eu
+          to="${TO:-$(python3 tools/github_digest.py recipient --owner-type "${OWNER_TYPE:-User}")}"
+          python3 -c 'import json, os; json.dump(json.load(open(os.environ["GITHUB_EVENT_PATH"]))["comment"], open(os.environ["RUNNER_TEMP"] + "/comment.json", "w"))'
+          python3 tools/github_digest.py answer --repo "$REPO" --to "$to" \
+            --comment "$RUNNER_TEMP/comment.json" --default-branch "$DEFAULT_BRANCH" | tee -a "$GITHUB_STEP_SUMMARY"
