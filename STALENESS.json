@@ -1,8 +1,3819 @@
 {
  "default_branch": "main",
  "format": 1,
- "generated_at": "2026-10-20T21:52:23Z",
+ "generated_at": "2026-10-20T21:59:28Z",
  "pulls": [
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/protocol-fixes-f14-xljomq",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "66392da9ec55cfc5d6c7d763fcfd59bcc15096c2",
+     [
+      80,
+      79,
+      76,
+      82,
+      83,
+      81,
+      77
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 180,
+   "check_seconds_redone": 97,
+   "claim": false,
+   "closed": "2026-10-14T16:10:08Z",
+   "commits": 4,
+   "first_green": "2026-10-14T16:09:25Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 7,
+   "merged": "2026-10-14T16:10:08Z",
+   "number": 78,
+   "opened": "2026-10-14T13:18:54Z",
+   "ready": "2026-10-14T16:01:36Z",
+   "reruns": 1,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-14T13:14:22Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/coordbench-12-review-v7l66b",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 1,
+   "caused_by": [
+    [
+     "8ee0120b8cf722934cf8c77f8fdaa4df781a8f9c",
+     [
+      80
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 188,
+   "check_seconds_redone": 91,
+   "claim": false,
+   "closed": "2026-10-14T13:54:36Z",
+   "commits": 2,
+   "first_green": "2026-10-14T13:36:06Z",
+   "force_pushes": 0,
+   "landings_after_green": 1,
+   "landings_during_life": 1,
+   "merged": "2026-10-14T13:54:36Z",
+   "number": 79,
+   "opened": "2026-10-14T13:30:20Z",
+   "ready": "2026-10-14T13:34:26Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 1110,
+   "started": "2026-10-14T13:30:00Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/checkpoint-2026-10-14c-6f057b",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 103,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-14T13:39:44Z",
+   "commits": 3,
+   "first_green": "2026-10-14T13:39:21Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-14T13:39:44Z",
+   "number": 80,
+   "opened": "2026-10-14T13:35:02Z",
+   "ready": "2026-10-14T13:35:02Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 0,
+   "started": "2026-10-14T13:34:46Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/coordbench-14-review-2026-10-14d",
+   "catch_ups": 2,
+   "catch_ups_after_green": 2,
+   "catch_ups_by_button": 2,
+   "caused_by": [
+    [
+     "a90b1ada480acb89de0b4a88669ab73a6fe5202c",
+     [
+      82
+     ]
+    ],
+    [
+     "2e76f4ef5caaaa1c1e3d782ecd63984ec4d05fd4",
+     [
+      83
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 2,
+   "check_seconds": 243,
+   "check_seconds_redone": 154,
+   "claim": false,
+   "closed": "2026-10-14T15:13:05Z",
+   "commits": 3,
+   "first_green": "2026-10-14T14:53:20Z",
+   "force_pushes": 0,
+   "landings_after_green": 2,
+   "landings_during_life": 2,
+   "merged": "2026-10-14T15:13:05Z",
+   "number": 81,
+   "opened": "2026-10-14T14:51:47Z",
+   "ready": "2026-10-14T14:51:47Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 1185,
+   "started": "2026-10-14T14:51:27Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/awesome-lovelace-7cm439",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 144,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-14T14:59:56Z",
+   "commits": 2,
+   "first_green": "2026-10-14T14:56:24Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-14T14:59:56Z",
+   "number": 82,
+   "opened": "2026-10-14T14:53:06Z",
+   "ready": "2026-10-14T14:53:06Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-14T14:52:51Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-z152ee",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 100,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-14T15:10:54Z",
+   "commits": 1,
+   "first_green": "2026-10-14T15:10:41Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-14T15:10:54Z",
+   "number": 83,
+   "opened": "2026-10-14T15:05:01Z",
+   "ready": "2026-10-14T15:08:57Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-14T15:04:40Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-8d9veg",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 113,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-14T23:48:37Z",
+   "commits": 1,
+   "first_green": "2026-10-14T23:47:58Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-14T23:48:37Z",
+   "number": 84,
+   "opened": "2026-10-14T23:38:16Z",
+   "ready": "2026-10-14T23:46:03Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-14T23:38:02Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-2gxon1",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 1,
+   "caused_by": [
+    [
+     "8826e8a53e98dc7c43e50e8478b238899d9e65f2",
+     [
+      84
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 207,
+   "check_seconds_redone": 111,
+   "claim": false,
+   "closed": "2026-10-14T23:51:01Z",
+   "commits": 2,
+   "first_green": "2026-10-14T23:46:57Z",
+   "force_pushes": 0,
+   "landings_after_green": 1,
+   "landings_during_life": 1,
+   "merged": "2026-10-14T23:51:01Z",
+   "number": 85,
+   "opened": "2026-10-14T23:41:42Z",
+   "ready": "2026-10-14T23:45:19Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 244,
+   "started": "2026-10-14T23:41:24Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/handoff-2026-10-14e-qv2g34",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "c664f8b190ed20c5f3d0bfcf5b544afe6e370c21",
+     [
+      84,
+      85
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 0,
+   "check_seconds": 310,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-14T23:54:39Z",
+   "commits": 4,
+   "first_green": "2026-10-14T23:54:32Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 2,
+   "merged": "2026-10-14T23:54:39Z",
+   "number": 86,
+   "opened": "2026-10-14T23:45:16Z",
+   "ready": "2026-10-14T23:52:57Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-14T23:45:00Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-handoff-2026-10-14-yo9pzb",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "97ba68f36bb8e223d6e77e1dc49a0983c433b92b",
+     [
+      88,
+      89
+     ]
+    ]
+   ],
+   "check_runs": 5,
+   "check_runs_redone": 1,
+   "check_seconds": 687,
+   "check_seconds_redone": 144,
+   "claim": false,
+   "closed": "2026-10-15T04:27:34Z",
+   "commits": 5,
+   "first_green": "2026-10-15T03:58:46Z",
+   "force_pushes": 1,
+   "landings_after_green": 1,
+   "landings_during_life": 2,
+   "merged": "2026-10-15T04:27:34Z",
+   "number": 87,
+   "opened": "2026-10-15T01:31:23Z",
+   "ready": "2026-10-15T03:54:22Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 1728,
+   "started": "2026-10-15T01:31:23Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/deep-lane-checkpoint-2026-10-15",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 103,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-15T03:58:12Z",
+   "commits": 1,
+   "first_green": "2026-10-15T03:57:45Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-15T03:58:12Z",
+   "number": 88,
+   "opened": "2026-10-15T03:55:56Z",
+   "ready": "2026-10-15T03:56:00Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-15T03:55:20Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/cooperbench-2026-10-15-r5k2",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 1,
+   "caused_by": [
+    [
+     "d8770840637ee8a8d4281281662504f9c7523f42",
+     [
+      88
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 1,
+   "check_seconds": 325,
+   "check_seconds_redone": 86,
+   "claim": false,
+   "closed": "2026-10-15T04:12:16Z",
+   "commits": 3,
+   "first_green": "2026-10-15T04:07:26Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-15T04:12:16Z",
+   "number": 89,
+   "opened": "2026-10-15T03:58:38Z",
+   "ready": "2026-10-15T03:58:38Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 290,
+   "started": "2026-10-15T03:58:27Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/vendor-f18-qnx4ps",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 117,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-15T09:51:43Z",
+   "commits": 1,
+   "first_green": "2026-10-15T09:51:17Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-15T09:51:43Z",
+   "number": 90,
+   "opened": "2026-10-15T09:46:19Z",
+   "ready": "2026-10-15T09:49:18Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-15T09:45:23Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/coordbench-17-8jn0pg",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 103,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-15T10:39:59Z",
+   "commits": 1,
+   "first_green": "2026-10-15T10:39:48Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-15T10:39:59Z",
+   "number": 91,
+   "opened": "2026-10-15T10:35:27Z",
+   "ready": "2026-10-15T10:38:03Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-15T10:29:48Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/checkpoint-2026-10-15b-2lv0lk",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "5050ab6ea3ff494fc285ed07e179e111e581d1da",
+     [
+      93
+     ]
+    ]
+   ],
+   "check_runs": 4,
+   "check_runs_redone": 0,
+   "check_seconds": 621,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-15T23:01:52Z",
+   "commits": 6,
+   "first_green": "2026-10-15T23:01:08Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-15T23:01:52Z",
+   "number": 92,
+   "opened": "2026-10-15T22:32:00Z",
+   "ready": "2026-10-15T22:58:39Z",
+   "reruns": 0,
+   "runs_cancelled": 3,
+   "stale_seconds": 0,
+   "started": "2026-10-15T22:31:43Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-taxonomy-spec-gkoz9m",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 127,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-15T22:42:10Z",
+   "commits": 1,
+   "first_green": "2026-10-15T22:40:00Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-15T22:42:10Z",
+   "number": 93,
+   "opened": "2026-10-15T22:37:45Z",
+   "ready": "2026-10-15T22:37:51Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-15T22:37:24Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-16T09:30:25Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-beyond-cooperation-guc8hl",
+   "catch_ups": 5,
+   "catch_ups_after_green": 4,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "31a5bc25b7643577e4d7b8bb23e3bbe13f1dc04d",
+     [
+      97,
+      95,
+      99
+     ]
+    ],
+    [
+     "91a9da961244270570f800dd710ca9d7cdb07499",
+     [
+      102
+     ]
+    ],
+    [
+     "0dcb95e9dd73f309b2ff04646f437b000258cd9e",
+     [
+      98
+     ]
+    ],
+    [
+     "1ef885f18781165f7cccc79295feffa08fad7f59",
+     [
+      100
+     ]
+    ],
+    [
+     "ac9438f08911d22f8477d534703e055e3ab9ae7c",
+     [
+      101
+     ]
+    ]
+   ],
+   "check_runs": 6,
+   "check_runs_redone": 3,
+   "check_seconds": 833,
+   "check_seconds_redone": 395,
+   "claim": false,
+   "closed": "2026-10-16T09:32:15Z",
+   "commits": 10,
+   "first_green": "2026-10-16T08:53:53Z",
+   "force_pushes": 0,
+   "landings_after_green": 3,
+   "landings_during_life": 7,
+   "merged": "2026-10-16T09:32:15Z",
+   "number": 94,
+   "opened": "2026-10-16T00:02:32Z",
+   "ready": "2026-10-16T08:50:30Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 2302,
+   "started": "2026-10-16T00:02:01Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-control-website-ma7g9x",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "a8273f15b92f5a40411287381ba98799f549fe78",
+     [
+      97
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 249,
+   "check_seconds_redone": 146,
+   "claim": false,
+   "closed": "2026-10-16T04:39:17Z",
+   "commits": 4,
+   "first_green": "2026-10-16T04:39:02Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-16T04:39:17Z",
+   "number": 95,
+   "opened": "2026-10-16T00:17:52Z",
+   "ready": "2026-10-16T04:36:34Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-16T00:17:24Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/agentic-workflow-benchmarks-gsb5h3",
+   "catch_ups": 5,
+   "catch_ups_after_green": 3,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "704b6823b8e14be951807a723d4b843a94c36a73",
+     [
+      97,
+      95,
+      99,
+      102
+     ]
+    ],
+    [
+     "b7b9c7b27d7fc2bf250ef4c919d9b7151cb09a54",
+     [
+      98
+     ]
+    ],
+    [
+     "184d3def5344325a3d8f0be50db4c879fab2da7b",
+     [
+      100
+     ]
+    ],
+    [
+     "991100b0cb24d9a6a9794f7764b94bdeed177cd5",
+     [
+      101
+     ]
+    ],
+    [
+     "2248cac5782f5ced182bd535994ba23c58d2ff93",
+     [
+      94
+     ]
+    ]
+   ],
+   "check_runs": 5,
+   "check_runs_redone": 4,
+   "check_seconds": 757,
+   "check_seconds_redone": 624,
+   "claim": false,
+   "closed": "2026-10-16T09:41:19Z",
+   "commits": 7,
+   "first_green": "2026-10-16T09:20:41Z",
+   "force_pushes": 0,
+   "landings_after_green": 2,
+   "landings_during_life": 8,
+   "merged": "2026-10-16T09:41:19Z",
+   "number": 96,
+   "opened": "2026-10-16T00:35:52Z",
+   "ready": "2026-10-16T09:17:02Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 1238,
+   "started": "2026-10-16T00:35:28Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-versus-competitors-c7mc4k",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 141,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-16T04:28:32Z",
+   "commits": 1,
+   "first_green": "2026-10-16T04:20:28Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-16T04:28:32Z",
+   "number": 97,
+   "opened": "2026-10-16T04:15:23Z",
+   "ready": "2026-10-16T04:18:04Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-16T04:14:47Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/integration-assessment-9w21hf",
+   "catch_ups": 2,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "81cc38aff12c3ac05093250645468a2518546677",
+     [
+      97,
+      95,
+      99
+     ]
+    ],
+    [
+     "61c3acdf9a4583e0b3f49f217bee245d2282dfca",
+     [
+      102
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 1,
+   "check_seconds": 469,
+   "check_seconds_redone": 128,
+   "claim": false,
+   "closed": "2026-10-16T09:13:50Z",
+   "commits": 5,
+   "first_green": "2026-10-16T08:51:34Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 4,
+   "merged": "2026-10-16T09:13:50Z",
+   "number": 98,
+   "opened": "2026-10-16T04:24:05Z",
+   "ready": "2026-10-16T08:47:53Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 1336,
+   "started": "2026-10-16T04:20:47Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/research-notes-rt4tg6",
+   "catch_ups": 2,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "586388d11a28cbb005204b2903ba592c6c638458",
+     [
+      97
+     ]
+    ],
+    [
+     "b1f1b55bbe0e8c8cd337bc32b2e3fc89c03c5e66",
+     [
+      95
+     ]
+    ]
+   ],
+   "check_runs": 4,
+   "check_runs_redone": 0,
+   "check_seconds": 519,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-16T08:41:21Z",
+   "commits": 6,
+   "first_green": "2026-10-16T04:46:38Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 2,
+   "merged": "2026-10-16T08:41:21Z",
+   "number": 99,
+   "opened": "2026-10-16T04:26:08Z",
+   "ready": "2026-10-16T04:41:06Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-16T04:25:07Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/claude-token-wizard-t88uev",
+   "catch_ups": 3,
+   "catch_ups_after_green": 2,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "c415d03e2b4e0bfeb46f7f63ea7ccc30a633b37b",
+     [
+      97,
+      95,
+      99
+     ]
+    ],
+    [
+     "79696f34cb3faeb18e8ee8856d772a700b765e57",
+     [
+      102
+     ]
+    ],
+    [
+     "a79a6d2717354ee43da57d8844d908edc71d830a",
+     [
+      98
+     ]
+    ]
+   ],
+   "check_runs": 4,
+   "check_runs_redone": 2,
+   "check_seconds": 628,
+   "check_seconds_redone": 263,
+   "claim": false,
+   "closed": "2026-10-16T09:19:22Z",
+   "commits": 9,
+   "first_green": "2026-10-16T08:52:30Z",
+   "force_pushes": 0,
+   "landings_after_green": 1,
+   "landings_during_life": 5,
+   "merged": "2026-10-16T09:19:22Z",
+   "number": 100,
+   "opened": "2026-10-16T04:33:23Z",
+   "ready": "2026-10-16T08:57:19Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 1612,
+   "started": "2026-10-16T00:17:08Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/beethoven-worker-opening-ujxy67",
+   "catch_ups": 4,
+   "catch_ups_after_green": 2,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "bfc3a1d9990cc13d2255e88646e5403603f09145",
+     [
+      95
+     ]
+    ],
+    [
+     "d7651b1440976146f82e8fe775f8d39d6361730a",
+     [
+      99
+     ]
+    ],
+    [
+     "4b20c7cc2c3aa95b5bf790e3247966a149b2e302",
+     [
+      102,
+      98
+     ]
+    ],
+    [
+     "4fb3179b95ec201092c371cabfa55c9f9162fc9d",
+     [
+      100
+     ]
+    ]
+   ],
+   "check_runs": 4,
+   "check_runs_redone": 2,
+   "check_seconds": 557,
+   "check_seconds_redone": 262,
+   "claim": false,
+   "closed": "2026-10-16T09:26:01Z",
+   "commits": 6,
+   "first_green": "2026-10-16T08:53:05Z",
+   "force_pushes": 0,
+   "landings_after_green": 2,
+   "landings_during_life": 5,
+   "merged": "2026-10-16T09:26:01Z",
+   "number": 101,
+   "opened": "2026-10-16T04:35:17Z",
+   "ready": "2026-10-16T04:39:00Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 1976,
+   "started": "2026-10-16T04:34:53Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-control-website-ma7g9x",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "9d031ac7048d8c57182ce3da0154d21eb2d38e57",
+     [
+      99
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 354,
+   "check_seconds_redone": 140,
+   "claim": false,
+   "closed": "2026-10-16T08:48:34Z",
+   "commits": 2,
+   "first_green": "2026-10-16T04:48:54Z",
+   "force_pushes": 0,
+   "landings_after_green": 1,
+   "landings_during_life": 1,
+   "merged": "2026-10-16T08:48:34Z",
+   "number": 102,
+   "opened": "2026-10-16T04:45:05Z",
+   "ready": "2026-10-16T04:45:18Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 14380,
+   "started": "2026-10-16T04:43:34Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-wsu-grid-sy2dkf",
+   "catch_ups": 3,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "79947894cad422ed8d8df4eb123c9b455b9edf8f",
+     [
+      95,
+      99,
+      102,
+      98
+     ]
+    ],
+    [
+     "df15229b3b447ab9df087b23bbc03da159928fa2",
+     [
+      100
+     ]
+    ],
+    [
+     "970162dacc4720a3354b0c68e715d626ea23e826",
+     [
+      101,
+      94,
+      96
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 2,
+   "check_seconds": 331,
+   "check_seconds_redone": 331,
+   "claim": false,
+   "closed": "2026-10-16T10:04:47Z",
+   "commits": 7,
+   "first_green": "2026-10-16T10:02:25Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 8,
+   "merged": "2026-10-16T10:04:47Z",
+   "number": 103,
+   "opened": "2026-10-16T09:19:55Z",
+   "ready": "2026-10-16T09:59:26Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 0,
+   "started": "2026-10-16T08:53:15Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-16T12:10:24Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-beyond-cooperation-guc8hl",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "3a1c45d946d105f947332c179824487ea7c798d0",
+     [
+      96,
+      103,
+      105
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 1,
+   "check_seconds": 555,
+   "check_seconds_redone": 200,
+   "claim": false,
+   "closed": "2026-10-16T12:14:13Z",
+   "commits": 4,
+   "first_green": "2026-10-16T12:13:51Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 3,
+   "merged": "2026-10-16T12:14:13Z",
+   "number": 104,
+   "opened": "2026-10-16T09:55:42Z",
+   "ready": "2026-10-16T12:10:19Z",
+   "reruns": 0,
+   "runs_cancelled": 3,
+   "stale_seconds": 0,
+   "started": "2026-10-16T09:54:42Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/claude-token-wizard-t88uev",
+   "catch_ups": 3,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "6eaa1b0bb90e33c55c5d3e7101f3e3f9fac7044b",
+     [
+      101,
+      94
+     ]
+    ],
+    [
+     "90bbcc4be9cce1227083d8ac83d8f2a2347eef22",
+     [
+      96
+     ]
+    ],
+    [
+     "9defaf7df8e87242da3bfc403166ae410c6d52d5",
+     [
+      103
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 2,
+   "check_seconds": 271,
+   "check_seconds_redone": 271,
+   "claim": false,
+   "closed": "2026-10-16T10:16:09Z",
+   "commits": 6,
+   "first_green": "2026-10-16T10:09:31Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 4,
+   "merged": "2026-10-16T10:16:09Z",
+   "number": 105,
+   "opened": "2026-10-16T10:07:09Z",
+   "ready": "2026-10-16T10:12:44Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 398,
+   "started": "2026-10-16T09:31:39Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/protocol-fixes-0-5-0-p0yrit",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "7d20c9d5580c970d58dafae13300e2ee3fd704fc",
+     [
+      104
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 282,
+   "check_seconds_redone": 133,
+   "claim": false,
+   "closed": "2026-10-16T12:44:28Z",
+   "commits": 5,
+   "first_green": "2026-10-16T12:03:45Z",
+   "force_pushes": 0,
+   "landings_after_green": 1,
+   "landings_during_life": 1,
+   "merged": "2026-10-16T12:44:28Z",
+   "number": 106,
+   "opened": "2026-10-16T12:01:11Z",
+   "ready": "2026-10-16T12:32:01Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 2443,
+   "started": "2026-10-16T10:53:13Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-16T18:00:12Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-beyond-cooperation-guc8hl",
+   "catch_ups": 4,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "6b4b2c2fd561d6617ce77563a662c785486bcad1",
+     [
+      106
+     ]
+    ],
+    [
+     "8d36253af6b4e37ff0c8cdb88686cc3dcd925be7",
+     [
+      108
+     ]
+    ],
+    [
+     "9c9074ea072c47ab90f52a24c57884c4019893d1",
+     [
+      110
+     ]
+    ],
+    [
+     "6b661eb7c66d6929b4992ef70aa60d176fd8b37b",
+     [
+      109
+     ]
+    ]
+   ],
+   "check_runs": 6,
+   "check_runs_redone": 4,
+   "check_seconds": 889,
+   "check_seconds_redone": 609,
+   "claim": false,
+   "closed": "2026-10-16T18:02:42Z",
+   "commits": 11,
+   "first_green": "2026-10-16T18:01:57Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 4,
+   "merged": "2026-10-16T18:02:42Z",
+   "number": 107,
+   "opened": "2026-10-16T12:37:16Z",
+   "ready": "2026-10-16T17:59:50Z",
+   "reruns": 0,
+   "runs_cancelled": 3,
+   "stale_seconds": 0,
+   "started": "2026-10-16T12:17:38Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/protocol-fixes-0-5-0-p0yrit",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 3,
+   "check_runs_redone": 0,
+   "check_seconds": 626,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-16T15:40:08Z",
+   "commits": 3,
+   "first_green": "2026-10-16T15:35:55Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-16T15:40:07Z",
+   "number": 108,
+   "opened": "2026-10-16T14:09:27Z",
+   "ready": "2026-10-16T15:32:04Z",
+   "reruns": 0,
+   "runs_cancelled": 3,
+   "stale_seconds": 0,
+   "started": "2026-10-16T14:09:09Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-control-website-ma7g9x",
+   "catch_ups": 3,
+   "catch_ups_after_green": 2,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "c4bb2cf58c81782c66c312eba32f86e613b16b9a",
+     [
+      104,
+      106
+     ]
+    ],
+    [
+     "eaf6ff0a6b988ef9a71647a8a0d1d4b970e9afbf",
+     [
+      108
+     ]
+    ],
+    [
+     "52506ed234f64bb2171d9221459dad61dfc5fe01",
+     [
+      110
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 2,
+   "check_seconds": 419,
+   "check_seconds_redone": 274,
+   "claim": false,
+   "closed": "2026-10-16T16:26:48Z",
+   "commits": 5,
+   "first_green": "2026-10-16T14:31:59Z",
+   "force_pushes": 0,
+   "landings_after_green": 2,
+   "landings_during_life": 4,
+   "merged": "2026-10-16T16:26:48Z",
+   "number": 109,
+   "opened": "2026-10-16T14:22:33Z",
+   "ready": "2026-10-16T14:29:27Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 6889,
+   "started": "2026-10-16T14:18:44Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/protocol-fixes-0-5-0-p0yrit",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 2,
+   "check_runs_redone": 0,
+   "check_seconds": 315,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-16T16:13:55Z",
+   "commits": 2,
+   "first_green": "2026-10-16T16:13:44Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-16T16:13:55Z",
+   "number": 110,
+   "opened": "2026-10-16T15:48:04Z",
+   "ready": "2026-10-16T16:11:05Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-16T15:47:47Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "dependabot/github_actions/actions/upload-artifact-7",
+   "catch_ups": 2,
+   "catch_ups_after_green": 2,
+   "catch_ups_by_button": 2,
+   "caused_by": [
+    [
+     "7a48fcf935de7c6b5f0b49adecf9b3c8224ab269",
+     [
+      194,
+      200,
+      203
+     ]
+    ],
+    [
+     "d5cba28dd76ed486af1cd84dcd28aae2a973f9d4",
+     [
+      199
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 2,
+   "check_seconds": 606,
+   "check_seconds_redone": 384,
+   "claim": false,
+   "closed": "2026-10-18T08:53:00Z",
+   "commits": 3,
+   "first_green": "2026-10-18T08:08:40Z",
+   "force_pushes": 9,
+   "landings_after_green": 4,
+   "landings_during_life": 4,
+   "merged": "2026-10-18T08:52:59Z",
+   "number": 111,
+   "opened": "2026-10-16T16:05:04Z",
+   "ready": "2026-10-16T16:05:04Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 2659,
+   "started": "2026-10-16T16:05:04Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "dependabot/github_actions/actions/setup-python-7",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 1,
+   "caused_by": [
+    [
+     "3fcf121ea888989bfcf84193e13bf39ed6aadacd",
+     [
+      194,
+      200,
+      203,
+      199,
+      111
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 405,
+   "check_seconds_redone": 143,
+   "claim": false,
+   "closed": "2026-10-18T09:41:41Z",
+   "commits": 2,
+   "first_green": "2026-10-18T08:09:18Z",
+   "force_pushes": 9,
+   "landings_after_green": 5,
+   "landings_during_life": 5,
+   "merged": "2026-10-18T09:41:41Z",
+   "number": 112,
+   "opened": "2026-10-16T16:05:12Z",
+   "ready": "2026-10-16T16:05:12Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 5543,
+   "started": "2026-10-16T16:05:12Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "dependabot/github_actions/actions/create-github-app-token-3",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 1,
+   "caused_by": [
+    [
+     "b8cf599599637ac89baba8969a9471aca3fbfd01",
+     [
+      112
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 408,
+   "check_seconds_redone": 200,
+   "claim": false,
+   "closed": "2026-10-18T09:48:18Z",
+   "commits": 2,
+   "first_green": "2026-10-18T08:58:33Z",
+   "force_pushes": 10,
+   "landings_after_green": 1,
+   "landings_during_life": 1,
+   "merged": "2026-10-18T09:48:18Z",
+   "number": 113,
+   "opened": "2026-10-16T16:05:16Z",
+   "ready": "2026-10-16T16:05:16Z",
+   "reruns": 1,
+   "runs_cancelled": 2,
+   "stale_seconds": 2985,
+   "started": "2026-10-16T16:05:16Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-16T18:59:28Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-control-website-ma7g9x",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "9d04355abd091e84913fdf1785e966bf1bb06388",
+     [
+      107,
+      115
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 1,
+   "check_seconds": 554,
+   "check_seconds_redone": 241,
+   "claim": false,
+   "closed": "2026-10-16T19:03:55Z",
+   "commits": 3,
+   "first_green": "2026-10-16T17:19:49Z",
+   "force_pushes": 0,
+   "landings_after_green": 2,
+   "landings_during_life": 2,
+   "merged": "2026-10-16T19:03:55Z",
+   "number": 114,
+   "opened": "2026-10-16T16:48:24Z",
+   "ready": "2026-10-16T17:17:08Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 6246,
+   "started": "2026-10-16T16:44:57Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/agentic-workflow-benchmarks-gsb5h3",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 261,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-16T18:36:20Z",
+   "commits": 1,
+   "first_green": "2026-10-16T18:34:20Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-16T18:36:20Z",
+   "number": 115,
+   "opened": "2026-10-16T18:29:34Z",
+   "ready": "2026-10-16T18:29:57Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 0,
+   "started": "2026-10-16T18:29:17Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-beyond-cooperation-guc8hl",
+   "catch_ups": 2,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "c418eafa2adb247626226489201647bd9725a47a",
+     [
+      115
+     ]
+    ],
+    [
+     "cde95a92617e0ceb354bb3250b311ca84c8b91df",
+     [
+      114,
+      120,
+      122,
+      118,
+      117,
+      121,
+      124,
+      119,
+      123
+     ]
+    ]
+   ],
+   "check_runs": 4,
+   "check_runs_redone": 1,
+   "check_seconds": 759,
+   "check_seconds_redone": 129,
+   "claim": false,
+   "closed": "2026-10-17T14:26:07Z",
+   "commits": 7,
+   "first_green": "2026-10-17T14:25:49Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 10,
+   "merged": "2026-10-17T14:26:07Z",
+   "number": 116,
+   "opened": "2026-10-16T18:40:31Z",
+   "ready": "2026-10-17T14:21:21Z",
+   "reruns": 0,
+   "runs_cancelled": 3,
+   "stale_seconds": 0,
+   "started": "2026-10-16T18:32:43Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-16T19:07:02Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/checkpoint-2026-10-16-z0yy2l",
+   "catch_ups": 4,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "7203da861182ba0c8aab9c9b25ef9b495a1e4de4",
+     [
+      114
+     ]
+    ],
+    [
+     "8ead7b19a089087374a2f0530719dfcdf186a66e",
+     [
+      120
+     ]
+    ],
+    [
+     "87bf1ef0727b2d5d2760a322dbd6a8088e004378",
+     [
+      122
+     ]
+    ],
+    [
+     "593410fb80b4a6a7f110c46cc41be0e2de230f60",
+     [
+      118
+     ]
+    ]
+   ],
+   "check_runs": 5,
+   "check_runs_redone": 2,
+   "check_seconds": 862,
+   "check_seconds_redone": 323,
+   "claim": false,
+   "closed": "2026-10-16T19:31:35Z",
+   "commits": 9,
+   "first_green": "2026-10-16T19:26:17Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 4,
+   "merged": "2026-10-16T19:31:35Z",
+   "number": 117,
+   "opened": "2026-10-16T19:06:30Z",
+   "ready": "2026-10-16T19:06:55Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-16T19:03:53Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-16T19:17:51Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-wsu-grid-sy2dkf",
+   "catch_ups": 2,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "d7c7dd26ea3776a306bccc4b354abe90c3f4a0e8",
+     [
+      120
+     ]
+    ],
+    [
+     "7c893332bfcf3d598944a20d919dca0f04ec2b19",
+     [
+      122
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 2,
+   "check_seconds": 519,
+   "check_seconds_redone": 342,
+   "claim": false,
+   "closed": "2026-10-16T19:25:36Z",
+   "commits": 4,
+   "first_green": "2026-10-16T19:20:41Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 2,
+   "merged": "2026-10-16T19:25:36Z",
+   "number": 118,
+   "opened": "2026-10-16T19:08:20Z",
+   "ready": "2026-10-16T19:17:46Z",
+   "reruns": 0,
+   "runs_cancelled": 3,
+   "stale_seconds": 295,
+   "started": "2026-10-16T19:07:23Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/protocol-fixes-0-5-0-p0yrit",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "80570a8e639e02364a23e72ccb0c643ed742fb2c",
+     [
+      114,
+      120,
+      122,
+      118,
+      117,
+      121,
+      124
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 281,
+   "check_seconds_redone": 137,
+   "claim": false,
+   "closed": "2026-10-17T13:51:53Z",
+   "commits": 2,
+   "first_green": "2026-10-16T19:11:57Z",
+   "force_pushes": 0,
+   "landings_after_green": 6,
+   "landings_during_life": 7,
+   "merged": "2026-10-17T13:51:53Z",
+   "number": 119,
+   "opened": "2026-10-16T19:09:29Z",
+   "ready": "2026-10-16T19:09:29Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 67196,
+   "started": "2026-10-16T19:09:07Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-16T19:10:37Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-control-website-ma7g9x",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 170,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-16T19:13:38Z",
+   "commits": 1,
+   "first_green": "2026-10-16T19:13:20Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-16T19:13:38Z",
+   "number": 120,
+   "opened": "2026-10-16T19:10:19Z",
+   "ready": "2026-10-16T19:10:27Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-16T19:10:02Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-16T19:16:02Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/agentic-workflow-benchmarks-gsb5h3",
+   "catch_ups": 3,
+   "catch_ups_after_green": 3,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "e0193cebc10b3e91f4b1c3111a605a8a695e0d26",
+     [
+      114,
+      120,
+      122
+     ]
+    ],
+    [
+     "de2a0736f2d47f7f003af6ab4d5718bf05a6aa8b",
+     [
+      118
+     ]
+    ],
+    [
+     "9f069f16fb3ae1c3d9a3ec876a43ba8acd79fcf5",
+     [
+      117
+     ]
+    ]
+   ],
+   "check_runs": 4,
+   "check_runs_redone": 3,
+   "check_seconds": 685,
+   "check_seconds_redone": 493,
+   "claim": false,
+   "closed": "2026-10-16T19:39:28Z",
+   "commits": 4,
+   "first_green": "2026-10-16T19:19:10Z",
+   "force_pushes": 0,
+   "landings_after_green": 3,
+   "landings_during_life": 5,
+   "merged": "2026-10-16T19:39:28Z",
+   "number": 121,
+   "opened": "2026-10-16T19:14:18Z",
+   "ready": "2026-10-16T19:15:55Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 1218,
+   "started": "2026-10-16T19:13:24Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-16T19:16:22Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/beethoven-worker-opening-ujxy67",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "2352e6a61970824f936256ba74e6375fbbbf1610",
+     [
+      114,
+      120
+     ]
+    ]
+   ],
+   "check_runs": 1,
+   "check_runs_redone": 1,
+   "check_seconds": 195,
+   "check_seconds_redone": 195,
+   "claim": false,
+   "closed": "2026-10-16T19:20:15Z",
+   "commits": 2,
+   "first_green": "2026-10-16T19:19:34Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 2,
+   "merged": "2026-10-16T19:20:15Z",
+   "number": 122,
+   "opened": "2026-10-16T19:15:21Z",
+   "ready": "2026-10-16T19:16:17Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-16T19:14:10Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/claude-token-wizard-t88uev",
+   "catch_ups": 2,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "8a54865999a1796f00297abd8a71426ddd9e050c",
+     [
+      120,
+      122,
+      118,
+      117,
+      121,
+      124
+     ]
+    ],
+    [
+     "55baf4b699b2151b78b04fa11a6c6e81a311120d",
+     [
+      119
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 2,
+   "check_seconds": 427,
+   "check_seconds_redone": 266,
+   "claim": false,
+   "closed": "2026-10-17T13:56:43Z",
+   "commits": 4,
+   "first_green": "2026-10-17T13:56:21Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 7,
+   "merged": "2026-10-17T13:56:43Z",
+   "number": 123,
+   "opened": "2026-10-16T19:20:06Z",
+   "ready": "2026-10-17T13:51:45Z",
+   "reruns": 0,
+   "runs_cancelled": 3,
+   "stale_seconds": 0,
+   "started": "2026-10-16T19:19:43Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-16T19:41:08Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/checkpoint-2026-10-16-z0yy2l",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "a0d1658b73010aed0ceb5c696543c4f182b5103d",
+     [
+      121
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 0,
+   "check_seconds": 295,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-16T19:56:42Z",
+   "commits": 3,
+   "first_green": "2026-10-16T19:56:08Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-16T19:56:42Z",
+   "number": 124,
+   "opened": "2026-10-16T19:40:58Z",
+   "ready": "2026-10-16T19:41:02Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 0,
+   "started": "2026-10-16T19:40:35Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "7e4f823e541109429b05eeae3a8d696a23ce811d",
+     [
+      116
+     ]
+    ]
+   ],
+   "check_runs": 1,
+   "check_runs_redone": 1,
+   "check_seconds": 262,
+   "check_seconds_redone": 262,
+   "claim": false,
+   "closed": "2026-10-17T14:36:32Z",
+   "commits": 3,
+   "first_green": "2026-10-17T14:36:11Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-17T14:36:32Z",
+   "number": 125,
+   "opened": "2026-10-17T14:31:32Z",
+   "ready": "2026-10-17T14:31:32Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-17T14:18:20Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/signin-live",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "e7bf2303942b31c363b69ee9fd444807f8f509b1",
+     [
+      125
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 337,
+   "check_seconds_redone": 171,
+   "claim": false,
+   "closed": "2026-10-17T14:47:16Z",
+   "commits": 2,
+   "first_green": "2026-10-17T14:40:43Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-17T14:47:16Z",
+   "number": 126,
+   "opened": "2026-10-17T14:37:55Z",
+   "ready": "2026-10-17T14:37:55Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 393,
+   "started": "2026-10-17T14:37:44Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 139,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-17T15:15:48Z",
+   "commits": 1,
+   "first_green": "2026-10-17T15:15:29Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-17T15:15:48Z",
+   "number": 145,
+   "opened": "2026-10-17T15:13:07Z",
+   "ready": "2026-10-17T15:13:07Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T15:12:46Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-l2qwbn",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 168,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-17T15:27:54Z",
+   "commits": 1,
+   "first_green": "2026-10-17T15:27:27Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-17T15:27:54Z",
+   "number": 146,
+   "opened": "2026-10-17T15:24:36Z",
+   "ready": "2026-10-17T15:24:36Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T15:24:24Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-axt5uz",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "826ae0a3a43f7d5b6ccdf5a2a672eeb44bda6d68",
+     [
+      146
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 271,
+   "check_seconds_redone": 157,
+   "claim": false,
+   "closed": "2026-10-17T15:36:41Z",
+   "commits": 2,
+   "first_green": "2026-10-17T15:30:46Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-17T15:36:41Z",
+   "number": 147,
+   "opened": "2026-10-17T15:28:48Z",
+   "ready": "2026-10-17T15:28:48Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 355,
+   "started": "2026-10-17T15:28:37Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-17T16:02:31Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ondq55",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "42e17174c6abab6c4c6bb5c0cae427ca1389a8a2",
+     [
+      147
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 278,
+   "check_seconds_redone": 162,
+   "claim": false,
+   "closed": "2026-10-17T16:05:16Z",
+   "commits": 2,
+   "first_green": "2026-10-17T15:50:41Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-17T16:05:16Z",
+   "number": 148,
+   "opened": "2026-10-17T15:48:42Z",
+   "ready": "2026-10-17T15:48:42Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 875,
+   "started": "2026-10-17T15:48:31Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/control-board-graph",
+   "catch_ups": 2,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "b74bcedcb8e16103c99fc6a97f48e86a3e8f85bf",
+     [
+      146,
+      147
+     ]
+    ],
+    [
+     "440213d3a68429ad2633cca0cda7c2298bea990e",
+     [
+      148
+     ]
+    ]
+   ],
+   "check_runs": 1,
+   "check_runs_redone": 1,
+   "check_seconds": 166,
+   "check_seconds_redone": 166,
+   "claim": false,
+   "closed": "2026-10-17T16:47:06Z",
+   "commits": 7,
+   "first_green": "2026-10-17T16:46:26Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 3,
+   "merged": "2026-10-17T16:47:06Z",
+   "number": 149,
+   "opened": "2026-10-17T16:08:21Z",
+   "ready": "2026-10-17T16:08:21Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T15:46:53Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-axt5uz",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 185,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-17T16:54:59Z",
+   "commits": 1,
+   "first_green": "2026-10-17T16:54:47Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-17T16:54:59Z",
+   "number": 150,
+   "opened": "2026-10-17T16:51:39Z",
+   "ready": "2026-10-17T16:51:39Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T16:51:23Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "8cff740a5d7ebb8bbeca137af24374a959afe22d",
+     [
+      149,
+      150
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 344,
+   "check_seconds_redone": 174,
+   "claim": false,
+   "closed": "2026-10-17T17:30:15Z",
+   "commits": 3,
+   "first_green": "2026-10-17T17:13:22Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 2,
+   "merged": "2026-10-17T17:30:15Z",
+   "number": 151,
+   "opened": "2026-10-17T17:10:28Z",
+   "ready": "2026-10-17T17:10:28Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 1013,
+   "started": "2026-10-17T16:55:08Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 163,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-17T18:17:13Z",
+   "commits": 1,
+   "first_green": "2026-10-17T18:12:25Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-17T18:17:13Z",
+   "number": 152,
+   "opened": "2026-10-17T18:09:39Z",
+   "ready": "2026-10-17T18:09:39Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T18:09:28Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 138,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-17T18:28:32Z",
+   "commits": 1,
+   "first_green": "2026-10-17T18:27:22Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-17T18:28:32Z",
+   "number": 153,
+   "opened": "2026-10-17T18:25:01Z",
+   "ready": "2026-10-17T18:25:01Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T18:24:48Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 183,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-17T21:49:27Z",
+   "commits": 1,
+   "first_green": "2026-10-17T21:49:11Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-17T21:49:26Z",
+   "number": 154,
+   "opened": "2026-10-17T21:46:05Z",
+   "ready": "2026-10-17T21:46:05Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T21:45:50Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/grid-ssh-gate-4wx0ul",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "0205db09877875a5c4e09eb2492682d340ea59e6",
+     [
+      154
+     ]
+    ]
+   ],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 172,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-17T22:17:57Z",
+   "commits": 3,
+   "first_green": "2026-10-17T21:58:50Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-17T22:17:57Z",
+   "number": 155,
+   "opened": "2026-10-17T21:55:55Z",
+   "ready": "2026-10-17T21:55:55Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T21:35:54Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-17T22:51:44Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "2d55ceb095fc8a4d984f529e12609e8b4db5e5d9",
+     [
+      155
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 319,
+   "check_seconds_redone": 176,
+   "claim": false,
+   "closed": "2026-10-17T22:54:59Z",
+   "commits": 2,
+   "first_green": "2026-10-17T22:48:55Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-17T22:54:59Z",
+   "number": 156,
+   "opened": "2026-10-17T22:46:30Z",
+   "ready": "2026-10-17T22:46:30Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 364,
+   "started": "2026-10-17T22:46:15Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-17T23:11:12Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/flowbench-pilot-1whw40",
+   "catch_ups": 2,
+   "catch_ups_after_green": 2,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "fe4d417a30837d8406a84f8dbd43af2150c2899c",
+     [
+      154,
+      155,
+      156,
+      158
+     ]
+    ],
+    [
+     "7ace15c767e746e2adac982238bd8ee6aae12ffa",
+     [
+      159
+     ]
+    ]
+   ],
+   "check_runs": 4,
+   "check_runs_redone": 2,
+   "check_seconds": 578,
+   "check_seconds_redone": 252,
+   "claim": false,
+   "closed": "2026-10-17T23:20:02Z",
+   "commits": 4,
+   "first_green": "2026-10-17T23:08:02Z",
+   "force_pushes": 0,
+   "landings_after_green": 1,
+   "landings_during_life": 5,
+   "merged": "2026-10-17T23:20:01Z",
+   "number": 157,
+   "opened": "2026-10-17T22:59:20Z",
+   "ready": "2026-10-17T22:59:20Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 719,
+   "started": "2026-10-17T22:58:51Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-17T23:01:11Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 185,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-17T23:04:43Z",
+   "commits": 1,
+   "first_green": "2026-10-17T23:04:12Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-17T23:04:43Z",
+   "number": 158,
+   "opened": "2026-10-17T23:01:04Z",
+   "ready": "2026-10-17T23:01:04Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T23:00:51Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/grid-ssh-gate-4wx0ul",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "c0ee1378e3a974b221deadd10da890f34294d606",
+     [
+      158
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 353,
+   "check_seconds_redone": 174,
+   "claim": false,
+   "closed": "2026-10-17T23:13:01Z",
+   "commits": 2,
+   "first_green": "2026-10-17T23:06:55Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-17T23:13:01Z",
+   "number": 159,
+   "opened": "2026-10-17T23:03:54Z",
+   "ready": "2026-10-17T23:03:54Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 366,
+   "started": "2026-10-17T23:03:45Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-17T23:17:39Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "ee1d033283639c3a6784050f6cc73945a4af570d",
+     [
+      157
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 345,
+   "check_seconds_redone": 170,
+   "claim": false,
+   "closed": "2026-10-17T23:26:28Z",
+   "commits": 2,
+   "first_green": "2026-10-17T23:20:32Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-17T23:26:28Z",
+   "number": 160,
+   "opened": "2026-10-17T23:17:33Z",
+   "ready": "2026-10-17T23:17:33Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 356,
+   "started": "2026-10-17T23:15:05Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-17T23:29:12Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 178,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-17T23:32:32Z",
+   "commits": 1,
+   "first_green": "2026-10-17T23:32:08Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-17T23:32:31Z",
+   "number": 161,
+   "opened": "2026-10-17T23:29:07Z",
+   "ready": "2026-10-17T23:29:07Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T23:26:37Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-17T23:36:46Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/graph-setup",
+   "catch_ups": 3,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "4af6bea49e2c41f85b7d62f4ff80674ff10a0b37",
+     [
+      157
+     ]
+    ],
+    [
+     "12ff4d13f9bfe34a1565913d75e75d20e3d922a1",
+     [
+      160
+     ]
+    ],
+    [
+     "9211061c16851d9aeeb7e305e0754a4d749f3f6a",
+     [
+      161
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 2,
+   "check_seconds": 263,
+   "check_seconds_redone": 263,
+   "claim": false,
+   "closed": "2026-10-17T23:39:02Z",
+   "commits": 7,
+   "first_green": "2026-10-17T23:36:35Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 3,
+   "merged": "2026-10-17T23:39:02Z",
+   "number": 162,
+   "opened": "2026-10-17T23:34:09Z",
+   "ready": "2026-10-17T23:34:09Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T23:16:30Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/grid-ssh-gate-4wx0ul",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 145,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-17T23:48:00Z",
+   "commits": 1,
+   "first_green": "2026-10-17T23:47:04Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-17T23:48:00Z",
+   "number": 163,
+   "opened": "2026-10-17T23:44:36Z",
+   "ready": "2026-10-17T23:44:36Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-17T23:44:24Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/grid-ssh-gate-4wx0ul",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 179,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T00:36:57Z",
+   "commits": 1,
+   "first_green": "2026-10-18T00:36:38Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T00:36:57Z",
+   "number": 164,
+   "opened": "2026-10-18T00:33:37Z",
+   "ready": "2026-10-18T00:33:37Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T00:33:17Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T00:39:42Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/assistant",
+   "catch_ups": 2,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "0064acbe0f837b47f9ec6c3b638f817688fc5273",
+     [
+      163
+     ]
+    ],
+    [
+     "299cf152512bc72ee3fc6fc01449d5949fd88acc",
+     [
+      164
+     ]
+    ]
+   ],
+   "check_runs": 1,
+   "check_runs_redone": 1,
+   "check_seconds": 174,
+   "check_seconds_redone": 174,
+   "claim": false,
+   "closed": "2026-10-18T00:43:42Z",
+   "commits": 5,
+   "first_green": "2026-10-18T00:42:38Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 2,
+   "merged": "2026-10-18T00:43:42Z",
+   "number": 165,
+   "opened": "2026-10-18T00:37:24Z",
+   "ready": "2026-10-18T00:37:24Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-17T23:56:41Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T01:22:41Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 126,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T01:24:55Z",
+   "commits": 1,
+   "first_green": "2026-10-18T01:24:39Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T01:24:55Z",
+   "number": 166,
+   "opened": "2026-10-18T01:22:30Z",
+   "ready": "2026-10-18T01:22:30Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T01:22:20Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T01:41:41Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 142,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T01:44:12Z",
+   "commits": 1,
+   "first_green": "2026-10-18T01:44:01Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T01:44:12Z",
+   "number": 167,
+   "opened": "2026-10-18T01:41:37Z",
+   "ready": "2026-10-18T01:41:37Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T01:41:27Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-sdnams",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "f72358eb8c775d3a562bbfe857af76a150298793",
+     [
+      167
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 322,
+   "check_seconds_redone": 147,
+   "claim": false,
+   "closed": "2026-10-18T01:56:10Z",
+   "commits": 2,
+   "first_green": "2026-10-18T01:49:58Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-18T01:56:10Z",
+   "number": 168,
+   "opened": "2026-10-18T01:47:00Z",
+   "ready": "2026-10-18T01:47:00Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 372,
+   "started": "2026-10-18T01:46:41Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T02:02:42Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/symphony-extension-store-tozqq8",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "6d683bebfd9bfcbec077afb40cd6398d6388a8f8",
+     [
+      168
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 357,
+   "check_seconds_redone": 181,
+   "claim": false,
+   "closed": "2026-10-18T02:11:44Z",
+   "commits": 2,
+   "first_green": "2026-10-18T02:05:35Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-18T02:11:44Z",
+   "number": 169,
+   "opened": "2026-10-18T02:02:35Z",
+   "ready": "2026-10-18T02:02:35Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 369,
+   "started": "2026-10-18T02:02:23Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T02:11:37Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/word-revisions-onedrive-bormtg",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "8942068824ce0c0b0fbb84039c97720e40d62f07",
+     [
+      168,
+      169
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 350,
+   "check_seconds_redone": 169,
+   "claim": false,
+   "closed": "2026-10-18T02:20:48Z",
+   "commits": 2,
+   "first_green": "2026-10-18T02:14:35Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 2,
+   "merged": "2026-10-18T02:20:48Z",
+   "number": 170,
+   "opened": "2026-10-18T02:11:30Z",
+   "ready": "2026-10-18T02:11:30Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 373,
+   "started": "2026-10-18T02:11:09Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T02:25:52Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/grid-ssh-gate-4wx0ul",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "9398dd6121f868844f6701055b74facac24e98f6",
+     [
+      170
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 321,
+   "check_seconds_redone": 180,
+   "claim": false,
+   "closed": "2026-10-18T02:29:06Z",
+   "commits": 2,
+   "first_green": "2026-10-18T02:22:32Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-18T02:29:06Z",
+   "number": 171,
+   "opened": "2026-10-18T02:20:07Z",
+   "ready": "2026-10-18T02:20:07Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 394,
+   "started": "2026-10-18T02:19:57Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T02:43:15Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/assistant-page-record",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 168,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T02:46:16Z",
+   "commits": 1,
+   "first_green": "2026-10-18T02:45:55Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T02:46:15Z",
+   "number": 172,
+   "opened": "2026-10-18T02:43:04Z",
+   "ready": "2026-10-18T02:43:04Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T02:42:55Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T04:49:35Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 198,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T04:53:23Z",
+   "commits": 1,
+   "first_green": "2026-10-18T04:57:55Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T04:53:23Z",
+   "number": 173,
+   "opened": "2026-10-18T04:49:31Z",
+   "ready": "2026-10-18T04:49:31Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T04:49:18Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T04:59:39Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/grid-ssh-gate-4wx0ul",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 179,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T05:02:55Z",
+   "commits": 1,
+   "first_green": "2026-10-18T05:02:37Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T05:02:55Z",
+   "number": 174,
+   "opened": "2026-10-18T04:59:35Z",
+   "ready": "2026-10-18T04:59:35Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T04:59:26Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T05:07:01Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/word-revisions-onedrive-bormtg",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "996616930c955dd23aa36d64f5dfa87011d212aa",
+     [
+      173,
+      174
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 1,
+   "check_seconds": 445,
+   "check_seconds_redone": 172,
+   "claim": false,
+   "closed": "2026-10-18T05:18:01Z",
+   "commits": 3,
+   "first_green": "2026-10-18T05:11:35Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 2,
+   "merged": "2026-10-18T05:18:01Z",
+   "number": 175,
+   "opened": "2026-10-18T05:06:54Z",
+   "ready": "2026-10-18T05:06:54Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 386,
+   "started": "2026-10-18T05:06:38Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T05:08:46Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 3,
+   "catch_ups_after_green": 3,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "a30dd038e6c0cc38b083d8c2faac9f0483441471",
+     [
+      174
+     ]
+    ],
+    [
+     "e94d719eea4e74986c27067ac17f9d2fd278aea5",
+     [
+      175
+     ]
+    ],
+    [
+     "510f9e0b0773b48faadc4ae2447ce191f0d9deb9",
+     [
+      177
+     ]
+    ]
+   ],
+   "check_runs": 4,
+   "check_runs_redone": 3,
+   "check_seconds": 638,
+   "check_seconds_redone": 465,
+   "claim": false,
+   "closed": "2026-10-18T05:32:25Z",
+   "commits": 6,
+   "first_green": "2026-10-18T05:11:37Z",
+   "force_pushes": 0,
+   "landings_after_green": 2,
+   "landings_during_life": 3,
+   "merged": "2026-10-18T05:32:25Z",
+   "number": 176,
+   "opened": "2026-10-18T05:08:41Z",
+   "ready": "2026-10-18T05:08:41Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 1248,
+   "started": "2026-10-18T04:54:25Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T05:21:42Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/word-revisions-onedrive-bormtg",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 141,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T05:24:11Z",
+   "commits": 1,
+   "first_green": "2026-10-18T05:24:02Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T05:24:11Z",
+   "number": 177,
+   "opened": "2026-10-18T05:21:38Z",
+   "ready": "2026-10-18T05:21:38Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T05:21:21Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T05:28:21Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/site-docs-navigation-csdzct",
+   "catch_ups": 3,
+   "catch_ups_after_green": 3,
+   "catch_ups_by_button": 1,
+   "caused_by": [
+    [
+     "f772d3f15725777ad326891a27dd2fd99c54b2ee",
+     [
+      177
+     ]
+    ],
+    [
+     "e984ac40bb8e195a6bb4911f7ca4c2d9cd1613ef",
+     [
+      176
+     ]
+    ],
+    [
+     "5607df374002129d03e77170004c6f7d280c61b6",
+     [
+      179
+     ]
+    ]
+   ],
+   "check_runs": 4,
+   "check_runs_redone": 3,
+   "check_seconds": 681,
+   "check_seconds_redone": 503,
+   "claim": false,
+   "closed": "2026-10-18T05:45:54Z",
+   "commits": 4,
+   "first_green": "2026-10-18T05:31:17Z",
+   "force_pushes": 0,
+   "landings_after_green": 2,
+   "landings_during_life": 3,
+   "merged": "2026-10-18T05:45:54Z",
+   "number": 178,
+   "opened": "2026-10-18T05:28:16Z",
+   "ready": "2026-10-18T05:28:16Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 877,
+   "started": "2026-10-18T05:28:08Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T05:37:53Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/competitor-comparison-wbd99l",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "5073db3fd89238c1116f145496ec0c9f3dfb2e3e",
+     [
+      177,
+      176
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 345,
+   "check_seconds_redone": 176,
+   "claim": false,
+   "closed": "2026-10-18T05:41:11Z",
+   "commits": 2,
+   "first_green": "2026-10-18T05:34:10Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 2,
+   "merged": "2026-10-18T05:41:11Z",
+   "number": 179,
+   "opened": "2026-10-18T05:31:19Z",
+   "ready": "2026-10-18T05:31:19Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 421,
+   "started": "2026-10-18T05:29:56Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T05:50:48Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "869f750857a48e8b52e2527ef1ea6a3ccfa14d68",
+     [
+      178
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 347,
+   "check_seconds_redone": 172,
+   "claim": false,
+   "closed": "2026-10-18T05:59:30Z",
+   "commits": 2,
+   "first_green": "2026-10-18T05:53:43Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-18T05:59:30Z",
+   "number": 180,
+   "opened": "2026-10-18T05:50:44Z",
+   "ready": "2026-10-18T05:50:44Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 347,
+   "started": "2026-10-18T05:50:34Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T06:03:29Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/new-user-setup-thpzri",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 169,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T06:06:41Z",
+   "commits": 1,
+   "first_green": "2026-10-18T06:06:16Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T06:06:41Z",
+   "number": 181,
+   "opened": "2026-10-18T06:03:24Z",
+   "ready": "2026-10-18T06:03:24Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T06:03:13Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T06:19:37Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 2,
+   "catch_ups_after_green": 2,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "de6cd83c9d4ad051148720e27bb3670cf4b21af6",
+     [
+      183
+     ]
+    ],
+    [
+     "6c5ba26aba54a90673f8ebeafabe0e861c9b8dc0",
+     [
+      184
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 2,
+   "check_seconds": 612,
+   "check_seconds_redone": 381,
+   "claim": false,
+   "closed": "2026-10-18T06:39:09Z",
+   "commits": 3,
+   "first_green": "2026-10-18T06:23:28Z",
+   "force_pushes": 0,
+   "landings_after_green": 1,
+   "landings_during_life": 2,
+   "merged": "2026-10-18T06:39:09Z",
+   "number": 182,
+   "opened": "2026-10-18T06:17:22Z",
+   "ready": "2026-10-18T06:19:35Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 941,
+   "started": "2026-10-18T06:17:03Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T06:19:24Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/checkpoint-control-panel",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 167,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T06:21:19Z",
+   "commits": 1,
+   "first_green": "2026-10-18T06:21:14Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T06:21:19Z",
+   "number": 183,
+   "opened": "2026-10-18T06:18:25Z",
+   "ready": "2026-10-18T06:18:25Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T06:18:03Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T06:27:16Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-sdnams",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "ccbaa39efdcdc4cc5b21c10a4a306fddb414ff3d",
+     [
+      183
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 316,
+   "check_seconds_redone": 180,
+   "claim": false,
+   "closed": "2026-10-18T06:30:18Z",
+   "commits": 2,
+   "first_green": "2026-10-18T06:23:00Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-18T06:30:18Z",
+   "number": 184,
+   "opened": "2026-10-18T06:20:40Z",
+   "ready": "2026-10-18T06:20:40Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 438,
+   "started": "2026-10-18T06:20:37Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T06:30:53Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/new-user-setup-thpzri",
+   "catch_ups": 3,
+   "catch_ups_after_green": 3,
+   "catch_ups_by_button": 1,
+   "caused_by": [
+    [
+     "1cb35400c5fcfc352e0af7e90b0aaeaed6da0dcb",
+     [
+      184,
+      182,
+      186,
+      188,
+      190,
+      191,
+      192,
+      193,
+      197,
+      198,
+      194,
+      200,
+      203
+     ]
+    ],
+    [
+     "515415b53a4f219f41c0f506c8a2558d6e7cb744",
+     [
+      199,
+      111,
+      112,
+      113,
+      204,
+      206,
+      205,
+      210,
+      208,
+      209,
+      207
+     ]
+    ],
+    [
+     "28e7497063ee315960ed210e15c9e9bb6e4bd623",
+     [
+      211,
+      213
+     ]
+    ]
+   ],
+   "check_runs": 4,
+   "check_runs_redone": 3,
+   "check_seconds": 790,
+   "check_seconds_redone": 617,
+   "claim": false,
+   "closed": "2026-10-18T15:06:54Z",
+   "commits": 4,
+   "first_green": "2026-10-18T06:33:35Z",
+   "force_pushes": 0,
+   "landings_after_green": 25,
+   "landings_during_life": 26,
+   "merged": "2026-10-18T15:06:54Z",
+   "number": 185,
+   "opened": "2026-10-18T06:30:39Z",
+   "ready": "2026-10-18T06:30:39Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 30799,
+   "started": "2026-10-18T06:30:28Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T06:36:58Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/control-panel-console-gv5s7h",
+   "catch_ups": 2,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "2aaff814c9ae0b23dd63e31f4bd8421745030b38",
+     [
+      183,
+      184
+     ]
+    ],
+    [
+     "606fbb0646e5a912f08e51aa2d0a86d7f124d241",
+     [
+      182
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 2,
+   "check_seconds": 326,
+   "check_seconds_redone": 326,
+   "claim": false,
+   "closed": "2026-10-18T06:45:56Z",
+   "commits": 4,
+   "first_green": "2026-10-18T06:38:52Z",
+   "force_pushes": 0,
+   "landings_after_green": 1,
+   "landings_during_life": 3,
+   "merged": "2026-10-18T06:45:56Z",
+   "number": 186,
+   "opened": "2026-10-18T06:36:32Z",
+   "ready": "2026-10-18T06:36:32Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 424,
+   "started": "2026-10-18T06:19:50Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T06:49:35Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/word-revisions-onedrive-bormtg",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "48522f6a0e47e87ada10e4cb64ef8134acb93f8d",
+     [
+      186
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 333,
+   "check_seconds_redone": 140,
+   "claim": false,
+   "closed": "2026-10-18T07:01:40Z",
+   "commits": 2,
+   "first_green": "2026-10-18T06:52:46Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-18T07:01:40Z",
+   "number": 188,
+   "opened": "2026-10-18T06:49:30Z",
+   "ready": "2026-10-18T06:49:30Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 534,
+   "started": "2026-10-18T06:49:22Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T07:02:08Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/site-docs-navigation-csdzct",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 1,
+   "caused_by": [
+    [
+     "c9d44f9fcd1696faa7132c656233a95a8732acad",
+     [
+      188
+     ]
+    ]
+   ],
+   "check_runs": 1,
+   "check_runs_redone": 1,
+   "check_seconds": 210,
+   "check_seconds_redone": 210,
+   "claim": false,
+   "closed": "2026-10-18T07:07:11Z",
+   "commits": 2,
+   "first_green": "2026-10-18T07:06:53Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-18T07:07:11Z",
+   "number": 190,
+   "opened": "2026-10-18T07:02:04Z",
+   "ready": "2026-10-18T07:02:04Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-18T07:01:55Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T07:03:23Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "b2ea6e77c3cbcc80b14f5b13316564030eaf15aa",
+     [
+      188,
+      190
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 332,
+   "check_seconds_redone": 141,
+   "claim": false,
+   "closed": "2026-10-18T07:15:06Z",
+   "commits": 2,
+   "first_green": "2026-10-18T07:06:33Z",
+   "force_pushes": 0,
+   "landings_after_green": 1,
+   "landings_during_life": 2,
+   "merged": "2026-10-18T07:15:06Z",
+   "number": 191,
+   "opened": "2026-10-18T07:03:19Z",
+   "ready": "2026-10-18T07:03:19Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 513,
+   "started": "2026-10-18T07:03:10Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T07:29:16Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 162,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T07:32:04Z",
+   "commits": 1,
+   "first_green": "2026-10-18T07:31:56Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T07:32:04Z",
+   "number": 192,
+   "opened": "2026-10-18T07:29:11Z",
+   "ready": "2026-10-18T07:29:11Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T07:28:58Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T07:37:37Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/word-revisions-onedrive-bormtg",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 153,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T07:40:19Z",
+   "commits": 1,
+   "first_green": "2026-10-18T07:40:09Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-18T07:40:19Z",
+   "number": 193,
+   "opened": "2026-10-18T07:37:33Z",
+   "ready": "2026-10-18T07:37:33Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T07:37:17Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T07:40:41Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/share-from-control-board-law5si",
+   "catch_ups": 2,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "c10e3a69b9c04d770d5070dd17b3e25836ab8d55",
+     [
+      192,
+      193,
+      197
+     ]
+    ],
+    [
+     "bbb4559909bd79b4504133b8e32753062c098e93",
+     [
+      198
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 1,
+   "check_seconds": 537,
+   "check_seconds_redone": 144,
+   "claim": false,
+   "closed": "2026-10-18T08:10:21Z",
+   "commits": 4,
+   "first_green": "2026-10-18T08:04:10Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 4,
+   "merged": "2026-10-18T08:10:21Z",
+   "number": 194,
+   "opened": "2026-10-18T07:39:58Z",
+   "ready": "2026-10-18T07:39:58Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 371,
+   "started": "2026-10-18T07:39:49Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T07:41:22Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-ufukll",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "f6da0c34bf1d9350a5524d5a4ee751e74e4ddd80",
+     [
+      193
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 379,
+   "check_seconds_redone": 188,
+   "claim": false,
+   "closed": "2026-10-18T07:51:07Z",
+   "commits": 2,
+   "first_green": "2026-10-18T07:44:33Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-18T07:51:07Z",
+   "number": 197,
+   "opened": "2026-10-18T07:41:19Z",
+   "ready": "2026-10-18T07:41:19Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 394,
+   "started": "2026-10-18T07:41:10Z"
+  },
+  {
+   "auto_merge_enabled": "2026-10-18T07:59:19Z",
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/assistant-tile-settings",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "932337e5c368ecbbd52b0a075cbd57946c869ff4",
+     [
+      197
+     ]
+    ]
+   ],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 173,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-18T08:02:49Z",
+   "commits": 4,
+   "first_green": "2026-10-18T08:02:08Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-18T08:02:49Z",
+   "number": 198,
+   "opened": "2026-10-18T07:59:11Z",
+   "ready": "2026-10-18T07:59:11Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-18T07:43:19Z"
+  },
   {
    "auto_merge_enabled": "2026-10-18T08:01:56Z",
    "base": "main",
@@ -3753,23 +7564,93 @@
    "runs_cancelled": 0,
    "stale_seconds": 0,
    "started": "2026-10-20T21:40:48Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-0hb32q",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 149,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-20T21:57:25Z",
+   "commits": 1,
+   "first_green": "2026-10-20T21:57:03Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-20T21:57:25Z",
+   "number": 307,
+   "opened": "2026-10-20T21:54:30Z",
+   "ready": "2026-10-20T21:54:30Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-20T21:54:14Z"
   }
  ],
  "repository": "OpenSpineConsortium/symphony-template",
  "summary": {
-  "auto_merge_used": 24,
+  "auto_merge_used": 70,
   "board_conflicts": 0,
   "board_main_moved": 0,
   "by_day": {
+   "2026-10-14": {
+    "catch_ups": 6,
+    "check_runs": 16,
+    "check_runs_redone": 5,
+    "merged": 9,
+    "share_with_catch_up": 0.556,
+    "stale_after_green": 3,
+    "stale_hours": 0.71,
+    "with_catch_up": 5
+   },
+   "2026-10-15": {
+    "catch_ups": 3,
+    "check_runs": 16,
+    "check_runs_redone": 2,
+    "merged": 7,
+    "share_with_catch_up": 0.429,
+    "stale_after_green": 2,
+    "stale_hours": 0.56,
+    "with_catch_up": 3
+   },
+   "2026-10-16": {
+    "catch_ups": 50,
+    "check_runs": 74,
+    "check_runs_redone": 35,
+    "merged": 25,
+    "share_with_catch_up": 0.8,
+    "stale_after_green": 12,
+    "stale_hours": 11.2,
+    "with_catch_up": 20
+   },
+   "2026-10-17": {
+    "catch_ups": 21,
+    "check_runs": 41,
+    "check_runs_redone": 17,
+    "merged": 24,
+    "share_with_catch_up": 0.625,
+    "stale_after_green": 9,
+    "stale_hours": 19.9,
+    "with_catch_up": 15
+   },
    "2026-10-18": {
-    "catch_ups": 32,
-    "check_runs": 57,
-    "check_runs_redone": 27,
-    "merged": 32,
-    "share_with_catch_up": 0.594,
-    "stale_after_green": 13,
-    "stale_hours": 6.94,
-    "with_catch_up": 19
+    "catch_ups": 66,
+    "check_runs": 121,
+    "check_runs_redone": 58,
+    "merged": 66,
+    "share_with_catch_up": 0.636,
+    "stale_after_green": 33,
+    "stale_hours": 20.93,
+    "with_catch_up": 42
    },
    "2026-10-19": {
     "catch_ups": 24,
@@ -3783,10 +7664,10 @@
    },
    "2026-10-20": {
     "catch_ups": 42,
-    "check_runs": 95,
+    "check_runs": 96,
     "check_runs_redone": 40,
-    "merged": 43,
-    "share_with_catch_up": 0.605,
+    "merged": 44,
+    "share_with_catch_up": 0.591,
     "stale_after_green": 19,
     "stale_hours": 10.53,
     "with_catch_up": 26
@@ -3795,53 +7676,53 @@
   "by_parallel_work": {
    "0": {
     "catch_ups": 4,
-    "check_runs": 25,
+    "check_runs": 28,
     "check_runs_redone": 4,
-    "merged": 21,
-    "share_with_catch_up": 0.19,
+    "merged": 24,
+    "share_with_catch_up": 0.167,
     "stale_after_green": 0,
     "stale_hours": 0.0,
     "with_catch_up": 4
    },
    "1-2": {
-    "catch_ups": 23,
-    "check_runs": 58,
-    "check_runs_redone": 22,
-    "merged": 35,
-    "share_with_catch_up": 0.543,
-    "stale_after_green": 15,
-    "stale_hours": 4.15,
-    "with_catch_up": 19
+    "catch_ups": 26,
+    "check_runs": 80,
+    "check_runs_redone": 23,
+    "merged": 45,
+    "share_with_catch_up": 0.511,
+    "stale_after_green": 17,
+    "stale_hours": 3.92,
+    "with_catch_up": 23
    },
    "11+": {
-    "catch_ups": 2,
-    "check_runs": 3,
-    "check_runs_redone": 1,
-    "merged": 1,
+    "catch_ups": 16,
+    "check_runs": 25,
+    "check_runs_redone": 12,
+    "merged": 8,
     "share_with_catch_up": 1.0,
-    "stale_after_green": 0,
-    "stale_hours": 0.0,
-    "with_catch_up": 1
+    "stale_after_green": 5,
+    "stale_hours": 30.33,
+    "with_catch_up": 8
    },
    "3-5": {
-    "catch_ups": 47,
-    "check_runs": 85,
-    "check_runs_redone": 41,
-    "merged": 32,
-    "share_with_catch_up": 0.781,
-    "stale_after_green": 22,
-    "stale_hours": 17.74,
-    "with_catch_up": 25
+    "catch_ups": 74,
+    "check_runs": 154,
+    "check_runs_redone": 66,
+    "merged": 78,
+    "share_with_catch_up": 0.628,
+    "stale_after_green": 39,
+    "stale_hours": 19.17,
+    "with_catch_up": 49
    },
    "6-10": {
-    "catch_ups": 22,
-    "check_runs": 39,
-    "check_runs_redone": 21,
-    "merged": 10,
-    "share_with_catch_up": 1.0,
-    "stale_after_green": 6,
-    "stale_hours": 3.45,
-    "with_catch_up": 10
+    "catch_ups": 92,
+    "check_runs": 135,
+    "check_runs_redone": 74,
+    "merged": 44,
+    "share_with_catch_up": 0.932,
+    "stale_after_green": 28,
+    "stale_hours": 18.29,
+    "with_catch_up": 41
    }
   },
   "by_protocol": {
@@ -3856,23 +7737,23 @@
     "with_catch_up": 0
    },
    "no_claim": {
-    "catch_ups": 98,
-    "check_runs": 210,
-    "check_runs_redone": 89,
-    "merged": 99,
-    "share_with_catch_up": 0.596,
-    "stale_after_green": 43,
-    "stale_hours": 25.34,
-    "with_catch_up": 59
+    "catch_ups": 212,
+    "check_runs": 422,
+    "check_runs_redone": 179,
+    "merged": 199,
+    "share_with_catch_up": 0.628,
+    "stale_after_green": 89,
+    "stale_hours": 71.7,
+    "with_catch_up": 125
    }
   },
-  "catch_ups": 98,
-  "catch_ups_by_button": 3,
+  "catch_ups": 212,
+  "catch_ups_by_button": 15,
   "catch_ups_max": 6,
-  "check_hours": 13.89,
-  "check_hours_redone": 5.85,
-  "check_runs": 210,
-  "check_runs_redone": 89,
+  "check_hours": 23.16,
+  "check_hours_redone": 9.77,
+  "check_runs": 422,
+  "check_runs_redone": 179,
   "closed_unmerged": 1,
   "closed_unmerged_branch_landed_later": 1,
   "default_branch_checks": {
@@ -3912,135 +7793,135 @@
    },
    "2026-10-20": {
     "failure": 1,
-    "success": 38
+    "success": 39
    }
   },
-  "force_pushes": 2,
-  "landings_after_green_total": 54,
-  "landings_during_life_mean": 1.91,
+  "force_pushes": 31,
+  "landings_after_green_total": 125,
+  "landings_during_life_mean": 1.98,
   "landings_during_life_median": 1,
   "live": {
    "pulls_seen": 0,
    "pulls_seen_behind": 0,
    "pulls_seen_dirty": 0,
    "since": "2026-10-20T21:50:52Z",
-   "snapshots": 1
+   "snapshots": 2
   },
-  "merged": 99,
-  "reruns": 2,
+  "merged": 199,
+  "reruns": 4,
   "share_runs_redone": 0.424,
-  "share_stale_after_green": 0.434,
-  "share_with_catch_up": 0.596,
-  "stale_after_green": 43,
-  "stale_hours_total": 25.34,
-  "stale_minutes_median": 14.9,
+  "share_stale_after_green": 0.447,
+  "share_with_catch_up": 0.628,
+  "stale_after_green": 89,
+  "stale_hours_total": 71.7,
+  "stale_minutes_median": 14.6,
   "top_causes": [
    {
-    "branch": null,
-    "catch_ups_caused": 5,
+    "branch": "claude/symphony-control-website-ma7g9x",
+    "catch_ups_caused": 7,
+    "number": 95
+   },
+   {
+    "branch": "claude/research-notes-rt4tg6",
+    "catch_ups_caused": 7,
+    "number": 99
+   },
+   {
+    "branch": "claude/symphony-control-website-ma7g9x",
+    "catch_ups_caused": 7,
+    "number": 120
+   },
+   {
+    "branch": "claude/symphony-versus-competitors-c7mc4k",
+    "catch_ups_caused": 6,
+    "number": 97
+   },
+   {
+    "branch": "claude/symphony-control-website-ma7g9x",
+    "catch_ups_caused": 6,
+    "number": 102
+   },
+   {
+    "branch": "claude/beethoven-worker-opening-ujxy67",
+    "catch_ups_caused": 6,
+    "number": 122
+   },
+   {
+    "branch": "dependabot/github_actions/actions/create-github-app-token-3",
+    "catch_ups_caused": 6,
     "number": 113
    },
    {
-    "branch": "claude/project-thread-828yz3",
+    "branch": "claude/integration-assessment-9w21hf",
     "catch_ups_caused": 5,
-    "number": 297
+    "number": 98
    },
    {
-    "branch": "claude/dependabot-actions-h5chiv",
-    "catch_ups_caused": 4,
-    "number": 204
+    "branch": "claude/share-from-control-board-law5si",
+    "catch_ups_caused": 5,
+    "number": 194
    },
    {
-    "branch": "claude/project-thread-ljxmax",
-    "catch_ups_caused": 4,
-    "number": 264
-   },
-   {
-    "branch": "claude/project-thread-6cxgh2",
-    "catch_ups_caused": 4,
-    "number": 298
-   },
-   {
-    "branch": "claude/settings-variables",
-    "catch_ups_caused": 4,
-    "number": 296
-   },
-   {
-    "branch": "claude/project-thread-2r9k1d",
-    "catch_ups_caused": 4,
-    "number": 299
-   },
-   {
-    "branch": null,
-    "catch_ups_caused": 3,
-    "number": 111
-   },
-   {
-    "branch": null,
-    "catch_ups_caused": 3,
-    "number": 112
-   },
-   {
-    "branch": "claude/token-run-prompt",
-    "catch_ups_caused": 3,
-    "number": 206
+    "branch": "claude/console-fullscreen-note",
+    "catch_ups_caused": 5,
+    "number": 199
    }
   ],
   "top_pairs": [
    {
-    "landed": 198,
-    "made_stale": 199,
+    "landed": 80,
+    "made_stale": 78,
     "times": 1
    },
    {
-    "landed": 194,
-    "made_stale": 199,
+    "landed": 79,
+    "made_stale": 78,
     "times": 1
    },
    {
-    "landed": 200,
-    "made_stale": 199,
+    "landed": 76,
+    "made_stale": 78,
     "times": 1
    },
    {
-    "landed": 203,
-    "made_stale": 199,
+    "landed": 82,
+    "made_stale": 78,
     "times": 1
    },
    {
-    "landed": 198,
-    "made_stale": 200,
+    "landed": 83,
+    "made_stale": 78,
     "times": 1
    },
    {
-    "landed": 194,
-    "made_stale": 200,
+    "landed": 81,
+    "made_stale": 78,
     "times": 1
    },
    {
-    "landed": 199,
-    "made_stale": 204,
+    "landed": 77,
+    "made_stale": 78,
     "times": 1
    },
    {
-    "landed": 111,
-    "made_stale": 204,
+    "landed": 80,
+    "made_stale": 79,
     "times": 1
    },
    {
-    "landed": 112,
-    "made_stale": 204,
+    "landed": 82,
+    "made_stale": 81,
     "times": 1
    },
    {
-    "landed": 113,
-    "made_stale": 204,
+    "landed": 83,
+    "made_stale": 81,
     "times": 1
    }
   ],
   "with_board_conflict": 0,
-  "with_catch_up": 59
+  "with_catch_up": 125
  },
- "unread": 167,
+ "unread": 68,
  "workflow": "ci.yml"
 }
