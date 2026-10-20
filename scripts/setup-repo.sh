@@ -240,11 +240,26 @@ if grep -q '^- Crowd mode: on\.' docs/project.md 2>/dev/null; then
   die "crowd mode is on in this clone's docs/project.md: $crowd_refusal"
 fi
 read_error=$(mktemp)
-if crowd=$(gh api "repos/$REPO/actions/variables/CLAUDE_CROWD" --jq .value 2>"$read_error"); then
+if [ "${SYMPHONY_SETTINGS_APP:-}" = 1 ] && [ -n "${SYMPHONY_CROWD_VARIABLE+set}" ]; then
+  # The Settings workflow reads the variable from its own vars context,
+  # which needs no permission, and hands it here, set but empty where the
+  # repository has none.
+  crowd="$SYMPHONY_CROWD_VARIABLE"
+  rm -f "$read_error"
+elif crowd=$(gh api "repos/$REPO/actions/variables/CLAUDE_CROWD" --jq .value 2>"$read_error"); then
   rm -f "$read_error"
 elif grep -q '(HTTP 404)' "$read_error"; then
   crowd=""
   rm -f "$read_error"
+elif [ "${SYMPHONY_SETTINGS_APP:-}" = 1 ]; then
+  # The Settings workflow runs this with the App's token, whose
+  # installation may not have accepted Variables yet: there the mode is
+  # unknown, so auto-merge alone, the one setting crowd mode keeps off that
+  # this run would make, is left off, and nothing else waits on it (the
+  # workflow never stores a token).
+  printf 'crowd mode: unknown (could not read the variable CLAUDE_CROWD: %s), so auto-merge is left as it is\n' "$(head -n 1 "$read_error")"
+  rm -f "$read_error"
+  crowd="" CROWD_UNKNOWN=yes
 else
   reason=$(head -n 1 "$read_error")
   rm -f "$read_error"
@@ -254,16 +269,35 @@ if [ "$(printf '%s' "$crowd" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
   die "crowd mode is on (the variable CLAUDE_CROWD is true): $crowd_refusal"
 fi
 
+# The Settings workflow's weekly and visibility runs (SYMPHONY_SETTINGS_RECHECK)
+# make only what a plan or a visibility may have held back, the
+# environment and the Pages site, both made only when missing: a ruleset
+# is written on any plan and starts to hold by itself once the plan or the
+# visibility allows, and the toggles, the topic, scanning and the Actions
+# box are left as the owner may have set them since.
+RECHECK=no
+[ "${SYMPHONY_SETTINGS_RECHECK:-}" = 1 ] && RECHECK=yes
+if [ "$RECHECK" = yes ]; then
+  echo "recheck: only the environment and Pages, where they are missing"
+fi
+if [ "$RECHECK" = no ]; then
+
 # 2. The ruleset, from the file the docs ship, unless its name is already
 # listed. GitHub would make a second ruleset of the same name, so the check
 # is this script's job.
 name=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["name"])' "$RULESET")
-existing=$(gh api "repos/$REPO/rulesets" --jq '.[].name')
-if grep -Fxq -- "$name" <<<"$existing"; then
+# A refusal is reported and the run goes on, as the steps below do, since
+# one refused setting is no reason to leave the others undone.
+if ! existing=$(gh api "repos/$REPO/rulesets" --jq '.[].name' 2>&1); then
+  printf 'ruleset "%s": not created (could not list the rulesets: %s); import %s under https://github.com/%s/settings/rules\n' \
+    "$name" "$(head -n 1 <<<"$existing")" "$RULESET" "$REPO"
+elif grep -Fxq -- "$name" <<<"$existing"; then
   printf 'ruleset "%s": exists, skipped\n' "$name"
-else
-  gh api --method POST "repos/$REPO/rulesets" --input "$RULESET" --silent
+elif answer=$(gh api --method POST "repos/$REPO/rulesets" --input "$RULESET" --silent 2>&1); then
   printf 'ruleset "%s": created from %s\n' "$name" "$RULESET"
+else
+  printf 'ruleset "%s": not created (%s); import %s under https://github.com/%s/settings/rules\n' \
+    "$name" "$(head -n 1 <<<"$answer")" "$RULESET" "$REPO"
 fi
 if [ "$VISIBILITY" = "private" ]; then
   echo "  note: on GitHub Free a private repository's ruleset is written but not enforced (docs/setup/tiers.md)"
@@ -277,12 +311,27 @@ fi
 # after its first pull request's check; until then the step says so.
 pin_check "$name"
 
-# 3. The two toggles under General. Both are idempotent PATCHes.
-gh repo edit "$REPO" --delete-branch-on-merge --enable-auto-merge
-echo "general: delete head branches on merge, allow auto-merge: on"
+# 3. The two toggles under General. Both are idempotent PATCHes; where gh's
+# own command is refused, as it can be for an App's token, the same PATCH
+# goes through the REST API before the refusal is reported.
+toggles=(--delete-branch-on-merge --enable-auto-merge)
+fields=(-F delete_branch_on_merge=true -F allow_auto_merge=true)
+said="delete head branches on merge, allow auto-merge"
+if [ "${CROWD_UNKNOWN:-}" = yes ]; then
+  toggles=(--delete-branch-on-merge) fields=(-F delete_branch_on_merge=true) said="delete head branches on merge"
+fi
+if gh repo edit "$REPO" "${toggles[@]}" 2>/dev/null \
+   || answer=$(gh api --method PATCH "repos/$REPO" --silent "${fields[@]}" 2>&1); then
+  echo "general: $said: on"
+else
+  printf 'general: %s: not changed (%s); tick them under https://github.com/%s/settings\n' "$said" "$(head -n 1 <<<"$answer")" "$REPO"
+fi
 # The topic keeps the ones already there: --add-topic appends.
-gh repo edit "$REPO" --add-topic symphony
-echo "topic symphony: added"
+if answer=$(gh repo edit "$REPO" --add-topic symphony 2>&1); then
+  echo "topic symphony: added"
+else
+  printf 'topic symphony: not added (%s); add it under About on https://github.com/%s\n' "$(head -n 1 <<<"$answer")" "$REPO"
+fi
 
 # 4. Secret scanning, then push protection. A failure here is the plan or
 # the visibility, not the script, so it is reported and the run goes on;
@@ -292,9 +341,16 @@ echo "topic symphony: added"
 old_gh() {
   printf '%s: this gh (%s) predates the flag; install gh 2.65 or later (https://github.com/cli/cli/blob/trunk/docs/install_linux.md) and run this again\n' "$1" "$(gh --version | head -n 1)"
 }
-if answer=$(gh repo edit "$REPO" --enable-secret-scanning 2>&1); then
+# gh asks GraphQL whether the caller administers the repository before
+# these two, which an App's token may be told no to; the REST PATCH is the
+# same setting, tried before the refusal is reported.
+scanning() {
+  gh repo edit "$REPO" "$1" 2>&1 \
+    || gh api --method PATCH "repos/$REPO" --silent -f "security_and_analysis[$2][status]=enabled" 2>/dev/null
+}
+if answer=$(scanning --enable-secret-scanning secret_scanning); then
   echo "secret scanning: on"
-  if answer=$(gh repo edit "$REPO" --enable-secret-scanning-push-protection 2>&1); then
+  if answer=$(scanning --enable-secret-scanning-push-protection secret_scanning_push_protection); then
     echo "push protection: on"
   elif grep -q "unknown flag" <<<"$answer"; then
     old_gh "push protection"
@@ -381,6 +437,8 @@ else
 fi
 rm -f "$refusal"
 
+fi
+
 # 5b. The environment token-store, limited to the default branch. The Token
 # workflow (.github/workflows/token.yml) saves a lent Claude token there
 # with the SymphonyBoard App's key, and GitHub would make the environment
@@ -432,17 +490,36 @@ pages_refused() {
   printf 'pages: not turned on (%s); open https://github.com/%s/settings/pages and, under Build and deployment, choose GitHub Actions as the source, then set the repository variable SYMPHONY_DOCS to pages\n' \
     "$(head -n 1 <<<"$1")" "$REPO"
 }
+# A limit GitHub accepted is read back before the site counts as limited,
+# so a plan that takes the PUT and keeps the site open is caught.
+pages_limited() {
+  gh api --method PUT "repos/$REPO/pages" --silent -F public=false || return 1
+  local public
+  public=$(gh api "repos/$REPO/pages" --jq .public) || return 1
+  if [ "$public" != false ]; then
+    echo "GitHub took the limit, but the site still reads as public" >&2
+    return 1
+  fi
+}
 refusal=$(mktemp)
-if gh api "repos/$REPO/pages" --silent 2>"$refusal"; then
+if [ "$RECHECK" = yes ] && [ -n "${SYMPHONY_DOCS_VARIABLE:-}" ]; then
+  # SYMPHONY_DOCS is written once Pages is on, so set means decided: a site
+  # the owner removed since is not put back.
+  echo "pages: left as it is, since the variable SYMPHONY_DOCS is set"
+elif gh api "repos/$REPO/pages" --silent 2>"$refusal"; then
   echo "pages: a site is there already, left as it is; docs.yml publishes the documentation site there only once the repository variable SYMPHONY_DOCS is pages"
 elif ! grep -q '(HTTP 404)' "$refusal"; then
   pages_refused "$(<"$refusal")"
 elif ! gh api --method POST "repos/$REPO/pages" --silent -f build_type=workflow 2>"$refusal"; then
   pages_refused "$(<"$refusal")"
-elif [ "$VISIBILITY" != public ] && ! gh api --method PUT "repos/$REPO/pages" --silent -F public=false 2>"$refusal"; then
-  gh api --method DELETE "repos/$REPO/pages" --silent 2>/dev/null || true
-  printf 'pages: not turned on, since GitHub would not limit the site of this %s repository to its readers (%s) and it would be open to anyone; set it by hand at https://github.com/%s/settings/pages if that is meant\n' \
-    "$VISIBILITY" "$(head -n 1 "$refusal")" "$REPO"
+elif [ "$VISIBILITY" != public ] && ! pages_limited 2>"$refusal"; then
+  if gh api --method DELETE "repos/$REPO/pages" --silent 2>/dev/null; then
+    removed="removed again"
+  else
+    removed="and could not be removed again, so turn it off at https://github.com/$REPO/settings/pages"
+  fi
+  printf 'pages: not turned on, since GitHub would not limit the site of this %s repository to its readers (%s) and it would be open to anyone; the site was %s; set it by hand at https://github.com/%s/settings/pages if that is meant\n' \
+    "$VISIBILITY" "$(head -n 1 "$refusal")" "$removed" "$REPO"
 elif ! gh variable set SYMPHONY_DOCS --repo "$REPO" --body pages 2>"$refusal"; then
   printf 'pages: turned on, built by GitHub Actions, but the variable SYMPHONY_DOCS was not set (%s); set it to pages at https://github.com/%s/settings/variables/actions\n' \
     "$(head -n 1 "$refusal")" "$REPO"
@@ -451,11 +528,18 @@ else
 fi
 rm -f "$refusal"
 
+if [ "$RECHECK" = yes ]; then
+  exit 0
+fi
+
 # 6. The labels, from the one list in tools/template_init.py. --force
 # updates a label that exists instead of failing on it.
 while IFS=$'\t' read -r label color description; do
-  gh label create "$label" --repo "$REPO" --color "$color" --description "$description" --force
-  printf 'label %s: created or updated\n' "$label"
+  if answer=$(gh label create "$label" --repo "$REPO" --color "$color" --description "$description" --force 2>&1); then
+    printf 'label %s: created or updated\n' "$label"
+  else
+    printf 'label %s: not made (%s)\n' "$label" "$(head -n 1 <<<"$answer")"
+  fi
 done < <(python3 -c '
 import sys
 sys.path.insert(0, "tools")

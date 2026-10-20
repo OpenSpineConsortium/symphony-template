@@ -18,6 +18,10 @@ rules:
       # claude-code-action answers only an actor with write access and
       # fails the run for anyone else before it posts anything.
       - claude.yml
+      # issue_comment runs this file from the default branch on the event's
+      # data alone, never a pull request's code; it acts only on a comment
+      # on the digest issue by the digest's recipient, with write access.
+      - digest.yml
   github-app:
     ignore:
       # The App's token is made in the one run that initialises a copy.

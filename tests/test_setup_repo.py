@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -191,11 +192,29 @@ class Pages(unittest.TestCase):
         self.assertNotIn(f"POST {PAGES}", self.keys(calls))
         self.assertNotIn("variable set", self.keys(calls))
 
+    def limiting(self, public):
+        """The PUT that limits the site, after which the read back says
+        public as given."""
+        return {f"PUT {PAGES}": [answer(204, "", after={f"GET {PAGES}": [answer(200, f"{public}\n")]})]}
+
     def test_an_internal_repositorys_site_is_limited_to_its_readers(self):
-        done, calls = self.run_script({}, visibility="INTERNAL")
+        done, calls = self.run_script(self.limiting("false"), visibility="INTERNAL")
         self.assertIn("turned on", self.pages_line(done))
         limited = next(call for call in calls if call["key"] == f"PUT {PAGES}")
         self.assertEqual(fields(limited), {"public": ("-F", "false")})
+        self.assertIn("variable set", self.keys(calls))
+
+    def test_a_limit_github_took_but_did_not_keep_removes_the_site(self):
+        done, calls = self.run_script(self.limiting("true"), visibility="PRIVATE")
+        self.assertIn("still reads as public", self.pages_line(done))
+        self.assertIn("removed again", self.pages_line(done))
+        self.assertIn(f"DELETE {PAGES}", self.keys(calls))
+        self.assertNotIn("variable set", self.keys(calls))
+
+    def test_a_site_that_could_not_be_removed_says_so(self):
+        done, calls = self.run_script({f"PUT {PAGES}": [answer(422, {"message": "plan"})],
+                                       f"DELETE {PAGES}": [answer(500, {"message": "oops"})]}, visibility="PRIVATE")
+        self.assertIn("could not be removed again", self.pages_line(done))
 
     def test_a_site_that_cannot_be_limited_is_removed_again(self):
         done, calls = self.run_script({f"PUT {PAGES}": [answer(422, {"message": "plan"})]}, visibility="PRIVATE")
@@ -214,6 +233,95 @@ class Pages(unittest.TestCase):
         done, calls = self.run_script({f"GET {PAGES}": [answer(403, {"message": "Forbidden"})]})
         self.assertIn("not turned on", self.pages_line(done))
         self.assertNotIn(f"POST {PAGES}", self.keys(calls))
+
+
+class AsTheApp(unittest.TestCase):
+    """The Settings workflow runs the script with the SymphonyBoard App's
+    token (SYMPHONY_SETTINGS_APP=1), whose installation may not have
+    accepted every permission: each refusal is reported and the run goes
+    on, and a crowd mode it cannot read leaves auto-merge alone."""
+
+    def run_script(self, extra, app=True):
+        runner = WorkflowPermissions()
+        runner.addCleanup = self.addCleanup
+        with mock.patch.dict(os.environ, {"SYMPHONY_SETTINGS_APP": "1"} if app else {}):
+            return runner.run_script(workflow_answer("read", True), extra=extra)
+
+    def keys(self, calls):
+        return [call["key"] for call in calls]
+
+    def test_an_unread_crowd_variable_goes_on_without_auto_merge(self):
+        refused = {f"GET repos/{REPO}/actions/variables/CLAUDE_CROWD": [answer(403, {"message": "Forbidden"})]}
+        done, calls = self.run_script(refused)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("crowd mode: unknown", done.stdout)
+        edit = next(call for call in calls if call["key"] == "repo edit" and "--delete-branch-on-merge" in call["args"])
+        self.assertNotIn("--enable-auto-merge", edit["args"])
+        self.assertIn("label create", self.keys(calls))
+
+    def test_the_workflows_own_read_of_the_variable_needs_no_permission(self):
+        """The workflow hands the value from its vars context: empty turns
+        auto-merge on without asking the API, true stops before any write."""
+        refused = {f"GET repos/{REPO}/actions/variables/CLAUDE_CROWD": [answer(403, {"message": "Forbidden"})]}
+        with mock.patch.dict(os.environ, {"SYMPHONY_CROWD_VARIABLE": ""}):
+            done, calls = self.run_script(refused)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertNotIn("crowd mode: unknown", done.stdout)
+        self.assertNotIn(f"GET repos/{REPO}/actions/variables/CLAUDE_CROWD", self.keys(calls))
+        edit = next(call for call in calls if call["key"] == "repo edit" and "--delete-branch-on-merge" in call["args"])
+        self.assertIn("--enable-auto-merge", edit["args"])
+        with mock.patch.dict(os.environ, {"SYMPHONY_CROWD_VARIABLE": "TRUE"}):
+            done, calls = self.run_script({})
+        self.assertNotEqual(done.returncode, 0)
+        self.assertNotIn("repo edit", self.keys(calls))
+
+    def test_a_recheck_makes_only_the_environment_and_pages(self):
+        """The weekly and visibility runs make only what a plan or a
+        private repository held back, and touch no toggle, topic, ruleset,
+        scanning, Actions box or label the owner may have changed since."""
+        with mock.patch.dict(os.environ, {"SYMPHONY_SETTINGS_RECHECK": "1", "SYMPHONY_CROWD_VARIABLE": ""}):
+            done, calls = self.run_script({})
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("recheck: only the environment and Pages", done.stdout)
+        keys = self.keys(calls)
+        for untouched in ("repo edit", "label create", f"GET repos/{REPO}/rulesets", f"PATCH repos/{REPO}"):
+            self.assertNotIn(untouched, keys)
+        self.assertTrue([key for key in keys if "environments" in key], keys)
+        self.assertIn(f"POST repos/{REPO}/pages", keys)
+
+    def test_a_recheck_leaves_pages_alone_once_the_variable_is_set(self):
+        """SYMPHONY_DOCS set means Pages was decided, so a site the owner
+        removed is not put back."""
+        env = {"SYMPHONY_SETTINGS_RECHECK": "1", "SYMPHONY_CROWD_VARIABLE": "", "SYMPHONY_DOCS_VARIABLE": "pages"}
+        with mock.patch.dict(os.environ, env):
+            done, calls = self.run_script({})
+        self.assertIn("pages: left as it is", done.stdout)
+        self.assertFalse([key for key in self.keys(calls) if "/pages" in key])
+
+    def test_a_person_who_cannot_read_it_is_still_stopped(self):
+        refused = {f"GET repos/{REPO}/actions/variables/CLAUDE_CROWD": [answer(403, {"message": "Forbidden"})]}
+        done, calls = self.run_script(refused, app=False)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertNotIn("repo edit", self.keys(calls))
+
+    def test_refused_rulesets_toggles_topic_and_labels_stop_nothing(self):
+        done, calls = self.run_script({
+            f"GET repos/{REPO}/rulesets": [answer(403, {"message": "Resource not accessible by integration"})],
+            "repo edit": [answer(403, {"message": "Forbidden"})],
+            f"PATCH repos/{REPO}": [answer(403, {"message": "Forbidden"})],
+            "label create": [answer(403, {"message": "Forbidden"})],
+        })
+        self.assertEqual(done.returncode, 0, done.stderr)
+        for said in ("ruleset \"Protect the default branch\": not created", "general: delete head branches on merge, "
+                     "allow auto-merge: not changed", "topic symphony: not added", "not made"):
+            self.assertIn(said, done.stdout)
+        self.assertIn(f"GET repos/{REPO}/codeowners/errors", self.keys(calls))
+
+    def test_a_refused_toggle_command_goes_through_the_rest_api(self):
+        done, calls = self.run_script({"repo edit": [answer(403, {"message": "Forbidden"})],
+                                       f"PATCH repos/{REPO}": [answer(200, "")]})
+        self.assertIn("general: delete head branches on merge, allow auto-merge: on", done.stdout)
+        self.assertIn("secret scanning: on", done.stdout)
 
 
 class WorkflowPermissions(unittest.TestCase):
