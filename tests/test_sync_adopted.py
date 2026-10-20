@@ -270,6 +270,13 @@ class TheTemplate(unittest.TestCase):
         self.assertTrue(needs)
         self.assertTrue(may_add)
 
+    def test_the_drive_sync_runs_on_its_schedule_only_where_a_drive_is_tracked(self):
+        # every adopted repository is offered it, so an untracked one must
+        # spend no runner minute on the half-hourly schedule
+        text = (sync.ROOT / ".github/workflows/drive-sync.yml").read_text(encoding="utf-8")
+        self.assertIn("if: github.event.repository.fork == false && (github.event_name == 'workflow_dispatch' || "
+                      "vars.SYMPHONY_DRIVE == 'on')", text)
+
     def test_every_file_a_workflow_runs_is_in_its_unit(self):
         tree = sync.template_tree()
         found = {name: files for name, files, _, _ in sync.units(tree, lambda rel: sync.git("show", f"HEAD:{rel}"))}

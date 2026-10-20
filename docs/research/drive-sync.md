@@ -45,7 +45,11 @@ One tab of the control console, Folders, at https://openspineconsortium.com/symp
    SYMPHONY_DRIVE_REFRESH, both through the App. Then it starts the first sync.
 
 From then on .github/workflows/drive-sync.yml keeps the two in step every half hour, and the
-page's Sync now button runs it at once. A new comment in a document becomes a task on the board,
+page's Sync now button runs it at once. The half-hourly run starts only where the repository
+variable SYMPHONY_DRIVE is `on`, which Track is to set (2026-10-20): the template's sync offers
+the workflow to every adopted repository, most track no drive, and on a private repository GitHub
+bills each run as a whole minute, about 1,440 a month, while a job its `if` skips costs nothing.
+Sync now, and every start papers.yml makes, runs whatever the variable says. A new comment in a document becomes a task on the board,
 a worker answers it as tracked changes, and the revised file goes back to the drive as soon as
 its pull request merges: papers.yml starts the sync on any push that changes a document. A merge
 GITHUB_TOKEN makes starts no workflow, so such a revision waits for the half-hourly run.
