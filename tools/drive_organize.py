@@ -68,6 +68,11 @@ DIGEST_EACH = 5 << 20
 TREE_DEPTH = 4
 TREE_LINES = 1500
 NAMES_A_FOLDER = 10
+# The folders Microsoft 365 keeps for its own apps at a OneDrive's top: moving
+# one breaks the app that writes there, and what is in them (chat files,
+# recordings) is no project's, so they are listed but never read into or moved.
+MANAGED = {"apps", "attachments", "meetings", "microsoft copilot chat files", "microsoft teams chat files",
+           "microsoft teams data", "recordings", "notebooks", "desktop", "documents", "pictures"}
 MAX_PROJECTS = 30
 MAX_TASKS = 12
 READABLE = {"document", "spreadsheet", "table", "slides", "notebook", "text", "code", "data", "pdf", "image"}
@@ -127,12 +132,23 @@ def children(provider_name, provider, folder):
 
 
 def top(provider_name, provider, item):
+    """The item a walk starts from. A OneDrive's top keeps the id root,
+    which Graph takes for it, so the moves can name it as their home's
+    parent and tell the folders Microsoft 365's apps keep there."""
     if provider_name == "google":
         meta = provider.meta(item["id"])
     else:
         meta = provider.meta(item.get("drive", ""), item["id"])
     name = item.get("name") or meta.get("name", "") or item["id"]
-    return node(provider_name, meta, drive_sync.segment(name), item.get("drive", ""))
+    found = {**node(provider_name, meta, drive_sync.segment(name), item.get("drive", "")), "parent": ""}
+    if provider_name == "microsoft" and item["id"] == "root":
+        found["id"] = "root"
+    return found
+
+
+def kept_by_apps(provider_name, entry):
+    return (provider_name == "microsoft" and entry["folder"] and entry.get("parent") == "root"
+            and entry["name"].strip().lower() in MANAGED)
 
 
 def walk(provider_name, provider, items):
@@ -155,14 +171,15 @@ def walk(provider_name, provider, items):
                 break
             seen.add((current["drive"], current["id"]))
             found.append(current)
-            if not current["folder"]:
+            if not current["folder"] or kept_by_apps(provider_name, current):
                 continue
             if depth >= MAX_DEPTH:
                 problems.append(f"{current['path']}: deeper than {MAX_DEPTH} levels, not listed")
                 continue
             try:
-                kids = [node(provider_name, meta, f"{current['path']}/{drive_sync.segment(meta.get('name', ''))}",
-                             current["drive"]) for meta in children(provider_name, provider, current)]
+                kids = [{**node(provider_name, meta, f"{current['path']}/{drive_sync.segment(meta.get('name', ''))}",
+                                current["drive"]), "parent": current["id"]}
+                        for meta in children(provider_name, provider, current)]
             except drive_sync.DriveError as problem:
                 problems.append(f"{current['path']}: {problem}")
                 continue
@@ -198,7 +215,9 @@ def catalog_of(provider_name, found, problems, stopped):
         totals[entry["kind"]] = totals.get(entry["kind"], 0) + 1
     return {"provider": provider_name, "made": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "complete": not stopped and not problems, "problems": problems, "totals": totals,
-            "folders": sorted(folders.values(), key=lambda f: f["path"]), "files": files}
+            "folders": sorted(folders.values(), key=lambda f: f["path"]), "files": files,
+            "parents": {n["id"]: n["parent"] for n in found if n.get("parent")},
+            "managed": sorted(n["path"] for n in found if kept_by_apps(provider_name, n))}
 
 
 def ancestors(path, folders):

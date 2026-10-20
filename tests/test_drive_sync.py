@@ -357,6 +357,63 @@ class FakeOpener:
         raise AssertionError(f"no route for {request.full_url}")
 
 
+class Throttled:
+    """Refuses the first answers with the given HTTP codes, then answers."""
+
+    def __init__(self, codes, retry_after="7"):
+        self.codes, self.retry_after, self.requests = list(codes), retry_after, []
+
+    def open(self, request, timeout=None):
+        self.requests.append(request)
+        if self.codes:
+            headers = {"Retry-After": self.retry_after} if self.retry_after is not None else {}
+            raise urllib.error.HTTPError(request.full_url, self.codes.pop(0), "Throttled", headers,
+                                         io.BytesIO(b'{"error": {"code": "activityLimitReached"}}'))
+        return Answer(b'{"value": []}')
+
+
+class ThrottleTest(unittest.TestCase):
+    def call(self, method, opener):
+        waits = []
+        answer = drive_sync.call(method, "https://graph.microsoft.com/v1.0/me/drive/root/children", "t",
+                                 opener=opener, sleep=waits.append)
+        return answer, waits
+
+    def test_a_429_is_asked_again_after_the_wait_it_names(self):
+        opener = Throttled([429, 429])
+        (status, _, body), waits = self.call("GET", opener)
+        self.assertEqual((status, body, waits, len(opener.requests)), (200, b'{"value": []}', [7, 7], 3))
+        self.assertTrue(all(r.get_header("Authorization") == "Bearer t" for r in opener.requests))
+
+    def test_a_503_is_asked_again_only_for_a_read(self):
+        _, waits = self.call("GET", Throttled([503]))
+        self.assertEqual(waits, [7])
+        with self.assertRaises(drive_sync.DriveError) as caught:
+            self.call("PUT", Throttled([503]))
+        self.assertIn("answered 503: activityLimitReached", str(caught.exception))
+        _, waits = self.call("PUT", Throttled([429]))
+        self.assertEqual(waits, [7])
+
+    def test_the_tries_end(self):
+        opener = Throttled([429] * drive_sync.THROTTLE_TRIES)
+        with self.assertRaises(drive_sync.DriveError):
+            self.call("GET", opener)
+        self.assertEqual(len(opener.requests), drive_sync.THROTTLE_TRIES)
+
+    def test_the_wait_is_bounded_and_read_as_ascii_digits(self):
+        for named, wanted in (("0", 1), ("100000", drive_sync.THROTTLE_WAIT_MOST), (None, 5),
+                              ("Wed, 21 Oct 2026 07:28:00 GMT", 5), ("\u0663", 5), ("9" * 5000, 5)):
+            _, waits = self.call("GET", Throttled([429], named))
+            self.assertEqual(waits, [wanted], msg=named)
+
+    def test_other_refusals_are_not_asked_again(self):
+        for code in (400, 401, 403, 404, 500):
+            opener = Throttled([code])
+            with self.assertRaises(drive_sync.DriveError, msg=code):
+                self.call("GET", opener)
+            self.assertEqual(len(opener.requests), 1, msg=code)
+
+
 class ProviderTest(unittest.TestCase):
     def test_google_walks_a_folder_and_names_exports(self):
         opener = FakeOpener([

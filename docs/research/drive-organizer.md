@@ -134,7 +134,7 @@ accept running in a public repository, and a folder past the depth limit counted
   first organize waits on the owner's word, since it spends the Claude plan.
 - How long a large drive takes to walk: one Graph call per folder per 200 children, so a drive of
   50,000 files in 3,000 folders is a few thousand calls, inside the 90-minute job. Not measured.
-- Graph throttling (429) on a large walk is not retried yet; the folder is named as unlisted.
+- Graph throttling (429, and 503 on a read) is waited out since 2026-10-20, up to four tries after Retry-After's wait; a folder still refused is named as unlisted (onedrive-direct-graph.md).
 - The sync roots each tracked item at its own name, so two projects' "Reports" folders under
   different parents both land in `<folder>/Reports/`, and it walks six levels where the catalog
   walks sixteen. A task's files are named by their drive paths, so the board's Overlaps do not
@@ -145,7 +145,9 @@ accept running in a public repository, and a folder past the depth limit counted
 - How well Claude groups a real drive. The digests are the evidence it gets, and a domain
   outside the fifteen is "other".
 
-## Connector mode: the same from a Claude session
+## Connector mode: the same from a Claude session (retired 2026-10-20)
+
+Retired on the owner's word once Wayne State's consent made the Graph walk work ("dont expose to the user the ability to do that old way of creating the scan of the onedrive that didnt use natural authetication through microsoft"): the walk below is removed from tools/drive_connector.py and the skill, and kept here as the record of the first run (onedrive-direct-graph.md).
 
 Added the same day, answering the owner's message of 2026-10-18: "giving symphony through claude
 access to the entire onedrive for reorganizing into projects, repos, ect symphony repos that

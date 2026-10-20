@@ -24,10 +24,9 @@ name: Drive organizer
 #             a task whose files are not here yet; no Claude. A failed
 #             accept is run again as it was
 #   open      opens the proposals in plan.json on drive-catalog, which a
-#             Claude session wrote there with its catalog after reading the
-#             drive through the Microsoft 365 connector
-#             (tools/drive_connector.py, .claude/skills/drive-organize), so the
-#             issues are the workflow's own, as accept requires; no Claude
+#             Claude session wrote there from the catalog this workflow
+#             read (.claude/skills/drive-organize), so the issues are the
+#             workflow's own, as accept requires; no Claude
 #
 # A catalog names a person's files and holds a little of what is in them,
 # so every step runs only in a private repository and the log carries
@@ -98,19 +97,46 @@ jobs:
           python3 tools/drive_organize.py catalog --config "$CONFIG" --out "$RUNNER_TEMP/catalog" > "$RUNNER_TEMP/counts.json"
           echo "catalog: $(cat "$RUNNER_TEMP/counts.json")" | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Keep the catalog on drive-catalog
+      # drive-catalog also holds what others wrote beside the catalog: a
+      # session's plan.json, moves.json and MOVES.md, and the control
+      # panel's notebooks.json and notebooks/. So the new catalog is one
+      # commit on top of the branch, never a forced push that would drop
+      # them, and a branch that moved while the drive was read refuses it.
+      - name: Keep the catalog on drive-catalog, beside what is there
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
           basic="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          dir="$RUNNER_TEMP/catalog"
-          git init --quiet "$dir"
-          git -C "$dir" add catalog.json TREE.md digests.jsonl
-          git -C "$dir" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+          remote="https://github.com/$GITHUB_REPOSITORY"
+          work="$RUNNER_TEMP/drive-catalog"
+          git init --quiet "$work"
+          found=0
+          git -C "$work" -c http.extraheader="AUTHORIZATION: basic $basic" \
+            ls-remote --exit-code --heads "$remote" refs/heads/drive-catalog > /dev/null || found=$?
+          if [ "$found" = 0 ]; then
+            git -C "$work" -c http.extraheader="AUTHORIZATION: basic $basic" fetch --quiet "$remote" refs/heads/drive-catalog
+            git -C "$work" checkout --quiet --detach FETCH_HEAD
+          elif [ "$found" != 2 ]; then
+            echo "Could not read whether drive-catalog exists, so the catalog was not kept; run the step again." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          cp "$RUNNER_TEMP/catalog/catalog.json" "$RUNNER_TEMP/catalog/TREE.md" "$RUNNER_TEMP/catalog/digests.jsonl" "$work/"
+          git -C "$work" add catalog.json TREE.md digests.jsonl
+          if git -C "$work" diff --cached --quiet; then
+            echo "The catalog is as drive-catalog already held it." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git -C "$work" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit --quiet -m "What the drive organizer read"
-          git -C "$dir" -c http.extraheader="AUTHORIZATION: basic $basic" \
-            push --quiet --force "https://github.com/$GITHUB_REPOSITORY" "HEAD:refs/heads/drive-catalog"
+          if ! git -C "$work" -c http.extraheader="AUTHORIZATION: basic $basic" \
+              push --quiet "$remote" "HEAD:refs/heads/drive-catalog"; then
+            echo "drive-catalog refused the push, most likely because it moved while the drive was read, so the catalog was not kept; run the step again." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [ -f "$work/plan.json" ] || [ -f "$work/moves.json" ]; then
+            echo "plan.json or moves.json on drive-catalog came from an earlier catalog: check them against this one (tools/drive_connector.py check, moves) before any move." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
 
   organize:
     needs: catalog
@@ -142,7 +168,8 @@ jobs:
           basic="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           git -c http.extraheader="AUTHORIZATION: basic $basic" fetch --quiet origin drive-catalog
           mkdir -p .drive-catalog
-          git archive FETCH_HEAD | tar -x -C .drive-catalog
+          # only what the catalog step wrote: the branch also holds a plan, moves and notebooks that are not the drive
+          git archive FETCH_HEAD catalog.json TREE.md digests.jsonl | tar -x -C .drive-catalog
           {
             echo "schema=$(python3 tools/drive_organize.py schema --registry "$REGISTRY")"
             echo "workers<<WORKERS_END"
