@@ -192,6 +192,24 @@ class Pages(unittest.TestCase):
         self.assertNotIn(f"POST {PAGES}", self.keys(calls))
         self.assertNotIn("variable set", self.keys(calls))
 
+    def test_a_site_published_already_is_left_alone_whatever_builds_it(self):
+        """A site that has been built may be the owner's own, so the
+        variable that would let docs.yml deploy over it stays unset."""
+        for site in ("workflow built", "legacy never"):
+            with self.subTest(site=site):
+                done, calls = self.run_script({f"GET {PAGES}": [answer(200, f"{site}\n")]})
+                self.assertIn("left as it is", self.pages_line(done))
+                self.assertNotIn("variable set", self.keys(calls))
+
+    def test_a_site_from_actions_never_published_takes_the_variable(self):
+        """An earlier run made the site before it could set the variable;
+        nothing has deployed there since, so this run sets it."""
+        done, calls = self.run_script({f"GET {PAGES}": [answer(200, "workflow never\n")]})
+        self.assertIn("never published, so the variable SYMPHONY_DOCS is set to pages", self.pages_line(done))
+        self.assertNotIn(f"POST {PAGES}", self.keys(calls))
+        variable = next(call for call in calls if call["key"] == "variable set")
+        self.assertEqual(variable["args"][:3], ["variable", "set", "SYMPHONY_DOCS"])
+
     def limiting(self, public):
         """The PUT that limits the site, after which the read back says
         public as given."""
@@ -501,12 +519,13 @@ CHECK_RUNS = f"repos/{REPO}/commits/main/check-runs?check_name=check&per_page=10
 LISTED = f"repos/{REPO}/rulesets?includes_parents=false&per_page=100"
 
 
-def live_ruleset(check):
+def live_ruleset(check, strict=False):
     """The ruleset as GitHub reads it back, with fields a PUT does not take."""
     ruleset = json.loads(MAIN.read_text())
     for rule in ruleset["rules"]:
         if rule["type"] == "required_status_checks":
             rule["parameters"]["required_status_checks"] = [check]
+            rule["parameters"]["strict_required_status_checks_policy"] = strict
     return dict(ruleset, id=RULESET_ID, source_type="Repository", source=REPO, _links={})
 
 
@@ -519,20 +538,23 @@ class CheckPin(unittest.TestCase):
 
     run_script = WorkflowPermissions.run_script
 
-    def pin(self, reported, check=None, write=None, listed=None, read=None):
+    def pin(self, reported, check=None, write=None, listed=None, read=None, strict=False, both=False):
         name = json.loads(MAIN.read_text())["name"]
+        live = live_ruleset(check or {"context": "check"}, strict)
         extra = {
             f"GET {LISTED}": [listed or answer(200, [{"id": RULESET_ID, "name": name}])],
             f"GET {CHECK_RUNS}": [answer(200, f"{reported}\n")],
-            f"GET repos/{REPO}/rulesets/{RULESET_ID}": [read or answer(200, live_ruleset(check or {"context": "check"}))],
+            f"GET repos/{REPO}/rulesets/{RULESET_ID}": [read or answer(200, live)],
             f"PUT repos/{REPO}/rulesets/{RULESET_ID}": [write or answer(200, "")],
         }
         done, calls = self.run_script(workflow_answer("read", True), extra=extra)
         self.assertEqual(done.returncode, 0, done.stderr)
         lines = [line for line in done.stdout.splitlines() if line.startswith("check pin:")]
+        rules = [line for line in done.stdout.splitlines() if line.startswith("up-to-date rule:")]
         self.assertEqual(len(lines), 1, done.stdout)
+        self.assertEqual(len(rules), 1, done.stdout)
         puts = [call for call in calls if call["key"] == f"PUT repos/{REPO}/rulesets/{RULESET_ID}"]
-        return lines[0], puts
+        return ((lines[0], rules[0]) if both else lines[0]), puts
 
     def test_pins_the_check_once_actions_has_reported_it_keeping_every_rule(self):
         line, puts = self.pin(1)
@@ -579,6 +601,53 @@ class CheckPin(unittest.TestCase):
         self.assertIn("not changed (gh: fake answer (HTTP 422))", line)
         self.assertIn(f"https://github.com/{REPO}/settings/rules/{RULESET_ID}", line)
         self.assertEqual(len(puts), 1)
+
+
+class UpToDateRule(unittest.TestCase):
+    """"Require branches to be up to date" made every merge send each other
+    ready pull request back to CI, so no shipped ruleset carries it and the
+    script turns it off in a ruleset that has it on, whether or not the
+    check can be pinned yet, keeping every other rule as it was."""
+
+    pin = CheckPin.pin
+    run_script = WorkflowPermissions.run_script
+
+    def test_no_shipped_ruleset_requires_an_up_to_date_branch(self):
+        for path in sorted((ROOT / "docs" / "setup").glob("ruleset-*.json")):
+            with self.subTest(ruleset=path.name):
+                for rule in json.loads(path.read_text())["rules"]:
+                    if rule["type"] == "required_status_checks":
+                        self.assertIs(rule["parameters"]["strict_required_status_checks_policy"], False)
+
+    def test_turns_it_off_before_the_check_has_reported(self):
+        (pin, rule), puts = self.pin(0, strict=True, both=True)
+        self.assertIn("not yet", pin)
+        self.assertEqual(rule, "up-to-date rule: turned off")
+        self.assertEqual(len(puts), 1)
+        sent_back = {key: value for key, value in live_ruleset({"context": "check"}).items()
+                     if key in ("name", "target", "enforcement", "conditions", "rules", "bypass_actors")}
+        self.assertEqual(json.loads(puts[0]["stdin"]), sent_back)
+
+    def test_turns_it_off_and_pins_in_one_put(self):
+        (pin, rule), puts = self.pin(1, strict=True, both=True)
+        self.assertEqual(pin, 'check pin: "check" now requires GitHub Actions as its source')
+        self.assertEqual(rule, "up-to-date rule: turned off")
+        self.assertEqual(len(puts), 1)
+        checks = [r for r in json.loads(puts[0]["stdin"])["rules"] if r["type"] == "required_status_checks"]
+        self.assertIs(checks[0]["parameters"]["strict_required_status_checks_policy"], False)
+        self.assertEqual(checks[0]["parameters"]["required_status_checks"], [{"context": "check", "integration_id": 15368}])
+
+    def test_leaves_a_ruleset_with_it_off_alone(self):
+        (pin, rule), puts = self.pin(1, {"context": "check", "integration_id": 15368}, both=True)
+        self.assertEqual(rule, "up-to-date rule: off already")
+        self.assertEqual(puts, [])
+
+    def test_a_refused_put_names_the_box_to_untick(self):
+        (pin, rule), puts = self.pin(0, strict=True, write=answer(403), both=True)
+        self.assertIn("not yet", pin)
+        self.assertIn("not changed (gh: fake answer (HTTP 403))", rule)
+        self.assertIn("Require branches to be up to date before merging", rule)
+        self.assertIn(f"https://github.com/{REPO}/settings/rules/{RULESET_ID}", rule)
 
 
 class EveryShippedRuleset(unittest.TestCase):
