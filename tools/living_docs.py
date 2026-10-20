@@ -219,7 +219,7 @@ def notebook_of(path):
     cells = []
     for kind, body, _ in parse(path.read_text(encoding="utf-8")):
         if kind == "md" and body.strip():
-            cells.append(cell("markdown", rewrite_links_for_notebook(for_a_notebook(body.strip("\n")))))
+            cells.append(cell("markdown", rewrite_links_for_notebook(body.strip("\n"))))
         elif kind == "setup":
             cells.append(cell("code", setup_cell()))
         elif kind == "run":
@@ -233,14 +233,6 @@ def notebook_of(path):
     return {"cells": cells, "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
                                          "language_info": {"name": "python"}},
             "nbformat": 4, "nbformat_minor": 5}
-
-
-def for_a_notebook(text):
-    """Step 0 tells a reader with a clone what the setup block does; in a
-    notebook the setup cell clones the library itself, so it says that."""
-    text = text.replace("From the top of a clone of this repository, in a terminal, run this once.", "Run this cell first.")
-    text = text.replace("tells Python where the claim-protocol library is", "fetches the claim-protocol library")
-    return text.replace(" (In the Colab notebook the first cell does this for you.)", "")
 
 
 def rewrite_links_for_notebook(text):
@@ -280,48 +272,6 @@ def notebooks(args):
     for target in orphans:
         print(f"{target.relative_to(ROOT)}: no lesson of that name; delete it with its lesson")
     return 1 if stale or orphans else 0
-
-
-# The public copies: the same notebooks in symphony-protocol's notebooks/,
-# where Colab opens them for anyone with no GitHub sign-in (an internal
-# repository answers Colab 404). Links into this repository would answer a
-# stranger 404 too, so each becomes the public page that says the same, or
-# plain text where there is none.
-
-PUBLIC_COLAB = "https://colab.research.google.com/github/OpenSpineConsortium/symphony-protocol/blob/main/notebooks/"
-PUBLIC_PAGES = {"agents/PROTOCOL.md": LIBRARY_URL + "/blob/main/spec/PROTOCOL.md"}
-
-
-def public_links(text):
-    def moved(match):
-        label, target = match.groups()
-        if re.match(r"^0\d-[a-z0-9-]+\.ipynb$", target):
-            return f"[{label}]({PUBLIC_COLAB}{target})"
-        if re.match(r"^([a-z]+:|#)", target):
-            return match.group(0)
-        for tail, page in PUBLIC_PAGES.items():
-            if target.endswith(tail):
-                return f"[{label}]({page})"
-        return label
-    return re.sub(r"(?<!!)\[([^\]]+)\]\(([^)\s]+)\)", moved, text)
-
-
-def public_notebook(made):
-    for each in made["cells"]:
-        if each["cell_type"] == "markdown":
-            each["source"] = public_links("".join(each["source"])).splitlines(True)
-    return json.dumps(made, indent=1, ensure_ascii=True) + "\n"
-
-
-def publish(args):
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    demo = ROOT / "docs" / "start" / "demo.ipynb"
-    (out / demo.name).write_text(public_notebook(json.loads(demo.read_text(encoding="utf-8"))), encoding="utf-8")
-    for path in lessons():
-        (out / (path.stem + ".ipynb")).write_text(public_notebook(notebook_of(path)), encoding="utf-8")
-    print(f"wrote {len(lessons()) + 1} notebooks to {out}")
-    return 0
 
 
 # Holding the code to its documentation
@@ -676,8 +626,8 @@ def nav_html(sections, here):
 def lesson_actions(path, site):
     if not site.repo:
         return ""
-    # the public copy, which Colab opens with no GitHub sign-in (publish)
-    colab = f"{PUBLIC_COLAB}{path.stem}.ipynb"
+    notebook = f"docs/learn/notebooks/{path.stem}.ipynb"
+    colab = f"https://colab.research.google.com/github/{site.repo}/blob/{site.sha or 'main'}/{notebook}"
     codespace = (f"https://codespaces.new/{site.repo}?quickstart=1"
                  "&devcontainer_path=.devcontainer%2Fdemo%2Fdevcontainer.json")
     return (f'<div class="actions"><a class="button" href="{colab}">Open in Colab</a>'
@@ -786,8 +736,6 @@ def main(argv=None):
     sub.add_parser("check", help="every module documented, every lesson listed, the notebooks up to date")
     made = sub.add_parser("notebooks", help="write each lesson's notebook under docs/learn/notebooks/")
     made.add_argument("--check", action="store_true", help="fail, writing nothing, when one is out of date")
-    shared = sub.add_parser("publish", help="write the public copies of the notebooks, for symphony-protocol's notebooks/")
-    shared.add_argument("out")
     reported = sub.add_parser("report", help="run the test suite and write each test's result as JSON")
     reported.add_argument("out")
     built = sub.add_parser("site", help="build the static documentation site")
@@ -796,7 +744,7 @@ def main(argv=None):
     built.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""), help="OWNER/NAME, for links to files and Colab")
     built.add_argument("--sha", default="", help="the commit the site describes")
     args = parser.parse_args(argv)
-    return {"test": test, "check": check, "notebooks": notebooks, "publish": publish, "report": report, "site": site}[args.command](args)
+    return {"test": test, "check": check, "notebooks": notebooks, "report": report, "site": site}[args.command](args)
 
 
 if __name__ == "__main__":

@@ -82,18 +82,6 @@ class Notebooks(unittest.TestCase):
                          "[l2](02-x.ipynb), [p](../../agents/PROTOCOL.md), [w](https://x.org), ![f](a.svg)")
 
 
-class PublicCopies(unittest.TestCase):
-    def test_links_become_public_pages_colab_links_or_plain_text(self):
-        text = "[l2](02-x.ipynb), [p](../../agents/PROTOCOL.md), [r](../../../.claude/rules/board.md), [w](https://x.org)"
-        self.assertEqual(living_docs.public_links(text),
-                         f"[l2]({living_docs.PUBLIC_COLAB}02-x.ipynb), "
-                         f"[p]({living_docs.LIBRARY_URL}/blob/main/spec/PROTOCOL.md), r, [w](https://x.org)")
-
-    def test_step_0_tells_a_notebook_reader_to_run_the_cell(self):
-        made = living_docs.for_a_notebook("From the top of a clone of this repository, in a terminal, run this once. It")
-        self.assertEqual(made, "Run this cell first. It")
-
-
 class Html(unittest.TestCase):
     def test_alt_text_and_script_links_cannot_inject(self):
         made = living_docs.inline('![q" onerror="x](y.png) [a](javascript:alert(1))', lambda t: t)
@@ -115,7 +103,7 @@ class TheSite(unittest.TestCase):
         self.assertEqual(living_docs.site(Namespace(out=str(out.parent), tests=None, repo="", sha="")), 1)
         living_docs.site(Namespace(out=str(out), tests=str(results), repo="o/n", sha="abc1234def"))
         lesson = (out / "01-first-claim.html").read_text(encoding="utf-8")
-        self.assertIn("colab.research.google.com/github/OpenSpineConsortium/symphony-protocol/blob/main/notebooks/01-first-claim.ipynb", lesson)
+        self.assertIn("colab.research.google.com/github/o/n/blob/abc1234def/docs/learn/notebooks/01-first-claim.ipynb", lesson)
         self.assertIn('href="02-push-guard.html"', lesson)
         self.assertIn("ran in CI at commit abc1234", lesson)
         self.assertIn("1 of 1 tests passed", (out / "tests.html").read_text(encoding="utf-8"))
