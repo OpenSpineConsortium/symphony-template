@@ -40,5 +40,9 @@ sampled files, and the step organize giving them to Claude on the repository's o
 reviews against the code found what the first draft missed: the organize step's Claude run and
 issues, the scope and limits of the walk, the search words that Ask in claude.ai carries, and how
 New folder, Properties, the preview and name clashes really behave. Moves through Graph, planned
-and not built, need statement 37 before they ship; so would a Claude run added to the onedrive
+and not built, need a statement after 37 before they ship; so would a Claude run added to the onedrive
 repository's own catalog workflow.
+
+Statement 37 (symphony-start#84, site #101, 2026-10-20) adds the environment token-store, limited
+to the default branch, which Symphony Setup makes in an adoption run (symphony-start#83); it raised
+the statement's count of Setup's settings from seven to eight, which tests/test_form.py checks.
