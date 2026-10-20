@@ -191,11 +191,29 @@ class Pages(unittest.TestCase):
         self.assertNotIn(f"POST {PAGES}", self.keys(calls))
         self.assertNotIn("variable set", self.keys(calls))
 
+    def limiting(self, public):
+        """The PUT that limits the site, after which the read back says
+        public as given."""
+        return {f"PUT {PAGES}": [answer(204, "", after={f"GET {PAGES}": [answer(200, f"{public}\n")]})]}
+
     def test_an_internal_repositorys_site_is_limited_to_its_readers(self):
-        done, calls = self.run_script({}, visibility="INTERNAL")
+        done, calls = self.run_script(self.limiting("false"), visibility="INTERNAL")
         self.assertIn("turned on", self.pages_line(done))
         limited = next(call for call in calls if call["key"] == f"PUT {PAGES}")
         self.assertEqual(fields(limited), {"public": ("-F", "false")})
+        self.assertIn("variable set", self.keys(calls))
+
+    def test_a_limit_github_took_but_did_not_keep_removes_the_site(self):
+        done, calls = self.run_script(self.limiting("true"), visibility="PRIVATE")
+        self.assertIn("still reads as public", self.pages_line(done))
+        self.assertIn("removed again", self.pages_line(done))
+        self.assertIn(f"DELETE {PAGES}", self.keys(calls))
+        self.assertNotIn("variable set", self.keys(calls))
+
+    def test_a_site_that_could_not_be_removed_says_so(self):
+        done, calls = self.run_script({f"PUT {PAGES}": [answer(422, {"message": "plan"})],
+                                       f"DELETE {PAGES}": [answer(500, {"message": "oops"})]}, visibility="PRIVATE")
+        self.assertIn("could not be removed again", self.pages_line(done))
 
     def test_a_site_that_cannot_be_limited_is_removed_again(self):
         done, calls = self.run_script({f"PUT {PAGES}": [answer(422, {"message": "plan"})]}, visibility="PRIVATE")

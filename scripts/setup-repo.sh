@@ -432,6 +432,17 @@ pages_refused() {
   printf 'pages: not turned on (%s); open https://github.com/%s/settings/pages and, under Build and deployment, choose GitHub Actions as the source, then set the repository variable SYMPHONY_DOCS to pages\n' \
     "$(head -n 1 <<<"$1")" "$REPO"
 }
+# A limit GitHub accepted is read back before the site counts as limited,
+# so a plan that takes the PUT and keeps the site open is caught.
+pages_limited() {
+  gh api --method PUT "repos/$REPO/pages" --silent -F public=false || return 1
+  local public
+  public=$(gh api "repos/$REPO/pages" --jq .public) || return 1
+  if [ "$public" != false ]; then
+    echo "GitHub took the limit, but the site still reads as public" >&2
+    return 1
+  fi
+}
 refusal=$(mktemp)
 if gh api "repos/$REPO/pages" --silent 2>"$refusal"; then
   echo "pages: a site is there already, left as it is; docs.yml publishes the documentation site there only once the repository variable SYMPHONY_DOCS is pages"
@@ -439,10 +450,14 @@ elif ! grep -q '(HTTP 404)' "$refusal"; then
   pages_refused "$(<"$refusal")"
 elif ! gh api --method POST "repos/$REPO/pages" --silent -f build_type=workflow 2>"$refusal"; then
   pages_refused "$(<"$refusal")"
-elif [ "$VISIBILITY" != public ] && ! gh api --method PUT "repos/$REPO/pages" --silent -F public=false 2>"$refusal"; then
-  gh api --method DELETE "repos/$REPO/pages" --silent 2>/dev/null || true
-  printf 'pages: not turned on, since GitHub would not limit the site of this %s repository to its readers (%s) and it would be open to anyone; set it by hand at https://github.com/%s/settings/pages if that is meant\n' \
-    "$VISIBILITY" "$(head -n 1 "$refusal")" "$REPO"
+elif [ "$VISIBILITY" != public ] && ! pages_limited 2>"$refusal"; then
+  if gh api --method DELETE "repos/$REPO/pages" --silent 2>/dev/null; then
+    removed="removed again"
+  else
+    removed="and could not be removed again, so turn it off at https://github.com/$REPO/settings/pages"
+  fi
+  printf 'pages: not turned on, since GitHub would not limit the site of this %s repository to its readers (%s) and it would be open to anyone; the site was %s; set it by hand at https://github.com/%s/settings/pages if that is meant\n' \
+    "$VISIBILITY" "$(head -n 1 "$refusal")" "$removed" "$REPO"
 elif ! gh variable set SYMPHONY_DOCS --repo "$REPO" --body pages 2>"$refusal"; then
   printf 'pages: turned on, built by GitHub Actions, but the variable SYMPHONY_DOCS was not set (%s); set it to pages at https://github.com/%s/settings/variables/actions\n' \
     "$(head -n 1 "$refusal")" "$REPO"
