@@ -101,7 +101,20 @@ UTC to switch on his fine-grained locking. At 20:45:46 UTC the rule still
 stood as listed above. The workflow records the rule's state in each
 snapshot (`up_to_date_required`), since the ruleset's own history is
 readable only by an administrator (403 to the session's token), so the
-record dates each switch to within one merge. The comparison to make once a
+record dates each switch to within one merge. The rule went off, as the thread "Tokens and adopted repositories"
+reported and a poll of rules/branches/main every 30 seconds confirmed:
+SchwingNet at about 21:08 UTC, coordbench at 21:17:06, symphony-start at
+21:17:08 and symphony-template at 21:31:55 (Settings run 39501080936);
+symphony-app and symphony-marketplace had it off already, and
+symphony-protocol's change (its #59) was still waiting at 21:40. The
+first pull request to land under the new rule here, symphony-template
+#304, was green at 21:15, called behind after #301 landed at about 21:19,
+and merged at about 21:32 as it stood, with no catch-up and no second run;
+this note's own pull request, #302, went stale twice before the switch
+and was brought up to date twice. The fine-grained locking thread's
+overlap check (docs/research/overlap-check-instead-of-up-to-date.md),
+turned on by a switch file the protocol's 0.6.0 sync brings, marks the second
+"after". The comparison to make once a
 few days have passed is the same table split at each switch: catch-ups and
 stale-after-green should fall towards symphony-app's level, and the default
 branch's own failed checks are the price to watch.
