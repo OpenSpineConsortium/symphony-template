@@ -73,8 +73,11 @@ WORKFLOWS = (
 )
 LIBRARY_UNIT = "the vendored library and its record"
 ADDED = {".github/workflows/token.yml"}
-# A whole template's copy, which holds the template's own update workflow.
-WHOLE_TEMPLATE = ".github/workflows/protocol.yml"
+# A whole template's copy holds the template's own check beside its update
+# workflow. The update workflow alone marks nothing: a repository adopted
+# for the protocol alone may take protocol.yml by hand, as spine-program
+# did, and was then never offered the Token workflow (2026-10-20).
+WHOLE_TEMPLATE = (".github/workflows/protocol.yml", "scripts/check.sh")
 # GitHub's modes for a file that is no link and no submodule.
 FILE_MODES = {"100644", "100755"}
 
@@ -417,7 +420,7 @@ def offer(gh, repo, bot, read_blob, tree, held, unit_list):
         return "not adopted"
     if opted_out(gh, repo, theirs):
         return "opted out"
-    if WHOLE_TEMPLATE in theirs:
+    if all(rel in theirs for rel in WHOLE_TEMPLATE):
         # a whole template's copy runs the template's tests on its scripts,
         # which the files alone would leave behind, and has every workflow
         return "whole template"
