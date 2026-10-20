@@ -243,6 +243,36 @@ class FakeOrg:
         raise AssertionError(f"unexpected call {method} {path}")
 
 
+class MissingPermissionTest(unittest.TestCase):
+    """GitHub answers 404 on an organization's variables when the App's
+    installation lacks Variables, naming the permission in a header."""
+
+    def refusing(self, headers):
+        org = FakeOrg()
+
+        def call(method, path, body=None):
+            if "/variables" in path:
+                raise urllib.error.HTTPError(path, 404, "Not Found", headers, io.BytesIO())
+            return org.call(method, path, body)
+        return token_run.Pool("acme", "app", 42, call=call)
+
+    def test_a_missing_variables_permission_says_where_to_accept_it(self):
+        pool = self.refusing({"X-Accepted-GitHub-Permissions": "organization_actions_variables=write"})
+        with self.assertRaises(token_run.RunError) as said:
+            pool.store("sk-ant-oat01-x", "ashley")
+        text = str(said.exception)
+        self.assertIn("GitHub answered 404 when the run tried to mark slot 1 as yours", text)
+        self.assertIn("organization variables write", text)
+        self.assertIn("https://github.com/organizations/acme/settings/installations", text)
+
+    def test_a_refusal_with_no_permission_named_says_only_what_failed(self):
+        pool = self.refusing({})
+        with self.assertRaises(token_run.RunError) as said:
+            pool.store("sk-ant-oat01-x", "ashley")
+        self.assertEqual(str(said.exception),
+                         "GitHub answered 404 when the run tried to mark slot 1 as yours in SYMPHONY_CLAUDE_SETTINGS in acme's pool")
+
+
 class PoolStoreTest(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.mkdtemp()
