@@ -236,7 +236,8 @@ def answer(github, to, comment, default_branch):
     issue = digest_issue(issues)
     if issue is None or not comment.get("issue_url", "").endswith(f"/issues/{issue['number']}"):
         return "not a comment on the digest issue; nothing done"
-    if not may_answer(comment, to):
+    to = to or addressed(github.list(f"issues/{issue['number']}/comments?per_page=100"))
+    if not to or not may_answer(comment, to):
         return "the comment is not the digest recipient's; nothing done"
     open_ones = github.list("issues?state=open&labels=decision&per_page=100") + \
         github.list("issues?state=open&labels=proposed&per_page=100")
@@ -246,15 +247,34 @@ def answer(github, to, comment, default_branch):
     return "; ".join(apply(github, ops, issue["number"], default_branch)) or "nothing to do"
 
 
-def recipient(codeowners, owner, owner_type):
-    """The login the digest goes to: CODEOWNERS' first user, else a user's repository's owner."""
+LOGIN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})")
+ADDRESSED = re.compile(r"^@(" + LOGIN.pattern + r"), here is your Symphony digest\.$", re.MULTILINE)
+
+
+def recipient(codeowners, owner, owner_type, actor=""):
+    """The login the digest goes to: CODEOWNERS' first user, else a user's
+    repository's owner, else the person the run is for (who pressed Run, or
+    for the schedule whoever last changed it), since an organization is no
+    one to email and a template's CODEOWNERS is filled only in its copies."""
     for line in codeowners.splitlines():
         if line.strip().startswith("#"):
             continue
         for word in line.split()[1:]:
             if re.fullmatch(r"@[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})", word):
                 return word[1:]
-    return owner if owner_type == "User" else None
+    if owner_type == "User":
+        return owner
+    return actor if LOGIN.fullmatch(actor or "") else None
+
+
+def addressed(comments):
+    """The recipient the latest digest named, so an answer is checked
+    against the person the digest went to, never against whoever answers."""
+    for comment in reversed(comments):
+        if (comment.get("user") or {}).get("login") == BOT and MARKER.search(comment.get("body") or ""):
+            found = ADDRESSED.search(comment["body"])
+            return found.group(1) if found else None
+    return None
 
 
 def main(argv=None):
@@ -263,11 +283,13 @@ def main(argv=None):
     for name in ("post", "answer"):
         step = sub.add_parser(name)
         step.add_argument("--repo", required=True)
-        step.add_argument("--to", required=True)
+        step.add_argument("--to", required=(name == "post"), help="answer: the latest digest's recipient when omitted")
         if name == "answer":
             step.add_argument("--comment", required=True, help="the issue_comment event's comment, as JSON")
             step.add_argument("--default-branch", default="main")
-    sub.add_parser("recipient").add_argument("--owner-type", default="User")
+    found = sub.add_parser("recipient")
+    found.add_argument("--owner-type", default="User")
+    found.add_argument("--actor", default="")
     args = parser.parse_args(argv)
     try:
         if args.command == "recipient":
@@ -287,7 +309,7 @@ def main(argv=None):
 def recipient_command(args):
     path = Path(".github/CODEOWNERS")
     found = recipient(path.read_text(encoding="utf-8") if path.exists() else "",
-                      os.environ.get("GITHUB_REPOSITORY_OWNER", ""), args.owner_type)
+                      os.environ.get("GITHUB_REPOSITORY_OWNER", ""), args.owner_type, args.actor)
     if not found:
         print("github_digest: no recipient; set the repository variable SYMPHONY_DIGEST_TO", file=sys.stderr)
         return 1

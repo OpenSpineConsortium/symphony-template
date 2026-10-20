@@ -36,10 +36,12 @@ name: Board
 # contents: write covers the rename, issues: write the labels, and a call
 # GitHub refuses is only logged, so the board is still written. One run at
 # a time; when events come in a burst, as a merge's four are, the runs
-# wait their turn (queue: max, below) instead of the newest replacing the
+# wait their turn (queue: max, on the job below) instead of the newest replacing the
 # one waiting, so no event's run is lost; and since no comment depends on
 # the event that started the run, a run that were lost would cost only a
-# delay to the next, at most the schedule's six hours.
+# delay to the next, at most the schedule's six hours. A run with a newer
+# one waiting behind it stands back for it, unless a push to a claim
+# branch started it (the gate step says why).
 #
 # The checkout is the default branch itself, whatever event started the
 # run, so the board describes that branch's head (git rev-parse HEAD
@@ -83,18 +85,11 @@ on:
   workflow_dispatch:
 
 permissions:
+  # actions: read lets a run see whether a newer one waits behind it (below).
+  actions: read
   contents: write
   pull-requests: write
   issues: write
-
-concurrency:
-  group: board
-  cancel-in-progress: false
-  # Up to a hundred runs wait in the group in the order they arrived, in
-  # place of GitHub's default, which cancels the run waiting when another
-  # arrives: a merge fires four events at once, and the push to the default
-  # branch's run was the one often cancelled (symphony-protocol, F12).
-  queue: max
 
 env:
   DEFAULT_BRANCH: ${{ github.event.repository.default_branch || github.ref_name }}
@@ -105,6 +100,16 @@ jobs:
       github.event.repository.is_template == false
       && (github.event_name != 'push' || github.ref_name == github.event.repository.default_branch)
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    # On the job, not the workflow, so a run whose job is skipped (a push to
+    # a claim branch, a fork's pull request) never waits in the line.
+    # Up to a hundred jobs wait in the group in the order they arrived, in
+    # place of GitHub's default, which cancels the job waiting when another
+    # arrives: a merge fires four events at once, and the push to the default
+    # branch's run was the one often cancelled (symphony-protocol, F12).
+    concurrency:
+      group: board
+      cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -115,14 +120,48 @@ jobs:
       # the board (a setup branch, an adoption) the tool is not there yet:
       # that run is skipped, not red, and the first run after the merge
       # renders the board.
-      - name: Stop in the template itself, or before the board's tool has landed
+      #
+      # A run stands back for a newer one waiting behind it, which starts
+      # after this one would end and reads the whole state again, since
+      # nothing the run writes depends on the event that started it but one
+      # thing: a run started by a push to a claim branch (a branch made, or
+      # a pull request's synchronize) dates that push at its own start, so
+      # no claim is released in the run its push started (docs/agents/
+      # PROTOCOL.md, Release). Those runs never stand back. A burst of
+      # events, as a merge's four, then costs one full run, not four. Any
+      # answer GitHub does not give leaves the run to go on as before.
+      - name: Stop in the template itself, before the board's tool has landed, or for a newer run
         id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          CARRIES_A_PUSH: ${{ github.event_name == 'create' || (github.event_name == 'pull_request' && github.event.action == 'synchronize') }}
         run: |
+          newer_board_waits() {
+            local workflow id waiting
+            workflow="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .workflow_id)" || return 1
+            # Only runs whose job passes the job's own condition, so a run
+            # whose job GitHub is about to skip (a push to another branch, a
+            # fork's pull request) is never one this run stands back for.
+            for id in $(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?per_page=30" \
+                --jq ".workflow_runs[] | select(.run_number > $RUN_NUMBER and .status != \"completed\")
+                  | select(.event != \"push\" or .head_branch == \"$DEFAULT_BRANCH\")
+                  | select(.event != \"pull_request\" or .head_repository.full_name == \"$GITHUB_REPOSITORY\") | .id"); do
+              waiting="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+                --jq '[.jobs[] | select(.name == "board" and .status != "completed" and .status != "in_progress")] | length')" || continue
+              [ "${waiting:-0}" -gt 0 ] && return 0
+            done
+            return 1
+          }
           if [ -e .template/PENDING ]; then
             echo "the template itself, or a copy not yet initialised; no board"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           elif [ ! -f tools/board.py ]; then
             echo "the default branch has no tools/board.py yet; no board until the pull request that brings it is merged"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif [ "$CARRIES_A_PUSH" != "true" ] && newer_board_waits; then
+            echo "a newer board run waits behind this one and will read the same state later; this one stands back"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
