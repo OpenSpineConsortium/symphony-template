@@ -141,7 +141,7 @@ def top(provider_name, provider, item):
         meta = provider.meta(item.get("drive", ""), item["id"])
     name = item.get("name") or meta.get("name", "") or item["id"]
     found = {**node(provider_name, meta, drive_sync.segment(name), item.get("drive", "")), "parent": ""}
-    if provider_name == "microsoft" and item["id"] == "root":
+    if provider_name == "microsoft" and (item["id"] == "root" or "root" in meta):
         found["id"] = "root"
     return found
 
