@@ -4,8 +4,9 @@ name: Checks
 # default branch: bash scripts/check.sh, which runs tools/check_docs.py (the
 # repository's documents are the Claude project's instructions and memory,
 # so a broken import or a stray secret is a broken project), the tests, and
-# whatever lines the project adds. Branch protection requires the job named
-# "check" (docs/setup/github.md). A newer push to the same branch cancels
+# whatever lines the project adds, run as parts side by side (the job
+# parts) that the job named "check" waits for. Branch protection requires
+# the job named "check" (docs/setup/github.md). A newer push to the same branch cancels
 # the run still going, so nobody waits on a result that is already stale.
 # The runner's own python3 is used (3.12 on ubuntu-latest); swap in
 # actions/setup-python@v7 if the image ever moves below what the tools need.
@@ -82,10 +83,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    needs: values
-    if: ${{ !cancelled() }}
+  # The check's work runs as parts side by side, each on a runner of its
+  # own, and the job named check, the one branch protection requires,
+  # waits for them all and fails unless every part passed: part "rest" is
+  # scripts/check.sh without its tests, and parts 1 to 4 are the tests cut
+  # into four by tools/test_shard.py, so the check takes about as long as
+  # its slowest part, not the sum (docs/research/faster-backend-than-actions.md).
+  # None of them names a secret, as check never did.
+  parts:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [rest, 1/4, 2/4, 3/4, 4/4]
+    name: check part ${{ matrix.part }}
     steps:
       - uses: actions/checkout@v7
 
@@ -93,6 +104,7 @@ jobs:
         run: git clone --quiet https://github.com/OpenSpineConsortium/symphony-protocol "$RUNNER_TEMP/symphony-protocol"
 
       - name: Install the workflow linters, pinned by hash
+        if: matrix.part == 'rest'
         # actionlint and zizmor, which scripts/check.sh runs (issue #248).
         run: |
           set -eu
@@ -107,10 +119,26 @@ jobs:
           ln -s "$RUNNER_TEMP/lint/zizmor/bin/zizmor" "$RUNNER_TEMP/lint/bin/zizmor"
           echo "$RUNNER_TEMP/lint/bin" >> "$GITHUB_PATH"
 
-      - name: Run the checks
+      - name: Run the checks but the tests
+        if: matrix.part == 'rest'
         env:
           SDLC_PROTOCOL: ${{ runner.temp }}/symphony-protocol
+          CHECK_TESTS: none
         run: bash scripts/check.sh
+
+      - name: Run this part of the tests
+        if: matrix.part != 'rest'
+        env:
+          SDLC_PROTOCOL: ${{ runner.temp }}/symphony-protocol
+          PART: ${{ matrix.part }}
+        run: python3 tools/test_shard.py run "$PART"
+
+  check:
+    needs: [values, parts]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
 
       - name: Hold a crowd repository to its rules
         env:
@@ -127,6 +155,13 @@ jobs:
       - name: Hold a claude/ pull request to the claim protocol
         if: github.event_name == 'pull_request'
         run: python3 tools/check_protocol.py
+
+      - name: Every part of the check passed
+        env:
+          PARTS_RESULT: ${{ needs.parts.result }}
+        run: |
+          echo "the parts: $PARTS_RESULT"
+          [ "$PARTS_RESULT" = success ]
 
   values:
     runs-on: ubuntu-latest

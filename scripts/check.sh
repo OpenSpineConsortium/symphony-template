@@ -30,7 +30,13 @@ python3 tools/agents.py check
 # must match its lesson (tools/living_docs.py).
 python3 tools/living_docs.py test
 python3 tools/living_docs.py check
-python3 -m unittest discover -s tests -v
+# The tests, every module of them here and by hand; CI runs them as parts
+# side by side, each in a job of its own, and sets CHECK_TESTS=none for the
+# part that runs this script, so the tests run once (tools/test_shard.py,
+# .github/workflows/ci.yml).
+if [ "${CHECK_TESTS:-}" != none ]; then
+  python3 tools/test_shard.py run
+fi
 # The workflows (issue #248; docs/research/rust-coordinator.md, section 8):
 # actionlint type-checks every expression against the contexts its event
 # carries and runs shellcheck over every run: block, at warning and above;

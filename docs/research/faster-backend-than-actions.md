@@ -126,6 +126,15 @@ So the move is a few days of thread work if Python Workers run the library, and 
 1. Whether to start step 1: a template pull request splitting the check into parallel jobs, and a symphony-protocol pull request letting a burst of board runs collapse. Free, no server, ordinary pull requests.
 2. Whether to lift "no server of ours" for the webhook edge of step 2, knowing it puts the App's key on Cloudflare.
 
+## 7. Step 1 taken, 2026-10-20
+
+The owner said at 20:26 UTC that the free fixes "seem like no brainers", and the thread made them in one pull request:
+
+- The check in parts: ci.yml runs a job parts, five legs side by side (scripts/check.sh without its tests, and the tests cut into four by tools/test_shard.py, longest first by the seconds tests/durations.json records), and the required job check waits for them and fails unless every leg passed. Measured locally on 4 CPUs, the tests took 360 s in one run; the four parts come to about 168, 61, 61 and 61 s, so the template's check is held by its one longest module, tests/test_filled_copy.py, which runs three copies' own checks, and a copy's check by about a quarter of its tests.
+- The board's line: the concurrency group moved from the workflow to the job, so a run whose job is skipped (every push to a claim branch, a fork's pull request) no longer waits in it; and a run stands back when a newer run whose job will run waits behind it, except a run a push to a claim branch started (a branch made, or a pull request's synchronize), which dates that push at its start so no claim is released in the run its push started. A merge's burst then costs one full run, not four.
+
+Measured on the pull request's own run in the template (GitHub-hosted runners, 2026-10-20 20:49 UTC): the parts started together; rest took 13 s, parts 2 to 4 took 39 to 47 s, and part 1, tests/test_filled_copy.py alone, took 210 s, after which the job check took 9 s; the check finished 222 s after its parts began, against 299 s for the single job before (median of 18). The template stays bound by the copies' own checks that test makes; a copy, which skips that test, should finish in about its slowest part, under a minute against 100 s. The board's change is measured from a copy's runs once the sync brings it.
+
 ## Sources read
 
 - GitHub REST API: /actions/runs and /actions/runs/{id}/jobs on OpenSpineConsortium/symphony-template and on the owner's private copy, 2026-10-20.
