@@ -125,6 +125,25 @@ button, whose merge is a Chrome Web Store submission and so waits on the owner's
 here (the two words in its choice list), and the site's Folders tab (the place and its link). The gate's
 rule of one call a minute and its refusals stay as they are.
 
+## The owner's OnDemand test, 2026-10-20
+
+At 21:24 UTC the owner reported his first test of Grid OnDemand's Files on the VPN: browsing worked; the
+.mkv files, the container the YouTube downloads came in, did not play; .tsv and .html files were shown as
+plain text; a folder of about a million files froze the page; and a video that did play sat in a large
+black frame, like a cathode-ray television. He then set the order of routes: native Wayne State OneDrive
+access to the grid's files first, the tunnel second, the VPN last.
+
+What follows from it. Chrome plays MP4 (H.264) and WebM but not Matroska, so a browser view of the raw
+downloads needs an MP4 copy made on the grid, whatever the route; the cut clips' preview.mp4 already is
+one. A copy into OneDrive suits chosen folders of results and videos, never a folder of a million files,
+which the tunnel lists lazily and OneDrive would hold as a million items. No Microsoft OneDrive client
+exists for Linux, so the native way from the grid is rclone's OneDrive backend, which takes a client id
+of the owner's choosing and a list of scopes: SymphonyBoard Folders' own id with Files.ReadWrite and
+offline_access, the two scopes Wayne State consented to on 2026-10-19, so nothing new goes to C&IT
+(inferred; rclone's --onedrive-access-scopes, and whether Wayne State's Conditional Access lets a sign-in
+from a compute node through, are to measure). The black frame is not yet explained: the video's own
+letterbox, or OnDemand's viewer page.
+
 ## PHI and the patent
 
 - A dev tunnel's traffic passes through Microsoft's relay. VS Code's documentation describes it as
