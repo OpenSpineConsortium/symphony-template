@@ -294,7 +294,7 @@ class Microsoft:
         return f"{GRAPH}/drives/{q(drive)}/items/{q(item_id)}" if drive else f"{GRAPH}/me/drive/items/{q(item_id)}"
 
     def meta(self, drive, item_id):
-        return call_json("GET", self.item_url(drive, item_id) + "?$select=id,name,cTag,eTag,file,folder,"
+        return call_json("GET", self.item_url(drive, item_id) + "?$select=id,name,cTag,eTag,file,folder,root,"
                          "parentReference,size,lastModifiedDateTime,webUrl", self.token, opener=self.opener)
 
     def children(self, drive, item_id):

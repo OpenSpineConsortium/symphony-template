@@ -93,6 +93,19 @@ class Catalog(Drive):
         self.assertNotIn("OneDrive/Recordings/call.mp4", paths)
         self.assertTrue(made["complete"])
 
+    def test_the_drives_top_named_by_its_own_id_is_root_too(self):
+        class ByOwnId(MemoryOneDrive):
+            def meta(self, drive, item_id):
+                return {"id": "01ROOT", "name": "root", "folder": {}, "root": {}, "parentReference": {"driveId": DRIVE}}
+
+            def children(self, drive, item_id):
+                return super().children(drive, "root" if item_id == "root" else item_id)
+
+        found, _, _ = drive_organize.walk("microsoft", ByOwnId(), [{"id": "01ROOT", "name": "OneDrive", "drive": DRIVE}])
+        made = drive_organize.catalog_of("microsoft", found, [], False)
+        self.assertEqual(made["parents"][item(1)], "root")
+        self.assertEqual(made["managed"], ["OneDrive/Recordings"])
+
     def test_check_names_the_paths_the_catalog_lacks(self):
         made = self.catalog()
         self.assertIn("repository is not an object",
