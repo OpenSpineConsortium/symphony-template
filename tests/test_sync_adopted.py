@@ -215,7 +215,13 @@ class TheOffer(unittest.TestCase):
     def test_a_whole_templates_copy_is_left_to_its_own_route(self):
         files = theirs(token=None, token_run=None)
         files[".github/workflows/protocol.yml"] = ("100644", "q", "blob")
+        files["scripts/check.sh"] = ("100755", "c", "blob")
         self.assertEqual(offer(FakeGitHub(files)), "whole template")
+
+    def test_a_protocol_adoption_with_the_update_workflow_is_still_offered(self):
+        files = theirs(token=None, token_run=None)
+        files[".github/workflows/protocol.yml"] = ("100644", "q", "blob")
+        self.assertEqual(offer(FakeGitHub(files)), "offered")
 
     def test_an_open_pull_request_is_updated_in_place(self):
         tip = {"author": {"login": BOT}, "parents": [{}]}
