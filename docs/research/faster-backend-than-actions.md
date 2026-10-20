@@ -90,6 +90,25 @@ The design, costs and credential rule are in rust-coordinator.md, sections 2 to 
 - Protection: GitHub's rulesets and required checks protect the same way whoever writes, so nothing is lost; a missed delivery needs a sweep, which Actions' six-hourly board run already is.
 - Security: worse in one way. Today a workflow writes with a GITHUB_TOKEN scoped to one repository and one run. An edge holds the App's private key, which mints a token for every installation, so a leak of the Cloudflare account reaches every adopted repository. The control panel's sign-in Worker already runs on the same account, but it holds no App key.
 
+### What moving costs, and what it does to correctness
+
+The owner's follow-up at 19:53 UTC: "how much trouble to move to a cloudflare worker? do i lose any guarantee of correctness?" Inferred from the design above and the protocol's text; nothing measured or built.
+
+The work, about five pull requests in symphony-app beside the sign-in Worker, with the deploy-on-merge workflow it already has: a receiver that checks the webhook's signature and answers inside 10 seconds; App authentication (a JWT from the App's key, an installation token per repository); one Durable Object per repository that runs the board's step; a Cron Trigger that reconciles every repository and redelivers failed deliveries; and the board workflow changed to stand back while the edge is healthy. The one-time steps for the owner would be the App's webhook URL and secret and the App's key as a Worker secret; GitHub's API can set an App's webhook URL and secret with the App's own JWT, so the deploy workflow could likely set them, which was not tried.
+
+The language decides the risk. The protocol is a stdlib-only Python library, and Cloudflare runs Python Workers through Pyodide; whether that runs the library unchanged inside a Durable Object was not checked. If it does, the same code runs and symphony-protocol's tests and validation harness keep covering it. If the logic has to be ported to JavaScript or Rust, it is a second implementation, and until the harness checks it against the same oracle it carries none of the guarantees the Python library earned (F1 to F18 were found that way).
+
+What stays the same, whatever runs the board: the guarantees GitHub itself enforces. The claim lock (GitHub refuses the second push of a branch name), the rulesets, the required check, the push guard in each session and the merge gate do not depend on Actions, so no move can weaken them.
+
+What changes:
+
+- Better: one Durable Object per repository runs one step at a time, a single writer, so the board's queue and the race of a waiting run cancelled by a newer one (F12) go away by construction.
+- Worse unless handled: GitHub never redelivers a failed webhook by itself, where an Actions run is started for every event; the protocol survives a lost event only because each step reads the whole state again, so the edge must stay level-triggered and keep the sweep, with Actions' six-hourly board run as the last fallback.
+- New: while both the edge and the fallback can write, there are two writers again, so the board branch must be updated with an expected-head check (git's own compare-and-swap on a ref) and the fallback must not write while the edge is healthy.
+- To be re-specified: the Release section dates a push by "the run that a push to the branch started" and by the run's start; an edge has no run, so those rules need their edge equivalent, written into symphony-protocol and checked by its harness before the edge is trusted to release a claim.
+
+So the move is a few days of thread work if Python Workers run the library, and it loses no guarantee GitHub enforces. The protocol's own guarantees carry over only if the same library runs and the harness is extended to the edge's delivery and timing.
+
 ## 6. The owner's decisions
 
 1. Whether to start step 1: a template pull request splitting the check into parallel jobs, and a symphony-protocol pull request letting a burst of board runs collapse. Free, no server, ordinary pull requests.
