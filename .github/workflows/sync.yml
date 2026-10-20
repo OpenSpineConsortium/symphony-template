@@ -27,6 +27,7 @@ on:
       - ".github/workflows/tidy.yml"
       - ".github/workflows/metrics.yml"
       - ".github/workflows/token.yml"
+      - ".github/workflows/drive-sync.yml"
       - "tools/**"
       - "scripts/tokens.py"
   schedule:

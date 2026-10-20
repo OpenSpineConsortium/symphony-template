@@ -24,7 +24,12 @@ name: Drive sync
 # Every half hour as the fallback, and from the panel's Sync now
 # (workflow_dispatch); the minute is an odd one, so it does not queue behind
 # every workflow set for the top of the hour. On a private repository each
-# run spends a minute of the plan's Actions minutes, about 1,440 a month.
+# run spends a minute of the plan's Actions minutes, about 1,440 a month, so
+# the half-hourly run starts only where the repository variable
+# SYMPHONY_DRIVE is on, which the panel's Track sets: a job its if skips
+# takes no runner and costs nothing, and the sync offers this workflow to
+# every adopted repository, most of which track no drive. Sync now runs
+# whatever the variable says.
 
 on:
   schedule:
@@ -44,7 +49,7 @@ concurrency:
 
 jobs:
   sync:
-    if: github.event.repository.fork == false
+    if: github.event.repository.fork == false && (github.event_name == 'workflow_dispatch' || vars.SYMPHONY_DRIVE == 'on')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
