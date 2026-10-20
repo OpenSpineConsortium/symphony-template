@@ -18,15 +18,14 @@ rules:
       # claude-code-action answers only an actor with write access and
       # fails the run for anyone else before it posts anything.
       - claude.yml
+      # issue_comment runs this file from the default branch on the event's
+      # data alone, never a pull request's code; it acts only on a comment
+      # on the digest issue by the digest's recipient, with write access.
+      - digest.yml
   github-app:
     ignore:
       # The App's token is made in the one run that initialises a copy.
       - template-init.yml
-      # The settings need the installation's whole set, since the action
-      # names no variables permission (crowd mode's CLAUDE_CROWD, Pages'
-      # SYMPHONY_DOCS) and setup-repo.sh would fail where one it names is
-      # not accepted; the token is revoked by the step after the settings.
-      - settings.yml
       # The token wizard needs the installation's whole set, since the
       # action names no variables permission (token.yml says why); the look
       # token is revoked before claude starts.

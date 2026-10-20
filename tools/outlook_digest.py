@@ -364,23 +364,23 @@ def first_line(text):
     return line if len(line) <= TITLE_CHARS else line[:TITLE_CHARS - 3].rstrip() + "..."
 
 
-def prompt_ops(text):
+def prompt_ops(text, where="Outlook"):
     if not text:
         return []
-    return [{"op": "open_issue", "title": "From Outlook: " + first_line(text), "body": text, "labels": ["from-email"]}]
+    return [{"op": "open_issue", "title": f"From {where}: " + first_line(text), "body": text, "labels": ["from-email"]}]
 
 
-def answer_ops(decision, label, text):
+def answer_ops(decision, label, text, where="Outlook"):
     note = f"\n\n{text}" if text else ""
     if decision.kind == "project" and label == "Accept":
-        return [{"op": "accept_project", "epic": decision.number}, {"op": "comment", "issue": decision.number, "body": f"Accepted in Outlook.{note}"}]
+        return [{"op": "accept_project", "epic": decision.number}, {"op": "comment", "issue": decision.number, "body": f"Accepted in {where}.{note}"}]
     if decision.kind == "project":
-        return [{"op": "comment", "issue": decision.number, "body": f"Declined in Outlook.{note}"}, {"op": "close", "issue": decision.number, "reason": "not_planned"}]
+        return [{"op": "comment", "issue": decision.number, "body": f"Declined in {where}.{note}"}, {"op": "close", "issue": decision.number, "reason": "not_planned"}]
     marker = f"<!-- symphony-decision: {label} -->"
-    return [{"op": "comment", "issue": decision.number, "body": f"{marker}\nChosen in Outlook: {label}.{note}"}, {"op": "unlabel", "issue": decision.number, "label": "decision"}]
+    return [{"op": "comment", "issue": decision.number, "body": f"{marker}\nChosen in {where}: {label}.{note}"}, {"op": "unlabel", "issue": decision.number, "label": "decision"}]
 
 
-def plan(answers, prompt, decisions, actor=None, expected=None):
+def plan(answers, prompt, decisions, actor=None, expected=None, where="Outlook"):
     """The GitHub operations an answer asks for. answers is a list of
     (number, label, text); a label of "" sends the text alone to that issue.
     An actor other than the one expected, or a decision no longer open, is
@@ -402,12 +402,12 @@ def plan(answers, prompt, decisions, actor=None, expected=None):
             ops.append({"op": "refuse", "why": f"#{number} is no longer waiting on a decision"})
         elif not label:
             if text:
-                ops.append({"op": "comment", "issue": number, "body": f"From Outlook:\n\n{text}"})
+                ops.append({"op": "comment", "issue": number, "body": f"From {where}:\n\n{text}"})
         elif decision.option(label) is None:
             ops.append({"op": "refuse", "why": f"#{number} has no option {label!r}"})
         else:
-            ops += answer_ops(decision, decision.option(label), text)
-    return ops + prompt_ops(prompt)
+            ops += answer_ops(decision, decision.option(label), text, where)
+    return ops + prompt_ops(prompt, where)
 
 
 def plan_action(found, decisions, actor=None, expected=None):

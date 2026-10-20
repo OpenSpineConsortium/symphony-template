@@ -109,3 +109,35 @@ Two questions only C&IT can answer belong in the phase 1 request itself: which c
 The useful shift is from a list of scopes to a list of conversations. Microsoft's mid-2026 policy changes mean that, even in a tenant with user consent on, nearly every scope worth having beyond sending mail is now an administrator's decision, so each phase is a separate review that should arrive with its feature already built and demonstrable. Asking for less now makes the first approval faster and keeps a refusal of Mail.Read from costing anything, since Mail.Send alone already delivers the one-press digest.
 
 The larger risk is not consent but plumbing that consent cannot fix: a 24-hour token, a location policy that refuses GitHub's runners, or an organization switch that hides cards. The first two take one test with the Files permission Symphony already holds, and the card tests need only a self-sent card from the Actionable Messages designer, so all of them can run before or alongside the request to C&IT, and the request can ask for exactly what will work.
+
+## Measured at Wayne State, 2026-10-20
+
+The owner opened Microsoft's consent page for SymphonyBoard Folders with a Wayne State account, one permission at a time (prompt=consent, each link cancelled, nothing granted): User.Read showed the consent screen a user may accept, while Mail.Send, Mail.Read, and Calendars.ReadWrite with Tasks.ReadWrite showed "Need admin approval". So Wayne State does allow user consent, but only for a short list: Mail.Send, which Microsoft's managed default policy leaves to users, is blocked too, which points to a policy that lets users grant only scopes an administrator classified as low impact (inferred; the tenant's policy is not public). The conclusion holds and is now measured, not inferred: every mail, calendar and task scope goes to C&IT, and User.Read needs no request.
+
+## One request, 2026-10-20
+
+The owner asked at 18:08 UTC for one straight list to send C&IT instead of phases. It goes on SymphonyBoard Folders, which already holds Files.ReadWrite, offline_access and User.Read. It replaces the phased request and the separate digest app recommended above.
+
+- Mail.Send: the digest from the owner's mailbox to itself.
+- Mail.Read: the owner's replies to the digest, turned into tasks.
+- Calendars.ReadWrite: grant and paper deadlines on the calendar, and busy time.
+- Tasks.ReadWrite: claims mirrored to To Do and Planner.
+- Sites.Selected: only the SharePoint sites IT names, a lab or a PHI study site (docs/research/phi-with-microsoft-365.md).
+- InformationProtectionPolicy.Read: sensitivity labels, to recognise and protect PHI-labelled files.
+- Notes.ReadWrite: the owner's own OneNote notebooks.
+- ChannelMessage.Send and Team.ReadBasic.All: status cards in a lab Teams channel.
+
+Later, only for a feature that needs them: Files.Read.All if Sites.Selected is refused, User.ReadBasic.All, ChatMessage.Send. Never asked for: transcripts, Mail.ReadWrite, and any read-all or write-all scope.
+
+Beyond delegated Graph, the same request can ask C&IT for the following (owner's question, 18:11 UTC; from the author's knowledge, to check with C&IT):
+
+- Application permissions Mail.Send and Sites.Selected, with Exchange's RBAC for Applications limiting the app to the owner's mailbox, so the digest and PHI jobs run without a sign-in.
+- Organization-scope approval of the actionable-message provider by an Exchange administrator, and confirmation that actionable messages are on for the tenant.
+- Teams custom app upload, for a Symphony Teams app or bot with one-press buttons.
+- A Microsoft Graph connector (ExternalConnection.ReadWrite.OwnedBy), so the repositories are found in Microsoft Search and Copilot.
+- An Azure subscription or resource group under Wayne State's BAA, with Contributor, for Azure Health Data Services, virtual machines and a GitHub Enterprise Server for PHI.
+- A Purview "PHI - restricted" label and a DLP policy for the study site, and the named SharePoint site with its Sites.Selected grant.
+- A Conditional Access trusted location or exemption for Symphony's runners.
+- Power Platform premium connectors and Copilot Studio.
+
+Outside C&IT: the HIPAA privacy officer's word on where PHI may live, and whether the WSU grid is approved for PHI.

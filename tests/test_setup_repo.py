@@ -259,6 +259,45 @@ class AsTheApp(unittest.TestCase):
         self.assertNotIn("--enable-auto-merge", edit["args"])
         self.assertIn("label create", self.keys(calls))
 
+    def test_the_workflows_own_read_of_the_variable_needs_no_permission(self):
+        """The workflow hands the value from its vars context: empty turns
+        auto-merge on without asking the API, true stops before any write."""
+        refused = {f"GET repos/{REPO}/actions/variables/CLAUDE_CROWD": [answer(403, {"message": "Forbidden"})]}
+        with mock.patch.dict(os.environ, {"SYMPHONY_CROWD_VARIABLE": ""}):
+            done, calls = self.run_script(refused)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertNotIn("crowd mode: unknown", done.stdout)
+        self.assertNotIn(f"GET repos/{REPO}/actions/variables/CLAUDE_CROWD", self.keys(calls))
+        edit = next(call for call in calls if call["key"] == "repo edit" and "--delete-branch-on-merge" in call["args"])
+        self.assertIn("--enable-auto-merge", edit["args"])
+        with mock.patch.dict(os.environ, {"SYMPHONY_CROWD_VARIABLE": "TRUE"}):
+            done, calls = self.run_script({})
+        self.assertNotEqual(done.returncode, 0)
+        self.assertNotIn("repo edit", self.keys(calls))
+
+    def test_a_recheck_makes_only_the_environment_and_pages(self):
+        """The weekly and visibility runs make only what a plan or a
+        private repository held back, and touch no toggle, topic, ruleset,
+        scanning, Actions box or label the owner may have changed since."""
+        with mock.patch.dict(os.environ, {"SYMPHONY_SETTINGS_RECHECK": "1", "SYMPHONY_CROWD_VARIABLE": ""}):
+            done, calls = self.run_script({})
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("recheck: only the environment and Pages", done.stdout)
+        keys = self.keys(calls)
+        for untouched in ("repo edit", "label create", f"GET repos/{REPO}/rulesets", f"PATCH repos/{REPO}"):
+            self.assertNotIn(untouched, keys)
+        self.assertTrue([key for key in keys if "environments" in key], keys)
+        self.assertIn(f"POST repos/{REPO}/pages", keys)
+
+    def test_a_recheck_leaves_pages_alone_once_the_variable_is_set(self):
+        """SYMPHONY_DOCS set means Pages was decided, so a site the owner
+        removed is not put back."""
+        env = {"SYMPHONY_SETTINGS_RECHECK": "1", "SYMPHONY_CROWD_VARIABLE": "", "SYMPHONY_DOCS_VARIABLE": "pages"}
+        with mock.patch.dict(os.environ, env):
+            done, calls = self.run_script({})
+        self.assertIn("pages: left as it is", done.stdout)
+        self.assertFalse([key for key in self.keys(calls) if "/pages" in key])
+
     def test_a_person_who_cannot_read_it_is_still_stopped(self):
         refused = {f"GET repos/{REPO}/actions/variables/CLAUDE_CROWD": [answer(403, {"message": "Forbidden"})]}
         done, calls = self.run_script(refused, app=False)
