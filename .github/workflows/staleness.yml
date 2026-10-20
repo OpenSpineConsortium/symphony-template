@@ -92,15 +92,13 @@ jobs:
           GIT_COMMITTER_NAME: github-actions[bot]
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
-          cd "$RUNNER_TEMP/record"
+          record="$RUNNER_TEMP/record"
           entries=""
           for file in STALENESS.json SNAPSHOTS.jsonl REPORT.md; do
-            [ -e "$file" ] || continue
-            entries="$entries$(printf '100644 blob %s\t%s' "$(git -C "$GITHUB_WORKSPACE" hash-object -w "$file")" "$file")
-          "
+            [ -e "$record/$file" ] || continue
+            entries="${entries}100644 blob $(git hash-object -w "$record/$file")\t${file}\n"
           done
-          cd "$GITHUB_WORKSPACE"
-          tree="$(printf '%s' "$entries" | git mktree)"
+          tree="$(printf '%b' "$entries" | git mktree)"
           parent=""
           [ -n "$PREVIOUS" ] && parent="-p $PREVIOUS"
           # shellcheck disable=SC2086
