@@ -112,18 +112,17 @@ reaches the page or the repository, and no server of ours exists. Chrome asks th
 public page may reach a local address (Private Network Access), which is that pairing's consent.
 This step changes what the panel can reach, so it waits for the owner's yes and a security review.
 
-## What waits on the owner
-
-1. Steps 1 to 3 change only the site and are built next on the standing permission, unless the
-   owner says otherwise.
-2. Step 4: the recommendation is JavaScript, shipped inside the symphony plugin first; the owner
-   may prefer Python with the standard library, matching the template's tools, at the cost of a
-   second copy of every action.
-3. Publishing the program on npm is outward-facing and waits for the owner's word.
-4. Step 5, the local bridge, waits for the owner's yes.
-
 ## Where it stands
 
 The floating Claude button and the removal of the Ask Claude bar and the message line on every
-layout are in the site's pull request "Control panel: a floating Claude at the top right in place
-of the Ask Claude bar and the message line"; steps 1 to 5 are not started.
+layout are merged (site #117, 2026-10-20). Steps 1 to 5 are parked as a future feature: on
+2026-10-20 the owner said "lets park this to a future tab, feature", after weighing Python against
+JavaScript for step 4 and leaning towards Python for the idea of two code bases. If the work
+resumes, these choices are open:
+
+1. Step 4's language: JavaScript, one copy of every action, perhaps in a repository of its own that
+   the site and the command line both vendor; or Python with the standard library, matching the
+   template's tools, at the cost of a second copy of every action and a test pinning the two lists
+   together.
+2. Publishing the program on npm, which is outward-facing and waits for the owner's word.
+3. Step 5, the local bridge, which waits for the owner's yes and a security review.

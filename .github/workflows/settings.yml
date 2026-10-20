@@ -80,14 +80,20 @@ jobs:
       # The permissions the script uses, named, for this repository alone,
       # since beethoven-qa's supply-chain standard, which a copy carries,
       # refuses a token with the installation's whole set. Naming one the
-      # installation has not accepted fails the whole mint, so a second mint without Pages
-      # stands in until the owner accepts it; the action has no input for
-      # Variables, so the variable SYMPHONY_DOCS is a refusal the script
-      # reports. The action's own post step revokes each token.
+      # installation has not accepted fails the whole mint, so a second mint
+      # without Pages and Variables stands in until the owner accepts them.
+      # The action reads every permission-* input it is given, declared or
+      # not, from the environment GitHub sets for them, so the variable below
+      # reaches GitHub as actions_variables, which lets the script set
+      # SYMPHONY_DOCS; the action declares no such input, so it is given as
+      # that environment variable rather than under with:. The action's own
+      # post step revokes each token.
       - uses: actions/create-github-app-token@v3
         id: app-token
         if: steps.copy.outputs.copy == 'true' && vars.SDLC_APP_ID != ''
         continue-on-error: true
+        env:
+          INPUT_PERMISSION-ACTIONS-VARIABLES: write
         with:
           app-id: ${{ vars.SDLC_APP_ID }}
           private-key: ${{ secrets.SDLC_APP_PRIVATE_KEY }}
