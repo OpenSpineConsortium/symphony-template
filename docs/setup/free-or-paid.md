@@ -60,6 +60,7 @@ Not all of them are free. In a public repository almost all of them are free on 
   - Making the repositories workers change public. On a public repository almost every row is free on any plan, with unlimited standard-runner minutes. The exceptions are organization rulesets and the workflows rule (Team or Enterprise organizations only) and larger runners (always billed).
   - Basing the gate on a required status check pinned to GitHub Actions rather than on the workflows rule, since every repository that can have rulesets can have that check.
   - In repositories that stay private or internal, keeping SARIF as a workflow artifact unless Code Security is bought.
+- **Which to pay for, by kind of work:** docs/setup/pay-for-what-you-need.md sets out what the base does on GitHub Free, what each purchase adds, what comes on by itself after an upgrade, and six configurations.
 
 ## Sources
 

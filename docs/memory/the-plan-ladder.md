@@ -32,3 +32,10 @@ workflows need only the cheapest paid plan. The API credits bundled with
 Max and Team are spendable on the API side only and never extend Claude
 Code. Keep CI on ubuntu runners: Windows bills at about 1.7x, macOS at
 about 10x.
+
+After a change of plan or visibility (GitHub's docs, 2026-10-20): an
+environment on a repository made private is ignored and comes back only
+when it is public again, and none can be made while private on Free; the
+docs are silent on rulesets, which the settings page shows kept and not
+enforced. docs/setup/pay-for-what-you-need.md gives the configurations
+by kind of work; docs/research/github-plans-and-visibility.md the quotes.
