@@ -12,7 +12,9 @@ name: Digest
 # digest never answers itself. Nothing is posted on a day with nothing done
 # and no new decision. The recipient is the repository variable
 # SYMPHONY_DIGEST_TO when set, else .github/CODEOWNERS' first user, else a
-# user's repository's owner; their GitHub notification settings decide
+# user's repository's owner, else the run's actor (who pressed Run, or for
+# the schedule whoever last changed it); an answer is checked against the
+# login the latest digest named, never against whoever answers; their GitHub notification settings decide
 # whether the mention reaches them by email (on by default).
 
 on:
@@ -47,10 +49,11 @@ jobs:
           REPO: ${{ github.repository }}
           TO: ${{ vars.SYMPHONY_DIGEST_TO }}
           OWNER: ${{ github.repository_owner }}
+          ACTOR: ${{ github.actor }}
         run: |
           set -eu
           kind=$(gh api "users/$OWNER" --jq .type)
-          to="${TO:-$(python3 tools/github_digest.py recipient --owner-type "$kind")}"
+          to="${TO:-$(python3 tools/github_digest.py recipient --owner-type "$kind" --actor "$ACTOR")}"
           python3 tools/github_digest.py post --repo "$REPO" --to "$to" | tee -a "$GITHUB_STEP_SUMMARY"
 
   answer:
@@ -73,11 +76,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           TO: ${{ vars.SYMPHONY_DIGEST_TO }}
-          OWNER_TYPE: ${{ github.event.repository.owner.type }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -eu
-          to="${TO:-$(python3 tools/github_digest.py recipient --owner-type "${OWNER_TYPE:-User}")}"
           python3 -c 'import json, os; json.dump(json.load(open(os.environ["GITHUB_EVENT_PATH"]))["comment"], open(os.environ["RUNNER_TEMP"] + "/comment.json", "w"))'
-          python3 tools/github_digest.py answer --repo "$REPO" --to "$to" \
+          python3 tools/github_digest.py answer --repo "$REPO" ${TO:+--to "$TO"} \
             --comment "$RUNNER_TEMP/comment.json" --default-branch "$DEFAULT_BRANCH" | tee -a "$GITHUB_STEP_SUMMARY"
