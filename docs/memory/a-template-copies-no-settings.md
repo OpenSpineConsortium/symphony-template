@@ -11,7 +11,7 @@ Administration is used for the settings as well as the Share tab. Its
 token, minted from the variable SDLC_APP_ID and the secret
 SDLC_APP_PRIVATE_KEY that template-init already uses, runs
 scripts/setup-repo.sh in .github/workflows/settings.yml on the push
-template-init makes, on a change to the ruleset's file and daily: the
+template-init makes, on a change to the ruleset's file and by hand, never on a schedule, which would undo what the owner turned off: the
 ruleset of docs/setup/ruleset-main.json with any checks the copy adds,
 the pin of "check" to GitHub Actions, delete-branch-on-merge and
 auto-merge, the topic symphony, secret scanning and push protection,

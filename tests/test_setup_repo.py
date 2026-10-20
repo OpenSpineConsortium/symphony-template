@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -232,6 +233,56 @@ class Pages(unittest.TestCase):
         done, calls = self.run_script({f"GET {PAGES}": [answer(403, {"message": "Forbidden"})]})
         self.assertIn("not turned on", self.pages_line(done))
         self.assertNotIn(f"POST {PAGES}", self.keys(calls))
+
+
+class AsTheApp(unittest.TestCase):
+    """The Settings workflow runs the script with the SymphonyBoard App's
+    token (SYMPHONY_SETTINGS_APP=1), whose installation may not have
+    accepted every permission: each refusal is reported and the run goes
+    on, and a crowd mode it cannot read leaves auto-merge alone."""
+
+    def run_script(self, extra, app=True):
+        runner = WorkflowPermissions()
+        runner.addCleanup = self.addCleanup
+        with mock.patch.dict(os.environ, {"SYMPHONY_SETTINGS_APP": "1"} if app else {}):
+            return runner.run_script(workflow_answer("read", True), extra=extra)
+
+    def keys(self, calls):
+        return [call["key"] for call in calls]
+
+    def test_an_unread_crowd_variable_goes_on_without_auto_merge(self):
+        refused = {f"GET repos/{REPO}/actions/variables/CLAUDE_CROWD": [answer(403, {"message": "Forbidden"})]}
+        done, calls = self.run_script(refused)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("crowd mode: unknown", done.stdout)
+        edit = next(call for call in calls if call["key"] == "repo edit" and "--delete-branch-on-merge" in call["args"])
+        self.assertNotIn("--enable-auto-merge", edit["args"])
+        self.assertIn("label create", self.keys(calls))
+
+    def test_a_person_who_cannot_read_it_is_still_stopped(self):
+        refused = {f"GET repos/{REPO}/actions/variables/CLAUDE_CROWD": [answer(403, {"message": "Forbidden"})]}
+        done, calls = self.run_script(refused, app=False)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertNotIn("repo edit", self.keys(calls))
+
+    def test_refused_rulesets_toggles_topic_and_labels_stop_nothing(self):
+        done, calls = self.run_script({
+            f"GET repos/{REPO}/rulesets": [answer(403, {"message": "Resource not accessible by integration"})],
+            "repo edit": [answer(403, {"message": "Forbidden"})],
+            f"PATCH repos/{REPO}": [answer(403, {"message": "Forbidden"})],
+            "label create": [answer(403, {"message": "Forbidden"})],
+        })
+        self.assertEqual(done.returncode, 0, done.stderr)
+        for said in ("ruleset \"Protect the default branch\": not created", "general: delete head branches on merge, "
+                     "allow auto-merge: not changed", "topic symphony: not added", "not made"):
+            self.assertIn(said, done.stdout)
+        self.assertIn(f"GET repos/{REPO}/codeowners/errors", self.keys(calls))
+
+    def test_a_refused_toggle_command_goes_through_the_rest_api(self):
+        done, calls = self.run_script({"repo edit": [answer(403, {"message": "Forbidden"})],
+                                       f"PATCH repos/{REPO}": [answer(200, "")]})
+        self.assertIn("general: delete head branches on merge, allow auto-merge: on", done.stdout)
+        self.assertIn("secret scanning: on", done.stdout)
 
 
 class WorkflowPermissions(unittest.TestCase):
