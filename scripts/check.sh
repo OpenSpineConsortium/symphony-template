@@ -48,6 +48,20 @@ else
   echo "zizmor is not installed here; CI runs it"
 fi
 
+# A pinned copy of OpenSpineConsortium/beethoven-qa (docs/setup/beethoven-qa.md)
+# is checked by its own command, which runs only in the locked pixi
+# environment the copy's gate needs (icontract, beartype, pydantic); this
+# script adds no dependency, so where pixi is not on the path it says so
+# and leaves the copy to the kit's standards.yml and the gate lane, which
+# run it on GitHub's machines.
+if [ -f vendor/beethoven-qa/ORIGIN ]; then
+  if command -v pixi >/dev/null 2>&1 && [ -f pixi.lock ]; then
+    pixi run --locked python -m beethoven_qa vendor-check
+  else
+    echo "beethoven-qa copy at vendor/beethoven-qa ($(sed -n 's/^ref: //p' vendor/beethoven-qa/ORIGIN)); pixi is not here, so its vendor-check runs in CI"
+  fi
+fi
+
 # The project's own checks go here: its linter, its test runner, its build.
 
 echo "checks ok"
