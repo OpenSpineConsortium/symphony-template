@@ -7,11 +7,13 @@
 # the pages say. The test report is written even when a test fails, so the
 # Tests page shows the failure rather than hiding the page.
 #
-# Publishing needs two settings the workflow's token cannot make: Pages set
-# to deploy from GitHub Actions, and the repository variable SYMPHONY_DOCS
-# set to pages (docs/learn/README.md, Publishing the site). Until both are
-# set the site is built and kept as an artifact, and nothing is deployed, so
-# a copy that never turns Pages on sees no red run.
+# Publishing needs Pages set to deploy from GitHub Actions, which the
+# workflow's token cannot set, and the repository variable SYMPHONY_DOCS set
+# to pages, so a site the owner publishes from another workflow is never
+# overwritten; scripts/setup-repo.sh makes both (docs/learn/README.md,
+# Publishing the site). The build also reads the Pages setting with the
+# token's pages: read, so a copy whose plan has no Pages sees no red run:
+# the site is built and kept as an artifact.
 name: Docs
 
 on:
@@ -31,7 +33,23 @@ jobs:
     if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      pages: ${{ steps.pages.outputs.source }}
     steps:
+      - name: Read whether Pages deploys from GitHub Actions
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # a repository with no Pages site answers 404, which means no deploy;
+        # gh may print the error's body, so only the one word is passed on
+        run: |
+          source=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type 2>/dev/null) || source=none
+          [ "$source" = workflow ] || source=none
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
@@ -63,7 +81,7 @@ jobs:
 
   deploy:
     needs: build
-    if: vars.SYMPHONY_DOCS == 'pages'
+    if: needs.build.outputs.pages == 'workflow' && vars.SYMPHONY_DOCS == 'pages'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

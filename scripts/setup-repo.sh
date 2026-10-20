@@ -54,6 +54,14 @@
 #      branch, unless the repository has one of that name, so only the
 #      default branch's Token workflow ever holds the SymphonyBoard App's
 #      token there (Symphony Setup makes it in an adoption too);
+#      then turns on GitHub Pages with GitHub Actions as its source and
+#      sets the variable SYMPHONY_DOCS to pages, so
+#      .github/workflows/docs.yml publishes the living documentation site
+#      (docs/learn/README.md) from its next run on the default branch,
+#      readable only by the repository's readers unless it is public; a
+#      Pages site the repository has already is left as it is, and where
+#      the plan offers no Pages, or no limited one for a repository that
+#      is not public, it says so and goes on;
 #   6. creates or updates the labels, read from LABELS in
 #      tools/template_init.py, so the list lives in one place;
 #   7. sets each repository variable given as --var NAME=VALUE; the one
@@ -86,8 +94,9 @@ Usage: bash scripts/setup-repo.sh [OWNER/NAME] [--var NAME=VALUE]... [--token]
 Sets up the GitHub side of a repository made from this template: the
 default branch's ruleset, delete-branch-on-merge, auto-merge, secret
 scanning with push protection, the setting that lets GitHub Actions open
-pull requests, the labels, the variables asked for and, with --token, the
-secret CLAUDE_CODE_OAUTH_TOKEN; then prints any line of
+pull requests, GitHub Pages built by Actions, the labels, the variables
+asked for and, with --token, the secret CLAUDE_CODE_OAUTH_TOKEN; then
+prints any line of
 .github/CODEOWNERS GitHub cannot resolve. Needs the GitHub CLI signed in
 (gh auth login) with admin rights on the repository. In crowd mode (the
 variable CLAUDE_CROWD is true, or docs/project.md says crowd mode is on)
@@ -405,6 +414,40 @@ elif ! gh api --method POST "repos/$REPO/environments/$STORE/deployment-branch-p
     "$STORE" "$(head -n 1 "$refusal")" "$REPO" "$STORE" "$DEFAULT_BRANCH"
 else
   echo "environment $STORE: made, $DEFAULT_BRANCH only"
+fi
+rm -f "$refusal"
+
+# 5c. GitHub Pages, built by GitHub Actions, for the living documentation
+# site: docs.yml deploys it where Pages is set to that source and the
+# variable SYMPHONY_DOCS is pages, and its token cannot turn Pages on itself
+# (creating a site needs admin rights). The script makes the site and sets
+# the variable together. A site the repository has already, from a branch
+# or from Actions, is left as it is and the variable unset, since the owner
+# may publish something else there and docs.yml would deploy over it. On an
+# internal or private repository the new site is limited to the people who
+# can read the repository; where GitHub will not limit it (only Enterprise
+# plans can), the site is removed again rather than left open to anyone. A
+# refusal is reported with the page to set it on, and the run goes on.
+pages_refused() {
+  printf 'pages: not turned on (%s); open https://github.com/%s/settings/pages and, under Build and deployment, choose GitHub Actions as the source, then set the repository variable SYMPHONY_DOCS to pages\n' \
+    "$(head -n 1 <<<"$1")" "$REPO"
+}
+refusal=$(mktemp)
+if gh api "repos/$REPO/pages" --silent 2>"$refusal"; then
+  echo "pages: a site is there already, left as it is; docs.yml publishes the documentation site there only once the repository variable SYMPHONY_DOCS is pages"
+elif ! grep -q '(HTTP 404)' "$refusal"; then
+  pages_refused "$(<"$refusal")"
+elif ! gh api --method POST "repos/$REPO/pages" --silent -f build_type=workflow 2>"$refusal"; then
+  pages_refused "$(<"$refusal")"
+elif [ "$VISIBILITY" != public ] && ! gh api --method PUT "repos/$REPO/pages" --silent -F public=false 2>"$refusal"; then
+  gh api --method DELETE "repos/$REPO/pages" --silent 2>/dev/null || true
+  printf 'pages: not turned on, since GitHub would not limit the site of this %s repository to its readers (%s) and it would be open to anyone; set it by hand at https://github.com/%s/settings/pages if that is meant\n' \
+    "$VISIBILITY" "$(head -n 1 "$refusal")" "$REPO"
+elif ! gh variable set SYMPHONY_DOCS --repo "$REPO" --body pages 2>"$refusal"; then
+  printf 'pages: turned on, built by GitHub Actions, but the variable SYMPHONY_DOCS was not set (%s); set it to pages at https://github.com/%s/settings/variables/actions\n' \
+    "$(head -n 1 "$refusal")" "$REPO"
+else
+  echo "pages: turned on, built by GitHub Actions; docs.yml publishes the documentation site on its next run on $DEFAULT_BRANCH"
 fi
 rm -f "$refusal"
 
