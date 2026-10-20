@@ -156,6 +156,36 @@ jobs:
             echo "::warning::scripts/setup-repo.sh stopped (exit $status) before every setting was applied; its last line says why"
           fi
 
+      # The template itself, and a copy template-init has not filled yet,
+      # take no setting but one: "Require branches to be up to date" off in
+      # their own rulesets, which the owner asked for on 2026-10-20, since
+      # every merge otherwise sent each other ready pull request back to CI.
+      - uses: actions/create-github-app-token@v3
+        id: template-token
+        if: steps.copy.outputs.copy == 'false' && vars.SDLC_APP_ID != ''
+        continue-on-error: true
+        with:
+          app-id: ${{ vars.SDLC_APP_ID }}
+          private-key: ${{ secrets.SDLC_APP_PRIVATE_KEY }}
+          permission-administration: write
+          permission-metadata: read
+
+      - name: Turn the up-to-date rule off
+        if: steps.template-token.outputs.token != ''
+        env:
+          GH_TOKEN: ${{ steps.template-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/rulesets?includes_parents=false&per_page=100" --jq '.[].id'); do
+            gh api "repos/$GITHUB_REPOSITORY/rulesets/$id" > "$RUNNER_TEMP/ruleset.json"
+            if python3 tools/unstrict_ruleset.py "$RUNNER_TEMP/ruleset.json" "$RUNNER_TEMP/body.json"; then
+              gh api --method PUT "repos/$GITHUB_REPOSITORY/rulesets/$id" --input "$RUNNER_TEMP/body.json" --silent
+              echo "ruleset $id: up-to-date rule turned off" | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              echo "ruleset $id: up-to-date rule off already" | tee -a "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
       - name: Say why nothing was applied
         if: steps.copy.outputs.copy == 'true' && (steps.app-token.outputs.token || steps.app-token-core.outputs.token) == ''
         run: |
