@@ -1,0 +1,95 @@
+# Memory index
+
+## Start here / operating rules
+- [Symphony = Greg's GitHub claim protocol; spine-program adoption state](topic-memories/symphony-spine-program-adoption.md) -- NOT the Lab Recipe; Apps SymphonyBoard + Symphony Setup via symphony-start form; plugin `symphony` installed user-scope 2026-10-11; gh in WSL ~/.local/bin, GH_TOKEN from `git credential fill`
+- [spine-program: no manual edits](topic-memories/spine-program-no-manual-edits.md) -- Greg 2026-10-11: everything via the Apps, plugin skills (claims + PRs) or connectors; issues may be opened with gh
+- [ASHLEY HANDOFF - START HERE](topic-memories/ashley-extension-project.md) -- v2.0.0 licensed build 2026-09-28; checkpoint Desktop/ashley/docs/CHECKPOINT_2026-09-28.md; vendor keys in C:/Users/grego/.beethoven-vendor
+- [BEETHOVEN (was Ashley Bridge)](topic-memories/ashley-bridge-project.md) -- public name since 2026-09-29; openspineconsortium.com/beethoven/; repos ONLY OpenSpineConsortium/beethoven + beethoven-vscode (push via WSL); NO keys; Ashley Schehr is a PERSON
+- Beethoven rules -- [first-run UX brief](topic-memories/beethoven-first-run-ux.md) (nothing silent, no password handling without Greg); [browser ssh 12.0.0](topic-memories/beethoven-browser-ssh.md) (blocked on hpc@wayne.edu); [2026-10-02 field failures](topic-memories/beethoven-2026-10-02-field-failures.md) (read sacct/status.json first); [compliance boundary](topic-memories/ashley-compliance-boundary.md) (Ashley never holds a Claude credential); [~/.ashley deletion 2026-09-28](topic-memories/grid-ashley-deletion-2026-09-28.md); [diagnostics graph required](topic-memories/diagnostics-graph-required.md); [students see no internals](topic-memories/students-see-no-internals.md)
+- [Provisional patent materials](topic-memories/provisional-patent-materials.md) -- spine-program provisional_patent/ (PR #212, 2026-10-20); current packet = provisional/ of 09-18; Greg chose to keep confidential parts in the INTERNAL repo
+- [SchwingNet repo and registry](topic-memories/schwingnet-repo-and-registry.md) -- private, from the template 2026-10-20; automerge on ready; data/sources/ registry; PR #27 fixed AASCE/VinDr; Greg: resolve from history, choose consistency
+- [Fluoroscopy Data Atlas](topic-memories/fluoroscopy-data-atlas.md) -- artifact 8YNXyLYbthsLjqEbFxQph2: 217 fluoro/radiograph/paired CT-XR datasets + 16 request letters; top gaps COVID-19-NY-SBU radiographs, LUMOS, MIDRC
+- [Data platform & migration 2026-10](topic-memories/data-platform-migration-2026-10.md) -- spinesurg-ct-nnunet/data_platform (212-source manifest, reacquire, LAYOUT, batches B00-B14, dedup/, db/); Claude Docs 74a2ec52 / c3c7acfd / 3b03e849; students read all but VinDr/BUU
+- [VinDr covered by HPR 2026-330](topic-memories/vindr-covered-by-hpr-2026-330.md) -- 29 Sep 2026 supplement to 2026-269; never 'gated'; spine-program handoff 'pending' lines are stale; [AASCE two copies on Ceph](topic-memories/aasce-two-copies-on-ceph.md) -- 609 labelled + 98 challenge; mirror 707, old copy 579
+- U251 -- [START HERE](topic-memories/resume-2026-09-26-handoff.md) (checkpoints in the u251 repo RESUME.md); [containment](topic-memories/u251-project-containment.md) (only the u251 dir + its PUBLIC repo); [multi-omics pairing](topic-memories/u251-multiomics-sample-pairing.md); [name-sweep traps](topic-memories/u251-name-sweep-traps.md) (SHA-256 anchored, never sweep names); [translation fall](topic-memories/u251-translation-fall-il68b.md); [CIBERSORT](topic-memories/u251-cibersort-deconvolution.md) (not installed)
+- CNS 2026 decks -- [spine deck](topic-memories/cns-deck-v2-2026-09-25.md) (v12_public = 17 slides on the Desktop); [Abstract 418 LITT](topic-memories/cns-abstract-418-deck.md) (v5, 46 slides); [LITT contralateral reading](topic-memories/litt-contralateral-two-readings.md) (instrument sentences conditional, binding)
+- [Film N-curve ablation result](topic-memories/film-ncurve-ablation-result.md) -- DONE: renders raise film naming +6 to +22 points at 5-25 persons
+- [Paper split 2026-09-24](topic-memories/paper-split-2026-09-24.md) -- LevelCheck comparison is PAPER 2; paper 1 = five figures; [SIX-FIGURE PLAN](topic-memories/six-figure-paper-plan.md)
+- [ruleclass = SUPER DETECTOR RUN](topic-memories/ruleclass-super-detector-run.md) -- 21,622-CT census, TS arm A, Moller ribs arm B, Dataset803 pelvis; transitional review tree
+- [TS bench inside the v9 bank](topic-memories/ts-bench-inside-v9-bank.md) -- only 70 TS + 1 CTSP + 0 VerSe renders unseen by the v9 encoder
+- [Submit-and-sleep orchestration](topic-memories/submit-and-sleep-orchestration.md) -- submit, ESTIMATE wall time, write ids+ETA to the checkpoint
+- [LSTV/TLTV detection goal](topic-memories/lstv-tltv-detection-goal.md) -- standing 2026-09-23: detect the transitional vertebra from C-arm exposures at par
+- [Two mechanisms thesis](topic-memories/two-mechanisms-thesis.md) -- morphology classifier = limited-FOV localisation (1 body 72.9%, 5 bodies 97%)
+- [Flagship paper frame](topic-memories/flagship-paper-frame.md) + [gates G0-G7](topic-memories/flagship-program.md) -- docs/FLAGSHIP_PLAN.md; all-device + LODO arms; transitional 50/10/40 split
+- [SchwingNet manuscript](topic-memories/schwingnet-manuscript.md) -- RSNA AI article, rigor-passing numbers only; [endpoint](topic-memories/rsnai-paper-endpoint.md); [author limits](topic-memories/rsnai-author-instructions.md) (3000 words, 6 figures, 4 tables, 35 refs); [disclosure scrub](topic-memories/schwingnet-disclosure-scrub.md)
+- [Acquisition-space saturation](topic-memories/acquisition-space-saturation.md) -- accuracy follows where the frames sit, not N
+- [Literature first, not bespoke](topic-memories/morphology-deformation-feasibility.md) -- find the PUBLISHED validated method with its number before building
+- [Commercialization stance](topic-memories/commercialization-stance.md) -- the 510(k) level-confirmation product; [publication roadmap](topic-memories/publication-roadmap.md) P1-P6
+- [Affiliation: General Surgery](topic-memories/user-affiliation-general-surgery.md) -- Greg is General Surgery, WSU SOM / DMC, NOT Neurosurgery
+- Writing & figures -- [never "origin", no fractional versions](topic-memories/writing-preferences.md); [captions <=60 words](topic-memories/figure-captions-terse.md); [SchwingNet figure prefs](topic-memories/figure-preferences-schwingnet.md); [tables black, not colour](topic-memories/tables-black-not-colour.md); [charts: donuts/lines, never sideways bars](topic-memories/chart-preferences.md); [journal rules](topic-memories/journal-figure-and-style-rules.md) (DS main doc has NO abstract)
+- Data rules -- [no unexplained subsets: fix, don't disclose](topic-memories/no-unexplained-subsets-fix-not-disclose.md); [key patients from metadata, filename LAST](topic-memories/key-patients-from-metadata-not-filenames.md); [data directives 2026-09-23](topic-memories/data-directives-2026-09-23.md) (BINDING; FluoroCap DROPPED); [anomaly harvest directive](topic-memories/anomaly-harvest-directive.md) (every CT, two labellers)
+- PolyPose -- [decision](topic-memories/polypose-decision.md) (Panjabi + LSTV ranges; fused junctions ZERO motion); [generator build](topic-memories/polypose-generator-build.md)
+
+## Infrastructure & traps
+- Grid containers -- [Slurm inside Apptainer](topic-memories/grid-slurm-inside-apptainer.md); [apptainer module works](topic-memories/grid-apptainer-module-works.md) (`module load apptainer/1.2.2`; secp starts when reqp is PENDING); [~/.local singularity broken](topic-memories/grid-local-singularity-is-broken.md) (never -B /rs)
+- Grid access -- [go2432@grid.wayne.edu](topic-memories/grid-access.md); [Windows ssh](topic-memories/windows-ssh-to-grid.md) (`MACs +hmac-sha1`, `grid` alias); [second factor](topic-memories/grid-ssh-second-factor.md) (keys skip it; warrior bans python/node/md5sum by name); [access list gate](topic-memories/grid-access-list-gate.md) (students = named ACL entries on /rs/rs_grp_oschome)
+- [Grid CephFS oschome](topic-memories/grid-ceph-volume-oschome.md) -- 20 TB at /rs/rs_grp_oschome/go2432; [quota & deleted banks](topic-memories/grid-quota-and-deleted-banks.md) (pan_quota not df)
+- [No jobs on the login node](topic-memories/no-jobs-on-login-node.md) -- everything via sbatch; compute nodes have internet
+- [Grid bash is 4.2](topic-memories/grid-bash-4-2-quoting.md) -- `${var/pat/"$new"}` keeps the quotes on the grid; a WSL 5.2 suite does not catch it
+- [Use WSL for network](topic-memories/wsl-for-network.md) -- Windows sockets flake; git push + HF via WSL; cause = [11 s IPv6 DNS stall](topic-memories/windows-dns-ipv6-stall.md), curl -4 is instant
+- Git -- [commit directly to master](topic-memories/commit-directly-to-master.md) (CTSpinoPelvic1K); [push both remotes](topic-memories/push-both-github-remotes.md) (origin AND osc); [junctions vs worktree remove](topic-memories/windows-junction-worktree-trap.md) (rmdir junctions first)
+- [Bash heredoc backslashes](topic-memories/bash-heredoc-backslashes.md) -- inline heredocs collapse `\`; write scripts with Write; [scratchpad shadows stdlib](topic-memories/scratchpad-shadows-stdlib.md)
+- [living_docs test mutates the clone](topic-memories/living-docs-test-mutates-the-clone.md) -- never run scripts/check.sh in a template-made clone locally: blanks local git identity, switches to claude/7, leaves files
+- [Cloudflare TLS fingerprint](topic-memories/cloudflare-tls-fingerprint.md) -- curl_cffi impersonate="chrome"
+- [Model registry](topic-memories/model-registry.md) -- ~/model_registry + MLflow SQLite + HF mirror; never ln -sf a model
+- Hugging Face -- [identity gregoryschwingmdphd](topic-memories/hf-identity.md); [org token ~/.hf_org_token](topic-memories/hf-org-token-location.md); [OSC org token ~/.hf_osc_token](topic-memories/hf-osc-token-and-namespace.md) (don't ask again)
+- [Zenodo deposit](topic-memories/zenodo-deposit.md) -- token ~/.zenodo_token; concept DOI 10.5281/zenodo.22139642; v10 published 2026-09-07
+- FluoroCap -- [repo private since 2026-09-14, branch L6_Class](topic-memories/fluorocap-repo-private.md) (never push level-ID code public); [credentials ~/.fluorocap](topic-memories/fluorocap-credentials-and-resolution.md); [is reproductions, not fluoroscopy](topic-memories/fluorocap-is-reproductions-not-fluoroscopy.md) (~200 as a TEST set); [dataset](topic-memories/fluorocap-dataset.md); [prototype & LSTV arm](topic-memories/fluorocap-prototype-and-lstv-arm.md)
+- [Level service serving rule](topic-memories/level-service-serving.md) -- website never serves weights; inference behind service/
+- [WSU library access cutoff](topic-memories/wsu-library-access-cutoff.md) -- DMC residents dropped 2026-06-30; pre-1996 via U-M
+- [nnInteractive Colab versions](topic-memories/nninteractive-colab-versions.md) -- working pin set for the ITK-SNAP DLS server
+- PACS demo -- [ostk params & CLI](topic-memories/pacs-demo-and-ostk-params.md); [latency 40 s -> 1.36 s](topic-memories/pacs-website-latency-root-cause.md); [engine-swap architecture](topic-memories/engine-swap-architecture.md)
+- Students -- [onboarding structure](topic-memories/student-onboarding-structure.md); [lab recipe & board](topic-memories/lab-recipe-and-board.md) (leads are drafts for Greg; commit LOCAL)
+
+## CT data, labels, splits
+- [ostk canal-closing regression](topic-memories/ostk-canal-closing-regression.md) -- ostk 1b7005c inflates VBHp/EPD by 10-17 mm on ~1 in 7 vertebrae
+- [Label scheme v4 vs ostk](topic-memories/label-scheme-v4-vs-ostk.md) -- two live maps; `labels_for(volume)` detects; never import a fixed map
+- [HF mirror is v10](topic-memories/hf-mirror-is-v10.md) -- public HF/Zenodo still v10 with id 29; v11 local only
+- [Scheme is bone + hardware only](topic-memories/scheme-bone-hardware-only.md) -- v10: 0-68, 13 ribs/side, lumbar ribs 60/61, hardware 62-68
+- [S1 carve changed spinopelvic](topic-memories/s1-carve-changed-spinopelvic.md) -- released labels differ from v5_final only by the S1 carve
+- Orientation -- [never reorient when writing labels](topic-memories/never-reorient-when-writing-labels.md); [CT volumes are P,I,R](topic-memories/ct-volumes-are-pir-not-ras.md) (canonicalise to ANALYSE, never to WRITE)
+- [TS sacrum excludes S1](topic-memories/ts-sacrum-excludes-s1.md) -- whole sacrum = union of `sacrum` and `vertebrae_S1`
+- [CT 0533 truncated](topic-memories/grid-ct-0533-truncated.md) -- repaired on grid and HF 2026-09-23/24
+- [CT benchmark covers all collections](topic-memories/ct-benchmark-covers-all-collections.md) -- axis 3 is every CT; ct_inventory.py
+- [Identity audit findings](topic-memories/identity-audit-findings.md) -- CTSP prone/supine ruled out; TS v2/v3 is a 24-id renumber
+- Splits -- [patient-grouped + LSTV-stratified splitter](topic-memories/splits-origin-and-v3-resplit.md); [leak by cross-naming](topic-memories/split-leak-cross-naming.md); [NHANES in the banks twice](topic-memories/nhanes-double-inclusion.md)
+- [SPINEPS ids: raw pre-fix harvests](topic-memories/spineps-ids-can-be-scrambled.md) -- masks before 147428d carry raw ids 1..N
+- VerSeFusion -- [has_T13 is wrong](topic-memories/versefusion-t13-flag-wrong.md) (18 said, 6 true); [vf_813 drops C1-T9](topic-memories/vf813-drops-c1-t9-use-raw-verse-for-whole-spine.md); [Dataset813 links resolve only in Singularity](topic-memories/dataset813-image-links-are-container-paths.md)
+- [CTSpine1K selection code deleted](topic-memories/ctspine1k-selection-code-deleted.md) -- recoverable at 7f44959
+- [Thoracic GT is FOV-limited](topic-memories/thoracic-gt-fov-limited.md) -- v3 covers ~T8 down; [prone/supine flexibility (future)](topic-memories/prone-supine-flexibility-future.md)
+- Anomalies -- [manifest sources](topic-memories/anomaly-manifest-sources.md) (`lstv_flag_labels_v2.csv` is the master); [LSTV data landscape](topic-memories/lstv-data-landscape.md) (Kwak 2025 the only 2-D model); [re-read queue](topic-memories/lstv-reread-queue.md); [spondylolysis & border anomalies](topic-memories/spondylolysis-and-border-anomaly-findings.md); [R+C=22 rule evaluated](topic-memories/anomaly-rule-rc22-evaluated.md); [Panjabi 1991 p. 892](topic-memories/panjabi-1991-page-892.md)
+- Ribs -- [trust-TS](topic-memories/rib-approach-ts-trust.md); [canonical triage](topic-memories/canonical-rib-triage.md) (152 cases); [QC gates never block LSTV](topic-memories/rib-qc-gates-never-block-lstv.md); [auto-engulf post-correction only](topic-memories/rib-auto-engulf-post-correction-only.md)
+- Review -- [annotator roster](topic-memories/annotator-roster.md) (13 students); [Review Space repos](topic-memories/review-space-repos.md) (`CTSpinoPelvic1K-reviews-triaged`)
+- [Post-op spine synthesis](topic-memories/postop-spine-synthesis.md) -- ostk.surgery.simulate_correction; [jaggedness future](topic-memories/postop-jaggedness-future.md)
+- [Data audit: 99 gaps](topic-memories/data-audit-99-gaps.md) -- docs/DATA_COMPLETENESS_AUDIT.md; 5,013 duplicate COBRA frames
+
+## Level-ID, fluoro, DRR findings
+- [Local level-identity thesis](topic-memories/local-level-identity-thesis.md) -- teach a net what L4 looks like; don't count from C2
+- [C-arm plateau is the denominator](topic-memories/carm-plateau-is-the-denominator.md) -- same-device 82-85 %; [detection is the binding constraint](topic-memories/detection-is-the-binding-constraint.md)
+- [Registration-free prior art](topic-memories/registration-free-prior-art.md) -- published C-arm detection recall 0.96-0.98; naming peaks at 73.3%
+- [C-ArmLSpine level experiment](topic-memories/carmlspine-level-experiment.md) -- real intraop AP+LAT + CBCT; series UID and pixel spacing traps
+- Devices -- [k devices, one network](topic-memories/k-devices-one-network.md); [pooled vs LODO designs](topic-memories/pooled-vs-lodo-device-designs.md); [device sampling audit](topic-memories/device-sampling-audit.md); [learned formation refuted -> calibrate](topic-memories/learned-formation-refuted-calibrate-instead.md) (physics 80.9%, nine terms +4.3)
+- Physics -- [three defects measured](topic-memories/physics-three-defects-measured.md); [sweeps had no bone](topic-memories/sweep-physics-no-bone.md); [DRR row spacing defect](topic-memories/drr-row-spacing-defect.md) (2026-09-19); [DeepFluoro convention](topic-memories/deepfluoro-convention.md)
+- [DRR->fluoro levers](topic-memories/drr-to-fluoro-levers.md) -- CycleGAN+ADDA refuted; recall as a CURVE; [synthetic:real ratio](topic-memories/synthetic-real-ratio-evidence.md) (window 4:1-10:1)
+- [Film vs fluoro does not transfer](topic-memories/film-fluoro-boundary-not-transferable.md) -- devices separate pairwise
+- [Sweep map replaces registration](topic-memories/sweep-map-replaces-registration.md) -- CTSP 120 held-out 72->95%; [guided acquisition loop](topic-memories/guided-acquisition-loop.md); [oblique angles & sweep vision](topic-memories/oblique-angles-and-sweep-vision.md)
+- Refuted -- [remedies 2026-09-17](topic-memories/remedies-refuted-2026-09-17.md) (pretrain-on-DRR, film-noise, CReST); [STC does not transfer](topic-memories/stc-does-not-transfer.md)
+- [Feasibility claims measured](topic-memories/feasibility-claims-measured.md) -- anomalous real film 87.2% disproved; 49.9% over 128 films
+- Heads & benchmarks -- [mixed-length head](topic-memories/mixed-length-head-and-sota.md) (97.47% at 3 vertebrae); [recurrent head restored](topic-memories/recurrent-head-restored-2026-09-16.md); [the honest 99%](topic-memories/selective-prediction-the-honest-99.md) (99% at 35.7% coverage); [XR benchmark](topic-memories/xr-benchmark-and-robustness-2026-09-13.md); [2-D results 2026-09-13](topic-memories/level-id-2d-results-2026-09-13.md); [bank coverage](topic-memories/level-model-bank-coverage.md) (films_all2 is cervical+lumbar); [context ladder](topic-memories/context-ladder-2d-level-experiment.md) (BUU levels counting-inferred)
+- [L6 sample count & counting decoder](topic-memories/l6-sample-count-and-counting-decoder.md) -- L6 dice 0.000 = too few distinct cases
+- [Fluoro panel gap diagnosed](topic-memories/fluoro-panel-gap-diagnosed.md) -- domain + 22.6% structural contamination; [FluoroGen synthetic](topic-memories/fluorogen-synthetic.md)
+- [X-ray corner detector status](topic-memories/xray-corner-detector-status.md) -- corpus 33,943 instances; detect_v2 AP50 0.970
+- [Competitor benchmark](topic-memories/competitor-benchmark.md) -- TotalSegmentator/SPINEPS/VISTA3D/RibSeg; [spine data review & TS bench](topic-memories/spine-data-review-and-ts-bench.md)
+- [LSTV one-shot training run](topic-memories/lstv-oneshot-training-run.md) -- Dataset810 for CNS
+- [Rigor audit findings](topic-memories/rigor-audit-findings.md) -- selective reporting in 2 places, threshold-dependent detector figure
+- Superseded resume files, history only -- [2026-09-15](topic-memories/overnight-2026-09-15-chains.md), [09-21 pm](topic-memories/resume-2026-09-21-pm.md), [09-22](topic-memories/resume-2026-09-22.md), [09-22 pm](topic-memories/resume-2026-09-22-pm.md), [09-24](topic-memories/resume-2026-09-24.md)
