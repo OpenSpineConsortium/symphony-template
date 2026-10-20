@@ -2,6 +2,7 @@
 
 import base64
 import json
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -256,6 +257,26 @@ class TheTemplate(unittest.TestCase):
         self.assertIn("tools/VENDORED", found[LIB])
         # tools/usage.py loads tools/profile.py by its path
         self.assertIn("tools/profile.py", found[METRICS])
+
+    def test_the_drive_sync_carries_its_three_scripts_and_is_added_where_missing(self):
+        tree = sync.template_tree()
+        found = {name: (files, needs, may_add)
+                 for name, files, needs, may_add in sync.units(tree, lambda rel: sync.git("show", f"HEAD:{rel}"))}
+        files, needs, may_add = found["the drive sync and the scripts it runs"]
+        self.assertEqual(files[0], ".github/workflows/drive-sync.yml")
+        self.assertTrue({"tools/drive_sync.py", "tools/docx_review.py", "tools/drive_organize.py",
+                         "tools/file_digest.py"} <= set(files))
+        # tools/drive_organize.py imports the vendored library
+        self.assertTrue(needs)
+        self.assertTrue(may_add)
+
+    def test_every_file_a_workflow_runs_is_in_its_unit(self):
+        tree = sync.template_tree()
+        found = {name: files for name, files, _, _ in sync.units(tree, lambda rel: sync.git("show", f"HEAD:{rel}"))}
+        for name, workflow, _, _ in sync.WORKFLOWS:
+            text = (sync.ROOT / workflow).read_text(encoding="utf-8")
+            for script in sorted(set(re.findall(r"python3 (tools/[a-z_]+\.py)", text))):
+                self.assertIn(script, found[name], f"{workflow} runs {script}")
 
 
 if __name__ == "__main__":
