@@ -84,6 +84,11 @@ REASON = re.compile(r"[A-Za-z0-9_.-]{1,64}")
 # throttled folder is listed late instead of left out of the catalog.
 THROTTLE_TRIES = 4
 THROTTLE_WAIT_MOST = 120
+# Cloudflare, in front of the sign-in service, refuses urllib's own
+# User-Agent (Python-urllib/3.x) with a plain-text 403, "error code: 1010",
+# before the service sees the call, so every call names this program.
+USER_AGENT = "symphony-drive/1 (+https://openspineconsortium.com/symphony/)"
+EDGE_CODE = re.compile(rb"error code: ?([0-9]{3,5})")
 
 
 class DriveError(Exception):
@@ -107,7 +112,7 @@ def call(method, url, token=None, data=None, headers=None, opener=None, hops=3, 
     worked. A throttled answer is asked again after the wait it names (see
     throttled). Every failure the network or the drive gives is a DriveError."""
     for attempt in range(THROTTLE_TRIES):
-        request = urllib.request.Request(url, data=data, method=method, headers=dict(headers or {}))
+        request = urllib.request.Request(url, data=data, method=method, headers={"User-Agent": USER_AGENT, **(headers or {})})
         if token:
             request.add_header("Authorization", f"Bearer {token}")
         try:
@@ -146,6 +151,10 @@ def reason_in(body):
         answer = json.loads(body) if isinstance(body, (bytes, str)) else body
     except ValueError:
         answer = None
+    if answer is None and isinstance(body, bytes):
+        edge = EDGE_CODE.search(body[:512])
+        if edge:
+            return f"cloudflare_{edge.group(1).decode('ascii')}"
     found = answer.get("error") if isinstance(answer, dict) else None
     if isinstance(found, dict):
         found = found.get("status") or found.get("code")
