@@ -34,9 +34,6 @@ The tests behind all of it accumulate in [tests/](../../tests/): every test any 
 
 ## Publishing the site
 
-[docs.yml](../../.github/workflows/docs.yml) builds the site on every push to the default branch with `python3 tools/living_docs.py site`, and publishes it with GitHub Pages once two settings are made, which the workflow's own token cannot make:
+[docs.yml](../../.github/workflows/docs.yml) builds the site on every push to the default branch with `python3 tools/living_docs.py site`, and publishes it with GitHub Pages where Pages deploys from GitHub Actions and the repository variable `SYMPHONY_DOCS` is `pages`, so a site the owner publishes some other way is never overwritten. Pages needs admin rights to turn on, which the workflow's own token lacks, so `bash scripts/setup-repo.sh` makes both settings with the rest of a new repository's, and on an internal or private repository limits the site to the repository's readers, or makes none where GitHub cannot limit it. By hand: the repository's Settings, Pages, Build and deployment, Source: GitHub Actions; then Settings, Secrets and variables, Actions, Variables, New repository variable `SYMPHONY_DOCS` with the value `pages`. A repository whose plan offers no Pages keeps the built site as the run's artifact.
 
-1. The repository's Settings, Pages, Build and deployment, Source: GitHub Actions.
-2. The repository's Settings, Secrets and variables, Actions, Variables tab, New repository variable: name `SYMPHONY_DOCS`, value `pages`.
-
-Then run the Docs workflow once from the Actions tab (Run workflow). On an internal or private repository, Pages is visible only to people who can read the repository (inferred from GitHub's rules for Pages on such repositories). To preview the site locally: `python3 tools/living_docs.py site _site`, then open `_site/index.html`.
+The next push to the default branch publishes it, or run the Docs workflow from the Actions tab (Run workflow). On an internal or private repository, Pages is visible only to people who can read the repository (inferred from GitHub's rules for Pages on such repositories). To preview the site locally: `python3 tools/living_docs.py site _site`, then open `_site/index.html`.
