@@ -119,6 +119,24 @@ class RunError(Exception):
     """Why no token was sealed, in words the page shows; never a token."""
 
 
+def missing_permission(error, org):
+    """What to do when GitHub refused the App's token for want of a
+    permission, or an empty string. GitHub answers 404, not 403, on an
+    organization's variables when the installation lacks Variables, and says
+    in X-Accepted-GitHub-Permissions which permission the call needed
+    (spine-program's Add Token, 2026-10-20), so the person is told which one
+    and where an owner accepts it."""
+    if error.code not in (403, 404) or not ORG_SHAPE.match(org or ""):
+        return ""
+    needed = (error.headers.get("X-Accepted-GitHub-Permissions", "") if error.headers else "").strip()
+    if not needed:
+        return ""
+    words = ", ".join(part.strip().replace("organization_actions_", "organization ").replace("_", " ").replace("=", " ")
+                      for part in needed.split(",") if part.strip())
+    return (f"; the call needs {words}, which SymphonyBoard's installation on {org} does not hold yet: an owner of {org} "
+            f"accepts it at https://github.com/organizations/{org}/settings/installations, then press Add Token again")
+
+
 class GitHub:
     """The few issue calls the run makes, on the run's own GITHUB_TOKEN."""
 
@@ -393,7 +411,8 @@ class Pool:
             self.add_to_accounts(slot)
         except urllib.error.HTTPError as error:
             # the page waits for a word from the run, so GitHub's refusal becomes one
-            raise RunError(f"GitHub answered {error.code} when the run tried to {step} in {self.org}'s pool") from None
+            raise RunError(f"GitHub answered {error.code} when the run tried to {step} in {self.org}'s pool"
+                           + missing_permission(error, self.org)) from None
         return slot
 
 
@@ -851,7 +870,9 @@ def look(environ, keeper=None, call=None):
             finish_issue(github, environ, True)
             print(f"Lent slot {slot}, already the person's own, where this run was asked to.", flush=True)
     except urllib.error.HTTPError as error:
-        raise RunError(f"GitHub answered {error.code} when the run looked for your token in {environ.get('STORE_ORG', '')}'s pool") from None
+        org = environ.get("STORE_ORG", "")
+        raise RunError(f"GitHub answered {error.code} when the run looked for your token in {org}'s pool"
+                       + missing_permission(error, org)) from None
     finally:
         revoke_app_token(environ, call)
     output = environ.get("GITHUB_OUTPUT")
@@ -889,7 +910,8 @@ def manage(environ, keeper=None):
             say_lent(github, keeper, slot)
         finish_issue(github, environ, True)
     except urllib.error.HTTPError as error:
-        raise RunError(f"GitHub answered {error.code} when the run tried to {action} your token in {keeper.org}'s pool") from None
+        raise RunError(f"GitHub answered {error.code} when the run tried to {action} your token in {keeper.org}'s pool"
+                       + missing_permission(error, keeper.org)) from None
 
 
 STAGES = {"sign-in": run, "store": store, "fail": fail, "look": look, "manage": manage}
