@@ -1,0 +1,10 @@
+---
+name: fluoroscopy-data-atlas
+description: The Fluoroscopy Data Atlas artifact (2026-10-17) -- 217 fluoroscopy / spine radiograph / paired CT-XR / CBCT / DRR datasets classified by annotation, quality, access and Greg's holdings, plus the 16 request letters (Radiopaedia = no. 8)
+metadata:
+  type: reference
+---
+
+Artifact: https://claude.ai/artifact/8YNXyLYbthsLjqEbFxQph2 (private, published 2026-10-17). Built from three catalogs merged by scratchpad/datasets/merge_atlas.py in session 0599380b: inhouse.json (189 entries from spinesurg-ct-nnunet data_platform DATA_MANIFEST/sources.json, HANDOFF literature_state, spine-program 01 docs/data_requests + FLUORO_VIDEO_SOURCES, external_reports PDFs, memory), web_fluoro.json (44), web_paired.json (30); requests.json parsed from spine-program 01_carm_level_detection/docs/data_requests/FLUORO_VIDEO_REQUESTS_READY_2026-09-26.md + balgrist + SX-Stitch letters. In the repository since 2026-10-17 (issue #116, PR #117): spine-program/data_mining/ -- CATALOG.md (reads on GitHub from any account), fluoroscopy_data_atlas.html, data/ (datasets.json, requests.json, sources/), scripts/ (rebuild: python data_mining/scripts/merge_atlas.py; NOT build/, which .gitignore line 54 ignores).
+
+Key facts it records: Radiopaedia ML use needs licensing-team approval ("Non-commercial use of Radiopaedia content for Machine Learning", license@radiopaedia.org cited by published studies; the USD 250 fee is unconfirmed; never script radiopaedia.org). Quickest gap: TCIA COVID-19-NY-SBU radiographs for the 439 patients whose CT Greg already holds (also COVID-19-AR, CMB-MML: CT half only). Other top gaps: LUMOS (Zenodo 18173664), MIDRC open data (10,100 CT+radiograph cases), Balgrist ex-vivo (request 15), UCLA Charters 2024 kV pairs, PENGWIN Task 2, SyntheX, SPARE, LIDC-IDRI, Flepp femur. No public intraoperative spine fluoroscopy with level labels exists; no public biplanar/EOS spine + CT pairs; no public spine C-arm CBCT raw projections. The Kaggle re-host of VinDr-SpineXR under MIT must not be used. See [[data-platform-migration-2026-10]].
