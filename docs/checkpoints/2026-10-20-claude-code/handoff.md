@@ -128,7 +128,7 @@ identity, switch to `claude/7` and leave files at the root (topic memory `living
 - OpenSpineConsortium/SchwingNet #2 and #3: dependabot action bumps.
 - OpenSpineConsortium/spine-program #216: symphony/sync, the board's files brought up to date. Greg merges there.
 - OpenSpineConsortium/spine-program #89: claude/25, folder 05 (CT-2, the anterior pelvic plane), an older claim.
-- OpenSpineConsortium/symphony-template, the pull request that adds this checkpoint (#310).
+- OpenSpineConsortium/symphony-template, the pull request that adds this checkpoint (#311, issue #310).
 
 ## 5. Waiting on greg, numbered
 
