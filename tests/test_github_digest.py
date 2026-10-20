@@ -146,6 +146,22 @@ class Recipient(unittest.TestCase):
         self.assertEqual(gd.recipient("* @{{" + "CODE_OWNER}}\n", "greg", "User"), "greg")
         self.assertIsNone(gd.recipient("* @org/team\n", "org", "Organization"))
 
+    def test_an_organizations_repository_falls_back_to_the_runs_actor_never_a_bot(self):
+        self.assertEqual(gd.recipient("* @org/team\n", "org", "Organization", "greg"), "greg")
+        self.assertIsNone(gd.recipient("", "org", "Organization", "github-actions[bot]"))
+
+    def test_an_answer_is_checked_against_the_login_the_digest_named(self):
+        digest = {"user": BOT, "body": "<!-- symphony-digest: symphony-digest-202610201317 decisions=12 -->\n"
+                                       "@greg, here is your Symphony digest.\n"}
+        github = world([digest])
+        comment = {"body": "12 Accept", "user": {"login": "greg"}, "author_association": "MEMBER",
+                   "issue_url": "https://api.github.com/repos/o/r/issues/40"}
+        gd.answer(github, None, comment, "main")
+        self.assertIn(("DELETE", "issues/12/labels/decision"), [(m, p) for m, p, _ in github.calls])
+        other = dict(comment, user={"login": "mallory"})
+        github = world([digest])
+        self.assertIn("nothing done", gd.answer(github, None, other, "main"))
+
 
 if __name__ == "__main__":
     unittest.main()
