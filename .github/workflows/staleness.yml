@@ -1,0 +1,109 @@
+name: Staleness
+
+# Records, after every merge, what it cost the other pull requests that the
+# default branch moved under them: when the required check must run on a
+# branch that is up to date (the ruleset's strict policy), each landing
+# makes every other open pull request stale, and it has to take the default
+# branch in and run its check again before it may land. tools/staleness.py
+# reads that from GitHub's own history (each pull request's timeline and
+# the check workflow's runs), which GitHub keeps for good, so the record is
+# rebuilt from the source rather than counted by hand; the snapshot adds the
+# one thing history keeps no trace of, which open pull requests GitHub
+# called behind or in conflict at the moment the default branch moved. The
+# branch staleness holds STALENESS.json, SNAPSHOTS.jsonl and REPORT.md, one
+# ordinary commit per run, never a forced one, so the record's own history
+# shows how it grew. A first run reads at most a few hundred pull requests
+# (--max-new) and the next runs read on from there, so the board keeps its
+# share of GITHUB_TOKEN's hour. Merges that come faster than a run lose
+# their snapshot, since GitHub keeps one waiting run of a concurrency group;
+# the history they leave is read by the next run all the same. docs/research/stale-branch-failures.md says what each
+# number means and what history cannot recover. Runs on GITHUB_TOKEN alone
+# and spends no Claude run; the pushes it makes start no workflow.
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+  issues: read
+  actions: read
+
+concurrency:
+  group: staleness
+  cancel-in-progress: false
+
+env:
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch || github.ref_name }}
+
+jobs:
+  staleness:
+    if: >-
+      github.event.repository.fork == false
+      && (github.event_name != 'pull_request'
+          || (github.event.pull_request.merged
+              && github.event.pull_request.base.ref == github.event.repository.default_branch
+              && github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+
+      - name: Read the record kept so far
+        id: previous
+        run: |
+          mkdir -p "$RUNNER_TEMP/record"
+          if git fetch --quiet --no-tags origin +refs/heads/staleness:refs/remotes/origin/staleness 2>/dev/null; then
+            echo "sha=$(git rev-parse refs/remotes/origin/staleness)" >> "$GITHUB_OUTPUT"
+            for file in STALENESS.json SNAPSHOTS.jsonl; do
+              git show "refs/remotes/origin/staleness:$file" > "$RUNNER_TEMP/record/$file" 2>/dev/null || rm -f "$RUNNER_TEMP/record/$file"
+            done
+          fi
+
+      - name: Note which open pull requests the move left behind or in conflict
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          python3 tools/staleness.py snapshot --repo "$GITHUB_REPOSITORY" --default-branch "$DEFAULT_BRANCH"
+          --append "$RUNNER_TEMP/record/SNAPSHOTS.jsonl"
+
+      - name: Read the closed pull requests' history
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 tools/staleness.py collect --repo "$GITHUB_REPOSITORY" --default-branch "$DEFAULT_BRANCH" \
+            --previous "$RUNNER_TEMP/record/STALENESS.json" --snapshots "$RUNNER_TEMP/record/SNAPSHOTS.jsonl" \
+            --max-new 100 --out "$RUNNER_TEMP/record/STALENESS.json"
+          python3 tools/staleness.py report "$RUNNER_TEMP/record/STALENESS.json" > "$RUNNER_TEMP/record/REPORT.md"
+          cat "$RUNNER_TEMP/record/REPORT.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Add the record to the branch staleness
+        env:
+          PREVIOUS: ${{ steps.previous.outputs.sha }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          cd "$RUNNER_TEMP/record"
+          entries=""
+          for file in STALENESS.json SNAPSHOTS.jsonl REPORT.md; do
+            [ -e "$file" ] || continue
+            entries="$entries$(printf '100644 blob %s\t%s' "$(git -C "$GITHUB_WORKSPACE" hash-object -w "$file")" "$file")
+          "
+          done
+          cd "$GITHUB_WORKSPACE"
+          tree="$(printf '%s' "$entries" | git mktree)"
+          parent=""
+          [ -n "$PREVIOUS" ] && parent="-p $PREVIOUS"
+          # shellcheck disable=SC2086
+          commit="$(git commit-tree "$tree" $parent -m "Staleness as of $(date -u +%Y-%m-%dT%H:%MZ)")"
+          git push --quiet origin "$commit:refs/heads/staleness"
+          echo "staleness written as $commit"
