@@ -46,6 +46,19 @@ The owner wrote, relayed by the coordinator on 2026-10-20, that the start should
 - Not built, by the owner's or the review's word: switching the sync on when the tab opens (a decision asked of the owner, which would need a later statement), an Untrack, and taking a repository off the organization secret's list, which no statement covers yet.
 - Checks: FS1 to FS6 pass with the rest of the suite (82 checks), and the mutants f109 to f119 are killed (110 Folders mutants in all).
 
+## Folders: the connection kept, and Track for a whole account or organization
+
+The owner tapped "Yes, automatically" on 2026-10-20 to switching the half-hourly sync on when the tab opens a repository that already tracks a drive: built as site #108 with checks FS7 (symphony-app #55); a variable set to off is never turned back on. The same day OpenSpineConsortium/onedrive showed the secret empty after Track; Track now reads the repository's own list of organization secrets after writing the organization's, and saves a repository secret where GitHub withholds it (site #110, FS8 in symphony-app #56).
+
+The owner then wrote, relayed on 2026-10-20: "if I authorize over depository to use my OneDrive next time I login it's no longer authorized ... I want to be able to authorize for an entire get hub account or even an entire GitHub organization", and chose "Both" on the card that followed.
+
+- Cause: the page held the drive's tokens in its memory alone, and dropped them after Track, on a reload, on any sign-out and when a sign-in ran out. Nothing at Microsoft was lost.
+- Now the page keeps the refresh token on the browser (localStorage, key symphony_panel_drive_kept), by GitHub login, with the day it was issued and the drive's name and id; never the access token. A reload, a sign-in that ran out or a new sign-in as the same account finds it; another account does not. It ends with Forget OneDrive (beside the connection's name), Forget the token, Microsoft refusing it (invalid_grant) or its 90 days. Track no longer drops it, so Track in any other repository needs no Connect, and dates drive.json by the day the connection was made. A page never writes its token over a newer one another tab kept, nor forgets that one when Microsoft refuses its own; Forget the token forgets every connection kept on the browser.
+- The sign-in service's /drive/token returns no rotated refresh token, so the kept one lasts its 90 days from Connect, as the repositories' secrets do; keeping the rotated one would need the service to pass it on.
+- An organization's secret is now written with visibility private, so every private and internal repository of the organization reads it and one Track covers the organization; public repositories and private ones on GitHub Free keep a secret of their own. Anyone who may run a workflow in any private repository of the organization can then reach the whole drive.
+- GitHub has no secret that all of a personal account's repositories read, so on a personal account Track also renews the secret in each other repository of the account that holds one and tracks the same drive by its drive.json, where that file is dated earlier than the connection; a walk-only repository names no drive and is left alone, and a failure is named with the dialog kept open.
+- Checks R1 to R3 and FS4 hold it, with mutants f134 to f145 and nine aimed again (symphony-app branch claude/remember-drive-checks).
+
 ## Explore, not picked
 
 For Explore the list proposed before building was: a breadcrumb with sibling menus, search, state filters, a live log of a running job, re-run and cancel (writes, so privacy 36 first), and links out to GitHub; the owner has not picked from it.
