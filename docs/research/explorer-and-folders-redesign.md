@@ -34,6 +34,18 @@ The owner answered the list of twelve with "do all" (2026-10-20, 06:49 UTC). All
 - The adversarial review found twelve faults: the folder before drawn and actionable while the next one read, or after its read failed; a preview stuck on a second click; the phone's preview covering the list; keys on a heading or tick acting on the selection; a rename lost when the list was read again under it; a moved item left cut; writes from search results leaving the real folder's list stale; a folder pasted into its own subfolder; no guard on a double paste; a menu removed under a later click; shortcuts a browser keeps; and dialog quirks. Each is fixed, and FA14 to FA17 hold the first five.
 - Not measured: Graph's preview page on a personal OneDrive, which may not exist there; the pane then shows the thumbnail.
 
+## Folders: the start as cloud tiles
+
+The owner wrote, relayed by the coordinator on 2026-10-20, that the start should be "icon based cloud synchronization", a "+ add" dashed tile opening a dialog with one-click sign-in to OneDrive first and other drives later; that linking made him make a new repository; and that Track's dialog did not close. Built on site claude/folders-start (site #103, merged 2026-10-20) and held by symphony-app's folders.test.mjs FS1 to FS6 (symphony-app #53).
+
+- With no drive the explorer shows one dashed tile, "+ Add a cloud drive", which opens a dialog of tiles: OneDrive, one press to Microsoft's sign-in, and Google Drive and Dropbox shown as coming later. Once a drive is connected the head keeps a small Add button and names the connected account beside a cloud.
+- Track uses the repository chosen in the bar; making a new one is a closed fold, "Need a new repository?", in the dialog. A repository that only walks the drive (it has drive-catalog.yml and no drive-sync.yml, as OpenSpineConsortium/onedrive does) is tracked with the secret alone.
+- In an organization the drive's token is kept as one organization secret with visibility "selected", shared only with the repositories that track that drive, unless the repository has a secret of its own, the organization's key cannot be read, another drive already holds the secret (told by the variable SYMPHONY_DRIVE_ID), or a private repository is on the free plan, where an organization secret does not reach it; a refused write falls back to the repository's own secret.
+- Track switches the half-hourly sync on with the repository variable SYMPHONY_DRIVE=on, between writing the file and starting the first run, and the dialog closes by itself once Track is done; it stays open only when something went wrong, with what to do.
+- These writes are only on the person's Track press and are in the Apps' privacy statement 39 (symphony-start#86), which was live before the merge.
+- Not built, by the owner's or the review's word: switching the sync on when the tab opens (a decision asked of the owner, which would need a later statement), an Untrack, and taking a repository off the organization secret's list, which no statement covers yet.
+- Checks: FS1 to FS6 pass with the rest of the suite (82 checks), and the mutants f109 to f119 are killed (110 Folders mutants in all).
+
 ## Explore, not picked
 
 For Explore the list proposed before building was: a breadcrumb with sibling menus, search, state filters, a live log of a running job, re-run and cancel (writes, so privacy 36 first), and links out to GitHub; the owner has not picked from it.
