@@ -1,0 +1,16 @@
+{
+  "private": [
+    ".claude/session.md",
+    "docs/checkpoints/*"
+  ],
+  "exports": [
+    {
+      "name": "notebooks",
+      "source": "OpenSpineConsortium/symphony-template",
+      "repository": "OpenSpineConsortium/symphony-protocol",
+      "build": "python3 tools/living_docs.py publish \"$EXPORT_DIR/notebooks\"",
+      "owns": ["notebooks/*.ipynb"],
+      "import": false
+    }
+  ]
+}

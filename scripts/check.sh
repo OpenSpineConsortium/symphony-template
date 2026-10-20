@@ -30,6 +30,10 @@ python3 tools/agents.py check
 # must match its lesson (tools/living_docs.py).
 python3 tools/living_docs.py test
 python3 tools/living_docs.py check
+# The manifest of what leaves this repository for public ones holds
+# together: every listed file exists and none is private
+# (tools/public_export.py, docs/setup/public-export.md).
+python3 tools/public_export.py check
 python3 -m unittest discover -s tests -v
 # The workflows (issue #248; docs/research/rust-coordinator.md, section 8):
 # actionlint type-checks every expression against the contexts its event
