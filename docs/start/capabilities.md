@@ -14,7 +14,7 @@ The demo runs the claim protocol itself on your machine, in about a second: two 
 
 [scripts/demo.sh](../../scripts/demo.sh) is the script, [.devcontainer/demo/devcontainer.json](../../.devcontainer/demo/devcontainer.json) the Codespace, and [demo.ipynb](https://github.com/OpenSpineConsortium/symphony-protocol/blob/main/notebooks/demo.ipynb) in symphony-protocol the notebook, which clones the public library [symphony-protocol](https://github.com/OpenSpineConsortium/symphony-protocol) at v0.5.1 and runs the same three parts from it. The Codespace link names the demo configuration, so the setup Codespace of [codespace.md](../setup/codespace.md), which stays the repository's default configuration, is untouched. The comparison of these and other sandboxes, and why there is no zero-wait page yet, is [interactive-sandbox.md](../research/interactive-sandbox.md).
 
-To learn it step by step rather than watch it, the [four lessons](../learn/README.md) teach claims, the push guard, the board and Overlaps by doing, each runnable on your machine or as a [Colab notebook](../learn/notebooks/); every command in them is run by the required check, so they show what the current release does.
+To learn it step by step rather than watch it, the [four lessons](../learn/README.md) teach claims, the push guard, the board and Overlaps by doing, each runnable on your machine or as a [Colab notebook](https://github.com/OpenSpineConsortium/symphony-protocol/tree/main/notebooks); they live in the public symphony-protocol, whose required check runs every command in them.
 
 ### What the demo shows
 

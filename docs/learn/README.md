@@ -2,7 +2,7 @@
 
 Four short lessons teach Symphony by running it. Each takes about ten minutes, needs no Claude account, no key and no GitHub sign-in, and works at a terminal or in Google Colab. They are written for students and new users who have never used git's branches or GitHub's pull requests in a team: every step says what to type, what you should see, and why it matters.
 
-They live in the public library, [symphony-protocol's lessons/](https://github.com/OpenSpineConsortium/symphony-protocol/blob/main/lessons), with their Colab notebooks beside them in its notebooks/, so there is one copy, anyone can open it, and Colab needs no sign-in. That repository's required check runs every command the lessons show and compares its output with the page, and makes the notebooks from the lessons, so what you read is what the code does.
+They live in the public library, [symphony-protocol's lessons/](https://github.com/OpenSpineConsortium/symphony-protocol/tree/main/lessons), with their Colab notebooks beside them in its notebooks/, so there is one copy, anyone can open it, and Colab needs no sign-in. That repository's required check runs every command the lessons show and compares its output with the page, and makes the notebooks from the lessons, so what you read is what the code does.
 
 | Lesson | You learn | Features it uses | Colab |
 | --- | --- | --- | --- |

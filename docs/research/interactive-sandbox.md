@@ -5,7 +5,7 @@ Source: the thread "Capabilities demo and sandbox", 2026-10-20, from the owner's
 ## The answer in short
 
 - The demo needs no Claude at all. The claim protocol's guarantees, a second claim refused, the push guard's refusals and the board, run in plain git and Python against a local bare repository, which applies the same non-fast-forward rule GitHub does. So no sandbox holds a Claude credential or an API key, as the project requires, and none has anything to spend.
-- Built on 2026-10-20: `bash scripts/demo.sh` (about one second, offline), a third dev container configuration, `.devcontainer/demo/devcontainer.json`, beside the setup one and .devcontainer/token/, for a Codespace, and `docs/start/demo.ipynb` for Colab, which clones the public symphony-protocol at v0.5.1 and runs the same three parts. tests/test_demo.py runs the script in the required check.
+- Built on 2026-10-20: `bash scripts/demo.sh` (about one second, offline), a third dev container configuration, `.devcontainer/demo/devcontainer.json`, beside the setup one and .devcontainer/token/, for a Codespace, and `docs/start/demo.ipynb` for Colab (since moved to symphony-protocol's notebooks/; see the last follow-up), which clones the public symphony-protocol at v0.5.1 and runs the same three parts. tests/test_demo.py runs the script in the required check.
 - The binding limit is visibility, not speed. symphony-template is internal, so every sandbox that opens it, Codespaces, Colab and Binder alike, serves only people GitHub lets read it. A stranger's one-click demo has to open the public symphony-protocol; that is a change in that repository, proposed below and not made here.
 
 ## The options compared
@@ -66,10 +66,10 @@ The owner's follow-up the same day asked for something more end-user than a deve
 
 The owner opened Colab's GitHub tab in a second window and saw OpenSpineConsortium/CTSpinoPelvic1K on branch master with "No results", and asked for a testing process that proves the notebooks work. Two separate things were happening:
 
-- Colab's GitHub tab lists only the .ipynb files on the branch it shows. That repository, at master, evidently has none (inferred; this session cannot read that repository); symphony-template's are on main, at docs/start/demo.ipynb and docs/learn/notebooks/.
+- Colab's GitHub tab lists only the .ipynb files on the branch it shows. That repository, at master, evidently has none (inferred; this session cannot read that repository); symphony-template's are on main, at docs/start/demo.ipynb and docs/learn/notebooks/ (since moved to symphony-protocol; see the last follow-up).
 - Colab keeps the GitHub authorization in the browser and Google account that granted it, which is why the direct link worked in one window only (inferred from the owner's report). While symphony-template is internal, every reader authorizes once per browser and account. The one fix that needs no authorization at all is the copy into the public symphony-protocol proposed above, which is the owner's to approve.
 
-What a machine can test, it now tests: tools/run_notebook.py runs a notebook's code cells as Colab's kernel does (one Python namespace, %%bash cells through bash without -e, the kernel's environment), and .github/workflows/notebooks.yml runs all five notebooks on each change to one, by hand and weekly, since the lessons' notebooks clone the library's newest release. All five ran clean in the cloud session on 2026-10-20 in about ten seconds. What no machine can test is Colab's own sign-in: that stays a check the owner makes once per browser.
+What a machine can test, it now tests (the runner and its workflow have since moved to symphony-protocol with the notebooks; see the last follow-up): tools/run_notebook.py runs a notebook's code cells as Colab's kernel does (one Python namespace, %%bash cells through bash without -e, the kernel's environment), and .github/workflows/notebooks.yml runs all five notebooks on each change to one, by hand and weekly, since the lessons' notebooks clone the library's newest release. All five ran clean in the cloud session on 2026-10-20 in about ten seconds. What no machine can test is Colab's own sign-in: that stays a check the owner makes once per browser.
 
 ## Follow-up: the settings made reproducible (2026-10-20)
 
