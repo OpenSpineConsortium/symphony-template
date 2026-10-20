@@ -45,6 +45,17 @@ name: Checks
 # issue, a head in this repository. The extra event types are the moments
 # those facts change without a push: marked ready, converted back to draft,
 # the body edited.
+# On a pull request the job overlap says whether the change must bring the
+# default branch in (docs/agents/PROTOCOL.md, Locks): what the default
+# branch changed since the branch left it, with what that code depends on,
+# set beside what the branch changes and builds on, and the default branch
+# asked for only where the two meet, at the strength .github/symphony-locks
+# sets, advise printing and enforce failing. It takes the place of GitHub's
+# rule that a branch be up to date before it merges, which is off
+# (docs/setup/github.md): .github/workflows/overlap.yml asks the same of
+# every open pull request whenever the default branch moves and writes the
+# answer on each head as a check run of the same name, so the newest word
+# stands, and a ruleset may require that name once the switch says enforce.
 # The same job holds a crowd repository (docs/setup/crowdsourcing.md) to
 # its rules, so they are part of the required check: tools/crowd_check.py
 # guard fails while a Claude secret or variable reaches the repository and
@@ -162,6 +173,25 @@ jobs:
         run: |
           echo "the parts: $PARTS_RESULT"
           [ "$PARTS_RESULT" = success ]
+
+  # Whether the change must bring the branch it is onto in (the header
+  # above), the default branch for nearly every pull request here, since a
+  # pull request onto another branch meets what that branch did, not what
+  # the default branch did. The checkout is GitHub's test merge, one commit
+  # deep: the tool reads the branch's own side of it and fetches the base
+  # branch and what else it needs itself. The job is named for the check
+  # run it leaves on the head.
+  overlap:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Say whether the change must bring its base branch in
+        env:
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+        run: python3 tools/locks.py overlap --base "origin/$BASE_BRANCH"
 
   values:
     runs-on: ubuntu-latest

@@ -1,0 +1,54 @@
+name: Overlap
+
+# Asks every open pull request, once the default branch has moved, whether
+# it must bring the default branch in, and writes the answer on its head as
+# the check run named overlap (tools/overlap.py): the name of the job
+# .github/workflows/ci.yml runs in the pull request's own run, so the newest
+# word stands where a ruleset requires it. GitHub's rule that a branch be
+# up to date before it merges asked every pull request to bring the default
+# branch in after each merge, whatever it changed; this asks only the ones
+# whose change meets what the default branch did (docs/agents/PROTOCOL.md,
+# Locks), at the strength .github/symphony-locks sets: success where
+# nothing meets, neutral where something does at advise, failure at
+# enforce; while the switch says off the tool writes nothing.
+#
+# It runs on every push to the default branch, and a newer push cancels a
+# run still going, whose answers would be stale. The push trigger names no
+# branch, since a workflow file carries no placeholder (template-init never
+# writes one): the job's own condition keeps it to the default branch, and
+# the branches left out, the claim branches, the sync's and the tables the
+# workflows keep, start no run here at all. A push to any other branch
+# starts one whose job is skipped, which leaves a skipped run of this name
+# on the head, as .github/workflows/ci.yml's own job of this name leaves on
+# such a push; a pull request from that branch gets the real one from its
+# own run, and GitHub reads a skipped run as passing, so neither holds it.
+# The token reads pull requests and writes check runs, and nothing else.
+
+on:
+  push:
+    branches-ignore: ["claude/**", "symphony-protocol/**", "crowd/setup", "metrics", "locks", "board"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: write
+
+concurrency:
+  group: overlap
+  cancel-in-progress: true
+
+jobs:
+  overlap:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Ask every open pull request whether it must bring the default branch in
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 tools/overlap.py
