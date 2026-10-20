@@ -396,7 +396,8 @@ class Labels(unittest.TestCase):
 
     def test_the_setup_issue_opens_with_the_one_command_and_links_every_settings_page(self):
         body = template_init.setup_issue_body("octo/widgets", "main")
-        self.assertTrue(body.splitlines()[2].startswith("- [ ] Run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand:"))
+        self.assertTrue(body.splitlines()[2].startswith("- [ ] Check the [Settings workflow]("))
+        self.assertIn("run `bash scripts/setup-repo.sh` once from your clone, with gh signed in; or by hand:", body.splitlines()[2])
         settings = "https://github.com/octo/widgets/settings"
         for page in (f"{settings}/rules", f"{settings})", f"{settings}/actions)", f"{settings}/security_analysis",
                      "https://github.com/octo/widgets/labels", f"{settings}/secrets/actions/new",
