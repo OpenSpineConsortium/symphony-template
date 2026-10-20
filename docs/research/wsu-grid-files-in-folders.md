@@ -87,10 +87,43 @@ Claude Code's sign-in already sits.
 
 What the Folders tab would do. A "WSU grid" entry beside OneDrive in the tab's places, which opens
 https://vscode.dev/tunnel/<name>/rs/rs_grp_oschome/<folder> in a new tab when the tunnel is up and says how
-to start it when it is not. The start itself can be a word of the existing gate (start-tunnel), so a press
-in the panel runs grid-gate.yml and queues the job, or a Beethoven button, as the gate's setup already is;
-either is a change in hpcworker and in the site's Folders tab, which the explorer thread built and the
-Phone home screen thread's shell holds, so it goes through the coordinator.
+to start it when it is not. How it starts, on Beethoven's existing button, is the next section. The tab is
+the explorer thread's work and sits in the Phone home screen thread's shell, so its change goes through the
+coordinator.
+
+## Building on Beethoven's Connect GitHub Actions
+
+The owner pointed out, at 21:01 UTC, that Beethoven already has a button that connects the grid and
+GitHub Actions both ways. It is *Connect GitHub Actions* under Settings, *For your lab lead*, added in
+beethoven-extension#18 (22.0.0) and carried in 23.0.0: one press types hpcworker's cli.json line
+grid-gate-setup into the portal's shell, which runs `tools/grid_runner.sh --gate-setup`, so the ssh gate
+(a key whose forced command takes start, status or stop, held as the environment secret GRID_GATE_KEY)
+is set up with nothing run on the owner's computer (docs/research/wsu-grid-and-github-actions.md, "The
+gate's setup as a button"). That is the native starting point, and the tunnel route fits on it in two
+pieces, each a copy of a pattern that already works:
+
+1. Starting and stopping the tunnel goes through the gate already set up. Two more words for
+   tools/grid_gate.sh, tunnel-start and tunnel-stop, queue and cancel one job of hpcworker's own that runs
+   `code tunnel` under a fixed name, size and wall time the gate's line names, as the runner chain's size
+   is named there. The Folders tab's "WSU grid" place runs grid-gate.yml with the word, through the
+   panel's existing workflow-run action, and opens the vscode.dev link once status says the job runs. The
+   gate still never runs a workflow's code: the job runs one fixed program. No new key, secret or setting.
+2. The tunnel's one GitHub sign-in is a second button beside the first, *Connect browser access*, which
+   types `code tunnel user login --provider github` into the portal's shell and shows the owner the device
+   code there. The code must never pass through an Actions log: whoever enters a device code first owns
+   the tunnel, and every writer of the repository can read a run's log, so the sign-in stays in the portal
+   shell, as the gate's own setup does.
+
+Why not ride the runner chain itself, grid.yml, for the listing. A grid.yml job runs inside GitHub's
+runner image with `--containall --no-mount bind-paths`, so it sees neither the home nor the lab volume:
+that is what keeps a workflow's code away from the account's gh and Claude sign-ins. Binding the volume
+in would give every writer's workflow the corpora, and each listing would still be a queued workflow run
+returning an artifact, not a stream. The chain stays for computing; the tunnel is for looking.
+
+What this changes: hpcworker (the two words, the job, the cli.json line), beethoven-extension (the
+button, whose merge is a Chrome Web Store submission and so waits on the owner's word), grid-gate.yml
+here (the two words in its choice list), and the site's Folders tab (the place and its link). The gate's
+rule of one call a minute and its refusals stay as they are.
 
 ## PHI and the patent
 
@@ -119,7 +152,7 @@ Phone home screen thread's shell holds, so it goes through the coordinator.
 
 ## What waits on the owner
 
-- The choice of route (the thread's card).
+- The choice of route (the thread's card), and his word before the beethoven-extension merge.
 - For the tunnel: one GitHub device-code sign-in when the first job prints its code, and Wayne State's word
   on tunnels if he wants it first.
 - For a OneDrive copy from the grid: whether PHI or confidential renders may go there.
