@@ -1,11 +1,10 @@
-# The living documentation site (docs/learn/README.md): the lessons, the
-# capabilities page, a reference made from the code's own docstrings and the
-# test suite's results, built by tools/living_docs.py on every push to the
-# default branch and published with GitHub Pages. The lessons' commands
-# already ran in the required check before the merge; they run again here,
-# so a page is published only from a commit whose examples still print what
-# the pages say. The test report is written even when a test fails, so the
-# Tests page shows the failure rather than hiding the page.
+# The living documentation site (docs/learn/README.md): the guide to the
+# lessons, which live in symphony-protocol, the capabilities page, a
+# reference made from the code's own docstrings and the test suite's
+# results, built by tools/living_docs.py on every push to the default branch
+# and published with GitHub Pages. The test report is written even when a
+# test fails, so the Tests page shows the failure rather than hiding the
+# page.
 #
 # Publishing needs Pages set to deploy from GitHub Actions, which the
 # workflow's token cannot set, and the repository variable SYMPHONY_DOCS set
@@ -57,9 +56,6 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-
-      - name: Run every lesson's commands
-        run: python3 tools/living_docs.py test
 
       - name: Clone symphony-protocol, as CI does, so the Tests page matches CI's run
         run: git clone --quiet https://github.com/OpenSpineConsortium/symphony-protocol "$RUNNER_TEMP/symphony-protocol"
