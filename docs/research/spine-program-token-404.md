@@ -17,3 +17,7 @@ Add Token, from an invited collaborator's sign-in, stopped with a 404 for .githu
 
 - tools/sync_adopted.py now takes a repository as a whole template's copy only where it holds both protocol.yml and scripts/check.sh. Run against spine-program's tree, the plan offers 12 files: the board's, metrics and Token workflows with their scripts (tokens.py, pool.py, sealbox.py, token_run.py, usage.py, profile.py, economics.py), and holds nothing back; the library is already current.
 - The control panel's text (a patch handed to the control panel's thread): the Token's 404, once the repository is reached, says only that the file is missing and points at an open symphony/sync pull request when there is one; the invitation's refusal says that only an administrator may invite.
+
+## Where it stands
+
+The sync ran on the merge of symphony-template #262 and opened spine-program #213, which merged on 2026-10-20 with the 12 files above; spine-program's default branch now holds .github/workflows/token.yml. Add Token there still waits on the organization's SDLC_APP_ID and SDLC_APP_PRIVATE_KEY reaching the repository, and the environment token-store, which the first lend makes unless the owner makes it first and limits it to main. Add people waits on an administrator and on SymphonyBoard's Administration permission accepted on the organization's installation. The real test is the owner's.
