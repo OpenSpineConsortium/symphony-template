@@ -165,6 +165,90 @@ day, adds only editing and a terminal over it, and waits on the owner's choice. 
 word. Whether Globus's HTTPS access is allowed for PHI depends on the collection being High Assurance,
 which is not known; until then the same rule holds as for the tunnel: public and de-identified data only.
 
+## Globus as the Folders tab's own backend, 2026-10-20
+
+At 22:00 UTC the owner asked for Globus as a second drive in the Folders tab beside OneDrive, "consistent"
+in look, "as high speed transfer and streaming as possible", opening a file on a double click (Globus's
+file manager opens one only from a side button), and "with as few intermediate steps as possible". Built
+the same evening on the site (assets/js/symphony-panel.js, the control page's body file and control.css;
+the site pull request is named in the thread), with six checks GL1 to GL6 and nine mutants in symphony-app's
+signin/panel-checks/e2e2/folders.test.mjs. The design, and what was read for it from the Globus JavaScript
+SDK's sources (globus/globus-sdk-javascript v6.4.0) and Globus's own static data portal
+(globus/static-data-portal), since docs.globus.org does not resolve from the cloud session:
+
+- The sign-in is the page's own: Globus Auth takes a native app ("thick client", no secret) with PKCE,
+  and answers a browser's token exchange, so no route on the sign-in service was needed, unlike
+  OneDrive's. The page sends the browser to https://auth.globus.org/v2/oauth2/authorize with client_id,
+  response_type=code, redirect_uri (the console's own address), scope, state, code_challenge (S256) and
+  access_type=offline, which asks for refresh tokens, and exchanges the code at /v2/oauth2/token,
+  form-encoded, with code_verifier, client_id and redirect_uri and ?include_consented_scopes=true. The
+  answer holds one token per service: the sign-in's own (resource_server auth.globus.org) and, under
+  other_tokens, the Transfer API's (transfer.api.globus.org) and the collection's HTTPS server's (the
+  collection's id). Each has its own refresh_token, renewed at the same endpoint with
+  grant_type=refresh_token; an access token lasts two days, a refresh token until six months unused.
+- The scopes: openid profile urn:globus:auth:scope:transfer.api.globus.org:all for the first sign-in; a
+  mapped collection on Globus Connect Server 5.4 then refuses the listing with 403 ConsentRequired and
+  required_scopes naming its data_access scope as the Transfer scope's dependent,
+  urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/<collection>/data_access],
+  and the page goes to Globus Auth once more with those and https://auth.globus.org/scopes/<collection>/https
+  for the HTTPS server. With the collection's id known beforehand (the constant GLOBUS_KNOWN in the
+  script, blank until the owner gives it) the first sign-in carries all three and the second trip is gone.
+- The listing: GET https://transfer.api.globus.org/v0.10/operation/endpoint/<collection>/ls?path=...
+  &show_hidden=false&limit=2000, answering DATA_TYPE file_list with absolute_path, DATA (each entry with
+  name, type dir or file, size, last_modified as "2026-10-20 10:00:00+00:00", permissions, user, group,
+  link_target) and the undocumented length and total; filter=name:~*word* narrows one folder by name, since
+  the API lists one folder at a time and searches nothing. The collection is found by
+  /v0.10/endpoint_search?filter_scope=all&filter_fulltext=wsugrid%23globus and read at
+  /v0.10/endpoint/<id>, whose https_server and default_directory the tab keeps. A folder of a million
+  files is cut at 2,000 entries, which the list says.
+- Opening a file: a double click opens https_server + the file's path, encoded once per segment, in a
+  new tab, as Globus's own portal does with its Open button; the collection's server asks for a Globus
+  sign-in there the first time and keeps a session cookie, then streams the file straight from the grid's
+  data node to the browser with HTTP range requests, so a video seeks without loading whole, and nothing
+  is written anywhere unless ?download is asked, which the Download verb asks. The page proxies nothing,
+  so the speed is the data node's uplink and the person's own connection, with no hop of ours.
+- The preview pane plays a video or a sound from the same address with a video element, and fetches a
+  text, an image or a PDF (up to 50 MB) into the page with the collection's own bearer token.
+- Read-only: the command bar's writing verbs, the menus' and the ticks are off on Globus; Track stays
+  OneDrive's. Both drives are kept on the browser per GitHub account (OneDrive under the login, Globus
+  under login|globus), each a root in the folder tree, a press on the other switching; Forget Globus
+  leaves OneDrive.
+- Globus issues new collection domains under gaccess.io since July 2025; wsugrid#globus keeps its
+  data.globus.org one, and the tab reads https_server from the collection document, hardcoding none.
+
+What was not measured, since the cloud session cannot reach globus.org (the proxy answers 403): whether
+the collection's HTTPS server allows the page's origin (CORS) for the preview pane's fetch, which the
+double click never needs; whether a video element plays from the address without the first sign-in
+click in a tab (the pane falls back to an Open in a new tab button on an error); and the exact filter
+syntax of ls, taken from the SDK's types and Globus's documentation as remembered. The owner's two
+one-time steps: register this page at https://app.globus.org/settings/developers as a thick client
+whose redirect is https://openspineconsortium.com/symphony/control/ and give its client UUID, and read
+wsugrid#globus's UUID from its Overview tab in the file manager; both go into the script's constants.
+
+The adversarial review of the first build (the same evening) found thirteen things, all fixed before the
+pull request: the collection was matched on display_name alone and fell back to the search's first hit,
+so a stranger's lookalike collection could have been opened (now an exact match on either name, else no
+collection); a fetched PDF was shown in a frame that was same-origin with the console and allowed
+scripts, so a file named .pdf but typed text/html by the server could have read the page's storage (now
+retyped by this page's own choice and framed with no script); a consent hop taken on its own after every
+return could bounce the page between the two sites for good (now once per collection per sitting, then a
+button); one refused refresh token forgot the whole connection (now only the Transfer API's does); every
+download but the first was blocked by the browser (now one per press, said); the tree walked the
+cluster's root and every folder above home (now it starts at the home folder); the active drive was
+recorded under an empty login; names reached the message area through the link-maker (now as text);
+Authorization followed redirects (now redirect: error); and three smaller inconsistencies in the head
+and the status bar. The list's error now says why and links the fixes: the same folder in Globus's own
+file manager (app.globus.org/file-manager?origin_id=<collection>&origin_path=<folder>), Connect Globus
+again, the consents page and Globus's status; and since Globus moves and streams files only, the same
+place names Beethoven for a shell, a job or Claude Code on the grid, with the page that says what it
+does, the Chrome Web Store listing to install it and OnDemand on the VPN as the portal, as the owner
+asked at 22:21 UTC (links and error messages when it is broken, the theme, the text size, which A- and
+A+ already scale, and help for a person without the Beethoven extension).
+
+Globus is files only (listing, streaming, transfers, sharing; Globus Compute runs functions, not a
+shell), so an interactive terminal on the grid without the VPN stays the VS Code tunnel's (above), built
+and parked in hpcworker, or OnDemand's shell on the VPN.
+
 ## PHI and the patent
 
 - A dev tunnel's traffic passes through Microsoft's relay. VS Code's documentation describes it as
@@ -188,7 +272,7 @@ which is not known; until then the same rule holds as for the tunnel: public and
   block the tunnel's Microsoft sign-in, as Utah's do; a GitHub sign-in avoids that (Utah's page).
 - vscode.dev playing a fluoroscopy MP4 through the tunnel, and how fast it starts on the lab volume.
 - Whether OnDemand's View serves an MP4 inline so it plays in place.
-- Whether wsugrid#globus has HTTPS access switched on.
+- Whether wsugrid#globus has HTTPS access switched on: it has (the owner's test, above).
 
 ## What waits on the owner
 
