@@ -1,8 +1,7 @@
-"""tools/drive_connector.py: a OneDrive walked from a Claude session's
-connector listings into the organizer's catalog, a plan checked against it,
-and the plan's moves written for the owner to read, made one connector call
-at a time only once approved, and undone back to where each item came from.
-Every name here is made up."""
+"""tools/drive_connector.py: a plan checked against the catalog the
+organizer's Graph walk writes, and the plan's moves written for the owner to
+read, made one call at a time only once approved, and undone back to where
+each item came from. Every name here is made up."""
 
 import contextlib
 import io
@@ -17,6 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
 import drive_connector  # noqa: E402
+import drive_organize  # noqa: E402
 
 DRIVE = "b!fakeDriveId-0123456789"
 
@@ -26,16 +26,35 @@ def item(number):
     return "01" + f"{number:032d}".replace("0", "A")
 
 
-def listing(*entries):
-    """Entries as the connector writes them, one after another with no separator."""
-    return "".join(f"{name} ({kind}, {size} bytes) file:///{DRIVE}/{item(n)}" for name, kind, size, n in entries)
+TREE = {"root": [("Budget 2026", "folder", 0, 1), ("Novel", "folder", 0, 2), ("Recordings", "folder", 0, 3),
+                 ("loose.txt", "file", 12, 4)],
+        item(1): [("ledger.xlsx", "file", 2048, 11), ("Receipts", "folder", 0, 12)],
+        item(2): [("chapter 1.docx", "file", 900, 21), ("cover.psd", "file", 5000, 22)],
+        item(3): [("call.mp4", "file", 9, 51)],
+        item(12): [("r1.pdf", "file", 300, 31)]}
 
 
-TOP = listing(("Budget 2026", "folder", 0, 1), ("Novel", "folder", 0, 2), ("Recordings", "folder", 0, 3),
-              ("loose.txt", "file", 12, 4))
-BUDGET = listing(("ledger.xlsx", "file", 2048, 11), ("Receipts", "folder", 0, 12))
-NOVEL = listing(("chapter 1.docx", "file", 900, 21), ("cover.psd", "file", 5000, 22))
-RECEIPTS = listing(("r1.pdf", "file", 300, 31))
+class MemoryOneDrive:
+    """Answers as drive_sync.Microsoft does, from TREE and its extras."""
+
+    def __init__(self, extra=None):
+        self.kids = {key: list(value) for key, value in TREE.items()}
+        for key, value in (extra or {}).items():
+            self.kids.setdefault(key, []).extend(value)
+        self.read = []
+
+    def graph(self, name, kind, size, number):
+        found = {"id": item(number), "name": name, "size": size, "parentReference": {"driveId": DRIVE},
+                 "lastModifiedDateTime": "2026-09-01T00:00:00Z", "webUrl": f"https://example.invalid/{number}"}
+        found[kind] = {} if kind == "folder" else {"mimeType": "application/octet-stream"}
+        return found
+
+    def meta(self, drive, item_id):
+        return {"id": "01ROOT", "name": "root", "folder": {}, "parentReference": {"driveId": DRIVE}}
+
+    def children(self, drive, item_id):
+        self.read.append(item_id)
+        return [self.graph(*entry) for entry in self.kids.get(item_id, [])]
 
 
 def plan(*projects):
@@ -55,88 +74,27 @@ class Drive(unittest.TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.dir)
-        self.walk = self.dir / "walk.jsonl"
 
-    def add(self, item_id, text):
-        return drive_connector.add(self.walk, item_id, DRIVE, text)
-
-    def walked(self):
-        self.add("root", TOP)
-        self.add(item(1), BUDGET)
-        self.add(item(2), NOVEL)
-        self.add(item(12), RECEIPTS)
-        return drive_connector.read_walk(self.walk)
+    def catalog(self, extra=None):
+        self.drive = MemoryOneDrive(extra)
+        found, problems, stopped = drive_organize.walk("microsoft", self.drive, [{"id": "root", "name": "OneDrive"}])
+        return drive_organize.catalog_of("microsoft", found, problems, stopped)
 
 
-class Walk(Drive):
-    def test_a_listing_is_read_by_the_shape_of_its_ids(self):
-        entries = drive_connector.parse_listing(TOP)
-        self.assertEqual([e["name"] for e in entries], ["Budget 2026", "Novel", "Recordings", "loose.txt"])
-        self.assertEqual(entries[0]["id"], item(1))
-        self.assertEqual((entries[3]["folder"], entries[3]["size"]), (False, 12))
-
-    def test_a_personal_drives_ids_and_a_listing_one_a_line(self):
-        text = f"a.docx (file, 5 bytes) file:///{DRIVE}/ABCDEF0123456789!101\nb (folder, 0 bytes) file:///{DRIVE}/ABCDEF0123456789!102"
-        self.assertEqual([e["id"] for e in drive_connector.parse_listing(text)],
-                         ["ABCDEF0123456789!101", "ABCDEF0123456789!102"])
-
-    def test_an_id_that_runs_into_the_next_name_is_refused(self):
-        text = f"a.docx (file, 5 bytes) file:///{DRIVE}/ABCDEF0123456789!1012025 plan.docx (file, 5 bytes) file:///{DRIVE}/ABCDEF0123456789!102"
-        with self.assertRaises(drive_connector.ConnectorError):
-            drive_connector.parse_listing(text)
-        with self.assertRaises(drive_connector.ConnectorError):
-            drive_connector.parse_listing(f" (file, 5 bytes) file:///{DRIVE}/{item(1)}")
-
-    def test_unlisted_names_the_next_folders_and_never_the_apps_own(self):
-        self.assertEqual(drive_connector.unlisted([])[0]["next"], [{"item": "root", "path": "OneDrive"}])
-        self.add("root", TOP)
-        status, _ = drive_connector.unlisted(drive_connector.read_walk(self.walk))
-        self.assertEqual([e["path"] for e in status["next"]], ["OneDrive/Budget 2026", "OneDrive/Novel"])
-        self.assertEqual(status["next"][0]["uri"], f"file:///{DRIVE}/{item(1)}")
-        self.assertIn("OneDrive/Recordings: kept by Microsoft 365's apps, not read", status["left"])
-
-    def test_a_folder_is_read_once_and_only_from_the_walk(self):
-        self.add("root", TOP)
-        self.assertEqual(self.add("root", TOP), 0)
-        with self.assertRaises(drive_connector.ConnectorError):
-            self.add(item(99), BUDGET)
-        with self.assertRaises(drive_connector.ConnectorError):
-            self.add(item(1), "not a listing")
-
-    def test_the_catalog_is_the_workflows_with_parents(self):
-        made = drive_connector.catalog(self.walked())
+class Catalog(Drive):
+    def test_the_graph_walk_names_each_parent_and_the_apps_folders(self):
+        made = self.catalog()
         paths = {f["path"] for f in made["files"]}
         self.assertIn("OneDrive/Budget 2026/Receipts/r1.pdf", paths)
-        budget = next(f for f in made["folders"] if f["path"] == "OneDrive/Budget 2026")
-        self.assertEqual((budget["files"], budget["bytes"]), (2, 2348))
         self.assertEqual(made["parents"][item(12)], item(1))
+        self.assertEqual(made["parents"][item(1)], "root")
         self.assertEqual(made["managed"], ["OneDrive/Recordings"])
-        self.assertFalse(made["complete"])
-
-    def test_a_search_gives_dates_and_one_link_gives_every_link(self):
-        self.walked()
-        base = "https://example-my.sharepoint.com/personal/someone_example_edu/Documents"
-        search = (json.dumps({"uri": "x", "driveId": DRIVE, "id": item(11), "name": "ledger.xlsx",
-                              "webUrl": f"{base}/Budget 2026/ledger.xlsx", "lastModifiedDateTime": "2026-09-01T00:00:00Z"})
-                  + json.dumps({"id": "01" + "Z" * 32, "webUrl": "https://elsewhere.example/x"})
-                  + json.dumps({"moreResults": True, "nextOffset": 2}))
-        self.assertEqual(drive_connector.found(self.walk, search), 1)
-        made = drive_connector.catalog(drive_connector.read_walk(self.walk))
-        files = {f["path"]: f for f in made["files"]}
-        self.assertEqual(files["OneDrive/Budget 2026/ledger.xlsx"]["modified"], "2026-09-01T00:00:00Z")
-        self.assertEqual(files["OneDrive/Novel/chapter 1.docx"]["web"], f"{base}/Novel/chapter%201.docx")
-        self.assertEqual(files["OneDrive/Novel/chapter 1.docx"]["modified"], "")
-        budget = next(f for f in made["folders"] if f["path"] == "OneDrive/Budget 2026")
-        self.assertEqual((budget["latest"], budget["web"]), ("2026-09-01T00:00:00Z", f"{base}/Budget%202026"))
-        with self.assertRaises(drive_connector.ConnectorError):
-            drive_connector.found(self.walk, "not json")
-
-    def test_without_a_search_the_links_are_unknown(self):
-        made = drive_connector.catalog(self.walked())
-        self.assertEqual({f["web"] for f in made["files"]}, {""})
+        self.assertNotIn(item(3), self.drive.read)
+        self.assertNotIn("OneDrive/Recordings/call.mp4", paths)
+        self.assertTrue(made["complete"])
 
     def test_check_names_the_paths_the_catalog_lacks(self):
-        made = drive_connector.catalog(self.walked())
+        made = self.catalog()
         self.assertIn("repository is not an object",
                       drive_connector.check(plan(project("b", "B", repository="x")), made)[0]["problems"])
         report = drive_connector.check(plan(project("books", "Books", "OneDrive/Novel", "OneDrive/Nowhere",
@@ -148,7 +106,7 @@ class Walk(Drive):
 
 class Moves(Drive):
     def moves(self, *projects):
-        return drive_connector.plan_moves(plan(*projects), drive_connector.catalog(self.walked()))
+        return drive_connector.plan_moves(plan(*projects), self.catalog())
 
     def test_each_project_gets_a_folder_and_its_items_move_into_it(self):
         moves = self.moves(project("budget", "Budget: 2026/27", "OneDrive/Budget 2026"),
@@ -172,8 +130,8 @@ class Moves(Drive):
             self.assertIn(words, said)
 
     def test_moves_take_only_a_catalog_that_names_parents(self):
-        made = drive_connector.catalog(self.walked())
-        for key in ("parents", "source"):
+        made = self.catalog()
+        for key in ("parents", "provider"):
             broken = {k: v for k, v in made.items() if k != key}
             with self.assertRaises(drive_connector.ConnectorError):
                 drive_connector.plan_moves(plan(project("a", "A", "OneDrive/Novel")), broken)
@@ -196,10 +154,7 @@ class Moves(Drive):
             self.assertEqual(drive_connector.main(["undo", "--moves", str(path)]), 1)
 
     def test_a_name_twice_in_one_project_is_renamed(self):
-        self.add("root", TOP)
-        self.add(item(1), listing(("notes.txt", "file", 1, 41)))
-        self.add(item(2), listing(("notes.txt", "file", 1, 42)))
-        made = drive_connector.catalog(drive_connector.read_walk(self.walk))
+        made = self.catalog({item(1): [("notes.txt", "file", 1, 41)], item(2): [("notes.txt", "file", 1, 42)]})
         moves = drive_connector.plan_moves(plan(project("n", "Notes", "OneDrive/Budget 2026/notes.txt",
                                                         "OneDrive/Novel/notes.txt")), made)
         self.assertEqual([op["new_name"] for op in moves["ops"] if op["op"] == "move"], ["", "notes (2).txt"])
@@ -223,10 +178,7 @@ class Moves(Drive):
         self.assertIsNone(drive_connector.next_call(moves))
 
     def test_undo_moves_back_what_moved_and_deletes_nothing(self):
-        self.add("root", TOP)
-        self.add(item(1), listing(("notes.txt", "file", 1, 41)))
-        self.add(item(2), listing(("notes.txt", "file", 1, 42)))
-        made = drive_connector.catalog(drive_connector.read_walk(self.walk))
+        made = self.catalog({item(1): [("notes.txt", "file", 1, 41)], item(2): [("notes.txt", "file", 1, 42)]})
         moves = drive_connector.plan_moves(plan(project("n", "Notes", "OneDrive/Budget 2026/notes.txt",
                                                         "OneDrive/Novel/notes.txt")), made)
         moves["approved"] = True
@@ -243,18 +195,17 @@ class Moves(Drive):
         self.assertIn("the folder it came from", drive_connector.moves_markdown(back))
 
     def test_the_command_line_writes_the_review_and_refuses_unapproved(self):
-        self.walked()
         out = self.dir / "out"
+        out.mkdir()
+        (out / "catalog.json").write_text(json.dumps(self.catalog()))
         plan_path = self.dir / "plan.json"
         plan_path.write_text(json.dumps(plan(project("budget", "Budget", "OneDrive/Budget 2026"))))
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
-            self.assertEqual(drive_connector.main(["catalog", "--walk", str(self.walk), "--out", str(out)]), 0)
             self.assertEqual(drive_connector.main(["moves", "--plan", str(plan_path), "--catalog",
                                                    str(out / "catalog.json"), "--out", str(out)]), 0)
             self.assertEqual(drive_connector.main(["next", "--moves", str(out / "moves.json")]), 1)
         self.assertIn("not approved", err.getvalue())
         self.assertIn("move `OneDrive/Budget 2026` to `Symphony projects/Budget/`", (out / "MOVES.md").read_text())
-        self.assertTrue((out / "TREE.md").exists())
 
 
 if __name__ == "__main__":

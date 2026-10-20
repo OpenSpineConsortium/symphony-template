@@ -145,7 +145,9 @@ accept running in a public repository, and a folder past the depth limit counted
 - How well Claude groups a real drive. The digests are the evidence it gets, and a domain
   outside the fifteen is "other".
 
-## Connector mode: the same from a Claude session
+## Connector mode: the same from a Claude session (retired 2026-10-20)
+
+Retired on the owner's word once Wayne State's consent made the Graph walk work ("dont expose to the user the ability to do that old way of creating the scan of the onedrive that didnt use natural authetication through microsoft"): the walk below is removed from tools/drive_connector.py and the skill, and kept here as the record of the first run (onedrive-direct-graph.md).
 
 Added the same day, answering the owner's message of 2026-10-18: "giving symphony through claude
 access to the entire onedrive for reorganizing into projects, repos, ect symphony repos that

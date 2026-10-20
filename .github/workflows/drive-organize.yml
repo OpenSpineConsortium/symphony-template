@@ -24,10 +24,9 @@ name: Drive organizer
 #             a task whose files are not here yet; no Claude. A failed
 #             accept is run again as it was
 #   open      opens the proposals in plan.json on drive-catalog, which a
-#             Claude session wrote there with its catalog after reading the
-#             drive through the Microsoft 365 connector
-#             (tools/drive_connector.py, .claude/skills/drive-organize), so the
-#             issues are the workflow's own, as accept requires; no Claude
+#             Claude session wrote there from the catalog this workflow
+#             read (.claude/skills/drive-organize), so the issues are the
+#             workflow's own, as accept requires; no Claude
 #
 # A catalog names a person's files and holds a little of what is in them,
 # so every step runs only in a private repository and the log carries

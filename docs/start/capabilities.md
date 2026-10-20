@@ -70,7 +70,7 @@ The site's /symphony/control/ drives a repository as the signed-in person throug
 
 | What | How | Where |
 | --- | --- | --- |
-| Native OneDrive access | Wayne State approved the SymphonyBoard Folders app on 2026-10-19, so the panel's Folders tab and the drive organizer can read a WSU OneDrive directly through Microsoft Graph. Until each piece moves to that sign-in, a Claude session does the same through the Microsoft 365 connector, using one code path | [drive organizer](../memory/drive-organizer.md), tools/drive_connector.py |
+| Native OneDrive access | Wayne State approved the SymphonyBoard Folders app on 2026-10-19, so the panel's Folders tab and the drive organizer read a WSU OneDrive directly through Microsoft Graph under the owner's own Microsoft sign-in, which the owner confirmed live on 2026-10-20; the connector walk is retired | [drive organizer](../memory/drive-organizer.md), [OneDrive on Graph](../research/onedrive-direct-graph.md) |
 | Organizing a drive | The whole drive read into a catalog, sorted into proposed projects, each a possible repository; files move only on the owner's own go, and every move can be undone | the drive-organize skill |
 | Notebooks | A group of drive files held together, as NotebookLM does, in a private repository that points at them by id and never moves them, with research, drafts and references | the notebook skill, tools/notebook.py |
 | Revising Word documents | Revisions written as tracked changes in a copy beside the file, never over a file the owner changed; several reviewers each as their own author | tools/docx_review.py, the lens-review skill |
