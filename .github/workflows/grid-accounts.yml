@@ -16,8 +16,8 @@
 # own verifier, which never leaves the grid, and Anthropic takes it once. docs/setup/grid.md, "Several
 # Claude accounts", has the owner's steps. The action job says one of the gate's job words (hpcworker
 # #23): update, which brings the gate's own clone to hpcworker's main, the spine-datasets promoter's
-# status, start and stop, and SchwingNet's status, pull and X-ray chain, so a session runs them in the
-# owner's place (his choice of 2026-10-21); the answer is logs/job-<job>.json.
+# status, start and stop, and SchwingNet's own grid/gate.sh words at its main (start, status, leaks,
+# v1, latency, stop, fetch-<id>), so a session runs them in the owner's place (his choice of 2026-10-21); the answer is logs/job-<job>.json.
 name: Grid accounts
 run-name: "Grid accounts: ${{ inputs.action }} ${{ inputs.slot }}${{ inputs.job }} (${{ inputs.request }})"
 on:
@@ -49,7 +49,7 @@ on:
         required: false
         default: ""
       job:
-        description: "The grid job (job): update, promoter-status, promoter-start, promoter-stop, schwingnet-status, schwingnet-pull or schwingnet-xray-chain"
+        description: "The grid job (job): update, promoter-status|start|stop, schwingnet-start|status|leaks|v1|latency|stop, or schwingnet-fetch-<id>"
         required: false
         default: ""
       request:

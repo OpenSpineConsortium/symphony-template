@@ -159,9 +159,11 @@ class Words(unittest.TestCase):
     def test_a_job_says_its_one_word_and_nothing_else(self):
         for job, word in (("update", "update"), ("promoter-status", "promoter status"), ("promoter-start", "promoter start"),
                           ("promoter-stop", "promoter stop"), ("schwingnet-status", "schwingnet status"),
-                          ("schwingnet-pull", "schwingnet pull"), ("schwingnet-xray-chain", "schwingnet xray-chain")):
+                          ("schwingnet-start", "schwingnet start"), ("schwingnet-v1", "schwingnet v1"),
+                          ("schwingnet-fetch-vindr_pcxr", "schwingnet fetch vindr_pcxr")):
             self.assertEqual(self.run_script("job", job=job)[1], [word, "accounts"], job)
-        for job in ("", "update now", "promoter start abc", "schwingnet-xray-chain --credentialed", "accounts", "id;x"):
+        for job in ("", "update now", "promoter start abc", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
+                    "schwingnet-fetch-VinDr", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
             rc, words, _ = self.run_script("job", job=job)
             self.assertNotEqual(rc, 0, job)
             self.assertEqual(words, [], job)

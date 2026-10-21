@@ -24,11 +24,13 @@ case "$ACTION" in
        elif [ -n "$NAME" ]; then [[ "$NAME" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { echo "::error::a worker's name is up to 32 letters, digits, _ or -"; exit 1; }; WHAT="worker $NAME"; LOGFILE="worker-$NAME"
        else WHAT=usage; LOGFILE=usage; fi;;
   # one of the gate's job words (hpcworker #23, the owner's choice of 2026-10-21), named as one word
-  # here: the gate takes these and no other, with no argument of anyone's
+  # here: the gate takes these and no other; SchwingNet's fetch carries one data set's id after it
+  # (schwingnet-fetch-vindr_pcxr), which SchwingNet's grid/gate.sh checks again against its own list
   job) JOB=${JOB:-}
-    case "$JOB" in update|promoter-status|promoter-start|promoter-stop|schwingnet-status|schwingnet-pull|schwingnet-xray-chain) ;;
-      *) echo "::error::the job is one of update, promoter-status, promoter-start, promoter-stop, schwingnet-status, schwingnet-pull, schwingnet-xray-chain"; exit 1;; esac
-    WHAT=${JOB/-/ }; LOGFILE="job-$JOB";;
+    if [[ "$JOB" =~ ^(update|promoter-(status|start|stop)|schwingnet-(start|status|leaks|v1|latency|stop))$ ]]; then WHAT=${JOB/-/ }
+    elif [[ "$JOB" =~ ^schwingnet-fetch-([a-z0-9_]{1,40})$ ]]; then WHAT="schwingnet fetch ${BASH_REMATCH[1]}"
+    else echo "::error::the job is one of update, promoter-status, promoter-start, promoter-stop, schwingnet-start, schwingnet-status, schwingnet-leaks, schwingnet-v1, schwingnet-latency, schwingnet-stop or schwingnet-fetch-<id>"; exit 1; fi
+    LOGFILE="job-$JOB";;
 esac
 [[ "$REQUEST" =~ ^[A-Za-z0-9_-]{0,64}$ ]] || { echo "::error::the request is a short plain name"; exit 1; }
 if [ "$ACTION" = code ]; then
