@@ -1,6 +1,6 @@
 {
- "action": "list",
- "at": "2026-10-21T22:24:31Z",
+ "action": "usage",
+ "at": "2026-10-21T22:25:19Z",
  "list": {
   "accounts": [
    {
@@ -45,7 +45,7 @@
     "slot": "2",
     "use": null,
     "who": {
-     "checked_at": "2026-10-21T21:47:57Z",
+     "checked_at": "2026-10-21T22:25:12Z",
      "sign_in": "none",
      "signed_in": false,
      "slot": "2",
@@ -56,23 +56,23 @@
   "auto": false,
   "current": "1",
   "framework": 24,
-  "usage_job": "running",
+  "usage_job": null,
   "v": 1,
   "worker": {
    "account": null,
-   "age_s": 10,
+   "age_s": 28,
    "job": "40688235",
    "link": "https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5",
    "message": "Open in Claude: https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5 and find Wayne State grid (or tap Code in the Claude app). space to show QR code",
    "name": "worker",
    "node": "hao1",
    "state": "online",
-   "updated_at": "2026-10-21T22:24:21Z"
+   "updated_at": "2026-10-21T22:24:51Z"
   },
   "workers": [
    {
     "account": null,
-    "age_s": 10,
+    "age_s": 28,
     "link": "https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5",
     "name": "worker",
     "node": "hao1",
@@ -82,7 +82,7 @@
   ]
  },
  "rc": 0,
- "request": "list-fw24",
+ "request": "usage-fw24",
  "said": [
   "HPCW-GRID-GATE accounts ok"
  ],

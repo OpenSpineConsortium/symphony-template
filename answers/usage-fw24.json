@@ -1,6 +1,6 @@
 {
  "action": "usage",
- "at": "2026-10-21T22:21:26Z",
+ "at": "2026-10-21T22:25:19Z",
  "list": {
   "accounts": [
    {
@@ -10,11 +10,28 @@
      "state": "none"
     },
     "slot": "1",
-    "use": null,
+    "use": {
+     "read_at": "2026-10-21T22:24:25Z",
+     "slot": "1",
+     "status": "allowed",
+     "v": 1,
+     "windows": {
+      "five_hour": {
+       "resetsAt": "2026-10-21T22:40:00Z",
+       "utilization": 0.0
+      },
+      "seven_day": {
+       "resetsAt": "2026-10-27T20:00:00Z",
+       "utilization": 0.02
+      }
+     }
+    },
     "who": {
-     "checked_at": "2026-10-21T21:47:55Z",
-     "sign_in": "none",
-     "signed_in": false,
+     "checked_at": "2026-10-21T22:22:39Z",
+     "email": "gr***@med.wayne.edu",
+     "plan": "max",
+     "sign_in": "subscription",
+     "signed_in": true,
      "slot": "1",
      "v": 1
     }
@@ -28,7 +45,7 @@
     "slot": "2",
     "use": null,
     "who": {
-     "checked_at": "2026-10-21T21:47:57Z",
+     "checked_at": "2026-10-21T22:25:12Z",
      "sign_in": "none",
      "signed_in": false,
      "slot": "2",
@@ -39,23 +56,23 @@
   "auto": false,
   "current": "1",
   "framework": 24,
-  "usage_job": "running",
+  "usage_job": null,
   "v": 1,
   "worker": {
    "account": null,
-   "age_s": 7,
+   "age_s": 28,
    "job": "40688235",
    "link": "https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5",
    "message": "Open in Claude: https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5 and find Wayne State grid (or tap Code in the Claude app). space to show QR code",
    "name": "worker",
    "node": "hao1",
    "state": "online",
-   "updated_at": "2026-10-21T22:21:19Z"
+   "updated_at": "2026-10-21T22:24:51Z"
   },
   "workers": [
    {
     "account": null,
-    "age_s": 7,
+    "age_s": 28,
     "link": "https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5",
     "name": "worker",
     "node": "hao1",
@@ -67,8 +84,6 @@
  "rc": 0,
  "request": "usage-fw24",
  "said": [
-  "HPCW-ACCOUNTS usage: job 40698433",
-  "HPCW-ACCOUNTS usage: still reading",
   "HPCW-GRID-GATE accounts ok"
  ],
  "slot": "",
