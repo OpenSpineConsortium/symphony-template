@@ -349,9 +349,13 @@ jobs:
           cp tools/usage.py "$RUNNER_TEMP/usage.py"
           cp tools/pool.py "$RUNNER_TEMP/pool.py"
           cp -r tools/profile.py tools/economics.py tools/sdlc_protocol "$RUNNER_TEMP/" || true
+          cp tools/check_docs.py scripts/keep-unpushed.sh "$RUNNER_TEMP/" || true
       - uses: anthropics/claude-code-action@v1
         id: claude
         if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true' && steps.account.outputs.wait != 'true'
+        # a deadline of its own inside the job's 90 minutes, so a run cut off still reaches the step
+        # below that keeps its unpushed work, rather than the whole job being cancelled with it
+        timeout-minutes: 75
         with:
           claude_code_oauth_token: >-
             ${{
@@ -423,6 +427,12 @@ jobs:
       # leaderboard credits the token and the person it belongs to with the
       # issues it worked; a token with no id yet is credited from its next
       # run after the Tokens tab gives it one.
+      - name: Keep work the run left unpushed on its own claim branch
+        if: always() && steps.claude.outcome != 'skipped' && steps.claude.outcome != 'success'
+        continue-on-error: true
+        env:
+          KEEP_TOOLS: ${{ runner.temp }}
+        run: bash "$RUNNER_TEMP/keep-unpushed.sh"
       - name: Credit the issue to the token the run took
         if: always() && steps.claude.outcome != 'skipped' && steps.next.outputs.issue != ''
         continue-on-error: true
