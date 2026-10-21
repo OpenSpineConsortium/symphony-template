@@ -14,16 +14,19 @@
 # the log, the summary or the branch in the clear. The code from Anthropic's page is an input, so it is
 # in the run's record for whoever may read this repository; it is worth nothing without the sign-in's
 # own verifier, which never leaves the grid, and Anthropic takes it once. docs/setup/grid.md, "Several
-# Claude accounts", has the owner's steps.
+# Claude accounts", has the owner's steps. The action job says one of the gate's job words (hpcworker
+# #23): update, which brings the gate's own clone to hpcworker's main, the spine-datasets promoter's
+# status, start and stop, and SchwingNet's status, pull and X-ray chain, so a session runs them in the
+# owner's place (his choice of 2026-10-21); the answer is logs/job-<job>.json.
 name: Grid accounts
-run-name: "Grid accounts: ${{ inputs.action }} ${{ inputs.slot }} (${{ inputs.request }})"
+run-name: "Grid accounts: ${{ inputs.action }} ${{ inputs.slot }}${{ inputs.job }} (${{ inputs.request }})"
 on:
   workflow_dispatch:
     inputs:
       action:
         description: What to do with the grid's Claude accounts
         type: choice
-        options: [list, use, login, code, usage, auto-on, auto-off, forget, worker-start, worker-stop, log]
+        options: [list, use, login, code, usage, auto-on, auto-off, forget, worker-start, worker-stop, log, job]
         default: list
       slot:
         description: The account, 1 to 32 (use, login, code, forget, worker-start; log, for its sign-in's output)
@@ -43,6 +46,10 @@ on:
         default: "1"
       key:
         description: The panel's RSA-OAEP public key, SPKI in base64, to seal the sign-in link for (login)
+        required: false
+        default: ""
+      job:
+        description: "The grid job (job): update, promoter-status, promoter-start, promoter-stop, schwingnet-status, schwingnet-pull or schwingnet-xray-chain"
         required: false
         default: ""
       request:
@@ -82,6 +89,7 @@ jobs:
           SLOT: ${{ inputs.slot }}
           NAME: ${{ inputs.name }}
           COUNT: ${{ inputs.count }}
+          JOB: ${{ inputs.job }}
           CODE: ${{ inputs.code }}
           PANEL_KEY: ${{ inputs.key }}
           REQUEST: ${{ inputs.request }}

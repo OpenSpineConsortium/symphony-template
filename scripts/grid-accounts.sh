@@ -4,7 +4,7 @@
 # grid for the panel (tools/grid_accounts.py masks it; a sign-in link is sealed for the panel's key and
 # never printed). Reads its inputs from the environment the workflow sets.
 set -euo pipefail
-case "$ACTION" in list|use|login|code|usage|auto-on|auto-off|forget|worker-start|worker-stop|log) ;; *) echo "::error::unknown action $ACTION"; exit 1;; esac
+case "$ACTION" in list|use|login|code|usage|auto-on|auto-off|forget|worker-start|worker-stop|log|job) ;; *) echo "::error::unknown action $ACTION"; exit 1;; esac
 case "$ACTION" in use|login|code|forget|worker-start)
   [[ "$SLOT" =~ ^([1-9]|[12][0-9]|3[0-2])$ ]] || { echo "::error::the account is a number from 1 to 32"; exit 1; };;
 esac
@@ -23,6 +23,12 @@ case "$ACTION" in
   log) if [ -n "$SLOT" ]; then [[ "$SLOT" =~ ^([1-9]|[12][0-9]|3[0-2])$ ]] || { echo "::error::the account is a number from 1 to 32"; exit 1; }; WHAT="login $SLOT"; LOGFILE="login-$SLOT"
        elif [ -n "$NAME" ]; then [[ "$NAME" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { echo "::error::a worker's name is up to 32 letters, digits, _ or -"; exit 1; }; WHAT="worker $NAME"; LOGFILE="worker-$NAME"
        else WHAT=usage; LOGFILE=usage; fi;;
+  # one of the gate's job words (hpcworker #23, the owner's choice of 2026-10-21), named as one word
+  # here: the gate takes these and no other, with no argument of anyone's
+  job) JOB=${JOB:-}
+    case "$JOB" in update|promoter-status|promoter-start|promoter-stop|schwingnet-status|schwingnet-pull|schwingnet-xray-chain) ;;
+      *) echo "::error::the job is one of update, promoter-status, promoter-start, promoter-stop, schwingnet-status, schwingnet-pull, schwingnet-xray-chain"; exit 1;; esac
+    WHAT=${JOB/-/ }; LOGFILE="job-$JOB";;
 esac
 [[ "$REQUEST" =~ ^[A-Za-z0-9_-]{0,64}$ ]] || { echo "::error::the request is a short plain name"; exit 1; }
 if [ "$ACTION" = code ]; then
@@ -119,6 +125,13 @@ case "$ACTION" in
     say "accounts log $WHAT" > /dev/null || rc=$?
     python3 tools/grid_accounts.py log "$d/log.json" --what "$WHAT" --request "$REQUEST" --rc "$rc" < "$d/out"
     echo "the grid's output for $WHAT: $(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["lines"]))' "$d/log.json") lines, written to the branch grid as logs/$LOGFILE.json";;
+  # the job's whole answer goes to the Console as a log of its own, cleaned as a job's output is
+  job)
+    say "$WHAT" > /dev/null || rc=$?
+    { echo "HPCW-ACCOUNTS-LOG-BEGIN $WHAT"; cat "$d/out"; echo "HPCW-ACCOUNTS-LOG-END"; } \
+      | python3 tools/grid_accounts.py log "$d/log.json" --what "$WHAT" --request "$REQUEST" --rc "$rc"
+    grep '^HPCW-GRID-GATE' "$d/out" || true
+    say accounts > /dev/null || true;;
   auto-on) say "accounts auto on" || rc=$?;;
   auto-off) say "accounts auto off" || rc=$?;;
   usage)
