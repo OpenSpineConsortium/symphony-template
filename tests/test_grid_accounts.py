@@ -78,6 +78,19 @@ class Answers(unittest.TestCase):
 
 
 class Link(unittest.TestCase):
+    def test_a_jobs_output_is_kept_cleaned_again(self):
+        token = "sk-ant-oat01-" + "B" * 40
+        lines = ["HPCW-GRID-GATE accounts ok", "HPCW-ACCOUNTS-LOG-BEGIN login 2", "--- the job's output (last 120 lines)",
+                 "signed in as someone@example.org", "leaked " + token, "AUTH-URL: https://claude.ai/x", "bell\x07here",
+                 "HPCW-ACCOUNTS-LOG-END", "HPCW-ACCOUNTS-JSON {}"]
+        rec = G.log_record(lines, "login 2", "r1", 0)
+        self.assertEqual(rec["lines"][0], "--- the job's output (last 120 lines)")
+        self.assertNotIn("someone@", json.dumps(rec))
+        self.assertNotIn("B" * 32, json.dumps(rec))
+        self.assertNotIn("claude.ai/x", json.dumps(rec))
+        self.assertIn("bellhere", rec["lines"])
+        self.assertEqual(len(rec["lines"]), 4)
+
     def test_only_anthropics_hosts(self):
         self.assertEqual(G.link_in(OUTPUT), LINK)
         self.assertEqual(G.link_in(["AUTH-URL: https://claude.ai.evil.example/x"]), "")
@@ -133,6 +146,15 @@ class Words(unittest.TestCase):
             rc, words, _ = self.run_script("worker-start", "2", name, count=count)
             self.assertNotEqual(rc, 0, (count, name))
             self.assertEqual(words, [], (count, name))
+
+    def test_log_names_the_job_whose_output_it_reads(self):
+        self.assertEqual(self.run_script("log", "2")[1], ["accounts log login 2"])
+        self.assertEqual(self.run_script("log", name="teamb")[1], ["accounts log worker teamb"])
+        self.assertEqual(self.run_script("log")[1], ["accounts log usage"])
+        for slot, name in (("33", ""), ("", "a b"), ("", "../x")):
+            rc, words, _ = self.run_script("log", slot, name)
+            self.assertNotEqual(rc, 0, (slot, name))
+            self.assertEqual(words, [], (slot, name))
 
     def test_a_busy_gate_is_asked_again(self):
         words = self.run_script("worker-start", "2", "teamb", busy=2)[1]
