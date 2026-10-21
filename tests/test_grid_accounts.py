@@ -109,7 +109,7 @@ class Words(unittest.TestCase):
     """scripts/grid-accounts.sh says to the gate only the words its action names, with a worker's
     name held to the gate's own shape, and the workflow offers every action the script takes."""
 
-    def run_script(self, action, slot="", name="", busy=0, count=""):
+    def run_script(self, action, slot="", name="", busy=0, count="", job=""):
         with tempfile.TemporaryDirectory() as td:
             bin_dir = Path(td) / "bin"
             bin_dir.mkdir()
@@ -123,7 +123,7 @@ class Words(unittest.TestCase):
             git = bin_dir / "git"
             git.write_text("#!/bin/bash\nexit 1\n")
             git.chmod(0o755)
-            env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}", ACTION=action, SLOT=slot, NAME=name, COUNT=count,
+            env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}", ACTION=action, SLOT=slot, NAME=name, COUNT=count, JOB=job,
                        CODE="", PANEL_KEY="", REQUEST="r1", KEY="k", ACCESS_ID="go2432", HOST_KEY="h", HOST="grid",
                        GH_TOKEN="", REPO="o/r", RUNNER_TEMP=td)
             env.pop("GITHUB_STEP_SUMMARY", None)
@@ -156,6 +156,16 @@ class Words(unittest.TestCase):
             self.assertNotEqual(rc, 0, (slot, name))
             self.assertEqual(words, [], (slot, name))
 
+    def test_a_job_says_its_one_word_and_nothing_else(self):
+        for job, word in (("update", "update"), ("promoter-status", "promoter status"), ("promoter-start", "promoter start"),
+                          ("promoter-stop", "promoter stop"), ("schwingnet-status", "schwingnet status"),
+                          ("schwingnet-pull", "schwingnet pull"), ("schwingnet-xray-chain", "schwingnet xray-chain")):
+            self.assertEqual(self.run_script("job", job=job)[1], [word, "accounts"], job)
+        for job in ("", "update now", "promoter start abc", "schwingnet-xray-chain --credentialed", "accounts", "id;x"):
+            rc, words, _ = self.run_script("job", job=job)
+            self.assertNotEqual(rc, 0, job)
+            self.assertEqual(words, [], job)
+
     def test_a_busy_gate_is_asked_again(self):
         words = self.run_script("worker-start", "2", "teamb", busy=2)[1]
         self.assertEqual(words, ["accounts start 2 teamb"] * 3 + ["accounts"])
@@ -183,3 +193,4 @@ class Words(unittest.TestCase):
         taken = re.search(r'case "\$ACTION" in ([a-z|-]+)\) ;;', script).group(1).split("|")
         self.assertEqual(sorted(offered), sorted(taken))
         self.assertIn("NAME: ${{ inputs.name }}", flow)
+        self.assertIn("JOB: ${{ inputs.job }}", flow)
