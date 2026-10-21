@@ -85,3 +85,25 @@ the Beethoven Connect failure, parked until the next failed press gives its debu
   which commits what the worker left and pushes it to the worker's own claim branch, never forced,
   never on another worker's claim or a branch that is no claim, and never with a file that looks like
   a secret; the push keeps the claim alive and the next run carries the work on.
+- Ranks 4 and 5, 2026-10-21, in part: the Grid tab flags a worker the grid has not heard from in 15
+  minutes, counted from the list's own age, and Beethoven's Connect press now says what it saw and
+  the last line the grid printed (beethoven-extension#22). The scheduled list every 15 minutes is
+  not built: each list spends a gate call, and a press already lists; it waits until the flag
+  shows a need. Splitting the gate setup into a pull step waits for the next failed press's log.
+- Rank 7, 2026-10-21: each account's tile counts the workers on it, and the start box says when a
+  new worker would share an account's five-hour window with another; it warns and never refuses.
+  Picking the account by its use, as tools/pool.py picks a cloud slot, is not built.
+
+## Deferred, and why
+
+- Rank 3, the timed push from grid workers: a grid worker is an interactive Claude session that
+  pushes as it works, and an autonomous job on the grid follows docs/agents/routines/worker.md,
+  which pushes each step; a timer in the job template would commit in a workspace a person may be
+  typing in. Revisit if the board releases a grid worker's claim it still meant to hold.
+- Rank 6, the multi-partition first-to-win start: Slurm takes --partition=a,b only where each
+  partition accepts the same QoS, and Wayne State's secp and reqp take different ones; two jobs
+  with a cancel of the loser need a measurement on the grid of how long each queue waits first.
+- Rank 8, an expiry on the gate key: OpenSSH takes expiry-time in authorized_keys from 7.7, and the
+  grid's login node runs CentOS 7, whose OpenSSH is 7.4, so the option would lock the gate out. An
+  ssh certificate or a scheduled rotation needs the lab lead's grid shell and is the next step.
+- Rank 9, one Workers view: medium work in the panel, not started.
