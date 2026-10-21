@@ -96,7 +96,7 @@ class Words(unittest.TestCase):
     """scripts/grid-accounts.sh says to the gate only the words its action names, with a worker's
     name held to the gate's own shape, and the workflow offers every action the script takes."""
 
-    def run_script(self, action, slot="", name="", busy=0):
+    def run_script(self, action, slot="", name="", busy=0, count=""):
         with tempfile.TemporaryDirectory() as td:
             bin_dir = Path(td) / "bin"
             bin_dir.mkdir()
@@ -110,7 +110,7 @@ class Words(unittest.TestCase):
             git = bin_dir / "git"
             git.write_text("#!/bin/bash\nexit 1\n")
             git.chmod(0o755)
-            env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}", ACTION=action, SLOT=slot, NAME=name,
+            env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}", ACTION=action, SLOT=slot, NAME=name, COUNT=count,
                        CODE="", PANEL_KEY="", REQUEST="r1", KEY="k", ACCESS_ID="go2432", HOST_KEY="h", HOST="grid",
                        GH_TOKEN="", REPO="o/r", RUNNER_TEMP=td)
             env.pop("GITHUB_STEP_SUMMARY", None)
@@ -122,6 +122,17 @@ class Words(unittest.TestCase):
         self.assertEqual(self.run_script("worker-start", "2", "teamb")[1], ["accounts start 2 teamb", "accounts"])
         self.assertEqual(self.run_script("worker-start", "3")[1], ["accounts start 3", "accounts"])
         self.assertEqual(self.run_script("worker-stop", name="teamb")[1], ["accounts stop teamb", "accounts"])
+
+    def test_several_workers_in_one_press(self):
+        self.assertEqual(self.run_script("worker-start", "2", "team", count="3")[1],
+                         ["accounts start 2 team-1", "accounts start 2 team-2", "accounts start 2 team-3", "accounts"])
+        self.assertEqual(self.run_script("worker-start", "4", count="2")[1],
+                         ["accounts start 4 account4-1", "accounts start 4 account4-2", "accounts"])
+        self.assertEqual(self.run_script("worker-start", "2", "team", count="1")[1], ["accounts start 2 team", "accounts"])
+        for count, name in (("9", "team"), ("0", "team"), ("2;x", "team"), ("2", "a" * 22)):
+            rc, words, _ = self.run_script("worker-start", "2", name, count=count)
+            self.assertNotEqual(rc, 0, (count, name))
+            self.assertEqual(words, [], (count, name))
 
     def test_a_busy_gate_is_asked_again(self):
         words = self.run_script("worker-start", "2", "teamb", busy=2)[1]

@@ -76,3 +76,7 @@ the Beethoven Connect failure, parked until the next failed press gives its debu
   grid (the newest 50 of the last day), so a panel whose run another overtook on accounts.json still
   finds its own. The panel itself sends one press at a time per page, so a burst was lost only across
   pages or people; it reads answers/ once the site's change lands.
+- Rank 2, 2026-10-21, on this side alone: worker-start takes a count, 1 to 8, and starts NAME-1 to
+  NAME-N one call after another in one run, each waiting out the gate's floor, so one press starts
+  several workers with nothing changed on the grid; a word that starts many in one call, which would
+  also drop the minute between them, waits for a framework release and the lab lead's pull.
