@@ -884,7 +884,7 @@ class Economics(unittest.TestCase):
             "seconds too large for a float": (zipped_text(record_text(seconds="9" * 401)), sonnet),
             "models given as a list": (zipped_text(record_text(models="[1, 2]")), None),
             "a key nested deeper than the interpreter's stack": (
-                zipped_text(record_text(worker="[" * 20000 + "]" * 20000)), "unread"),
+                zipped_text(record_text(worker="[" * 200000 + "]" * 200000)), "unread"),
             "a key nested deep enough to stop the cache being written": (
                 zipped_text(record_text(worker="[" * 1500 + "]" * 1500)), sonnet),
             "a workflow that is no word": (zipped_text(record_text(workflow="[" * 900 + "]" * 900)), sonnet),
