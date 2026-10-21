@@ -1,6 +1,6 @@
 {
- "action": "usage",
- "at": "2026-10-21T21:48:02Z",
+ "action": "job",
+ "at": "2026-10-21T21:48:07Z",
  "list": {
   "accounts": [
    {
@@ -43,7 +43,7 @@
   "v": 1,
   "worker": {
    "account": null,
-   "age_s": 6,
+   "age_s": 12,
    "job": "40688235",
    "link": "https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5",
    "message": "Open in Claude: https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5 and find Wayne State grid (or tap Code in the Claude app). space to show QR code",
@@ -55,7 +55,7 @@
   "workers": [
    {
     "account": null,
-    "age_s": 6,
+    "age_s": 12,
     "link": "https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5",
     "name": "worker",
     "node": "hao1",
@@ -65,7 +65,7 @@
   ]
  },
  "rc": 0,
- "request": "pmvin7k00hfsh1x",
+ "request": "schwingnet-status-before-v1",
  "said": [
   "HPCW-GRID-GATE accounts ok"
  ],
