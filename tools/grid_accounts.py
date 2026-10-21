@@ -15,6 +15,8 @@ form (docs/setup/grid.md, Several Claude accounts).
     python3 tools/grid_accounts.py state FILE SLOT     the login state of one account, or none
     python3 tools/grid_accounts.py usage-running FILE  exit 0 while the usage job runs
     python3 tools/grid_accounts.py link < gate-output  Anthropic's link, only from its own hosts
+    python3 tools/grid_accounts.py log OUT --what W --request R < gate-output
+                                                       what a grid job printed, for the Console
 """
 
 import argparse
@@ -28,6 +30,10 @@ import time
 EMAIL = re.compile(r"([A-Za-z0-9._%+-]{1,64})@([A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,63})")
 LINK = re.compile(r"^AUTH-URL: (https://(?:claude\.ai|claude\.com)/[A-Za-z0-9._~:/?#@!$&'()*+,;=%-]{1,2000})$")
 SAID = re.compile(r"^(HPCW-ACCOUNTS|HPCW-GRID-GATE) ")
+# the grid cleans a job's output before it leaves (hpcworker framework 23, accounts.sh acct_clean); this
+# side hides the same shapes again, so an older or changed grid never puts a token on the branch
+LONG = re.compile(r"[A-Za-z0-9_+=-]{32,}")
+LOG_LINES = 400
 JSON_LINE = "HPCW-ACCOUNTS-JSON "
 
 
@@ -64,6 +70,29 @@ def said_in(lines):
     """The gate's and the tool's own plain lines, never a link and at most twenty."""
     kept = [EMAIL.sub(mask_email, l)[:300] for l in lines if SAID.match(l) and "AUTH-URL" not in l]
     return kept[-20:]
+
+
+def log_in(lines):
+    """The lines between the gate's log markers, cleaned again, at most LOG_LINES of them."""
+    kept, inside = [], False
+    for line in lines:
+        if line.startswith("HPCW-ACCOUNTS-LOG-BEGIN"):
+            inside, kept = True, []
+            continue
+        if line.startswith("HPCW-ACCOUNTS-LOG-END"):
+            inside = False
+            continue
+        if inside and not line.startswith("AUTH-URL"):
+            clean = "".join(c for c in line if " " <= c <= "~" or c == "\t")
+            kept.append(LONG.sub("[hidden]", EMAIL.sub(mask_email, clean))[:300])
+    return kept[-LOG_LINES:]
+
+
+def log_record(lines, what, request, rc):
+    """What the branch grid keeps of one look at a job's output."""
+    return {"v": 1, "what": what, "request": request, "rc": rc,
+            "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "lines": log_in(lines), "said": said_in(lines)}
 
 
 def record(lines, action, slot, request, rc):
@@ -144,6 +173,11 @@ def main(argv=None):
     us = sub.add_parser("usage-running")
     us.add_argument("file")
     sub.add_parser("link")
+    lg = sub.add_parser("log")
+    lg.add_argument("out")
+    lg.add_argument("--what", required=True)
+    lg.add_argument("--request", default="")
+    lg.add_argument("--rc", type=int, default=0)
     pr = sub.add_parser("prune")
     pr.add_argument("folder")
     args = parser.parse_args(argv)
@@ -158,6 +192,11 @@ def main(argv=None):
         return 0
     if args.command == "usage-running":
         return 0 if (read_record(args.file).get("list") or {}).get("usage_job") == "running" else 1
+    if args.command == "log":
+        with open(args.out, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(log_record(sys.stdin.read().splitlines(), args.what, args.request, args.rc), fh, indent=1, sort_keys=True)
+            fh.write("\n")
+        return 0
     if args.command == "prune":
         prune_answers(args.folder)
         return 0

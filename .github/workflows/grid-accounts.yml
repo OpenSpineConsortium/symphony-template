@@ -6,7 +6,8 @@
 # of this repository may start it, since an account it signs in runs the owner's worker: the first step
 # asks GitHub for the actor's permission and stops on anything less.
 #
-# What the panel reads is written to the branch grid: accounts.json, the list with every e-mail masked
+# What the panel reads is written to the branch grid: logs/<what>.json, a grid job's output cleaned of
+# token shapes for the panel's Console (action log, hpcworker framework 23); accounts.json, the list with every e-mail masked
 # (tools/grid_accounts.py), and, for a sign-in, link.json, Anthropic's sign-in link sealed for the
 # browser that asked: an AES-256 key wrapped with the RSA-OAEP public key the panel sent as the input
 # key, which only that page's own private key, never stored, opens. The link and the code are never in
@@ -22,10 +23,10 @@ on:
       action:
         description: What to do with the grid's Claude accounts
         type: choice
-        options: [list, use, login, code, usage, auto-on, auto-off, forget, worker-start, worker-stop]
+        options: [list, use, login, code, usage, auto-on, auto-off, forget, worker-start, worker-stop, log]
         default: list
       slot:
-        description: The account, 1 to 32 (use, login, code, forget, worker-start)
+        description: The account, 1 to 32 (use, login, code, forget, worker-start; log, for its sign-in's output)
         required: false
         default: ""
       code:
@@ -33,7 +34,7 @@ on:
         required: false
         default: ""
       name:
-        description: The worker's name (worker-start, optional; worker-stop)
+        description: The worker's name (worker-start, optional; worker-stop; log, for its output)
         required: false
         default: ""
       count:

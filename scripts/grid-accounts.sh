@@ -4,7 +4,7 @@
 # grid for the panel (tools/grid_accounts.py masks it; a sign-in link is sealed for the panel's key and
 # never printed). Reads its inputs from the environment the workflow sets.
 set -euo pipefail
-case "$ACTION" in list|use|login|code|usage|auto-on|auto-off|forget|worker-start|worker-stop) ;; *) echo "::error::unknown action $ACTION"; exit 1;; esac
+case "$ACTION" in list|use|login|code|usage|auto-on|auto-off|forget|worker-start|worker-stop|log) ;; *) echo "::error::unknown action $ACTION"; exit 1;; esac
 case "$ACTION" in use|login|code|forget|worker-start)
   [[ "$SLOT" =~ ^([1-9]|[12][0-9]|3[0-2])$ ]] || { echo "::error::the account is a number from 1 to 32"; exit 1; };;
 esac
@@ -19,6 +19,10 @@ case "$ACTION" in
       [ "${#NAME}" -le 21 ] || { echo "::error::a name for several workers is up to 21 letters, digits, _ or -"; exit 1; }
     fi;;
   worker-stop) [[ "$NAME" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { echo "::error::name the worker to stop"; exit 1; };;
+  # what a job printed: a sign-in's when a slot is named, a worker's when a name is, else the usage job's
+  log) if [ -n "$SLOT" ]; then [[ "$SLOT" =~ ^([1-9]|[12][0-9]|3[0-2])$ ]] || { echo "::error::the account is a number from 1 to 32"; exit 1; }; WHAT="login $SLOT"; LOGFILE="login-$SLOT"
+       elif [ -n "$NAME" ]; then [[ "$NAME" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { echo "::error::a worker's name is up to 32 letters, digits, _ or -"; exit 1; }; WHAT="worker $NAME"; LOGFILE="worker-$NAME"
+       else WHAT=usage; LOGFILE=usage; fi;;
 esac
 [[ "$REQUEST" =~ ^[A-Za-z0-9_-]{0,64}$ ]] || { echo "::error::the request is a short plain name"; exit 1; }
 if [ "$ACTION" = code ]; then
@@ -66,6 +70,8 @@ publish() {
     if git -C "$w" fetch -q --depth 1 origin grid 2>/dev/null; then git -C "$w" checkout -q -b grid FETCH_HEAD; else git -C "$w" checkout -q --orphan grid; fi
     cp "$d/accounts.json" "$w/accounts.json"
     [ -s "$d/link.json" ] && cp "$d/link.json" "$w/link.json"
+    # a job's output for the Console: logs/<what>.json, the newest look at it, never in the run's log
+    [ -s "$d/log.json" ] && { mkdir -p "$w/logs"; cp "$d/log.json" "$w/logs/$LOGFILE.json"; }
     if [ -n "$REQUEST" ]; then
       mkdir -p "$w/answers"; cp "$d/accounts.json" "$w/answers/$REQUEST.json"
       python3 tools/grid_accounts.py prune "$w/answers"
@@ -109,6 +115,10 @@ case "$ACTION" in
     fi
     [ "$rc" != 0 ] || { sleep 4; say accounts || true; };;
   worker-stop) say "accounts stop $NAME" || rc=$?; [ "$rc" != 0 ] || { sleep 4; say accounts || true; };;
+  log)
+    say "accounts log $WHAT" > /dev/null || rc=$?
+    python3 tools/grid_accounts.py log "$d/log.json" --what "$WHAT" --request "$REQUEST" --rc "$rc" < "$d/out"
+    echo "the grid's output for $WHAT: $(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["lines"]))' "$d/log.json") lines, written to the branch grid as logs/$LOGFILE.json";;
   auto-on) say "accounts auto on" || rc=$?;;
   auto-off) say "accounts auto off" || rc=$?;;
   usage)
