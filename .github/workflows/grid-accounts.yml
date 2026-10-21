@@ -36,6 +36,10 @@ on:
         description: The worker's name (worker-start, optional; worker-stop)
         required: false
         default: ""
+      count:
+        description: How many workers to start, 1 to 8 (worker-start); more than one are named NAME-1 to NAME-N
+        required: false
+        default: "1"
       key:
         description: The panel's RSA-OAEP public key, SPKI in base64, to seal the sign-in link for (login)
         required: false
@@ -57,7 +61,7 @@ jobs:
   accounts:
     if: github.event.repository.private == true && github.event.repository.fork == false
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment: grid
     steps:
       - name: only an admin of this repository
@@ -76,6 +80,7 @@ jobs:
           ACTION: ${{ inputs.action }}
           SLOT: ${{ inputs.slot }}
           NAME: ${{ inputs.name }}
+          COUNT: ${{ inputs.count }}
           CODE: ${{ inputs.code }}
           PANEL_KEY: ${{ inputs.key }}
           REQUEST: ${{ inputs.request }}
