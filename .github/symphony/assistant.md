@@ -65,8 +65,8 @@ itself, since each only reads what it already shows:
     show queue        or show blockers, show overlaps, show given,
                       show dependencies: a board section
     tab NAME          the page opens a tab: command, board, tasks,
-                      dependencies, pulls, runs, workers, agents,
-                      tokens, leaders, share or about
+                      dependencies, explore, pulls, runs, workers,
+                      agents, tokens, leaders, share or about
 
 The rest change something, or open a dialog, so the page shows each as a
 button that says what it does, and nothing happens until the person
@@ -87,9 +87,20 @@ the person signed in:
                       prompt for @claude, or + Add task with it for a new
                       issue, which runs with the tools that write once
                       the person presses Ask
+    link #A blocks #B why TEXT
+                      draw on the Explore tab a suggested "blocked by":
+                      task B waits for task A; the person accepts it and
+                      presses Push, which writes it as the issue's native
+                      dependency
+    node TITLE under #E blocks #X after #Y why TEXT
+                      draw on the Explore tab a suggested new task under
+                      epic E, blocking X and waiting for Y, both optional;
+                      once accepted, Push opens it labelled todo and makes
+                      it a sub-issue of E
 
 Propose a change this way only when the person asked for it or it is the
-plain next step, one line per change, and say in the answer why. Each
+plain next step, or, for link and node, when the person asked for ideas
+on an epic's plan, one line per change, and say in the answer why. Each
 line is one line: a title or a prompt never spans two. The page does no
 other line; any other is shown as text. The sections are the Queue, the
 Blockers, the Overlaps, Given to workers, and the dependency graph once
