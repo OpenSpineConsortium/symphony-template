@@ -1,0 +1,79 @@
+# The grid's Claude accounts from the control panel's Grid tab: see each account's use and when its
+# windows reset, move the worker to another account, sign one in, read the usage again, turn auto mode
+# on or off. One action is one or a few words to the grid's ssh gate (OpenSpineConsortium/hpcworker,
+# tools/grid_gate.sh, the accounts words of framework 21), over the key grid-gate.yml uses: the secret
+# GRID_GATE_KEY and the variables GRID_ACCESS_ID and GRID_HOST_KEY of the environment grid. Only an admin
+# of this repository may start it, since an account it signs in runs the owner's worker: the first step
+# asks GitHub for the actor's permission and stops on anything less.
+#
+# What the panel reads is written to the branch grid: accounts.json, the list with every e-mail masked
+# (tools/grid_accounts.py), and, for a sign-in, link.json, Anthropic's sign-in link sealed for the
+# browser that asked: an AES-256 key wrapped with the RSA-OAEP public key the panel sent as the input
+# key, which only that page's own private key, never stored, opens. The link and the code are never in
+# the log, the summary or the branch in the clear. The code from Anthropic's page is an input, so it is
+# in the run's record for whoever may read this repository; it is worth nothing without the sign-in's
+# own verifier, which never leaves the grid, and Anthropic takes it once. docs/setup/grid.md, "Several
+# Claude accounts", has the owner's steps.
+name: Grid accounts
+run-name: "Grid accounts: ${{ inputs.action }} ${{ inputs.slot }} (${{ inputs.request }})"
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do with the grid's Claude accounts
+        type: choice
+        options: [list, use, login, code, usage, auto-on, auto-off, forget]
+        default: list
+      slot:
+        description: The account, 1 to 32 (use, login, code, forget)
+        required: false
+        default: ""
+      code:
+        description: The code from Anthropic's page (code)
+        required: false
+        default: ""
+      key:
+        description: The panel's RSA-OAEP public key, SPKI in base64, to seal the sign-in link for (login)
+        required: false
+        default: ""
+      request:
+        description: The panel's own name for this run, written back beside the answer
+        required: false
+        default: ""
+permissions:
+  contents: write
+concurrency:
+  group: grid-accounts
+  cancel-in-progress: false
+jobs:
+  accounts:
+    if: github.event.repository.private == true && github.event.repository.fork == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: grid
+    steps:
+      - name: only an admin of this repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+        run: |
+          p=$(gh api "repos/$REPO/collaborators/$ACTOR/permission" --jq .permission 2>/dev/null) || p=""
+          [ "$p" = admin ] || { echo "::error::only an admin of $REPO may change the grid's Claude accounts ($ACTOR is ${p:-unknown})"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: the action, through the grid's gate
+        env:
+          ACTION: ${{ inputs.action }}
+          SLOT: ${{ inputs.slot }}
+          CODE: ${{ inputs.code }}
+          PANEL_KEY: ${{ inputs.key }}
+          REQUEST: ${{ inputs.request }}
+          KEY: ${{ secrets.GRID_GATE_KEY }}
+          ACCESS_ID: ${{ vars.GRID_ACCESS_ID }}
+          HOST_KEY: ${{ vars.GRID_HOST_KEY }}
+          HOST: grid.wayne.edu
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: bash scripts/grid-accounts.sh

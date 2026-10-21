@@ -7,7 +7,7 @@ sign-ins instead of on year-long setup tokens held as secrets, all manageable fr
 tab. Read on the day: OpenSpineConsortium/hpcworker at framework 20 (bin/hpcworker, jobs/
 worker.sbatch.tpl, lib/login_plain.sh, tools/grid_gate.sh, interface/contract/cli.json),
 beethoven-extension 23.0.0's sign-in flow, symphony-template's tools/pool.py and
-docs/research/claude-token-pool.md. Nothing here is built. The thread that owns the token pool and
+docs/research/claude-token-pool.md. Built on 2026-10-21 as hpcworker framework 21, grid-accounts.yml and the control panel's Grid tab (the section Built, at the end). The thread that owns the token pool and
 the Tokens tab ("Tokens and adopted repositories") is told before any pool code changes.
 
 ## What already exists, and is reused whole
@@ -138,3 +138,14 @@ of Service and the Usage Policy, to be checked by the owner on the live pages
    grid button in the site repository.
 4. Not before the owner's word: the first sign-in of a second slot on the grid, which spends an
    allocation for the sitting.
+
+## Built (2026-10-21)
+
+The owner asked the same night for all of it from the control panel: see each account's use, the resets, a swap, auto mode, low latency. Built as designed above, with three choices made on the way:
+
+- The accounts are numbered folders beside the profile's folder, which becomes a link to the one in use (hpcworker's lib/accounts.sh). A worker runs Claude Code in the folder the link named when it started, never through the link, and moves when the link moves; tested against stand-ins in hpcworker's tests/test_job.py.
+- The panel reaches the grid through the ssh gate's new accounts words, not a fourth single word: a list, use, login, code (on standard input), link, usage, auto on and off, forget. Words that only touch files have a floor of three seconds, so a press answers in one workflow run, about half a minute.
+- The sign-in link is sealed with RSA-OAEP and AES for the page that asked, since an issue or a log would show it to everyone who may read the repository, and whoever opens it first could sign their own account into the owner's grid.
+
+Not yet measured on the grid: the detached sign-in's job end to end, auto mode against a real limit, and how fast a swapped worker's new link appears.
+
