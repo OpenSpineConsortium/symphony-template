@@ -93,6 +93,11 @@ the Beethoven Connect failure, parked until the next failed press gives its debu
 - Rank 7, 2026-10-21: each account's tile counts the workers on it, and the start box says when a
   new worker would share an account's five-hour window with another; it warns and never refuses.
   Picking the account by its use, as tools/pool.py picks a cloud slot, is not built.
+- Rank 9, 2026-10-21: the control panel's Workers tab opens with Running now, every worker at work
+  in one list: the grid's live Slurm workers from the branch grid, each with the open issues its
+  label grid-NAME holds, its session, its Output and its Stop, and the cloud's runs of workers.yml
+  still queued or going, each with its run and its Cancel; an ended worker or a finished run is
+  never listed. The registry's table stays below it. Checked by symphony-app's G16 and two mutants.
 
 ## Deferred, and why
 
@@ -106,4 +111,3 @@ the Beethoven Connect failure, parked until the next failed press gives its debu
 - Rank 8, an expiry on the gate key: OpenSSH takes expiry-time in authorized_keys from 7.7, and the
   grid's login node runs CentOS 7, whose OpenSSH is 7.4, so the option would lock the gate out. An
   ssh certificate or a scheduled rotation needs the lab lead's grid shell and is the next step.
-- Rank 9, one Workers view: medium work in the panel, not started.
