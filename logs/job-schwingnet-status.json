@@ -1,12 +1,17 @@
 {
- "at": "2026-10-21T21:27:33Z",
+ "at": "2026-10-21T21:29:41Z",
  "lines": [
-  "HPCW-GRID-GATE refused copy: /wsu/home/go/go24/go2432/SchwingNet is missing or a link"
+  "HPCW-GRID-GATE schwingnet cloned OpenSpineConsortium/SchwingNet into /wsu/home/go/go24/go2432/SchwingNet",
+  "schwingnet status at commit 5ecce95 on warrior 2026-10-21 21:29:41 UTC",
+  "no job submitted by the gate yet; 'start' submits the graph",
+  "schwingnet status: exit 0",
+  "HPCW-GRID-GATE schwingnet status ok"
  ],
- "rc": 126,
- "request": "schwingnet-first-status",
+ "rc": 0,
+ "request": "schwingnet-status-after-update",
  "said": [
-  "HPCW-GRID-GATE refused copy: /wsu/home/go/go24/go2432/SchwingNet is missing or a link"
+  "HPCW-GRID-GATE schwingnet cloned OpenSpineConsortium/SchwingNet into /wsu/home/go/go24/go2432/SchwingNet",
+  "HPCW-GRID-GATE schwingnet status ok"
  ],
  "v": 1,
  "what": "schwingnet status"
