@@ -49,7 +49,7 @@ on:
         required: false
         default: ""
       job:
-        description: "The grid job (job): update, promoter-status|start|stop, schwingnet-start|status|leaks|v1|latency|stop, or schwingnet-fetch-<id>"
+        description: "The grid job (job): update, promoter-status|start|stop, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval, or schwingnet-fetch-<id> or schwingnet-census-<id>"
         required: false
         default: ""
       request:
