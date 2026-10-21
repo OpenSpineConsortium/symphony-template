@@ -104,5 +104,13 @@ What the build settled beyond the sketch:
 - Push writes new tasks first, then removals, then links, and stops at the first failure, saying
   which; a link to a task the same push made is written with that task's new number. Undo walks
   the push back in the reverse order.
+- An idea GitHub already holds is not offered again when the answer is read anew after a push or
+  a reload: a task of the same title under its epic, with or without "Task: ", or a link GitHub
+  has. A task still Claude's idea is accepted before Connect takes it, so no waiting link names a
+  card that may go.
+- A task whose issue was opened but not placed under its epic, the push stopping between the two,
+  is placed on the next push and never opened twice; a later push adds its writes to the same Undo,
+  and Undo writes only as the account that pushed. A link GitHub already has, or an unlink it no
+  longer holds, counts as done instead of stopping the push.
 - Dragging from a card's edge and moving a task to another epic are left for later: Connect does
   the first, and the Tasks tab's settings the second.
