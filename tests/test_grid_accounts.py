@@ -162,10 +162,10 @@ class Words(unittest.TestCase):
                           ("schwingnet-start", "schwingnet start"), ("schwingnet-v1", "schwingnet v1"),
                           ("schwingnet-fetch-vindr_pcxr", "schwingnet fetch vindr_pcxr"),
                           ("schwingnet-prior", "schwingnet prior"), ("schwingnet-chain_eval", "schwingnet chain_eval"),
-                          ("schwingnet-census-all", "schwingnet census all")):
+                          ("schwingnet-census-all", "schwingnet census all"), ("schwingnet-samples", "schwingnet samples")):
             self.assertEqual(self.run_script("job", job=job)[1], [word, "accounts"], job)
         for job in ("", "update now", "promoter start abc", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
-                    "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
+                    "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
             rc, words, _ = self.run_script("job", job=job)
             self.assertNotEqual(rc, 0, job)
             self.assertEqual(words, [], job)
