@@ -8,3 +8,4 @@
 {"at": "2026-10-20T23:04:56Z", "pulls": [{"branch": "claude/project-thread-lhkv7r", "draft": true, "mergeable": null, "number": 313, "state": "unknown"}], "up_to_date_required": false}
 {"at": "2026-10-20T23:18:21Z", "pulls": [], "up_to_date_required": false}
 {"at": "2026-10-21T00:26:02Z", "pulls": [], "up_to_date_required": false}
+{"at": "2026-10-21T02:06:56Z", "pulls": [{"branch": "claude/320", "draft": true, "mergeable": true, "number": 322, "state": "clean"}, {"branch": "claude/project-thread-lhkv7r", "draft": false, "mergeable": true, "number": 318, "state": "clean"}], "up_to_date_required": false}
