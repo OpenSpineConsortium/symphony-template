@@ -1,0 +1,13 @@
+{
+ "at": "2026-10-21T21:27:33Z",
+ "lines": [
+  "HPCW-GRID-GATE refused copy: /wsu/home/go/go24/go2432/SchwingNet is missing or a link"
+ ],
+ "rc": 126,
+ "request": "schwingnet-first-status",
+ "said": [
+  "HPCW-GRID-GATE refused copy: /wsu/home/go/go24/go2432/SchwingNet is missing or a link"
+ ],
+ "v": 1,
+ "what": "schwingnet status"
+}
