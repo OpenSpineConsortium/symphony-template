@@ -80,3 +80,8 @@ the Beethoven Connect failure, parked until the next failed press gives its debu
   NAME-N one call after another in one run, each waiting out the gate's floor, so one press starts
   several workers with nothing changed on the grid; a word that starts many in one call, which would
   also drop the minute between them, waits for a framework release and the lab lead's pull.
+- Rank 10, 2026-10-21: the Claude step in workers.yml has a deadline of its own, 75 minutes inside
+  the job's 90, and a run it cuts off, or one cancelled or failed, reaches scripts/keep-unpushed.sh,
+  which commits what the worker left and pushes it to the worker's own claim branch, never forced,
+  never on another worker's claim or a branch that is no claim, and never with a file that looks like
+  a secret; the push keeps the claim alive and the next run carries the work on.
