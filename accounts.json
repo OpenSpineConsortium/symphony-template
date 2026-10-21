@@ -1,0 +1,49 @@
+{
+ "action": "list",
+ "at": "2026-10-21T03:48:22Z",
+ "list": {
+  "accounts": [
+   {
+    "current": true,
+    "login": {
+     "line": "",
+     "state": "none"
+    },
+    "slot": "1",
+    "use": null,
+    "who": {
+     "checked_at": "2026-10-21T03:48:07Z",
+     "email": "gr***@med.wayne.edu",
+     "plan": "max",
+     "sign_in": "subscription",
+     "signed_in": true,
+     "slot": "1",
+     "v": 1
+    }
+   }
+  ],
+  "auto": false,
+  "current": "1",
+  "framework": 21,
+  "usage_job": null,
+  "v": 1,
+  "worker": {
+   "account": null,
+   "age_s": 15,
+   "job": "40671151",
+   "link": "https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m",
+   "message": "Open in Claude: https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m (or tap Code in the Claude app). space to show QR code",
+   "name": "worker",
+   "node": "hao1",
+   "state": "online",
+   "updated_at": "2026-10-21T03:48:07Z"
+  }
+ },
+ "rc": 0,
+ "request": "pmvhknpb2spnbau",
+ "said": [
+  "HPCW-GRID-GATE accounts ok"
+ ],
+ "slot": "",
+ "v": 1
+}
