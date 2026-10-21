@@ -85,8 +85,9 @@ case "$ACTION" in
   list) say accounts || rc=$?;;
   use) say "accounts use $SLOT" || rc=$?;;
   forget) say "accounts forget $SLOT" || rc=$?;;
-  worker-start) say "accounts start $SLOT${NAME:+ $NAME}" || rc=$?;;
-  worker-stop) say "accounts stop $NAME" || rc=$?;;
+  # the start and stop words print no list, so the list follows for the panel to show the worker
+  worker-start) say "accounts start $SLOT${NAME:+ $NAME}" || rc=$?; [ "$rc" != 0 ] || { sleep 4; say accounts || true; };;
+  worker-stop) say "accounts stop $NAME" || rc=$?; [ "$rc" != 0 ] || { sleep 4; say accounts || true; };;
   auto-on) say "accounts auto on" || rc=$?;;
   auto-off) say "accounts auto off" || rc=$?;;
   usage)

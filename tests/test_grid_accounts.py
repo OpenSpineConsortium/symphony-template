@@ -98,9 +98,9 @@ class Words(unittest.TestCase):
             return proc.returncode, words, proc.stdout + proc.stderr
 
     def test_start_and_stop_a_worker(self):
-        self.assertEqual(self.run_script("worker-start", "2", "teamb")[1], ["accounts start 2 teamb"])
-        self.assertEqual(self.run_script("worker-start", "3")[1], ["accounts start 3"])
-        self.assertEqual(self.run_script("worker-stop", name="teamb")[1], ["accounts stop teamb"])
+        self.assertEqual(self.run_script("worker-start", "2", "teamb")[1], ["accounts start 2 teamb", "accounts"])
+        self.assertEqual(self.run_script("worker-start", "3")[1], ["accounts start 3", "accounts"])
+        self.assertEqual(self.run_script("worker-stop", name="teamb")[1], ["accounts stop teamb", "accounts"])
 
     def test_a_bad_name_or_slot_reaches_no_gate(self):
         for action, slot, name in (("worker-start", "2", "a b"), ("worker-start", "2", "x;rm"), ("worker-start", "33", ""),
