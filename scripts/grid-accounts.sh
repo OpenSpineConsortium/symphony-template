@@ -27,18 +27,21 @@ trap 'rm -rf "$d"' EXIT
 ( umask 077; printf '%s\n' "$KEY" | tr -d '\r' > "$d/key"; printf '%s\n' "$HOST_KEY" | tr -d '\r' > "$d/known_hosts" )
 unset KEY
 
-# say WORD [STDIN_TEXT]: one call to the gate, its whole answer in $d/out, never echoed; one more
-# try when the gate's floor refused it, after the seconds it named
+# say WORD [STDIN_TEXT]: one call to the gate, its whole answer in $d/out, never echoed. Runs of this
+# workflow may overlap (only lists share a concurrency group, since GitHub keeps one waiting run per
+# group and drops the older one), so the gate's lock or floor may refuse a call: it is tried again
+# after the seconds the gate names, up to SAY_TRIES times, about eight minutes inside the job's fifteen
 say() {
-  local rc=0 wait
-  for _ in 1 2; do
-    rc=0
+  local rc=0 wait tries=0
+  while :; do
+    tries=$(( tries + 1 )); rc=0
     printf '%s' "${2:-}" | ssh -T -i "$d/key" -o IdentitiesOnly=yes -o BatchMode=yes -o PreferredAuthentications=publickey \
       -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$d/known_hosts" -o GlobalKnownHostsFile=/dev/null \
       -o ConnectTimeout=30 -o LogLevel=ERROR "$ACCESS_ID@$HOST" "$1" > "$d/out" 2>&1 || rc=$?
-    [ "$rc" = 123 ] || break
-    wait=$(grep -o 'try again in [0-9]*' "$d/out" | grep -o '[0-9]*$' || echo 60)
-    sleep $(( ${wait:-60} + 1 ))
+    [ "$rc" = 123 ] && [ "$tries" -lt "${SAY_TRIES:-8}" ] || break
+    wait=$(grep -o 'try again in [0-9]\{1,4\} second' "$d/out" | grep -o '[0-9][0-9]*' | head -1 || true)
+    [ -n "$wait" ] && [ "$wait" -le 60 ] || wait=60
+    sleep $(( wait + 1 ))
   done
   # what the log shows: the gate's own words, e-mails masked; never the list or a link
   python3 tools/grid_accounts.py record "$d/said.json" --action "$ACTION" --rc "$rc" < "$d/out"
@@ -56,6 +59,10 @@ publish() {
     if git -C "$w" fetch -q --depth 1 origin grid 2>/dev/null; then git -C "$w" checkout -q -b grid FETCH_HEAD; else git -C "$w" checkout -q --orphan grid; fi
     cp "$d/accounts.json" "$w/accounts.json"
     [ -s "$d/link.json" ] && cp "$d/link.json" "$w/link.json"
+    if [ -n "$REQUEST" ]; then
+      mkdir -p "$w/answers"; cp "$d/accounts.json" "$w/answers/$REQUEST.json"
+      python3 tools/grid_accounts.py prune "$w/answers"
+    fi
     [ -s "$w/README.md" ] || printf '%s\n' "# The grid's Claude accounts" "" "Written by .github/workflows/grid-accounts.yml for the control panel's Grid tab; e-mails are masked and a sign-in link is only ever here sealed for the browser that asked." > "$w/README.md"
     git -C "$w" add -A
     git -C "$w" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "grid accounts: $ACTION ${SLOT}" || return 0

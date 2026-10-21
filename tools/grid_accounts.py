@@ -18,7 +18,9 @@ form (docs/setup/grid.md, Several Claude accounts).
 """
 
 import argparse
+import calendar
 import json
+import os
 import re
 import sys
 import time
@@ -104,6 +106,29 @@ def read_record(path):
         return {}
 
 
+def prune_answers(folder, keep=50, hours=24, now=None):
+    """Each run also leaves its answer under answers/<request>.json, so a panel whose run was
+    overtaken by another's on accounts.json still finds its own; the folder keeps the newest few
+    of the last day, by the time each answer says it was written."""
+    now = time.time() if now is None else now
+    dated = []
+    for name in os.listdir(folder):
+        path = os.path.join(folder, name)
+        if not name.endswith(".json") or not os.path.isfile(path):
+            continue
+        at = read_record(path).get("at", "")
+        try:
+            stamp = calendar.timegm(time.strptime(at, "%Y-%m-%dT%H:%M:%SZ"))
+        except (TypeError, ValueError):
+            stamp = 0
+        dated.append((stamp, path))
+    dated.sort(reverse=True)
+    gone = [path for i, (stamp, path) in enumerate(dated) if i >= keep or now - stamp > hours * 3600]
+    for path in gone:
+        os.remove(path)
+    return gone
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -119,6 +144,8 @@ def main(argv=None):
     us = sub.add_parser("usage-running")
     us.add_argument("file")
     sub.add_parser("link")
+    pr = sub.add_parser("prune")
+    pr.add_argument("folder")
     args = parser.parse_args(argv)
     if args.command == "record":
         lines = sys.stdin.read().splitlines()
@@ -131,6 +158,9 @@ def main(argv=None):
         return 0
     if args.command == "usage-running":
         return 0 if (read_record(args.file).get("list") or {}).get("usage_job") == "running" else 1
+    if args.command == "prune":
+        prune_answers(args.folder)
+        return 0
     found = link_in(sys.stdin.read().splitlines())
     if found:
         print(found)
