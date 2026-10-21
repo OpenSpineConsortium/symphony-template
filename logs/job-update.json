@@ -1,14 +1,14 @@
 {
- "at": "2026-10-21T21:28:31Z",
+ "at": "2026-10-21T22:19:16Z",
  "lines": [
-  "HPCW-GRID-GATE update ok 84d3c65afcba..279a4d237f10",
-  "HPCW-GRID-GATE framework 23"
+  "HPCW-GRID-GATE update ok 279a4d237f10..19a8a4787071",
+  "HPCW-GRID-GATE framework 24"
  ],
  "rc": 0,
- "request": "schwingnet-update-before-status",
+ "request": "update-fw24",
  "said": [
-  "HPCW-GRID-GATE update ok 84d3c65afcba..279a4d237f10",
-  "HPCW-GRID-GATE framework 23"
+  "HPCW-GRID-GATE update ok 279a4d237f10..19a8a4787071",
+  "HPCW-GRID-GATE framework 24"
  ],
  "v": 1,
  "what": "update"
