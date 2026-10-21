@@ -249,6 +249,33 @@ Globus is files only (listing, streaming, transfers, sharing; Globus Compute run
 shell), so an interactive terminal on the grid without the VPN stays the VS Code tunnel's (above), built
 and parked in hpcworker, or OnDemand's shell on the VPN.
 
+## Live on the grid, 2026-10-21
+
+The owner registered the page at Globus on 2026-10-21 (a native app, "Symphony control panel", a thick
+client with the console page as its redirect and the Apps' privacy statement as its privacy URL; site
+#120 carries the client id, site #119 the collection's) and signed in: the Transfer API listed his home
+folder on wsugrid#globus, 1221 entries, as go2432@wayne.edu, read-only, with OneDrive still connected
+beside it. One thing the mock had not shown: the collection's endpoint document gives default_directory
+as the placeholder "{server_default}", which the Transfer API resolves but the page had shown as the
+folder's name; a placeholder (any value with a brace, like "/~/") is now no path, and the first listing's
+absolute_path says where home is.
+
+His next words were about the look, not the plumbing: the head read as one long sentence beside a
+globe, and he asked for the drives mounted "like something Apple would have for mounting multiple cloud
+accounts", consistent with the rest of the panel, and in the Workers tab's card shape. So the head now
+carries an accounts strip: one card per drive kept on the browser, in the console's card shape (12 px
+radius, the theme's line, a 3 px inset accent in the drive's colour, the one shown lit in teal), with the
+drive's mark, its name and whose it is ("Greg (personal)", "go2432@wayne.edu, read-only"); a press on
+the other card switches to it, an eject control on the lit one forgets it (the head's own Forget button,
+moved into the card, its words kept for a screen reader), and a dashed card adds a drive. The Add a
+cloud drive dialog lists the drives as rows, each with its mark, its name and a word on it, as a
+system's add-account sheet does. The words that say whose drive it is stay, in one small line under the
+head, since every state of the panel is written in words. The strip's radii, borders and hover colours
+read the Panel design system thread's tokens (--ds-radius, --ds-border, --ds-surface, --ds-hover-border,
+--ds-hover-bg) with the old values as fallbacks, so it looks the same before and after that thread's
+shared classes land, and takes them when they do. The checks FS1 and GL1 to GL7 and the whole Folders
+file hold it, and the Folders mutants were run against it.
+
 ## PHI and the patent
 
 - A dev tunnel's traffic passes through Microsoft's relay. VS Code's documentation describes it as
