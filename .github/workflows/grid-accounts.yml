@@ -22,14 +22,18 @@ on:
       action:
         description: What to do with the grid's Claude accounts
         type: choice
-        options: [list, use, login, code, usage, auto-on, auto-off, forget]
+        options: [list, use, login, code, usage, auto-on, auto-off, forget, worker-start, worker-stop]
         default: list
       slot:
-        description: The account, 1 to 32 (use, login, code, forget)
+        description: The account, 1 to 32 (use, login, code, forget, worker-start)
         required: false
         default: ""
       code:
         description: The code from Anthropic's page (code)
+        required: false
+        default: ""
+      name:
+        description: The worker's name (worker-start, optional; worker-stop)
         required: false
         default: ""
       key:
@@ -67,6 +71,7 @@ jobs:
         env:
           ACTION: ${{ inputs.action }}
           SLOT: ${{ inputs.slot }}
+          NAME: ${{ inputs.name }}
           CODE: ${{ inputs.code }}
           PANEL_KEY: ${{ inputs.key }}
           REQUEST: ${{ inputs.request }}

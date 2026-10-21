@@ -147,5 +147,9 @@ The owner asked the same night for all of it from the control panel: see each ac
 - The panel reaches the grid through the ssh gate's new accounts words, not a fourth single word: a list, use, login, code (on standard input), link, usage, auto on and off, forget. Words that only touch files have a floor of three seconds, so a press answers in one workflow run, about half a minute.
 - The sign-in link is sealed with RSA-OAEP and AES for the page that asked, since an issue or a log would show it to everyone who may read the repository, and whoever opens it first could sign their own account into the owner's grid.
 
+## Several workers at once (framework 22, 2026-10-21)
+
+The owner asked next for several Claude Code workers on the grid at once, from all his accounts, each launched, tracked, cancelled and reached from the panel, coordinating through git like the cloud sessions. Each is a named worker (hpcworker's worker start --name, which already existed) with a file account.pin in its run folder: the job runs Claude Code in that account's folder and never follows the link, so Use and auto mode move only the main worker. The gate's words accounts start N [NAME] and accounts stop NAME start and stop one; the list carries every worker of the last day with its state, node, link, account and pin. Each worker's environment sets SYMPHONY_WORKER to grid-<name>, so its claims carry a name of their own and the board's claim lock (one branch push per issue) keeps it from racing a cloud session or another grid worker. Each worker is its own Slurm chain, so it spends allocation like the main one.
+
 Not yet measured on the grid: the detached sign-in's job end to end, auto mode against a real limit, and how fast a swapped worker's new link appears.
 

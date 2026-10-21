@@ -4,9 +4,14 @@
 # grid for the panel (tools/grid_accounts.py masks it; a sign-in link is sealed for the panel's key and
 # never printed). Reads its inputs from the environment the workflow sets.
 set -euo pipefail
-case "$ACTION" in list|use|login|code|usage|auto-on|auto-off|forget) ;; *) echo "::error::unknown action $ACTION"; exit 1;; esac
-case "$ACTION" in use|login|code|forget)
+case "$ACTION" in list|use|login|code|usage|auto-on|auto-off|forget|worker-start|worker-stop) ;; *) echo "::error::unknown action $ACTION"; exit 1;; esac
+case "$ACTION" in use|login|code|forget|worker-start)
   [[ "$SLOT" =~ ^([1-9]|[12][0-9]|3[0-2])$ ]] || { echo "::error::the account is a number from 1 to 32"; exit 1; };;
+esac
+NAME=${NAME:-}
+case "$ACTION" in
+  worker-start) [[ "$NAME" =~ ^[A-Za-z0-9_-]{0,24}$ ]] || { echo "::error::a worker's name is up to 24 letters, digits, _ or -"; exit 1; };;
+  worker-stop) [[ "$NAME" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { echo "::error::name the worker to stop"; exit 1; };;
 esac
 [[ "$REQUEST" =~ ^[A-Za-z0-9_-]{0,64}$ ]] || { echo "::error::the request is a short plain name"; exit 1; }
 if [ "$ACTION" = code ]; then
@@ -80,6 +85,9 @@ case "$ACTION" in
   list) say accounts || rc=$?;;
   use) say "accounts use $SLOT" || rc=$?;;
   forget) say "accounts forget $SLOT" || rc=$?;;
+  # the start and stop words print no list, so the list follows for the panel to show the worker
+  worker-start) say "accounts start $SLOT${NAME:+ $NAME}" || rc=$?; [ "$rc" != 0 ] || { sleep 4; say accounts || true; };;
+  worker-stop) say "accounts stop $NAME" || rc=$?; [ "$rc" != 0 ] || { sleep 4; say accounts || true; };;
   auto-on) say "accounts auto on" || rc=$?;;
   auto-off) say "accounts auto off" || rc=$?;;
   usage)
