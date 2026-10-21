@@ -82,8 +82,27 @@ A cycle in blocked_by is refused before the push, since a task blocked by itself
 could never become free under Pick. The canvas reads each task's state, claim and checks as
 Dependencies does, so a card says "claimed by nightly" or "0 of 2 met" without a read of its own.
 
-## Not built yet
+## Built
 
-The tab itself, the two verbs in assistant.md and its test, and the page's checks. Built on the
-design system's parts (`.ds-card`, `.ds-seg`, `.console__add`, `button.chip`) once that branch
-lands, so the canvas reads like the Workers tab. Waiting on the owner's yes to the sketch.
+The owner said yes to the sketch on 2026-10-21 01:53 UTC ("yes finally you understand what i
+want"). The tab is built in the site's assets/js/symphony-panel.js (the block after the comment
+"Explore: plan an epic with Claude"), its look in assets/css/control.css under #tab-explore, and its browser
+checks in symphony-app's signin/panel-checks/e2e2/explore.test.mjs (BS1 to BS8) with `b*`
+mutants that prove each check bites. The two verbs are in .github/symphony/assistant.md and pinned
+by tests/test_claude_assistant.py.
+
+What the build settled beyond the sketch:
+
+- The canvas lays the cards out in columns by the longest chain of "blocked by" before each, so
+  a task always stands to the right of what it waits for, and scales between half and full size
+  to fit the panel.
+- A link Claude names between two tasks that are not both on the focused epic's canvas is listed
+  under the canvas, never drawn to nowhere.
+- Pressing Connect, then two cards, adds "the second is blocked by the first"; the same pair again
+  takes a waiting change back, and a pair already linked on GitHub becomes a removal. A pair that
+  would close a loop is refused with those words.
+- Push writes new tasks first, then removals, then links, and stops at the first failure, saying
+  which; a link to a task the same push made is written with that task's new number. Undo walks
+  the push back in the reverse order.
+- Dragging from a card's edge and moving a task to another epic are left for later: Connect does
+  the first, and the Tasks tab's settings the second.

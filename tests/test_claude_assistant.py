@@ -217,7 +217,7 @@ class ThePrompt(unittest.TestCase):
         text = PROMPT.read_text(encoding="utf-8")
         section = text.split("## The reply vocabulary", 1)[1]
         verbs = set(re.findall(r"^    ([a-z]+) ", section, re.M))
-        self.assertEqual(verbs, {"focus", "open", "filter", "show", "tab", "run", "give", "merge", "task", "ask"})
+        self.assertEqual(verbs, {"focus", "open", "filter", "show", "tab", "run", "give", "merge", "task", "ask", "link", "node"})
         reads, changes = section.split("The rest change something", 1)
         self.assertEqual(set(re.findall(r"^    ([a-z]+) ", reads, re.M)), {"focus", "open", "filter", "show", "tab"})
         self.assertIn("nothing happens until the person", re.sub(r"\s+", " ", changes))
