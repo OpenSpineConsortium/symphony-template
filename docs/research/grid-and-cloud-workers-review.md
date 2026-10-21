@@ -67,3 +67,12 @@ short-lived credentials are the norm; errors reach the person without their caus
 Two or more grid workers at once on real nodes; the time from press to online and the queue wait
 per partition; whether --continue keeps a long session whole over several job ends; the cause of
 the Beethoven Connect failure, parked until the next failed press gives its debug log.
+
+## Built
+
+- Rank 1, 2026-10-21: only lists share a concurrency group in grid-accounts.yml; every other action
+  runs in a group of its own, scripts/grid-accounts.sh asks a busy gate again up to eight times after
+  the seconds it names, and each run also writes its answer to answers/<request>.json on the branch
+  grid (the newest 50 of the last day), so a panel whose run another overtook on accounts.json still
+  finds its own. The panel itself sends one press at a time per page, so a burst was lost only across
+  pages or people; it reads answers/ once the site's change lands.

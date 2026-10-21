@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -59,6 +60,23 @@ class Record(unittest.TestCase):
         self.assertEqual(r["rc"], 123)
 
 
+class Answers(unittest.TestCase):
+    def test_the_newest_answers_of_the_day_are_kept(self):
+        now = 1_800_000_000
+        with tempfile.TemporaryDirectory() as td:
+            def answer(name, age):
+                at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - age))
+                Path(td, name + ".json").write_text(json.dumps({"at": at}))
+            answer("old", 25 * 3600)
+            answer("broken", 0)
+            Path(td, "broken.json").write_text("not json")
+            for i in range(3):
+                answer(f"r{i}", 60 * i)
+            gone = G.prune_answers(td, keep=2, now=now)
+            self.assertEqual(sorted(os.listdir(td)), ["r0.json", "r1.json"])
+            self.assertEqual(len(gone), 3)
+
+
 class Link(unittest.TestCase):
     def test_only_anthropics_hosts(self):
         self.assertEqual(G.link_in(OUTPUT), LINK)
@@ -78,13 +96,16 @@ class Words(unittest.TestCase):
     """scripts/grid-accounts.sh says to the gate only the words its action names, with a worker's
     name held to the gate's own shape, and the workflow offers every action the script takes."""
 
-    def run_script(self, action, slot="", name=""):
+    def run_script(self, action, slot="", name="", busy=0):
         with tempfile.TemporaryDirectory() as td:
             bin_dir = Path(td) / "bin"
             bin_dir.mkdir()
             said = Path(td) / "said"
             fake = bin_dir / "ssh"
-            fake.write_text('#!/bin/bash\necho "${@: -1}" >> "%s"\necho "HPCW-GRID-GATE accounts ok"\n' % said)
+            # the first `busy` calls find the gate busy, as an overlapping run leaves it
+            fake.write_text('#!/bin/bash\necho "${@: -1}" >> "%s"\n'
+                            'n=$(wc -l < "%s"); if [ "$n" -le %d ]; then echo "HPCW-GRID-GATE limit: one call a minute;'
+                            ' try again in 0 seconds"; exit 123; fi\necho "HPCW-GRID-GATE accounts ok"\n' % (said, said, busy))
             fake.chmod(0o755)
             git = bin_dir / "git"
             git.write_text("#!/bin/bash\nexit 1\n")
@@ -101,6 +122,19 @@ class Words(unittest.TestCase):
         self.assertEqual(self.run_script("worker-start", "2", "teamb")[1], ["accounts start 2 teamb", "accounts"])
         self.assertEqual(self.run_script("worker-start", "3")[1], ["accounts start 3", "accounts"])
         self.assertEqual(self.run_script("worker-stop", name="teamb")[1], ["accounts stop teamb", "accounts"])
+
+    def test_a_busy_gate_is_asked_again(self):
+        words = self.run_script("worker-start", "2", "teamb", busy=2)[1]
+        self.assertEqual(words, ["accounts start 2 teamb"] * 3 + ["accounts"])
+
+    def test_a_gate_busy_for_good_fails_in_the_end(self):
+        rc, words, _ = self.run_script("use", "2", busy=99)
+        self.assertNotEqual(rc, 0)
+        self.assertEqual(words, ["accounts use 2"] * 8)
+
+    def test_only_lists_share_a_concurrency_group(self):
+        flow = (ROOT / ".github/workflows/grid-accounts.yml").read_text()
+        self.assertIn("group: grid-accounts-${{ inputs.action == 'list' && 'list' || github.run_id }}", flow)
 
     def test_a_bad_name_or_slot_reaches_no_gate(self):
         for action, slot, name in (("worker-start", "2", "a b"), ("worker-start", "2", "x;rm"), ("worker-start", "33", ""),

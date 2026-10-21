@@ -46,8 +46,12 @@ on:
         default: ""
 permissions:
   contents: write
+# A list may wait behind another and be dropped for a newer one, which reads the same; every other
+# action runs at once in a group of its own, since GitHub keeps one waiting run per group and cancels
+# the older, which lost presses (docs/research/grid-and-cloud-workers-review.md). The gate takes one
+# call at a time and scripts/grid-accounts.sh tries again when it is busy.
 concurrency:
-  group: grid-accounts
+  group: grid-accounts-${{ inputs.action == 'list' && 'list' || github.run_id }}
   cancel-in-progress: false
 jobs:
   accounts:
