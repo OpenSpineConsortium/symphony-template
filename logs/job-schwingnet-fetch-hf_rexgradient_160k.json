@@ -1,0 +1,23 @@
+{
+ "at": "2026-10-22T17:43:09Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 25159c060736",
+  "schwingnet fetch hf_rexgradient_160k at commit 25159c0 on warrior 2026-10-22 17:43:08 UTC",
+  "  size budget: 1 sources, 156 GB stated; /rs/rs_grp_oschome has 5888843 GB free, margin 5000 GB",
+  "  hf_rexgradient_160k: job 40712197 (afterany:40704982,afterany:40712010) hf-token 156GB",
+  "  2026-10-22 13:43:08 platform chain: hf_rexgradient_160k=40712197 size_gb=156",
+  "  ETA: network-bound, about 1 hour per 20 GB, so about 8 hours for 156 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
+  "  ",
+  "  dp_hf_rexgradient_160k: job 40712197",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "paperwork-schwingnet-fetch-hf_rexgradient_160k",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 25159c060736",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch hf_rexgradient_160k"
+}
