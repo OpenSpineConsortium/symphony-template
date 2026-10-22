@@ -11,8 +11,8 @@ Thread "SchwingNet video demo plan", session https://claude.ai/code/session_01Pc
 ## Left to do
 
 1. A session on any account: read pull request #363's checks. If any are red, fix them. If all are green, mark it ready and merge it on the standing permission.
-2. A three-lens review of the skill (tool mechanics, safety, the four-account run) was running as workflow wf_89c1eb1c-e82 and died with the account. Run it again, or read the skill against the Artifact tool's own description, and fix what it finds in a follow-up pull request.
-3. Then, on each of the owner's four other accounts:
+2. The three-lens review of the skill finished: 38 findings, 6 of them high, written out in export-artifacts-review.md beside this file. Among the high ones: SchwingNet needs add_repo with push access and a clone; the sort can send patent material here and behind a public link; and a Docs export comes back as base64 that has to be decoded, not retyped. Apply them all in one pull request before anyone runs the skill, and above all before "and share them".
+3. Only then, on each of the owner's four other accounts:
    - open https://claude.ai/code;
    - start a session on OpenSpineConsortium/symphony-template, with OpenSpineConsortium/SchwingNet selected too;
    - type `/export-artifacts`. Add "and share them" only with Claude in Chrome connected and signed in to that same account.
