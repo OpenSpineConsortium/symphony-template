@@ -175,6 +175,30 @@ class References(unittest.TestCase):
         self.assertEqual((first["title"], first["year"], first["doi"]), ("A Fast Matching", "2020", "10.1000/abc"))
         self.assertEqual((second["key"], second["title"]), ("ref2", "Untitled Book"))
 
+    def test_mendeley_desktop_escapes_are_undone(self):
+        text = ("@article{Smith2021,\nauthor = {Smith, John and {World Health Organization}},\n"
+                "doi = {https://doi.org/10.1016/J.X{\\_}1},\ntitle = {{Five {\\%} {\\&} more}},\n"
+                "url = {https://example.test/a{\\_}b?c=1{\\&}d=\\~{}e},\nyear = {2021}\n}\n")
+        [entry] = self.read(text, ".bib")
+        self.assertEqual((entry["doi"], entry["title"], entry["url"], entry["authors"][1]),
+                         ("10.1016/j.x_1", "Five % & more", "https://example.test/a_b?c=1&d=~e",
+                          "World Health Organization"))
+
+    def test_every_key_is_unique_and_ris_keys_read_as_author_and_year(self):
+        found = self.read("@article{Lee2020, title={A}, year={2020}}\n@article{Lee2020, title={B}, year={2020}}\n", ".bib")
+        found += self.read("TY  - JOUR\nAU  - M\u00fcller, Hans\nTI  - C\nPY  - 2019\nER  - \n", ".ris")
+        notebook.keyed(found)
+        self.assertEqual([each["key"] for each in found], ["Lee2020", "Lee2020a", "Muller2019"])
+
+    def test_a_new_export_keeps_the_keys_citations_already_use(self):
+        before = [{"key": "Old2019", "doi": "10.1/a", "title": "A", "year": "2019"},
+                  {"key": "ref1", "doi": "", "title": "B: the sequel", "year": "2020"}]
+        found = self.read("TY  - JOUR\nAU  - New, Ann\nTI  - B: The Sequel\nPY  - 2020\nER  - \n"
+                          "TY  - JOUR\nAU  - Old, Al\nTI  - A, retitled\nPY  - 2019\nDO  - 10.1/A\nER  - \n"
+                          "TY  - JOUR\nAU  - Old, Al\nTI  - Another\nPY  - 2019\nER  - \n", ".ris")
+        self.assertEqual(notebook.keyed(found, before), 2)
+        self.assertEqual([each["key"] for each in found], ["ref1", "Old2019", "Old2019a"])
+
     def test_the_command_line_reports_counts(self):
         with tempfile.TemporaryDirectory() as folder:
             export, out = Path(folder) / "lib.bib", Path(folder) / "references.json"
@@ -182,7 +206,11 @@ class References(unittest.TestCase):
             printed = io.StringIO()
             with contextlib.redirect_stdout(printed):
                 self.assertEqual(notebook.main(["refs", "--export", str(export), "--out", str(out)]), 0)
-            self.assertEqual(json.loads(printed.getvalue()), {"references": 1, "with_doi": 1})
+            self.assertEqual(json.loads(printed.getvalue()), {"references": 1, "with_doi": 1, "kept_keys": 0})
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                notebook.main(["refs", "--export", str(export), "--out", str(out)])
+            self.assertEqual(json.loads(printed.getvalue())["kept_keys"], 1)
 
 
 if __name__ == "__main__":
