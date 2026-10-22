@@ -1,23 +1,23 @@
 {
- "at": "2026-10-22T10:18:31Z",
+ "at": "2026-10-22T15:36:22Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull ok 935061c64dfe..07bcc9c73a64",
-  "schwingnet fetch vindr_pcxr at commit 07bcc9c on warrior 2026-10-22 10:18:31 UTC",
-  "  size budget: 1 entries, 35 GB stated; /rs/rs_grp_oschome has 5886567 GB free, margin 5000 GB",
-  "  2026-10-22 06:18:31 fetch=40702978 bank=40702980 catalog=40702982 only=vindr_pcxr credentialed=1 size_gb=35 pydrv=/wsu/home/go/go24/go2432/SchwingNet/grid/bin/train-cpu-python",
-  "  submitted: 1 fetch 40702978 -> 2 bank-ingest 40702980 (afterany) -> 3 catalog 40702982 (afterany)",
+  "HPCW-GRID-GATE schwingnet pull current a0e43dd762ea",
+  "schwingnet fetch vindr_pcxr at commit a0e43dd on warrior 2026-10-22 15:36:20 UTC",
+  "  size budget: 1 entries, 35 GB stated; /rs/rs_grp_oschome has 5889761 GB free, margin 5000 GB",
+  "  2026-10-22 11:36:22 fetch=40704982 bank=40704984 catalog=40704986 only=vindr_pcxr credentialed=1 size_gb=35 pydrv=/wsu/home/go/go24/go2432/SchwingNet/grid/bin/train-cpu-python",
+  "  submitted: 1 fetch 40704982 -> 2 bank-ingest 40704984 (afterany) -> 3 catalog 40704986 (afterany)",
   "  ETA: stage 1 is network-bound, about 1 hour per 20 GB on a compute node (35 GB stated, so about 2 hours; a 4-day wall time, requeued on preemption); stage 2 minutes per source (hashing and copying; a JPG set converts at a few hundred frames a minute); stage 3 under a minute.",
   "  watch: the gate word status; the reports: /wsu/home/go/go24/go2432/SchwingNet/grid/logs/0*-STAGE-REPORT.md",
-  "  xr_fetch: job 40702978",
-  "  xr_bank: job 40702980",
-  "  xr_catalog: job 40702982",
+  "  xr_fetch: job 40704982",
+  "  xr_bank: job 40704984",
+  "  xr_catalog: job 40704986",
   "schwingnet fetch: exit 0",
   "HPCW-GRID-GATE schwingnet fetch ok"
  ],
  "rc": 0,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull ok 935061c64dfe..07bcc9c73a64",
+  "HPCW-GRID-GATE schwingnet pull current a0e43dd762ea",
   "HPCW-GRID-GATE schwingnet fetch ok"
  ],
  "v": 1,
