@@ -1,0 +1,13 @@
+{
+ "at": "2026-10-22T05:49:24Z",
+ "lines": [
+  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts or job word), and nothing else"
+ ],
+ "rc": 126,
+ "request": "artifacts-grid",
+ "said": [
+  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts or job word), and nothing else"
+ ],
+ "v": 1,
+ "what": "artifacts"
+}
