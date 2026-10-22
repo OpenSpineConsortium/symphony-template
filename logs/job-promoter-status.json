@@ -1,16 +1,16 @@
 {
- "at": "2026-10-21T21:37:48Z",
+ "at": "2026-10-22T01:23:10Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
   "          40696335      reqp spine-da   go2432 PD       0:00      1 (Dependency)",
-  "          40696334      reqp spine-da   go2432  R    2:01:00      1 hao1",
+  "          40696334      reqp spine-da   go2432  R    5:46:22      1 hao1",
   "== /rs/rs_grp_oschome/go2432/spine-datasets-promoter/logs/[hidden].out",
   "self-update: tools/promote.py was last changed outside an owner's merge; keeping the copy here",
   "grid/promote.json was last changed outside an owner's own pull request; using the default budget",
   "self-update: tools/promote.py was last changed outside an owner's merge; keeping the copy here",
   "grid/promote.json was last changed outside an owner's own pull request; using the default budget",
-  "cadica: promoted",
-  "cadica: record update opened as #115",
+  "self-update: tools/promote.py was last changed outside an owner's merge; keeping the copy here",
+  "grid/promote.json was last changed outside an owner's own pull request; using the default budget",
   "self-update: tools/promote.py was last changed outside an owner's merge; keeping the copy here",
   "grid/promote.json was last changed outside an owner's own pull request; using the default budget",
   "self-update: tools/promote.py was last changed outside an owner's merge; keeping the copy here",
@@ -28,7 +28,7 @@
   "HPCW-GRID-GATE promoter status ok"
  ],
  "rc": 0,
- "request": "promoter-status-after-connect",
+ "request": "handoff-check-2026-10-22",
  "said": [
   "HPCW-GRID-GATE promoter status ok"
  ],
