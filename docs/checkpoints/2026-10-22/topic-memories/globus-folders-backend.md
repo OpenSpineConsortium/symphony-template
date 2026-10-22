@@ -1,0 +1,20 @@
+---
+name: globus-folders-backend
+description: Globus is the Folders tab's second, read-only drive beside OneDrive (WSU grid files, no VPN); live since 2026-10-21, the drives mounted as cards in the Folders head, and the rules it must keep
+metadata:
+  type: project
+  modified: 2026-10-21T03:30:00.000Z
+---
+
+Decided 2026-10-20 (thread "WSU grid files in Folders"): the control panel's Folders tab has Globus as a second backend beside OneDrive, read-only, for the WSU grid's collection wsugrid#globus. Merged 2026-10-20 23:00 UTC: site #118, symphony-app #69 (checks) and #70 (refreshed mutants), template #314 (research); collection id site #119 / app #72 (GL7); client id site #120 / app #73, merged 2026-10-21 01:15 UTC. greg confirmed it works live (home folder listed) 2026-10-21 ~02:00 UTC. Built on the site (assets/js/symphony-panel.js, control page body, control.css Folders block), checks GL1-GL8 and mutants gl01-gl11 plus css c35, c37, c38 in symphony-app signin/panel-checks/e2e2/folders.test.mjs, research in symphony-template docs/research/wsu-grid-files-in-folders.md (section "Live on the grid, 2026-10-21", template #325).
+
+- Sign-in is the page's own PKCE at Globus Auth (thick client, no secret), no sign-in-service route. Only refresh tokens are kept (localStorage key login|globus). Collection matched by exact name, never the search's first hit.
+- Double-click opens https_server + path in a new tab (Globus streams it, nothing written); preview pane plays video from the address, fetches text/image/PDF with the collection's token (retyped, no-script frame). Tree starts at the home folder: globusHomeOf() drops the endpoint document's placeholder "{server_default}" and "/~/", so the ls's absolute_path names the real home (site #124).
+- The Folders head is an accounts strip (site #124, 2026-10-21 03:20 UTC; checks app #78): drawAccounts() draws one .acct card per kept drive in the Workers card shape (ds tokens with fallbacks, --card-accent inset edge, lit card teal with aria-current), the eject (#fd-forget, "Forget <drive>" out of sight) on the lit card, the dashed #fd-add card last, the add dialog as rows (.clouds). It redraws only when its data-drawn key changes; keyboardOnStrip() is read at the top of drawConnectState because Chromium blurs a focused button the moment it is hidden or moved. The note p.folders__who goes quiet (visually hidden) when the cards already say it. control.css: only the Folders block is this thread's; the shared tokens are Panel design system's.
+- Errors link the fixes: Globus file manager at the folder, Connect again, consents, status; and name Beethoven (site page, Chrome Web Store listing heoopgbkbkfckhhpbkkcgigohfekjicn, OnDemand) for a shell/job, since Globus is files only.
+- GLOBUS_CLIENT is the native app "Symphony control panel" greg registered on 2026-10-21 (thick client, redirect https://openspineconsortium.com/symphony/control/, privacy URL the Apps statement; he put Beethoven's terms page in the Terms field, which does not apply). GLOBUS_KNOWN[0].id is wsugrid#globus's collection UUID. The checks blank both by pattern in open() and put stand-ins in.
+- Not measured from the container (globus.org blocked): CORS on the collection's HTTPS server for in-page fetch; in-pane video without the first sign-in click; exact ls filter syntax. .mkv does not play in Chrome; an MP4 copy is a grid job on greg's word.
+- PHI rule: Globus route only for public/de-identified data until IRB says otherwise. Terminal on the grid = Beethoven / parked VS Code tunnel in hpcworker, never through Globus.
+
+**Why:** greg wanted grid videos in the panel with no VPN and no download; Globus HTTPS already served them. He then called the first head "terrible" and asked for Apple-like mounting of several cloud accounts (2026-10-21 01:41 UTC).
+**How to apply:** change Globus behaviour only in symphony-panel.js with the GL checks; keep write verbs fenced by canWrite(); never store access tokens; run the folders suite and run-mutants.sh (css-mutants too) before each site merge.
