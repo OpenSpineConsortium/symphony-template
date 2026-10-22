@@ -3,7 +3,8 @@
 The owner's rule for the owner's own sessions is an adversarial review before each
 substantive pull request. Written only in the owner's Claude instructions it binds
 nobody else, so this check makes it part of the required check "check" for
-every contributor, a person or a session alike: a pull request marked ready
+every contributor who opens a pull request under their own login, a person
+or a session alike: a pull request marked ready
 for review carries a section headed "## Adversarial review" whose text says
 what was checked against the change and what came of it.
 
@@ -12,8 +13,11 @@ What passes without one, and why:
   (docs/agents/PROTOCOL.md, Work in the open), and the review comes before
   the pull request is marked ready;
 - a pull request opened by a bot account (Dependabot, a GitHub App, a
-  workflow's GITHUB_TOKEN), whose change is generated and whose own check
-  is the review;
+  workflow's GITHUB_TOKEN, the workers in Actions among them), whose change
+  is generated or whose own run is reviewed by the owner before it lands;
+- a pull request from one of the branches a workflow or a script writes
+  with a person's token where Actions may not open one (GENERATED_HEADS),
+  whose body is generated;
 - a pull request opened before the rule began (STARTED), so work already in
   review is not stopped half way;
 - a run outside a pull request event, such as bash scripts/check.sh on a
@@ -32,24 +36,52 @@ import sys
 from datetime import datetime
 
 STARTED = "2026-10-22T05:00:00Z"
-HEADING = re.compile(r"^#{2,3}\s+adversarial review\s*$", re.IGNORECASE)
-NEXT_HEADING = re.compile(r"^#{1,3}\s")
+HEADING = re.compile(r"^(?:#{2,4}\s+|\*\*)\s*adversarial review\s*[:.]?\s*(?:\*\*)?\s*#*\s*$", re.IGNORECASE)
+NEXT_HEADING = re.compile(r"^#{1,6}\s")
+FENCE = re.compile(r"^\s*(```|~~~)")
+HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 PLACEHOLDER = "What a reviewer who wanted the change to fail checked"
 MINIMUM_LETTERS = 40
+# Branches whose pull request a workflow or a script writes, body and all,
+# and opens with a person's token where GitHub Actions may not open one:
+# crowd.py setup, protocol.yml's sync, sync.yml's offer to adopted
+# repositories, add-worker.yml and agents.yml, drive-sync.yml.
+GENERATED_HEADS = ("crowd/setup", "symphony-protocol/", "symphony/", "drive/sync")
+
+
+def lines_outside_fences(body):
+    """Each line with a flag saying whether it is inside a fenced block."""
+    inside = False
+    for line in HTML_COMMENT.sub("", body or "").replace("\r\n", "\n").split("\n"):
+        if FENCE.match(line):
+            inside = not inside
+            yield line, True
+            continue
+        yield line, inside
 
 
 def review_text(body):
-    """The text under the review heading, up to the next heading, or None."""
-    lines = (body or "").replace("\r\n", "\n").split("\n")
-    for at, line in enumerate(lines):
-        if HEADING.match(line.strip()):
-            section = []
-            for following in lines[at + 1:]:
-                if NEXT_HEADING.match(following):
-                    break
-                section.append(following)
-            return "\n".join(section).strip()
-    return None
+    """The text under every review heading, each up to the next heading, or None."""
+    sections, current = [], None
+    for line, fenced in lines_outside_fences(body):
+        if not fenced and HEADING.match(line.strip()):
+            current = []
+            sections.append(current)
+        elif not fenced and NEXT_HEADING.match(line):
+            current = None
+        elif current is not None:
+            current.append(line)
+    if not sections:
+        return None
+    return "\n".join("\n".join(section) for section in sections).strip()
+
+
+def generated_head(pull):
+    head = pull.get("head") or {}
+    ref, repo, base_repo = head.get("ref") or "", head.get("repo") or {}, (pull.get("base") or {}).get("repo") or {}
+    same_repository = repo.get("full_name") and repo.get("full_name") == base_repo.get("full_name")
+    return bool(same_repository) and any(ref == name or (name.endswith("/") and ref.startswith(name))
+                                         for name in GENERATED_HEADS)
 
 
 def letters_in(text):
@@ -69,6 +101,8 @@ def verdict(pull):
         return True, "review record: a draft, so not yet asked for"
     if (pull.get("user") or {}).get("type") == "Bot":
         return True, "review record: opened by a bot, so not asked for"
+    if generated_head(pull):
+        return True, "review record: a branch whose pull request a workflow or a script writes, so not asked for"
     if opened_before_rule(pull.get("created_at")):
         return True, f"review record: opened before {STARTED}, so not asked for"
     text = review_text(pull.get("body"))

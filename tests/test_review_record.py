@@ -55,6 +55,37 @@ class Verdict(unittest.TestCase):
         body = "## Adversarial review\n\nok\n\n## Notes\n\n" + "x" * 200 + "\n"
         self.assertFalse(review_record.verdict(pull(body))[0])
 
+    def test_a_command_in_a_fence_stays_in_the_section(self):
+        body = "## Adversarial review\n\n```\n# run the tests\npython3 -m unittest\n```\nA second session ran the suite against the empty body case and it passed.\n"
+        self.assertTrue(review_record.verdict(pull(body))[0])
+
+    def test_a_heading_inside_a_fence_does_not_count(self):
+        body = "```\n## Adversarial review\n" + "x" * 80 + "\n```\n"
+        self.assertFalse(review_record.verdict(pull(body))[0])
+
+    def test_text_in_an_html_comment_does_not_count(self):
+        body = "## Adversarial review\n\n<!-- " + "x" * 80 + " -->\n"
+        self.assertFalse(review_record.verdict(pull(body))[0])
+
+    def test_the_heading_may_carry_a_colon_closing_hashes_level_four_or_bold(self):
+        for heading in ("## Adversarial review:", "## Adversarial review ##", "#### Adversarial review",
+                        "**Adversarial review**"):
+            body = heading + "\n\nA second session tried an empty body and a CRLF body; both now pass.\n"
+            self.assertTrue(review_record.verdict(pull(body))[0], heading)
+
+    def test_an_empty_first_section_does_not_hide_a_second(self):
+        body = "## Adversarial review\n\n## Adversarial review\n\nA second session tried an empty body and a CRLF body; both pass.\n"
+        self.assertTrue(review_record.verdict(pull(body))[0])
+
+    def test_a_generated_branch_in_this_repository_passes(self):
+        here = {"repo": {"full_name": "o/r"}}
+        for ref in ("crowd/setup", "symphony-protocol/sync", "symphony/worker-docs", "drive/sync"):
+            self.assertTrue(review_record.verdict(pull("", head={"ref": ref, **here}, base=here))[0], ref)
+
+    def test_a_generated_branch_name_from_a_fork_is_still_asked(self):
+        self.assertFalse(review_record.verdict(pull("", head={"ref": "crowd/setup", "repo": {"full_name": "x/r"}},
+                                                    base={"repo": {"full_name": "o/r"}}))[0])
+
     def test_a_draft_passes(self):
         self.assertTrue(review_record.verdict(pull("", draft=True))[0])
 
