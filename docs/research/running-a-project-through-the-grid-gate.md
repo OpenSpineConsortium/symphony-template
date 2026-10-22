@@ -70,6 +70,14 @@ split-check a catalog, and train and score a first model run on a GPU node.
 - PhysioNet answering 401 and then 403 means wget's first request went without a login and the
   second, with it, was refused: the login was taken and the account lacks access to that project,
   which its page grants once its data use agreement is signed.
+- That reading names an account, not which one, and the owner's page showed the agreement signed
+  while the grid was still refused. The fetch report now names the login wget sent, masked to its
+  first two characters, its last and its length, first on the line so the status word's 200
+  character cut keeps it (SchwingNet #108, #109). The next fetch (job 40702978) showed a 19
+  character login beginning op and ending m, the organization's PhysioNet account, while the owner
+  signed as his own: the agreement belongs to one PhysioNet account, and ~/.netrc must name that
+  account. Only the owner can type the password, so the edit is his, through the portal's file
+  editor; no workflow holds a PhysioNet password.
 
 ## The protocol check and a moving default branch
 
