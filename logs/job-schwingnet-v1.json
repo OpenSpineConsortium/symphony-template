@@ -1,0 +1,21 @@
+{
+ "at": "2026-10-22T02:23:21Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull ok d863d2c79e0c..8116aae773f1",
+  "schwingnet v1 at commit 8116aae on warrior 2026-10-22 02:23:21 UTC",
+  "  weights: /rs/rs_grp_oschome/go2432/models/resnet18-f37072fd.pth is there; no job",
+  "  carmlspine: job 40702196",
+  "  catalog: job 40702197",
+  "  v1_driver: job 40702198",
+  "schwingnet v1: exit 0",
+  "HPCW-GRID-GATE schwingnet v1 ok"
+ ],
+ "rc": 0,
+ "request": "demo-plan-v1",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull ok d863d2c79e0c..8116aae773f1",
+  "HPCW-GRID-GATE schwingnet v1 ok"
+ ],
+ "v": 1,
+ "what": "schwingnet v1"
+}
