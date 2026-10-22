@@ -1,0 +1,23 @@
+{
+ "at": "2026-10-22T02:58:58Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 82d7e3afbd80",
+  "schwingnet samples at commit 82d7e3a on warrior 2026-10-22 02:58:57 UTC",
+  "  samples_plan: job 40702274",
+  "  samples_scan: job 40702275",
+  "  samples_merge: job 40702276",
+  "  2026-10-21 22:58:58 samples plan=40702274 scan=40702275 merge=40702276 run=/rs/rs_grp_oschome/go2432/data/_samples/20261021-225857-J6Ax",
+  "  the manifest: /rs/rs_grp_oschome/go2432/data/_samples/20261021-225857-J6Ax/MANIFEST.md once the merge ends; 'bash grid/run-samples.sh report' prints it",
+  "submitted. 'status' shows the index's MANIFEST.md (counts per source) once the merge ends.",
+  "schwingnet samples: exit 0",
+  "HPCW-GRID-GATE schwingnet samples ok"
+ ],
+ "rc": 0,
+ "request": "3d-priors-census",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 82d7e3afbd80",
+  "HPCW-GRID-GATE schwingnet samples ok"
+ ],
+ "v": 1,
+ "what": "schwingnet samples"
+}
