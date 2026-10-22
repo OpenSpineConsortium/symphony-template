@@ -15,8 +15,10 @@
 # in the run's record for whoever may read this repository; it is worth nothing without the sign-in's
 # own verifier, which never leaves the grid, and Anthropic takes it once. docs/setup/grid.md, "Several
 # Claude accounts", has the owner's steps. The action job says one of the gate's job words (hpcworker
-# #23): update, which brings the gate's own clone to hpcworker's main, the spine-datasets promoter's
-# status, start, stop and restart (hpcworker #31), and SchwingNet's own grid/gate.sh words at its main (start, status, leaks,
+# #23): update, which brings the gate's own clone to hpcworker's main; artifacts, which keeps the
+# artifacts/ folders of this repository and SchwingNet in the owner's ~/claude-artifacts on the grid
+# (artifacts-grid.yml); the spine-datasets promoter's status, start, stop and restart (hpcworker #31);
+# and SchwingNet's own grid/gate.sh words at its main (start, status, leaks,
 # v1, latency, stop, fetch-<id>), so a session runs them in the owner's place (his choice of 2026-10-21); the answer is logs/job-<job>.json.
 name: Grid accounts
 run-name: "Grid accounts: ${{ inputs.action }} ${{ inputs.slot }}${{ inputs.job }} (${{ inputs.request }})"
@@ -49,7 +51,7 @@ on:
         required: false
         default: ""
       job:
-        description: "The grid job (job): update, promoter-status|start|stop|restart, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples, or schwingnet-fetch-<id> or schwingnet-census-<id>"
+        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples, or schwingnet-fetch-<id> or schwingnet-census-<id>"
         required: false
         default: ""
       request:

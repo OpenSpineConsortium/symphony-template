@@ -16,3 +16,7 @@ Thread "SchwingNet video demo plan", session https://claude.ai/code/session_01Pc
    - open https://claude.ai/code;
    - start a session on OpenSpineConsortium/symphony-template, with OpenSpineConsortium/SchwingNet selected too;
    - type `/export-artifacts`. Add "and share them" only with Claude in Chrome connected and signed in to that same account.
+
+## Done since (2026-10-22, thread "Artifacts onto the grid")
+
+The review's findings, and those of a second review in this thread (docs/research/artifacts-on-the-grid.md, What the review changed), are applied in .claude/skills/export-artifacts/SKILL.md, the README and the memory, and the skill no longer holds itself back; a Docs document is written exactly by tools/docs_export.py (docs/research/artifacts-on-the-grid.md). The grid keeps both repositories' artifacts/ in ~/claude-artifacts through the gate's job word artifacts (hpcworker) and .github/workflows/artifacts-grid.yml. Step 3 above stands, with `/export-artifacts <a name for the account>`; if the command is not found, the skill is not on main yet.
