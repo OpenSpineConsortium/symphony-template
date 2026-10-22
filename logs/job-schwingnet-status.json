@@ -1,14 +1,13 @@
 {
- "at": "2026-10-21T21:48:03Z",
+ "at": "2026-10-22T01:33:58Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 5ecce95df477",
-  "schwingnet status at commit 5ecce95 on warrior 2026-10-21 21:48:03 UTC",
+  "HPCW-GRID-GATE schwingnet pull ok 5ecce95df477..d863d2c79e0c",
+  "schwingnet status at commit d863d2c on warrior 2026-10-22 01:33:58 UTC",
   "## the gate's newest jobs (sacct): id, what, state, elapsed, exit code, node",
   "  40697676 setup COMPLETED 00:05:10 0:0 sfx3",
   "  40697677 weights COMPLETED 00:00:11 0:0 hao1",
   "  40697678 carmlspine FAILED 00:00:48 1:0 sfx5",
   "  40697679 catalog FAILED 00:00:41 1:0 sfx5",
-  "  40697680 xr_fetch RUNNING 00:11:33 0:0 zfh1",
   "  40697681 xr_bank PENDING 00:00:00 0:0 None assigned",
   "  40697682 xr_catalog PENDING 00:00:00 0:0 None assigned",
   "  40697683 dp_aws_stoic2021 PENDING 00:00:00 0:0 None assigned",
@@ -40,6 +39,7 @@
   "  40697734 xr_fetch FAILED 00:00:08 1:0 zfh2",
   "  40697735 xr_bank COMPLETED 00:00:01 0:0 zfh2",
   "  40697736 xr_catalog PENDING 00:00:00 0:0 None assigned",
+  "  40697680 xr_fetch RUNNING 00:27:48 0:0 hao1",
   "## 00-carmlspine-STAGE-REPORT.md (2026-10-21 17:37:18)",
   "  # C-ArmLSpine ingest: 2026-10-21 17:36:30, job 40697678 on sfx5, commit 5ecce95",
   "  - train (unfrozen persons) refused: AttributeError: 'str' object has no attribute 'get'",
@@ -86,9 +86,9 @@
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "rc": 0,
- "request": "schwingnet-status-before-v1",
+ "request": "demo-plan-status",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 5ecce95df477",
+  "HPCW-GRID-GATE schwingnet pull ok 5ecce95df477..d863d2c79e0c",
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "v": 1,
