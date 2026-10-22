@@ -27,9 +27,9 @@ case "$ACTION" in
   # here: the gate takes these and no other; SchwingNet's fetch and census carry one id after it
   # (schwingnet-fetch-vindr_pcxr), which SchwingNet's grid/gate.sh checks again against its own list
   job) JOB=${JOB:-}
-    if [[ "$JOB" =~ ^(update|promoter-(status|start|stop)|schwingnet-(start|status|leaks|v1|latency|stop|prior|chain_eval|samples))$ ]]; then WHAT=${JOB/-/ }
+    if [[ "$JOB" =~ ^(update|promoter-(status|start|stop|restart)|schwingnet-(start|status|leaks|v1|latency|stop|prior|chain_eval|samples))$ ]]; then WHAT=${JOB/-/ }
     elif [[ "$JOB" =~ ^schwingnet-(fetch|census)-([a-z0-9_]{1,40})$ ]]; then WHAT="schwingnet ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
-    else echo "::error::the job is one of update, promoter-status, promoter-start, promoter-stop, schwingnet-start, schwingnet-status, schwingnet-leaks, schwingnet-v1, schwingnet-latency, schwingnet-stop, schwingnet-prior, schwingnet-chain_eval, schwingnet-samples, schwingnet-fetch-<id> or schwingnet-census-<id>"; exit 1; fi
+    else echo "::error::the job is one of update, promoter-status, promoter-start, promoter-stop, promoter-restart, schwingnet-start, schwingnet-status, schwingnet-leaks, schwingnet-v1, schwingnet-latency, schwingnet-stop, schwingnet-prior, schwingnet-chain_eval, schwingnet-samples, schwingnet-fetch-<id> or schwingnet-census-<id>"; exit 1; fi
     LOGFILE="job-$JOB";;
 esac
 [[ "$REQUEST" =~ ^[A-Za-z0-9_-]{0,64}$ ]] || { echo "::error::the request is a short plain name"; exit 1; }
