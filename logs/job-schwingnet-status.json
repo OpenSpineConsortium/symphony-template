@@ -1,8 +1,8 @@
 {
- "at": "2026-10-22T06:39:11Z",
+ "at": "2026-10-22T08:13:34Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 2ca92d9f4e70",
-  "schwingnet status at commit 2ca92d9 on warrior 2026-10-22 06:39:10 UTC",
+  "HPCW-GRID-GATE schwingnet pull ok 2ca92d9f4e70..f32fb8e5016b",
+  "schwingnet status at commit f32fb8e on warrior 2026-10-22 08:13:33 UTC",
   "## the gate's newest jobs (sacct): id, what, state, elapsed, exit code, node",
   "  40697676 setup COMPLETED 00:05:10 0:0 sfx3",
   "  40697677 weights COMPLETED 00:00:11 0:0 hao1",
@@ -13,8 +13,8 @@
   "  40697684 dp_idc_spine_mets_ct_seg COMPLETED 00:01:53 0:0 arw6",
   "  40697685 [hidden] COMPLETED 00:39:09 0:0 arw6",
   "  40697686 dp_zenodo_medpelvis3d COMPLETED 02:51:48 0:0 mem2",
-  "  40697687 dp_zenodo_lumvbcanseg RUNNING 00:07:30 0:0 tta1",
-  "  40697688 dp_zenodo_lumos PENDING 00:00:00 0:0 None assigned",
+  "  40697687 dp_zenodo_lumvbcanseg COMPLETED 00:35:25 0:0 tta1",
+  "  40697688 dp_zenodo_lumos RUNNING 01:06:21 0:0 hao1",
   "  40697689 dp_zenodo_ts_task_hip_implant PENDING 00:00:00 0:0 None assigned",
   "  40697690 [hidden] PENDING 00:00:00 0:0 None assigned",
   "  40697691 dp_zenodo_ts_task_liver_lesions PENDING 00:00:00 0:0 None assigned",
@@ -44,7 +44,7 @@
   "  40702198 v1_driver COMPLETED 00:05:16 0:0 voh7",
   "  40697683 dp_aws_stoic2021 COMPLETED 00:03:12 0:0 mem4",
   "  40702274 samples_plan COMPLETED 00:00:39 0:0 hao1",
-  "  40702276 samples_merge RUNNING 02:01:59 0:0 sfx6",
+  "  40702276 samples_merge RUNNING 03:36:22 0:0 sfx6",
   "  40702275_0 samples_scan COMPLETED 00:33:43 0:0 arw6",
   "  40702275_1 samples_scan COMPLETED 00:19:22 0:0 mem4",
   "  40702275_2 samples_scan COMPLETED 00:16:57 0:0 mem4",
@@ -249,9 +249,9 @@
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "rc": 0,
- "request": "schwingnet-status-latency-results-2",
+ "request": "schwingnet-status-latency-results-3",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 2ca92d9f4e70",
+  "HPCW-GRID-GATE schwingnet pull ok 2ca92d9f4e70..f32fb8e5016b",
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "v": 1,
