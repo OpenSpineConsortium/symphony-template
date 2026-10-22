@@ -80,4 +80,14 @@ is CSS `zoom` on .console__app, so any pointer arithmetic inside the console div
 
 ## State at the stop (2026-10-22, 00:02 UTC)
 
-The owner stopped every thread. At that moment every suite was green on the final code: home.test.mjs and the thirteen older suites. The full mutant run was stopped about 356 mutants in. Five mutants had survived, g139, g156, g157, g164 and g183, all from the graph suite. f134 was stale. It is not yet known whether these predate the change, so the next step is to run those six against master and against the branch. Then merge site #136, symphony-app #89 and this pull request, #344, if the survivors are the same on master. All three are pushed and their CI is green (the site has none).
+The owner stopped every thread. At that moment every suite was green on the final code: home.test.mjs and the thirteen older suites. The full mutant run was stopped about 356 mutants in. Five mutants had survived, g139, g156, g157, g164 and g183, all from the graph suite. f134 was stale. It is not yet known whether these predate the change, so the next step was to run those six against master and against the branch, then merge site #136, symphony-app #89 and this pull request, #344, if the survivors are the same on master. All three are pushed and their CI is green (the site has none).
+
+## The mutant run finished (2026-10-22, from the thread "Button home screen as default")
+
+The restarted thread brought master (10297bf, the Share tab's #137) into the site branch and main (#90) into the checks branch, both without conflict, and ran the six against master and the branch side by side, then the 385 mutants the stopped run never reached on the branch.
+
+- g139, g156, g157, g164 and g183 survive on master exactly as on the branch. Each is an equivalent the panel checks' README already lists: code for a phone page that scrolls, which no layout reaches since the phone home screen, or a push the floating tools never need. None is this change's.
+- f134 was stale on master too. The W&B tab (#133) put `wbForget(true)` between the sign-out's `writeKept({})` and `forgetToken()`, so its text no longer matched. It is aimed again at the line as it now reads and N3 catches it again (symphony-app #89).
+- Of the rest, all fourteen home screen mutants (hm01 to hm14) are killed. The others that survive or are stale (p04, p20, p49, c04, c26, s11, s19, s23, s25, k40; p11, k35, m7) are the equivalents and pre-existing ones the README names. c34, c36 and m23 were checked against master and behave the same there, so none of them is this change's either.
+- gr10 to gr14 have no `.only` or `.suite` on main, so run-mutants.sh runs them against signin.test.mjs with every check, where something unrelated kills them. This predates the change and is left for the Grid tab's owner.
+- Every suite passed on the merged branch. K4, G13 and W3 failed once when all fourteen suites ran at the same time on four CPUs, and passed when run alone. Each waits on a clock, so the failures came from the load.
