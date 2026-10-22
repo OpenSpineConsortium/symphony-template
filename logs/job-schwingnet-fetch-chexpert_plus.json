@@ -1,0 +1,24 @@
+{
+ "at": "2026-10-22T19:25:28Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 804fb6fa6231",
+  "schwingnet fetch chexpert_plus at commit 804fb6f on warrior 2026-10-22 19:25:26 UTC",
+  "  size budget: 1 sources, 0 GB stated; /rs/rs_grp_oschome has 5887766 GB free, margin 5000 GB",
+  "  no size stated for: chexpert_plus (counted as 0)",
+  "  chexpert_plus: job 40722124 (afterany:40704982) redivis 0GB",
+  "  2026-10-22 15:25:27 platform chain: chexpert_plus=40722124 size_gb=0",
+  "  ETA: network-bound, about 1 hour per 20 GB, so about 1 hours for 0 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
+  "  ",
+  "  dp_chexpert_plus: job 40722124",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "chexpert-plus-1",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 804fb6fa6231",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch chexpert_plus"
+}
