@@ -1,6 +1,6 @@
 # Stale branches in OpenSpineConsortium/symphony-template
 
-Read 2026-10-22T04:25:19Z from GitHub's history: 308 merged pull requests, 3 closed without a merge.
+Read 2026-10-22T04:26:52Z from GitHub's history: 308 merged pull requests, 3 closed without a merge.
 
 | measure | value |
 |---|---|
@@ -14,7 +14,7 @@ Read 2026-10-22T04:25:19Z from GitHub's history: 308 merged pull requests, 3 clo
 | runner hours of the check / redone | 27.9 h / 10.0 h |
 | re-runs of a run | 5 |
 | board's main-moved comments / conflicting | 0 / 0 |
-| seen live: snapshots / pull requests behind / in conflict | 43 / 0 / 0 |
+| seen live: snapshots / pull requests behind / in conflict | 44 / 0 / 0 |
 | closed unmerged / whose branch landed later | 3 / 2 |
 
 ## By the parallel work beside each pull request
