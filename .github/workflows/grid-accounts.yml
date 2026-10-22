@@ -80,7 +80,7 @@ jobs:
         run: |
           p=$(gh api "repos/$REPO/collaborators/$ACTOR/permission" --jq .permission 2>/dev/null) || p=""
           [ "$p" = admin ] || { echo "::error::only an admin of $REPO may change the grid's Claude accounts ($ACTOR is ${p:-unknown})"; exit 1; }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: the action, through the grid's gate
