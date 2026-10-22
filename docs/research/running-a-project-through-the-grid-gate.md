@@ -78,6 +78,17 @@ split-check a catalog, and train and score a first model run on a GPU node.
   signed as his own: the agreement belongs to one PhysioNet account, and ~/.netrc must name that
   account. Only the owner can type the password, so the edit is his, through the portal's file
   editor; no workflow holds a PhysioNet password.
+- With ~/.netrc naming the owner's account the fetch ran (job 40704982 from 15:36 UTC on
+  2026-10-22, bank 40704984 and catalog 40704986 after it), but the space tally showed nothing of it
+  for hours, since it rounds to whole GB and status shows a job's log only once it ends. Status now
+  prints, for each live fetch of one set, its raw folder's file count, size and last write, read
+  from CephFS's recursive directory attributes with no walk (SchwingNet #125, #126). At 23:17 UTC,
+  7 h 38 min in, it read 81 files and 295 MB of the set's 34.1 GB, last written 29 s before: alive,
+  and at its average so far weeks from done. Not yet measured: whether the first hours went to
+  listing files, so the rate is taken from two readings an hour or more apart, by sending
+  schwingnet-status and comparing the line. Once it ends: sha256sum -c against the set's
+  SHA256SUMS, the bank and catalog run on their own, and spine-datasets records the set fetched.
+  Never resend the fetch while the job runs.
 
 ## The protocol check and a moving default branch
 
