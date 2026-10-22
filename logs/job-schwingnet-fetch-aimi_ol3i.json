@@ -1,0 +1,23 @@
+{
+ "at": "2026-10-22T19:22:40Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull ok 04670f2cf63d..804fb6fa6231",
+  "schwingnet fetch aimi_ol3i at commit 804fb6f on warrior 2026-10-22 19:22:39 UTC",
+  "  size budget: 1 sources, 5 GB stated; /rs/rs_grp_oschome has 5887810 GB free, margin 5000 GB",
+  "  aimi_ol3i: job 40722025 (afterany:40704982) redivis 4.3GB",
+  "  2026-10-22 15:22:40 platform chain: aimi_ol3i=40722025 size_gb=5",
+  "  ETA: network-bound, about 1 hour per 20 GB, so about 1 hours for 5 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
+  "  ",
+  "  dp_aimi_ol3i: job 40722025",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "aimi-ol3i-1",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull ok 04670f2cf63d..804fb6fa6231",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch aimi_ol3i"
+}
