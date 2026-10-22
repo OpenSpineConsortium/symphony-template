@@ -77,3 +77,7 @@ the Chrome profile.
 A drag measured with `offsetLeft` against `clientX` holds only at zoom 1. The console's text size
 is CSS `zoom` on .console__app, so any pointer arithmetic inside the console divides by the scale
 (the rail's on-screen width over its offsetWidth).
+
+## State at the stop (2026-10-22, 00:02 UTC)
+
+The owner stopped every thread. At that moment every suite was green on the final code: home.test.mjs and the thirteen older suites. The full mutant run was stopped about 356 mutants in. Five mutants had survived, g139, g156, g157, g164 and g183, all from the graph suite. f134 was stale. It is not yet known whether these predate the change, so the next step is to run those six against master and against the branch. Then merge site #136, symphony-app #89 and this pull request, #344, if the survivors are the same on master. All three are pushed and their CI is green (the site has none).
