@@ -1,19 +1,22 @@
 {
- "at": "2026-10-22T10:54:40Z",
+ "at": "2026-10-22T17:12:23Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current f4fc5040123b",
-  "schwingnet fetch hf_cads_unique at commit f4fc504 on warrior 2026-10-22 10:54:40 UTC",
-  "  hf_cads_unique: left out: there is no ~/.hf/token.env on the grid account; the owner writes it, mode 600 (grid/README.md)",
-  "  size budget: 0 sources, 0 GB stated; /rs/rs_grp_oschome has 5886520 GB free, margin 5000 GB",
-  "  refusing to submit: the token or link file of hf_cads_unique is not in place (above); nothing was queued",
-  "schwingnet fetch: exit 2",
-  "HPCW-GRID-GATE schwingnet fetch failed 2"
+  "HPCW-GRID-GATE schwingnet pull ok a0e43dd762ea..0770619e0383",
+  "schwingnet fetch hf_cads_unique at commit 0770619 on warrior 2026-10-22 17:12:22 UTC",
+  "  size budget: 1 sources, 124 GB stated; /rs/rs_grp_oschome has 5889097 GB free, margin 5000 GB",
+  "  hf_cads_unique: job 40710713 (afterany:40704982) hf-token 123.3GB",
+  "  2026-10-22 13:12:22 platform chain: hf_cads_unique=40710713 size_gb=124",
+  "  ETA: network-bound, about 1 hour per 20 GB, so about 7 hours for 124 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
+  "  ",
+  "  dp_hf_cads_unique: job 40710713",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
  ],
- "rc": 2,
- "request": "granted-cads-1",
+ "rc": 0,
+ "request": "granted-cads-2",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current f4fc5040123b",
-  "HPCW-GRID-GATE schwingnet fetch failed 2"
+  "HPCW-GRID-GATE schwingnet pull ok a0e43dd762ea..0770619e0383",
+  "HPCW-GRID-GATE schwingnet fetch ok"
  ],
  "v": 1,
  "what": "schwingnet fetch hf_cads_unique"
