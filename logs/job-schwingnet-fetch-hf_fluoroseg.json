@@ -1,0 +1,23 @@
+{
+ "at": "2026-10-22T23:21:45Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current be1a3eb58327",
+  "schwingnet fetch hf_fluoroseg at commit be1a3eb on warrior 2026-10-22 23:21:45 UTC",
+  "  size budget: 1 sources, 2650 GB stated; /rs/rs_grp_oschome has 5886987 GB free, margin 5000 GB",
+  "  hf_fluoroseg: job 40731321 (afterany:40704982) hf-token 2650GB",
+  "  2026-10-22 19:21:45 platform chain: hf_fluoroseg=40731321 size_gb=2650",
+  "  ETA: network-bound, about 1 hour per 20 GB, so about 133 hours for 2650 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
+  "  ",
+  "  dp_hf_fluoroseg: job 40731321",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "granted-fluoroseg-1",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current be1a3eb58327",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch hf_fluoroseg"
+}
