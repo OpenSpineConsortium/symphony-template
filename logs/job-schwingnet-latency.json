@@ -1,0 +1,25 @@
+{
+ "at": "2026-10-22T04:22:42Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current ff9c743f3a84",
+  "schwingnet latency at commit ff9c743 on warrior 2026-10-22 04:22:41 UTC",
+  "  run: /rs/rs_grp_oschome/go2432/runs/e4f7054848f5; catalog: /rs/rs_grp_oschome/go2432/data/_catalog/versions/catalog-000001-252ba19562cf.sqlite",
+  "  gpu /.rs/volumes/rs_grp_oschome/rs_vol_oschome/[hidden]/go2432/runs/e4f7054848f5 40702515",
+  "  cpu /.rs/volumes/rs_grp_oschome/rs_vol_oschome/[hidden]/go2432/runs/e4f7054848f5 40702516",
+  "  sweep /.rs/volumes/rs_grp_oschome/rs_vol_oschome/[hidden]/go2432/runs/e4f7054848f5 40702517",
+  "  job ids in grid/LAST_LATENCY.txt; squeue -u $USER watches them",
+  "  latency_gpu: job 40702515",
+  "  latency_cpu: job 40702516",
+  "  latency_sweep: job 40702517",
+  "schwingnet latency: exit 0",
+  "HPCW-GRID-GATE schwingnet latency ok"
+ ],
+ "rc": 0,
+ "request": "schwingnet-latency-v1-e4f7054848f5",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current ff9c743f3a84",
+  "HPCW-GRID-GATE schwingnet latency ok"
+ ],
+ "v": 1,
+ "what": "schwingnet latency"
+}
