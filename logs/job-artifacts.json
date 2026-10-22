@@ -1,19 +1,19 @@
 {
- "at": "2026-10-22T05:50:44Z",
+ "at": "2026-10-22T06:48:22Z",
  "lines": [
-  "HPCW-GRID-GATE artifacts cloned OpenSpineConsortium/symphony-template into /wsu/home/go/go24/go2432/claude-artifacts/symphony-template",
-  "HPCW-GRID-GATE artifacts symphony-template 4 folders at 34b50498867b",
-  "HPCW-GRID-GATE artifacts cloned OpenSpineConsortium/SchwingNet into /wsu/home/go/go24/go2432/claude-artifacts/SchwingNet",
-  "HPCW-GRID-GATE artifacts SchwingNet 15 folders at 64c8e36b8bba",
+  "HPCW-GRID-GATE artifacts pull symphony-template ok 34b50498867b..8b3eba531917",
+  "HPCW-GRID-GATE artifacts symphony-template 4 folders at 8b3eba531917",
+  "HPCW-GRID-GATE artifacts pull SchwingNet ok 64c8e36b8bba..fd38de90ffc0",
+  "HPCW-GRID-GATE artifacts SchwingNet 19 folders at fd38de90ffc0",
   "HPCW-GRID-GATE artifacts ok /wsu/home/go/go24/go2432/claude-artifacts"
  ],
  "rc": 0,
  "request": "artifacts-grid",
  "said": [
-  "HPCW-GRID-GATE artifacts cloned OpenSpineConsortium/symphony-template into /wsu/home/go/go24/go2432/claude-artifacts/symphony-template",
-  "HPCW-GRID-GATE artifacts symphony-template 4 folders at 34b50498867b",
-  "HPCW-GRID-GATE artifacts cloned OpenSpineConsortium/SchwingNet into /wsu/home/go/go24/go2432/claude-artifacts/SchwingNet",
-  "HPCW-GRID-GATE artifacts SchwingNet 15 folders at 64c8e36b8bba",
+  "HPCW-GRID-GATE artifacts pull symphony-template ok 34b50498867b..8b3eba531917",
+  "HPCW-GRID-GATE artifacts symphony-template 4 folders at 8b3eba531917",
+  "HPCW-GRID-GATE artifacts pull SchwingNet ok 64c8e36b8bba..fd38de90ffc0",
+  "HPCW-GRID-GATE artifacts SchwingNet 19 folders at fd38de90ffc0",
   "HPCW-GRID-GATE artifacts ok /wsu/home/go/go24/go2432/claude-artifacts"
  ],
  "v": 1,
