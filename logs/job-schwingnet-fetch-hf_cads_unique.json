@@ -1,0 +1,20 @@
+{
+ "at": "2026-10-22T10:54:40Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current f4fc5040123b",
+  "schwingnet fetch hf_cads_unique at commit f4fc504 on warrior 2026-10-22 10:54:40 UTC",
+  "  hf_cads_unique: left out: there is no ~/.hf/token.env on the grid account; the owner writes it, mode 600 (grid/README.md)",
+  "  size budget: 0 sources, 0 GB stated; /rs/rs_grp_oschome has 5886520 GB free, margin 5000 GB",
+  "  refusing to submit: the token or link file of hf_cads_unique is not in place (above); nothing was queued",
+  "schwingnet fetch: exit 2",
+  "HPCW-GRID-GATE schwingnet fetch failed 2"
+ ],
+ "rc": 2,
+ "request": "granted-cads-1",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current f4fc5040123b",
+  "HPCW-GRID-GATE schwingnet fetch failed 2"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch hf_cads_unique"
+}
