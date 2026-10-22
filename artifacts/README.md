@@ -10,6 +10,9 @@ To add the artifacts of another account, open a session on this repository from 
 | Several grid workers, one per project | [several-grid-workers-one-per-project](several-grid-workers-one-per-project/) | https://claude.ai/artifact/UjuFBMxLEL8CnifRofU3Vv | first account | Plan for multi-project grid workers in Beethoven, awaiting greg's go (Docs type, kept as Markdown) |
 | Beethoven on the Chrome Web Store | [beethoven-on-the-chrome-web-store](beethoven-on-the-chrome-web-store/) | https://claude.ai/artifact/XxNp8Uy3FfWDSwMExpvLMT | first account | The store upload and automatic releases (Docs type, kept as Markdown) |
 | Symphony Handoff | [symphony-handoff](symphony-handoff/) | https://claude.ai/artifact/XQj71up9dbJhwSStCVUe9T | first account | Symphony handoff of 2026-10-13, with its files: PLAN.md, HANDOFF.md, the designs, free-or-paid.md, session.md and a patch |
+| Symphony and Beethoven Taxonomy Manual | [symphony-and-beethoven-taxonomy-manual-re4jtx](symphony-and-beethoven-taxonomy-manual-re4jtx/) | https://claude.ai/artifact/RE4jtXqsFFgiZxhQLamUDR | gschwing | The manual for the Symphony and Beethoven taxonomy (Docs type, kept as Markdown; date and mention chips kept as text) |
+| SDLC Build Plan | [sdlc-build-plan-bjzikn](sdlc-build-plan-bjzikn/) | https://claude.ai/artifact/BjZikNkPVNU2G4KGaCxawZ | gschwing | The plan of 2026-10-08 for the repository as every account's shared plane: Route A against Route B, the tools to lean on, phases and risks (Docs type, kept as Markdown; one embedded widget dropped, chips kept as text) |
+| SDLC Primitives Spec | [sdlc-primitives-spec-ldx4zd](sdlc-primitives-spec-ldx4zd/) | https://claude.ai/artifact/LDx4ZDE5CUexASCnEtHZVL | gschwing | What cswap and Claude Swap Cloud could export and import of a claude.ai Project on 2026-10-08, and the gaps (Docs type, kept as Markdown; chips kept as text) |
 
 Exported 2026-10-22 from the first account, the one at 97% of its usage that day.
 | Symphony versus competitors | [symphony-versus-competitors-lynwzk](symphony-versus-competitors-lynwzk/) | https://claude.ai/artifact/LynwZkPadyo2SQ7G4mJfHc | go2432 | Symphony set beside the other ways of coordinating coding agents, the Doc behind docs/research/symphony-versus-competitors.md (Docs type, kept as Markdown; an embedded widget dropped, chips kept as text) |
@@ -19,3 +22,5 @@ Exported 2026-10-22 from the first account, the one at 97% of its usage that day
 | Store upload and repo move, step by step | [store-upload-and-repo-move-step-by-step-fpy3fh](store-upload-and-repo-move-step-by-step-fpy3fh/) | https://claude.ai/artifact/Fpy3FhkGSwF4jkDUYRWXmu | go2432 | Claude Swap Cloud's first Chrome Web Store upload, its listing texts, the CWS_ secrets and the automatic release (Docs type, kept as Markdown; chips kept as text) |
 
 Exported 2026-10-22 from go2432: 10 artifacts listed, 5 copied here, the other 5 sorted elsewhere.
+
+Exported 2026-10-22 from gschwing: 3 artifacts here, 3 in the other repository.
