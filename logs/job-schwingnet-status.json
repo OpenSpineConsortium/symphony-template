@@ -1,8 +1,8 @@
 {
- "at": "2026-10-22T15:38:22Z",
+ "at": "2026-10-22T15:49:05Z",
  "lines": [
   "HPCW-GRID-GATE schwingnet pull current a0e43dd762ea",
-  "schwingnet status at commit a0e43dd on warrior 2026-10-22 15:38:21 UTC",
+  "schwingnet status at commit a0e43dd on warrior 2026-10-22 15:49:02 UTC",
   "## the gate's newest jobs (sacct): id, what, state, elapsed, exit code, node",
   "  40697676 setup COMPLETED 00:05:10 0:0 sfx3",
   "  40697677 weights COMPLETED 00:00:11 0:0 hao1",
@@ -18,7 +18,7 @@
   "  40697689 dp_zenodo_ts_task_hip_implant COMPLETED 00:38:53 0:0 hao1",
   "  40697690 [hidden] COMPLETED 00:37:15 0:0 hao1",
   "  40697691 dp_zenodo_ts_task_liver_lesions COMPLETED 03:14:14 0:0 hao1",
-  "  40697692 dp_zenodo_tmtv_benchmark RUNNING 00:07:09 0:0 hao1",
+  "  40697692 dp_zenodo_tmtv_benchmark RUNNING 00:17:51 0:0 hao1",
   "  40697693 dp_tcia_ct_colonography PENDING 00:00:00 0:0 None assigned",
   "  40697694 dp_cm_spine_drive_file PENDING 00:00:00 0:0 None assigned",
   "  40697695 dp_scidb_enhance_pet_1_6k PENDING 00:00:00 0:0 None assigned",
@@ -122,10 +122,10 @@
   "  40702980 xr_bank COMPLETED 00:00:01 0:0 hao1",
   "  40702982 xr_catalog COMPLETED 00:00:27 0:0 hao1",
   "  40703031 dp_rsna_rspect_pe FAILED 00:00:06 1:0 hao1",
-  "  40703320 samples_merge RUNNING 02:54:49 0:0 mem6",
+  "  40703320 samples_merge RUNNING 03:05:31 0:0 mem6",
   "  40704984 xr_bank PENDING 00:00:00 0:0 None assigned",
   "  40704986 xr_catalog PENDING 00:00:00 0:0 None assigned",
-  "  40704982 xr_fetch PENDING 00:00:00 0:0 None assigned",
+  "  40704982 xr_fetch RUNNING 00:09:51 0:0 csc1",
   "## 40697681 (xr_bank) ended FAILED after 00:59:18, exit 1:0",
   "    XR_BANK_RC=1 2026-10-21 23:38:11",
   "    (396 of its last 400 lines withheld: this job can print DICOM header values, person keys or a sign-in, so only its tracebacks and status lines are shown; the whole log stays on the grid)",
@@ -251,7 +251,7 @@
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "rc": 0,
- "request": "schwingnet-status-latency-results-6",
+ "request": "",
  "said": [
   "HPCW-GRID-GATE schwingnet pull current a0e43dd762ea",
   "HPCW-GRID-GATE schwingnet status ok"
