@@ -1,6 +1,6 @@
 # Artifacts on the grid, for every account
 
-Source: the thread "Artifacts onto the grid", 2026-10-22, from the owner's message of 04:14 UTC: know the handoff docs/checkpoints/2026-10-22/export-artifacts-handoff.md and the skill it names, then automate as much as possible of putting his claude.ai artifacts on the grid, so he can work on them from his other Claudes across all six of his accounts. It builds on that handoff, on the review beside it (export-artifacts-review.md) and on the multi-account design in grid-claude-accounts.md.
+Source: the thread "Artifacts onto the grid", 2026-10-22, from the owner's message of 04:14 UTC: know the handoff docs/checkpoints/2026-10-22/export-artifacts-handoff.md and the skill it names, then automate as much as possible of putting the owner's claude.ai artifacts on the grid, so the owner can work on them from the other Claudes, across all six of the owner's accounts. It builds on that handoff, on the review beside it (export-artifacts-review.md) and on the multi-account design in grid-claude-accounts.md.
 
 ## What no workflow can do
 
@@ -29,10 +29,16 @@ The four were sorted by the skill's search, all four to SchwingNet; one page of 
 
 An adversarial review of the first version found, besides the gate's faults above, that the skill could share a row whose folder was never copied, that its search for SchwingNet's subjects matched the organisation's own name in every file, that a published path was filtered only after it was read, that a republish under a new link would be copied twice, and that the workflow would ask for update after any failure. The skill now shares only a row whose folder is on main and left nothing out, and only where its search exits 1, having read everything and found nothing; the search passes over OpenSpineConsortium, adds the imaging words it lacked, and sends to SchwingNet any file it cannot read as words unless a look with Read shows nothing of the body; paths are filtered before any read and checked after the copy; a copy that matches a folder already kept gets a row linking that folder; records are read with ArtifactData's own out_dir, page by page, never under data/users/. The revised search still finds artifacts/symphony-handoff/ here, for 33 mentions of spine-program as a repository Symphony adopted and merges in, as this repository's own CLAUDE.md names it; it stays here, and the skill's sharing step leaves it private, since its search finds something.
 
+## Measured on the grid
+
+The first run came on 2026-10-22 at 05:49 UTC, when the merge of symphony-template#369 changed artifacts/ and so started artifacts-grid.yml. The gate's clone of hpcworker was then older than the word, so the gate refused `artifacts` as a word it did not know. The workflow did what it was built to do on that answer: it sent `update`, which brought the gate's clone to hpcworker 8e73104 (framework 27), and asked again.
+
+The second ask made both clones in ~/claude-artifacts within the gate's call. It counted 4 artifact folders in symphony-template at 34b5049, and 15 in SchwingNet at 64c8e36, the number of folders under artifacts/ on each main at those commits. The answer is kept in logs/job-artifacts.json on the branch grid, and holds the gate's own lines only.
+
 ## Not measured yet
 
-- The gate word on the grid itself: its tests ran in a container, with a stub for gh.
-- The fallback to a whole clone on the grid's own git.
+- Which way the grid's git cloned, partial or whole: the answer names neither, so the fallback to a whole clone on an older git is known only from the gate's tests.
+- A worker on one of the other accounts reading ~/claude-artifacts in a session of its own.
 - Whether a session on the grid has the Artifact and Claude Docs tools, and so whether it can republish an artifact it edited; until that is known it edits by pull request and a cloud session republishes.
 - The size at which an inline export is refused, somewhere between 26,657 and 53,270 bytes.
 - Whether Claude Code saves a large result of an MCP tool in the tool-results folder as it saves a large result of its own tools; tools/docs_export.py reads either.
