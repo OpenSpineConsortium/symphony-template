@@ -15,5 +15,12 @@ To add the artifacts of another account, open a session on this repository from 
 | SDLC Primitives Spec | [sdlc-primitives-spec-ldx4zd](sdlc-primitives-spec-ldx4zd/) | https://claude.ai/artifact/LDx4ZDE5CUexASCnEtHZVL | gschwing | What cswap and Claude Swap Cloud could export and import of a claude.ai Project on 2026-10-08, and the gaps (Docs type, kept as Markdown; chips kept as text) |
 
 Exported 2026-10-22 from the first account, the one at 97% of its usage that day.
+| Symphony versus competitors | [symphony-versus-competitors-lynwzk](symphony-versus-competitors-lynwzk/) | https://claude.ai/artifact/LynwZkPadyo2SQ7G4mJfHc | go2432 | Symphony set beside the other ways of coordinating coding agents, the Doc behind docs/research/symphony-versus-competitors.md (Docs type, kept as Markdown; an embedded widget dropped, chips kept as text) |
+| Symphony in brief | [symphony-in-brief-9cdciz](symphony-in-brief-9cdciz/) | https://claude.ai/artifact/9CDCiZqYfbrobDk6rRrMho | go2432 | What Symphony is, how it works, its 17 guarantees and what is not measured yet, as of 2026-10-14 (Docs type, kept as Markdown; the lifecycle diagram dropped, chips kept as text) |
+| Shared multi-account Claude project: plan | [shared-multi-account-claude-project-plan-rqzwh9](shared-multi-account-claude-project-plan-rqzwh9/) | https://claude.ai/artifact/Rqzwh9ncY9aj6kZa5BQp7m | go2432 | The plan of 2026-10-08 that became Symphony: the repository as the shared plane, claims by branch push, a coordinator (Docs type, kept as Markdown; the architecture diagram dropped, chips kept as text) |
+| Moving Beethoven for VS Code onto hpcworker | [moving-beethoven-for-vs-code-onto-hpcworker-apbd6t](moving-beethoven-for-vs-code-onto-hpcworker-apbd6t/) | https://claude.ai/artifact/ApBd6TpHYnsWVKvP1NjvyX | go2432 | The plan for the VS Code edition to become a client of hpcworker on the grid (Docs type, kept as Markdown; chips kept as text) |
+| Store upload and repo move, step by step | [store-upload-and-repo-move-step-by-step-fpy3fh](store-upload-and-repo-move-step-by-step-fpy3fh/) | https://claude.ai/artifact/Fpy3FhkGSwF4jkDUYRWXmu | go2432 | Claude Swap Cloud's first Chrome Web Store upload, its listing texts, the CWS_ secrets and the automatic release (Docs type, kept as Markdown; chips kept as text) |
+
+Exported 2026-10-22 from go2432: 10 artifacts listed, 5 copied here, the other 5 sorted elsewhere.
 
 Exported 2026-10-22 from gschwing: 3 artifacts here, 3 in the other repository.
