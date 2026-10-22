@@ -5,6 +5,8 @@ description: Use when the owner asks to export, back up, consolidate or share th
 
 # Export one account's artifacts into the repositories
 
+Not ready to run yet: a review found 38 problems, 6 of them high (docs/checkpoints/2026-10-22/export-artifacts-review.md). A session asked to run this skill applies those fixes first, in a pull request of their own, and removes this paragraph in it; until then it copies nothing and shares nothing.
+
 An artifact on claude.ai belongs to the account that made it: the Artifact tool lists, reads and publishes only that account's, and no tool of a session changes its Share menu. So each account exports its own, from a session on that account, and the files in artifacts/ are the copy every account reads, edits by pull request and republishes from. docs/memory/artifacts-are-kept-as-files.md says why; this is the procedure. Copying files into the owner's own repositories is the export itself and spends nothing beyond the session; changing a Share setting is a separate step, done only when the owner asks for it (step 8).
 
 The session is opened on OpenSpineConsortium/symphony-template with OpenSpineConsortium/SchwingNet beside it, since an artifact goes to one of the two:
