@@ -1,0 +1,25 @@
+{
+ "at": "2026-10-22T17:42:06Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 25159c060736",
+  "schwingnet fetch kaggle_fracture_multiregion at commit 25159c0 on warrior 2026-10-22 17:42:05 UTC",
+  "  size budget: 1 entries, 0 GB stated; /rs/rs_grp_oschome has 5888855 GB free, margin 5000 GB",
+  "  2026-10-22 13:42:06 fetch=40712010 bank=40712012 catalog=40712014 [hidden] credentialed=0 size_gb=0 pydrv=/wsu/home/go/go24/go2432/SchwingNet/grid/bin/train-cpu-python",
+  "  submitted: 1 fetch 40712010 -> 2 bank-ingest 40712012 (afterany) -> 3 catalog 40712014 (afterany)",
+  "  ETA: stage 1 is network-bound, about 1 hour per 20 GB on a compute node (0 GB stated, so about 1 hours; a 4-day wall time, requeued on preemption); stage 2 minutes per source (hashing and copying; a JPG set converts at a few hundred frames a minute); stage 3 under a minute.",
+  "  watch: the gate word status; the reports: /wsu/home/go/go24/go2432/SchwingNet/grid/logs/0*-STAGE-REPORT.md",
+  "  xr_fetch: job 40712010",
+  "  xr_bank: job 40712012",
+  "  xr_catalog: job 40712014",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "paperwork-schwingnet-fetch-kaggle_fracture_multiregion",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 25159c060736",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch kaggle_fracture_multiregion"
+}
