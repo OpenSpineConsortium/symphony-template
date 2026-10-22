@@ -1,0 +1,23 @@
+{
+ "at": "2026-10-22T17:41:02Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 25159c060736",
+  "schwingnet fetch idc_nlst at commit 25159c0 on warrior 2026-10-22 17:41:02 UTC",
+  "  size budget: 1 sources, 2305 GB stated; /rs/rs_grp_oschome has 5888866 GB free, margin 5000 GB",
+  "  idc_nlst: job 40711959 (afterany:40704982,afterany:40711923) idc 2305GB",
+  "  2026-10-22 13:41:02 platform chain: idc_nlst=40711959 size_gb=2305",
+  "  ETA: network-bound, about 1 hour per 20 GB, so about 116 hours for 2305 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
+  "  ",
+  "  dp_idc_nlst: job 40711959",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "paperwork-schwingnet-fetch-idc_nlst",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 25159c060736",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch idc_nlst"
+}
