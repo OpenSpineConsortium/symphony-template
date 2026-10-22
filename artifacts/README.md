@@ -2,7 +2,7 @@
 
 Every claude.ai artifact the owner's accounts made for this repository's work, kept here as files so any account can read, edit and republish them. Each folder holds one artifact: index.html for a page (with any image beside it), index.md for a Claude Docs document, exported as Markdown with its embedded widgets dropped. The link is the published artifact on the account that made it; this copy is the one to edit, by pull request, and to republish from with the Artifact tool on any account.
 
-To add the artifacts of another account: list them (Artifact tool, action list), read each page (action read, path index.html, and each other file a scope files listing shows), export each Docs document as Markdown (Claude Docs export), add one folder each here and one row below, in one pull request. Patent material (SchwingNet's methods) goes only to OpenSpineConsortium/SchwingNet, never to a public repository.
+To add the artifacts of another account, open a session on this repository from that account, with OpenSpineConsortium/SchwingNet beside it, and run /export-artifacts (.claude/skills/export-artifacts), adding "and share them" to set the shareable ones to anyone with the link through Claude in Chrome. By hand it is: list them (Artifact tool, action list), read each page (action read, path index.html, and each other file a scope files listing shows), export each Docs document as Markdown (Claude Docs export), add one folder each here and one row below, in one pull request. Patent material (SchwingNet's methods) goes only to OpenSpineConsortium/SchwingNet, never to a public repository.
 
 | Artifact | Folder | Link | What it is |
 |---|---|---|---|
