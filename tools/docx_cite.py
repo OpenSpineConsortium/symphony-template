@@ -8,7 +8,11 @@ from a Zotero library, the item's URI there. A file of citations,
   [{"paragraph": 4, "after": "as shown before", "refs": ["smith2020"]}]
 
 puts each citation straight after the words "after" names in that
-paragraph, which must occur there once. Two forms are written:
+paragraph, which must occur there once, in plain text and not inside a
+citation already there. Paragraphs are numbered as the review sheet numbers
+them (tools/docx_review.py sheet). A paragraph that already holds an
+accepted citation, a field or a link takes another; one with a tracked
+change still waiting is refused until the author accepts or rejects it. Two forms are written:
 
   word    Word's own citations: a CITATION field per citation and the
           reference in the document's source list (References, Manage
@@ -110,19 +114,24 @@ def zotero_code(references, citation_id):
 
 
 def csl_item(item_id, reference):
-    item = {"id": item_id, "type": "article-journal", "title": reference.get("title", "")}
+    kind = reference.get("type") or ("article-journal" if reference.get("venue") else "document")
+    item = {"id": item_id, "type": kind, "title": reference.get("title", "")}
     item["author"] = [person(name) for name in reference.get("authors", [])]
     if reference.get("year"):
         item["issued"] = {"date-parts": [[int(reference["year"])]]}
-    for field, csl in (("doi", "DOI"), ("url", "URL"), ("venue", "container-title")):
+    for field, csl in (("doi", "DOI"), ("url", "URL"), ("venue", "container-title"), ("volume", "volume"),
+                       ("issue", "issue"), ("pages", "page"), ("publisher", "publisher")):
         if reference.get(field):
             item[csl] = reference[field]
     return item
 
 
 def name_parts(name):
-    """Family and given name from "Last, First" or "First Last"."""
+    """Family and given name from "Last, First" or "First Last"; a name in
+    braces, as {World Health Organization}, is one name kept whole."""
     name = " ".join(str(name).split())
+    if name.startswith("{") and name.endswith("}"):
+        return name[1:-1].strip(), ""
     if "," in name:
         family, _, given = name.partition(",")
         return family.strip(), given.strip()
@@ -158,24 +167,33 @@ def field_runs(code, text, rpr):
 
 
 def check_plain(paragraph, index):
-    plain = all(child.tag in dr.PLAIN_PARAGRAPH for child in paragraph) and all(
-        part.tag in dr.PLAIN_RUN for run in paragraph.iter(W + "r") for part in run)
-    if not plain:
-        raise Refused(f"paragraph {index} holds a field, a link or a tracked change; cite in it by hand")
+    """A paragraph is cited in when apply could revise it: plain runs, with
+    citations, other fields and links kept whole, and no tracked change."""
+    try:
+        dr.old_atoms(paragraph, index)
+    except dr.Refused as refusal:
+        raise Refused(str(refusal)) from None
 
 
 def atoms_of(paragraph):
     """Each character the paragraph shows, as (run, element, index in its
-    text), a tab counting as one character at index 0 of its w:tab."""
-    atoms = []
-    for run in paragraph:
-        if run.tag != W + "r":
+    text), a tab counting as one character at index 0 of its w:tab. A
+    character of a citation, another field or a link has no run, since a
+    citation never goes inside one."""
+    atoms, depth = [], 0
+    for child in paragraph:
+        marks = [mark.get(W + "fldCharType") for mark in child.iter(W + "fldChar")] if child.tag == W + "r" else []
+        whole = depth or marks or child.tag != W + "r"
+        for mark in marks:
+            depth += 1 if mark == "begin" else -1 if mark == "end" else 0
+        if whole:
+            atoms += [(None, None, 0)] * len(dr.paragraph_text(child))
             continue
-        for element in run:
+        for element in child:
             if element.tag == W + "t":
-                atoms += [(run, element, at) for at in range(len(element.text or ""))]
+                atoms += [(child, element, at) for at in range(len(element.text or ""))]
             elif element.tag == W + "tab":
-                atoms.append((run, element, 0))
+                atoms.append((child, element, 0))
     return atoms
 
 
@@ -191,6 +209,9 @@ def split_at(paragraph, end):
     """Split the paragraph's runs after its character end - 1 and return
     where in the paragraph a citation goes in."""
     run, element, at = atoms_of(paragraph)[end - 1]
+    if run is None:
+        raise Refused("the words after which to cite end inside a citation, a field or a link; "
+                      "name words of plain text, or put the references in that citation")
     children = list(run)
     after_element = children[children.index(element) + 1:]
     tail = dr.make_run(run.find(W + "rPr"))
@@ -224,8 +245,9 @@ def source_element(reference):
     def put(tag, value):
         if value:
             ET.SubElement(source, B + tag).text = str(value)
+    kind = reference.get("type") or ("article-journal" if reference.get("venue") else "document")
     put("Tag", word_tag(reference))
-    put("SourceType", "JournalArticle" if reference.get("venue") else "Misc")
+    put("SourceType", WORD_TYPES.get(kind, "Misc"))
     put("Guid", "{" + str(uuid_of(reference["key"])).upper() + "}")
     names = reference.get("authors") or []
     if names:
@@ -237,11 +259,23 @@ def source_element(reference):
             if given:
                 ET.SubElement(one, B + "First").text = given
     put("Title", reference.get("title"))
-    put("JournalName", reference.get("venue"))
+    if kind != "book":
+        put(WORD_VENUE.get(kind, "JournalName"), reference.get("venue"))
     put("Year", reference.get("year"))
+    put("Volume", reference.get("volume"))
+    put("Issue", reference.get("issue"))
+    put("Pages", reference.get("pages"))
+    put("Publisher", reference.get("publisher"))
     put("DOI", reference.get("doi"))
     put("URL", reference.get("url") or (f"https://doi.org/{reference['doi']}" if reference.get("doi") else ""))
     return source
+
+
+# Word's own names for what a reference is, and for where it appeared.
+WORD_TYPES = {"article-journal": "JournalArticle", "article": "JournalArticle", "book": "Book",
+              "chapter": "BookSection", "paper-conference": "ConferenceProceedings", "thesis": "Report",
+              "report": "Report", "webpage": "InternetSite", "dataset": "ElectronicSource", "document": "Misc"}
+WORD_VENUE = {"chapter": "BookTitle", "paper-conference": "ConferenceName", "webpage": "InternetSiteTitle"}
 
 
 def uuid_of(text):
@@ -374,13 +408,14 @@ def write_copy(source, parts, target):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("docx")
-    parser.add_argument("--refs", required=True)
-    parser.add_argument("--cite", required=True)
-    parser.add_argument("--out", required=True)
-    parser.add_argument("--form", default="word", choices=FORMS)
-    parser.add_argument("--author", default="Claude")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("docx", help="the document to cite in; it is read, never written")
+    parser.add_argument("--refs", required=True, help="references.json, from tools/notebook.py refs")
+    parser.add_argument("--cite", required=True, help='the citations: [{"paragraph", "after", "refs"}]')
+    parser.add_argument("--out", required=True, help="the copy to write")
+    parser.add_argument("--form", default="word", choices=FORMS,
+                        help="word: Word's own citations, no add-in (default); zotero: Zotero's fields")
+    parser.add_argument("--author", default="Claude", help="the name Word shows on each change (default Claude)")
     args = parser.parse_args(argv)
     try:
         references = json.loads(Path(args.refs).read_text(encoding="utf-8"))
