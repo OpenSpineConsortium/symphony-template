@@ -28,6 +28,7 @@
   "test_profile": 0.5,
   "test_profile_report": 0.3,
   "test_protocol_update": 0.6,
+  "test_review_record": 0.1,
   "test_sealbox": 0.1,
   "test_setup_repo": 53.2,
   "test_sync_adopted": 1.2,
