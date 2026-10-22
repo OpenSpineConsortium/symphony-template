@@ -1,8 +1,8 @@
 {
- "at": "2026-10-22T10:56:22Z",
+ "at": "2026-10-22T12:04:50Z",
  "lines": [
   "HPCW-GRID-GATE schwingnet pull current f4fc5040123b",
-  "schwingnet status at commit f4fc504 on warrior 2026-10-22 10:56:21 UTC",
+  "schwingnet status at commit f4fc504 on warrior 2026-10-22 12:04:49 UTC",
   "## the gate's newest jobs (sacct): id, what, state, elapsed, exit code, node",
   "  40697676 setup COMPLETED 00:05:10 0:0 sfx3",
   "  40697677 weights COMPLETED 00:00:11 0:0 hao1",
@@ -14,9 +14,9 @@
   "  40697685 [hidden] COMPLETED 00:39:09 0:0 arw6",
   "  40697686 dp_zenodo_medpelvis3d COMPLETED 02:51:48 0:0 mem2",
   "  40697687 dp_zenodo_lumvbcanseg COMPLETED 00:35:25 0:0 tta1",
-  "  40697688 dp_zenodo_lumos RUNNING 03:49:09 0:0 hao1",
-  "  40697689 dp_zenodo_ts_task_hip_implant PENDING 00:00:00 0:0 None assigned",
-  "  40697690 [hidden] PENDING 00:00:00 0:0 None assigned",
+  "  40697688 dp_zenodo_lumos COMPLETED 03:53:09 0:0 hao1",
+  "  40697689 dp_zenodo_ts_task_hip_implant COMPLETED 00:38:53 0:0 hao1",
+  "  40697690 [hidden] RUNNING 00:25:17 0:0 hao1",
   "  40697691 dp_zenodo_ts_task_liver_lesions PENDING 00:00:00 0:0 None assigned",
   "  40697692 dp_zenodo_tmtv_benchmark PENDING 00:00:00 0:0 None assigned",
   "  40697693 dp_tcia_ct_colonography PENDING 00:00:00 0:0 None assigned",
@@ -274,7 +274,7 @@
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "rc": 0,
- "request": "granted-status-1",
+ "request": "3d-priors-census-status-6",
  "said": [
   "HPCW-GRID-GATE schwingnet pull current f4fc5040123b",
   "HPCW-GRID-GATE schwingnet status ok"
