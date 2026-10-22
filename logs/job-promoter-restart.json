@@ -1,0 +1,15 @@
+{
+ "at": "2026-10-22T04:56:27Z",
+ "lines": [
+  "stopped",
+  "HPCW-JOB submitted 40702556 promoter reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40702556.out",
+  "HPCW-GRID-GATE promoter restart ok at ed2d3b08b0a6"
+ ],
+ "rc": 0,
+ "request": "jr9apa-restart",
+ "said": [
+  "HPCW-GRID-GATE promoter restart ok at ed2d3b08b0a6"
+ ],
+ "v": 1,
+ "what": "promoter restart"
+}
