@@ -10,5 +10,9 @@ To add the artifacts of another account, open a session on this repository from 
 | Several grid workers, one per project | [several-grid-workers-one-per-project](several-grid-workers-one-per-project/) | https://claude.ai/artifact/UjuFBMxLEL8CnifRofU3Vv | first account | Plan for multi-project grid workers in Beethoven, awaiting greg's go (Docs type, kept as Markdown) |
 | Beethoven on the Chrome Web Store | [beethoven-on-the-chrome-web-store](beethoven-on-the-chrome-web-store/) | https://claude.ai/artifact/XxNp8Uy3FfWDSwMExpvLMT | first account | The store upload and automatic releases (Docs type, kept as Markdown) |
 | Symphony Handoff | [symphony-handoff](symphony-handoff/) | https://claude.ai/artifact/XQj71up9dbJhwSStCVUe9T | first account | Symphony handoff of 2026-10-13, with its files: PLAN.md, HANDOFF.md, the designs, free-or-paid.md, session.md and a patch |
+| Beethoven build roadmap | [beethoven-build-roadmap-sttvvw](beethoven-build-roadmap-sttvvw/) | https://claude.ai/artifact/StTvVVwZBJRq7PELUmLSbG | gregoryamdg | The six-phase build roadmap for Beethoven and its extension (Docs type, kept as Markdown) |
+| The Dollar-per-Feature Ladder | [the-dollar-per-feature-ladder-9ymg61](the-dollar-per-feature-ladder-9ymg61/) | https://claude.ai/artifact/9Ymg61SPUZTqaNBCbzGHMx | gregoryamdg | What the template costs at each price rung, verified 9 October 2026 (Docs type, kept as Markdown) |
 
 Exported 2026-10-22 from the first account, the one at 97% of its usage that day.
+
+Exported 2026-10-22 from gregoryamdg: 2 artifacts copied here; 24 sent to the other repository of the owner's (counted there).
