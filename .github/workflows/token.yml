@@ -97,7 +97,7 @@ jobs:
           KEY_ID: ${{ inputs.key_id }}
         run: python3 tools/token_run.py
       # a step that failed before the script could say so, so the page is told at once
-      - name: Say that the run stopped
+      - name: If a step failed, say why (skipped when all went well)
         if: failure()
         run: python3 tools/token_run.py fail
 
@@ -164,10 +164,10 @@ jobs:
           LEND_TO: ${{ inputs.lend_to }}
           TOKEN_FILE: ${{ runner.temp }}/claude-token
         run: python3 tools/token_run.py store
-      - name: Say that the run stopped
+      - name: If a step failed, say why (skipped when all went well)
         if: failure()
         run: python3 tools/token_run.py fail
-      - name: Remove the held token
+      - name: Delete the held token from the runner (runs every time)
         if: always()
         env:
           TOKEN_FILE: ${{ runner.temp }}/claude-token
@@ -208,7 +208,7 @@ jobs:
           MANAGE: ${{ inputs.manage }}
           TARGET_REPO_ID: ${{ inputs.target }}
         run: python3 tools/token_run.py manage
-      - name: Say that the run stopped
+      - name: If a step failed, say why (skipped when all went well)
         if: failure()
         run: python3 tools/token_run.py fail
 
