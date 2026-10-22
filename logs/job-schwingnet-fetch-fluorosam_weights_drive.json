@@ -1,0 +1,23 @@
+{
+ "at": "2026-10-22T23:19:30Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current be1a3eb58327",
+  "schwingnet fetch fluorosam_weights_drive at commit be1a3eb on warrior 2026-10-22 23:19:29 UTC",
+  "  size budget: 1 sources, 1 GB stated; /rs/rs_grp_oschome has 5886986 GB free, margin 5000 GB",
+  "  fluorosam_weights_drive: job 40731148 (afterany:40704982) gdown 1.0GB",
+  "  2026-10-22 19:19:29 platform chain: [hidden] size_gb=1",
+  "  ETA: network-bound, about 1 hour per 20 GB, so about 1 hours for 1 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
+  "  ",
+  "  dp_fluorosam_weights_drive: job 40731148",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "granted-fluorosam-1",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current be1a3eb58327",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch fluorosam_weights_drive"
+}
