@@ -52,8 +52,36 @@ split-check a catalog, and train and score a first model run on a GPU node.
 - A job's output moves from the repository's grid/logs to hpcworker's log folder for the project, and
   status reads it with `job log`, falling back to grid/logs for jobs queued before the move.
 
+## Measured once the move was merged
+
+- job submit queued a real chain on the grid: SchwingNet's #78 merged on 2026-10-22, and the next
+  gate word (fetch of one PhysioNet set) queued its fetch, bank and catalog jobs through it with
+  their afterany waits, each asked with --check first, and status read them back.
+
+## Reading a .netrc as wget does
+
+- A tool that names the login wget will send must read ~/.netrc as wget does, not with Python's
+  netrc module: that module refused the grid's file, which wget reads, and stopped every PhysioNet
+  fetch before its first request (SchwingNet #100, #102). The reader there is a port of wget 1.21's
+  parse_netrc_fp and search_netrc: keywords matched as written, a backslash taken out in any token,
+  the character after a closing quote eaten, an entry with no login dropped, the file read as bytes,
+  and no fallback to default, since wget given --user ignores it. A review against wget's source and
+  a real wget found each of those differences in the first version.
+- PhysioNet answering 401 and then 403 means wget's first request went without a login and the
+  second, with it, was refused: the login was taken and the account lacks access to that project,
+  which its page grants once its data use agreement is signed.
+
+## The protocol check and a moving default branch
+
+- The protocol check (symphony-protocol's checkout_of) counts the checkout as GitHub's test merge
+  only when its first parent is the event's base sha. When the default branch moved while a pull
+  request was pushed and marked ready, the ready_for_review event's run failed with "the checkout
+  is neither the head the event names, nor GitHub's test merge of it", and a re-run, which reads the
+  same event, failed the same way; a push that brought the default branch in gave the next event a
+  base that matched, and the check passed. Twice on 2026-10-22 (SchwingNet #78, #102). The fix
+  belongs in symphony-protocol, not in a copy.
+
 ## What is not measured yet
 
 - Whether Slurm on the grid accepts `sbatch --test-only` with `--array`.
-- A full start graph queued through job submit on the grid; the move was checked against the real
-  hpcworker 27 with a stand-in sbatch, not against Slurm itself.
+- A full start graph, setup to the version 1 run, queued through job submit.
