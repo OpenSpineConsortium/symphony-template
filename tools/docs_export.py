@@ -28,7 +28,11 @@ import sys
 from pathlib import Path
 
 ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
-SAVED = re.compile(r"<persisted-output>.*?saved to: (\S+)", re.S)
+# Claude Code notes a large result of one of its own tools in the first
+# form, and a large result of an MCP tool, as Claude Docs' export is, in the
+# second, whose sentence ends with a full stop after the path
+SAVED = re.compile(r"<persisted-output>.*?saved to: (\S+)"
+                   r"|exceeds maximum allowed tokens\. Output has been saved to (\S+)", re.S)
 
 
 class Refused(Exception):
@@ -119,13 +123,13 @@ def results_folder(transcript):
 
 def saved_output(transcript, text):
     """The whole result where Claude Code saved a large one to a file and
-    kept only a preview: read only from this session's own tool-results
-    folder, whatever path the note names."""
+    kept only a preview or a note: read only from this session's own
+    tool-results folder, whatever path the note names."""
     found = SAVED.search(text)
     if not found:
         return text
     folder = results_folder(transcript)
-    path = Path(found.group(1)).resolve()
+    path = Path((found.group(1) or found.group(2)).rstrip(".")).resolve()
     if path.parent != folder or not path.is_file():
         raise Refused(f"the result was saved to {path}, outside {folder}; export it again")
     saved = path.read_text(encoding="utf-8")

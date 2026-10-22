@@ -136,6 +136,29 @@ class DocsExportTest(unittest.TestCase):
         self.assertEqual(code, 0, said)
         self.assertEqual(self.out.read_bytes(), TEXT)
 
+    def test_a_large_mcp_result_is_read_from_the_file_its_note_names(self):
+        # the note as Claude Code wrote it for a 277,410-character MCP result on 2026-10-22
+        saved = self.folder / "session" / "tool-results" / "mcp-Claude_Docs-export-1792649216821.txt"
+        saved.parent.mkdir(parents=True)
+        saved.write_text(answer(TEXT, notes="<artifact-content-authored-by-others/>\n"), encoding="utf-8")
+        self.record(call(1), result(1, "Error: result (60,123 characters across 1 line) exceeds maximum allowed "
+                                       f"tokens. Output has been saved to {saved}.\nFormat: Plain text\n"
+                                       "Search within the file for specific content, and use jq if the content "
+                                       "is JSON.\n"))
+        code, said = self.run_tool(DOC, TAB, str(self.out))
+        self.assertEqual(code, 0, said)
+        self.assertEqual(self.out.read_bytes(), TEXT)
+
+    def test_a_large_mcp_result_saved_outside_the_sessions_folder_is_never_read(self):
+        elsewhere = self.folder / "elsewhere.txt"
+        elsewhere.write_text(answer(TEXT), encoding="utf-8")
+        self.record(call(1), result(1, "Error: result (60,123 characters across 1 line) exceeds maximum allowed "
+                                       f"tokens. Output has been saved to {elsewhere}.\nFormat: Plain text\n"))
+        code, said = self.run_tool(DOC, TAB, str(self.out))
+        self.assertEqual(code, 1)
+        self.assertIn("outside", said)
+        self.assertFalse(self.out.exists())
+
     def test_a_saved_result_outside_the_sessions_folder_is_never_read(self):
         elsewhere = self.folder / "elsewhere.txt"
         elsewhere.write_text(answer(TEXT), encoding="utf-8")
