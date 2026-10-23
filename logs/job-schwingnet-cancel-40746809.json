@@ -1,0 +1,18 @@
+{
+ "at": "2026-10-23T14:06:27Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 129a5a98ff5c",
+  "schwingnet cancel 40746809 at commit 129a5a9 on warrior 2026-10-23 14:06:27 UTC",
+  "cancelled (fetch:kaggle_fracture_multiregion): 40746805 40746807 40746809 ",
+  "schwingnet cancel: exit 0",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "rc": 0,
+ "request": "cancel-40746809",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 129a5a98ff5c",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "v": 1,
+ "what": "schwingnet cancel 40746809"
+}
