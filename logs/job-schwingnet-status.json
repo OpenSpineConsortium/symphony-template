@@ -1,5 +1,5 @@
 {
- "at": "2026-10-23T15:39:16Z",
+ "at": "2026-10-23T16:26:29Z",
  "lines": [
   "  The CephFS quota or its use could not be read, so the size rule admits no fetch:",
   "    ceph.quota.max_bytes reads 21990232555520",
@@ -244,7 +244,6 @@
   "  ",
   "  140 groups, 7008826 files, 7.3 TB.",
   "## the gate's newest jobs (sacct): id, what, state, elapsed, exit code, node",
-  "  40697704 dp_zenodo_unitochest COMPLETED 03:26:08 0:0 csc1",
   "  40697705 dp_zenodo_vsd_fullbody COMPLETED 07:14:01 0:0 csc1",
   "  40697706 dp_hf_abdomenatlas2_0_mini FAILED 05:57:06 1:0 amy1",
   "  40697707 dp_idc_lidc_idri FAILED 00:01:03 1:0 amy1",
@@ -367,6 +366,7 @@
   "  40746809 xr_catalog CANCELLED by 7152432 00:00:00 0:0 None assigned",
   "  40747985 explore COMPLETED 00:01:40 0:0 arw4",
   "  40748135 explore COMPLETED 00:03:13 0:0 hao1",
+  "  40748867 explore COMPLETED 00:00:38 0:0 csc1",
   "## 40697706 (dp_hf_abdomenatlas2_0_mini) ended FAILED after 05:57:06, exit 1:0",
   "    DP_FETCH start 2026-10-23 02:25:37 on amy1 job 40697706",
   "    DP_FETCH_RC=1 2026-10-23 08:22:42",
@@ -403,9 +403,9 @@
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "rc": 0,
- "request": "room-after-161",
+ "request": "status-1625",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull ok 5cbab994c0ad..83354d0c535f",
+  "HPCW-GRID-GATE schwingnet pull current 951b653293ef",
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "v": 1,

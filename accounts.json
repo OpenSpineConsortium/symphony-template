@@ -1,6 +1,6 @@
 {
  "action": "job",
- "at": "2026-10-23T16:03:56Z",
+ "at": "2026-10-23T16:26:32Z",
  "list": {
   "accounts": [
    {
@@ -67,7 +67,7 @@
    "name": "worker",
    "node": "csc1",
    "state": "online",
-   "updated_at": "2026-10-23T16:03:54Z"
+   "updated_at": "2026-10-23T16:26:31Z"
   },
   "workers": [
    {
@@ -82,7 +82,7 @@
   ]
  },
  "rc": 0,
- "request": "explore-fracture-rerun",
+ "request": "status-1625",
  "said": [
   "HPCW-GRID-GATE accounts ok"
  ],
