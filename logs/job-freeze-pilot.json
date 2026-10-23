@@ -1,0 +1,15 @@
+{
+ "at": "2026-10-23T13:13:54Z",
+ "lines": [
+  "queueing 1 sets: amos22 ",
+  "HPCW-JOB submitted 40744799 freeze reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40744799.out",
+  "HPCW-GRID-GATE freeze pilot ok at 0ece3de1ab73"
+ ],
+ "rc": 0,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE freeze pilot ok at 0ece3de1ab73"
+ ],
+ "v": 1,
+ "what": "freeze pilot"
+}
