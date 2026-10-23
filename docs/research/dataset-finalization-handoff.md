@@ -10,7 +10,7 @@ A new gate word, `dropzip <id>`, does it in one batch job that deletes a zip onl
 
 - hpcworker #40, the gate admits `schwingnet dropzip <id>`: merged, and the grid's clone took it by the `update` job word at 18:04 UTC (`update ok ..a6e6fe2a39c3`, framework 28).
 - symphony-template #424, grid-accounts.yml takes `schwingnet-dropzip-<id>`: merged.
-- SchwingNet #174, the word itself (tools/dropzip.py, grid/dropzip.sbatch, grid/gate.sh): open, ready, auto-merge armed; at 18:10 every check had passed but the beethoven-qa `gate` job, still running. The grid's SchwingNet fast-forwards to main by itself on the next gate send, unless grid/logs/HOLD exists.
+- SchwingNet #174, the word itself (tools/dropzip.py, grid/dropzip.sbatch, grid/gate.sh): merged at 18:07 UTC.
 
 ## The next steps, in order
 
