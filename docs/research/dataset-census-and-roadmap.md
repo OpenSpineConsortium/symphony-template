@@ -4,6 +4,7 @@ Source: the thread "Dataset census and roadmap", 2026-10-23, on OpenSpineConsort
 The work is spine-datasets #179 (issue #178, merged as 6856c4b), the tracks #174 to #177 and the
 tasks #181 to #208; another thread's #209 (merged as 90c4c92) then moved 18 more records to `held`.
 The CT part is spine-datasets #213 (issue #181, merged as 62068b2) and #214 (merged as b6fe73f).
+The check of the owner's list of fluoroscopy sets is spine-datasets #217 (merged as 0ece3de).
 The artifact "Spine Data Census" (https://claude.ai/artifact/PJrXJCBK8S4m8igHf5Q3MU) is a copy of
 the page the census wrote on the branch `census` at aa67051, and the artifact "Spine CT Census"
 (https://claude.ai/artifact/2LDmxK2rfnmcVNyWURpabv) a copy of the CT page beside it.
@@ -166,6 +167,27 @@ What it taught, for any census of masks:
    count among them.
 5. A sum over records counts a CT twice where two records hold it (AbdomenAtlas 3.0 Mini holds
    PANORAMA's 274 cases), so the page says so in place of folding them.
+
+## The owner's list of fluoroscopy sets, checked
+
+On 2026-10-23 the owner shared a two-page summary from Google Gemini of public fluoroscopy sets and
+asked whether the census was missing any. Each item was checked against its own source:
+
+- Already recorded: Veriserum, DeepFluoro, LevelCheck and CTSpine1K.
+- Not datasets: X23D (Jecklin et al., J Imaging 2022) has no data of its own, since it renders
+  CTSpine1K's CTs; DeepDRR, DiffDRR and ProST are simulators; and the NIH and Yale denoising paper
+  (Sadda and Qarni 2018) released no data.
+- Unnamed until then: the record cm_spine_drive_file is CM Spine of Zeng et al., Electronics 2024,
+  whose repository links the same Drive file: 208 intraoperative AP lumbar G-arm frames with L1 to
+  L5 annotated, and no licence stated anywhere.
+- Missing: CAMS-Knee (Taylor et al., J Biomech 2017), now the record cams_knee, behind an agreement
+  the requesting institution signs, for non-commercial use. Stan (Dreyer et al., J Biomech 2022) is
+  a reference subject made from CAMS-Knee's loads and kinematics, with no images, so it has no
+  record of its own and the CAMS-Knee record says why.
+
+The summary was wrong in several places, so it is never cited as a source. CM Spine needs no email
+to the authors, Stan has no fluoroscopic video, and the denoiser takes 21 ms a frame on a GPU, not
+under a millisecond.
 
 ## The roadmap
 
