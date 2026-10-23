@@ -1,5 +1,5 @@
 {
- "at": "2026-10-23T12:34:43Z",
+ "at": "2026-10-23T12:48:02Z",
  "lines": [
   "  the volume's quota: 21991 GB",
   "  data: 13528 GB in all",
@@ -363,7 +363,7 @@
   "  40732922 xr_fetch FAILED 00:00:09 1:0 mmi3",
   "  40732924 xr_bank COMPLETED 00:00:03 0:0 mmi3",
   "  40732926 xr_catalog COMPLETED 00:00:04 0:0 csc1",
-  "  40743332 dp_hf_cads_unique RUNNING 01:12:05 0:0 csc1",
+  "  40743332 dp_hf_cads_unique RUNNING 01:25:24 0:0 csc1",
   "  40743347 dp_hf_rexgradient_160k COMPLETED 00:59:35 0:0 hao1",
   "## 40697706 (dp_hf_abdomenatlas2_0_mini) ended FAILED after 05:57:06, exit 1:0",
   "    DP_FETCH start 2026-10-23 02:25:37 on amy1 job 40697706",
@@ -403,9 +403,9 @@
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "rc": 0,
- "request": "freeze-check",
+ "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull ok 7f6a4bb3a47c..7708538abbaa",
+  "HPCW-GRID-GATE schwingnet pull current 7708538abbaa",
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "v": 1,
