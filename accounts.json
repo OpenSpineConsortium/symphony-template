@@ -1,6 +1,6 @@
 {
  "action": "job",
- "at": "2026-10-23T14:48:20Z",
+ "at": "2026-10-23T14:49:25Z",
  "list": {
   "accounts": [
    {
@@ -60,24 +60,24 @@
   "v": 1,
   "worker": {
    "account": null,
-   "age_s": 1,
+   "age_s": 26,
    "job": "40739111",
-   "link": "",
-   "message": "checking the container and the sign-in",
+   "link": "https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m",
+   "message": "Open in Claude: https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m (or tap Code in the Claude app). space to show QR code",
    "name": "worker",
    "node": "csc1",
-   "state": "starting",
-   "updated_at": "2026-10-23T14:48:19Z"
+   "state": "online",
+   "updated_at": "2026-10-23T14:48:59Z"
   },
   "workers": [
    {
     "account": null,
-    "age_s": 1,
-    "link": "",
+    "age_s": 26,
+    "link": "https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m",
     "name": "worker",
     "node": "csc1",
     "pinned": null,
-    "state": "starting"
+    "state": "online"
    }
   ]
  },
