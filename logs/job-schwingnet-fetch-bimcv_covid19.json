@@ -1,0 +1,25 @@
+{
+ "at": "2026-10-23T00:11:39Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull ok be1a3eb58327..b12fe33b77ea",
+  "schwingnet fetch bimcv_covid19 at commit b12fe33 on warrior 2026-10-23 00:11:36 UTC",
+  "  size budget: 1 entries, 389 GB stated; /rs/rs_grp_oschome has 5886916 GB free, margin 5000 GB",
+  "  2026-10-22 20:11:39 fetch=40732922 bank=40732924 catalog=40732926 only=bimcv_covid19 credentialed=0 size_gb=389 pydrv=/wsu/home/go/go24/go2432/SchwingNet/grid/bin/train-cpu-python",
+  "  submitted: 1 fetch 40732922 -> 2 bank-ingest 40732924 (afterany) -> 3 catalog 40732926 (afterany)",
+  "  ETA: stage 1 is network-bound, about 1 hour per 20 GB on a compute node (389 GB stated, so about 20 hours; a 4-day wall time, requeued on preemption); stage 2 minutes per source (hashing and copying; a JPG set converts at a few hundred frames a minute); stage 3 under a minute.",
+  "  watch: the gate word status; the reports: /wsu/home/go/go24/go2432/SchwingNet/grid/logs/0*-STAGE-REPORT.md",
+  "  xr_fetch: job 40732922",
+  "  xr_bank: job 40732924",
+  "  xr_catalog: job 40732926",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull ok be1a3eb58327..b12fe33b77ea",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch bimcv_covid19"
+}
