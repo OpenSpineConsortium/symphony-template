@@ -1,21 +1,21 @@
 {
- "at": "2026-10-22T17:12:23Z",
+ "at": "2026-10-23T11:22:22Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull ok a0e43dd762ea..0770619e0383",
-  "schwingnet fetch hf_cads_unique at commit 0770619 on warrior 2026-10-22 17:12:22 UTC",
-  "  size budget: 1 sources, 124 GB stated; /rs/rs_grp_oschome has 5889097 GB free, margin 5000 GB",
-  "  hf_cads_unique: job 40710713 (afterany:40704982) hf-token 123.3GB",
-  "  2026-10-22 13:12:22 platform chain: hf_cads_unique=40710713 size_gb=124",
+  "HPCW-GRID-GATE schwingnet pull current 7f6a4bb3a47c",
+  "schwingnet fetch hf_cads_unique at commit 7f6a4bb on warrior 2026-10-23 11:22:22 UTC",
+  "  size budget: 1 sources, 124 GB stated; /rs/rs_grp_oschome has 5881937 GB free, margin 5000 GB",
+  "  hf_cads_unique: job 40743332 hf-token 123.3GB",
+  "  2026-10-23 07:22:22 platform chain: hf_cads_unique=40743332 size_gb=124",
   "  ETA: network-bound, about 1 hour per 20 GB, so about 7 hours for 124 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
   "  ",
-  "  dp_hf_cads_unique: job 40710713",
+  "  dp_hf_cads_unique: job 40743332",
   "schwingnet fetch: exit 0",
   "HPCW-GRID-GATE schwingnet fetch ok"
  ],
  "rc": 0,
- "request": "granted-cads-2",
+ "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull ok a0e43dd762ea..0770619e0383",
+  "HPCW-GRID-GATE schwingnet pull current 7f6a4bb3a47c",
   "HPCW-GRID-GATE schwingnet fetch ok"
  ],
  "v": 1,
