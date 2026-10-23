@@ -18,6 +18,7 @@
   "test_filled_copy": 167.6,
   "test_github_digest": 0.2,
   "test_guard_push": 0.2,
+  "test_handoff": 2.6,
   "test_living_docs": 0.5,
   "test_marked_section": 0.3,
   "test_metrics": 10.2,
