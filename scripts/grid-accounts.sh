@@ -24,12 +24,12 @@ case "$ACTION" in
        elif [ -n "$NAME" ]; then [[ "$NAME" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { echo "::error::a worker's name is up to 32 letters, digits, _ or -"; exit 1; }; WHAT="worker $NAME"; LOGFILE="worker-$NAME"
        else WHAT=usage; LOGFILE=usage; fi;;
   # one of the gate's job words (hpcworker #23, the owner's choice of 2026-10-21), named as one word
-  # here: the gate takes these and no other; SchwingNet's fetch and census carry one id after it
+  # here: the gate takes these and no other; SchwingNet's fetch, census and cancel carry one id after it
   # (schwingnet-fetch-vindr_pcxr), which SchwingNet's grid/gate.sh checks again against its own list
   job) JOB=${JOB:-}
     if [[ "$JOB" =~ ^(update|artifacts|promoter-(status|start|stop|restart)|schwingnet-(start|status|leaks|v1|latency|stop|prior|chain_eval|samples))$ ]]; then WHAT=${JOB/-/ }
-    elif [[ "$JOB" =~ ^schwingnet-(fetch|census)-([a-z0-9_]{1,40})$ ]]; then WHAT="schwingnet ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
-    else echo "::error::the job is one of update, artifacts, promoter-status, promoter-start, promoter-stop, promoter-restart, schwingnet-start, schwingnet-status, schwingnet-leaks, schwingnet-v1, schwingnet-latency, schwingnet-stop, schwingnet-prior, schwingnet-chain_eval, schwingnet-samples, schwingnet-fetch-<id> or schwingnet-census-<id>"; exit 1; fi
+    elif [[ "$JOB" =~ ^schwingnet-(fetch|census|cancel)-([a-z0-9_]{1,40})$ ]]; then WHAT="schwingnet ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+    else echo "::error::the job is one of update, artifacts, promoter-status, promoter-start, promoter-stop, promoter-restart, schwingnet-start, schwingnet-status, schwingnet-leaks, schwingnet-v1, schwingnet-latency, schwingnet-stop, schwingnet-prior, schwingnet-chain_eval, schwingnet-samples, schwingnet-fetch-<id>, schwingnet-census-<id> or schwingnet-cancel-<job>"; exit 1; fi
     LOGFILE="job-$JOB";;
 esac
 [[ "$REQUEST" =~ ^[A-Za-z0-9_-]{0,64}$ ]] || { echo "::error::the request is a short plain name"; exit 1; }
