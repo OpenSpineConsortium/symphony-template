@@ -6,6 +6,7 @@ Source: the thread "Spine knowledge synthesis", 2026-10-23, on the owner's ask o
 
 - Symphony and the operations that serve every project: this note.
 - The datasets, by the question each can answer, with the paired CT and X-ray breakout: spine-datasets docs/research/datasets-by-question.md (spine-datasets #180, step 4 of its track #175). The generated census is that repository's #178.
+- The paired CT and X-ray sets by tier, and the annotation plan: paired-ct-xray-annotation-plan.md, beside this note (the thread "Paired CT and X-ray datasets").
 - SchwingNet's research: SchwingNet docs/research/state-of-knowledge.md (SchwingNet #147), confidential, read there.
 - The owner's claude.ai artifacts as one book: SchwingNet's artifact-textbook programme (#120).
 
