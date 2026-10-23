@@ -1,7 +1,7 @@
 {
  "default_branch": "main",
  "format": 1,
- "generated_at": "2026-10-23T13:54:29Z",
+ "generated_at": "2026-10-23T14:43:47Z",
  "pulls": [
   {
    "auto_merge_enabled": null,
@@ -12695,6 +12695,73 @@
    "runs_cancelled": 1,
    "stale_seconds": 0,
    "started": "2026-10-23T13:47:04Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-fijxar",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "289e891b0e7a97f07e97dbf7e3ed50f12750fe1f",
+     [
+      415
+     ]
+    ]
+   ],
+   "check_runs": 3,
+   "check_runs_redone": 1,
+   "check_seconds": 966,
+   "check_seconds_redone": 294,
+   "claim": false,
+   "closed": "2026-10-23T14:42:53Z",
+   "commits": 3,
+   "first_green": "2026-10-23T14:42:21Z",
+   "force_pushes": 0,
+   "landings_after_green": 1,
+   "landings_during_life": 2,
+   "merged": "2026-10-23T14:42:53Z",
+   "number": 416,
+   "opened": "2026-10-23T13:48:44Z",
+   "ready": "2026-10-23T13:49:39Z",
+   "reruns": 0,
+   "runs_cancelled": 2,
+   "stale_seconds": 0,
+   "started": "2026-10-23T13:41:05Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-t7h01z",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 280,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-23T14:42:40Z",
+   "commits": 1,
+   "first_green": "2026-10-23T14:40:44Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-23T14:42:40Z",
+   "number": 417,
+   "opened": "2026-10-23T14:35:59Z",
+   "ready": "2026-10-23T14:35:59Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-23T14:35:45Z"
   }
  ],
  "repository": "OpenSpineConsortium/symphony-template",
@@ -12844,36 +12911,36 @@
     "with_catch_up": 4
    },
    "2026-10-23": {
-    "catch_ups": 8,
-    "check_runs": 32,
-    "check_runs_redone": 6,
-    "merged": 26,
-    "share_with_catch_up": 0.269,
+    "catch_ups": 9,
+    "check_runs": 36,
+    "check_runs_redone": 7,
+    "merged": 28,
+    "share_with_catch_up": 0.286,
     "stale_after_green": 3,
     "stale_hours": 13.51,
-    "with_catch_up": 7
+    "with_catch_up": 8
    }
   },
   "by_parallel_work": {
    "0": {
     "catch_ups": 5,
-    "check_runs": 79,
+    "check_runs": 78,
     "check_runs_redone": 4,
-    "merged": 68,
-    "share_with_catch_up": 0.074,
+    "merged": 67,
+    "share_with_catch_up": 0.075,
     "stale_after_green": 0,
     "stale_hours": 0.0,
     "with_catch_up": 5
    },
    "1-2": {
-    "catch_ups": 32,
-    "check_runs": 149,
-    "check_runs_redone": 26,
-    "merged": 107,
-    "share_with_catch_up": 0.262,
+    "catch_ups": 33,
+    "check_runs": 154,
+    "check_runs_redone": 27,
+    "merged": 110,
+    "share_with_catch_up": 0.264,
     "stale_after_green": 17,
     "stale_hours": 8.68,
-    "with_catch_up": 28
+    "with_catch_up": 29
    },
    "11+": {
     "catch_ups": 20,
@@ -12918,23 +12985,23 @@
     "with_catch_up": 3
    },
    "no_claim": {
-    "catch_ups": 239,
-    "check_runs": 605,
-    "check_runs_redone": 198,
-    "merged": 348,
-    "share_with_catch_up": 0.422,
+    "catch_ups": 240,
+    "check_runs": 609,
+    "check_runs_redone": 199,
+    "merged": 350,
+    "share_with_catch_up": 0.423,
     "stale_after_green": 95,
     "stale_hours": 93.79,
-    "with_catch_up": 147
+    "with_catch_up": 148
    }
   },
-  "catch_ups": 244,
+  "catch_ups": 245,
   "catch_ups_by_button": 18,
   "catch_ups_max": 6,
-  "check_hours": 32.61,
-  "check_hours_redone": 10.66,
-  "check_runs": 655,
-  "check_runs_redone": 200,
+  "check_hours": 32.95,
+  "check_hours_redone": 10.74,
+  "check_runs": 659,
+  "check_runs_redone": 201,
   "closed_unmerged": 3,
   "closed_unmerged_branch_landed_later": 2,
   "default_branch_checks": {
@@ -12983,24 +13050,24 @@
     "success": 28
    },
    "2026-10-23": {
-    "success": 22
+    "success": 23
    }
   },
   "force_pushes": 32,
-  "landings_after_green_total": 205,
-  "landings_during_life_mean": 1.66,
+  "landings_after_green_total": 206,
+  "landings_during_life_mean": 1.65,
   "landings_during_life_median": 1.0,
   "live": {
    "pulls_seen": 42,
    "pulls_seen_behind": 0,
    "pulls_seen_dirty": 7,
    "since": "2026-10-20T21:50:52Z",
-   "snapshots": 94
+   "snapshots": 95
   },
-  "merged": 358,
+  "merged": 360,
   "reruns": 5,
   "share_runs_redone": 0.305,
-  "share_stale_after_green": 0.265,
+  "share_stale_after_green": 0.264,
   "share_with_catch_up": 0.419,
   "stale_after_green": 95,
   "stale_hours_total": 93.79,
@@ -13110,7 +13177,7 @@
    }
   ],
   "with_board_conflict": 0,
-  "with_catch_up": 150
+  "with_catch_up": 151
  },
  "unread": 0,
  "workflow": "ci.yml"
