@@ -14,8 +14,8 @@ A new gate word, `dropzip <id>`, does it in one batch job that deletes a zip onl
 
 ## The next steps, in order
 
-1. Confirm SchwingNet #174 merged (auto-merge by github-actions[bot]; it closes no issue).
-2. Run grid-accounts.yml on symphony-template's main with action `job`, job `schwingnet-dropzip-rsna_rspect_pe`, any request tag. This is the one job the owner approved. The answer lands on the branch `grid` in logs/job-schwingnet-dropzip-rsna_rspect_pe.json and names the queued job.
+1. Done: SchwingNet #174 merged at 18:07 UTC.
+2. Done: the one approved job was sent at 18:16 UTC (request dz-rspect-1) and queued as job 40751186; the grid's SchwingNet pulled to e064e3c first. Do not send the word again while that job is live, or it is refused; never queue a second.
 3. Check it with the status word (job `schwingnet-status`) until the job is done, then send the same dropzip word again: it prints logs/DROPZIP-rsna_rspect_pe.md once. Expect "deleted, 534 GB ... all 1,937,450 files" (the zip holds 1,937,450 members; the exact size printed is the zip's own) and "freed" near 534 GB. Any "kept" line means nothing was deleted; report it to the owner and stop.
 4. In spine-datasets, by pull request, update datasets/rsna_rspect.json: a history entry that the zip was deleted (the job id and the freed size), the obstacle about the zip removed, and `next` left as "the census counts the CT volumes". Run bash scripts/check.sh first; the record's issue #88 is already closed, so the branch is not a claim branch.
 5. Correct the team memory grid-deletions-are-greg-shell: a deletion of a set's own download zip now goes through `dropzip`; anything else is still the owner's shell.
