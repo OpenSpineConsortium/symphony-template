@@ -1,8 +1,8 @@
 {
- "at": "2026-10-23T21:07:55Z",
+ "at": "2026-10-23T22:40:24Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
-  "          40752526      reqp spine-da   go2432  R    1:02:14      1 amy1",
+  "          40752526      reqp spine-da   go2432  R    2:34:44      1 amy1",
   "frozen so far: 96 of 99",
   "measured cadica: {\"by\":\"tools/freeze.py\",\"bytes\":3076112179,\"files\":1,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured buu_lspine: {\"by\":\"tools/freeze.py\",\"bytes\":35225321802,\"files\":46723,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
