@@ -1,0 +1,18 @@
+{
+ "at": "2026-10-23T14:05:23Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 129a5a98ff5c",
+  "schwingnet cancel 40746801 at commit 129a5a9 on warrior 2026-10-23 14:05:23 UTC",
+  "cancelled (fetch:kaggle_scoliosis_yolov5): 40746801 ",
+  "schwingnet cancel: exit 0",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "rc": 0,
+ "request": "cancel-40746801",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 129a5a98ff5c",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "v": 1,
+ "what": "schwingnet cancel 40746801"
+}
