@@ -27,9 +27,9 @@ case "$ACTION" in
   # here: the gate takes these and no other; SchwingNet's fetch, census and cancel carry one id after it
   # (schwingnet-fetch-vindr_pcxr), which SchwingNet's grid/gate.sh checks again against its own list
   job) JOB=${JOB:-}
-    if [[ "$JOB" =~ ^(update|artifacts|promoter-(status|start|stop|restart)|freeze-(status|pilot|start)|schwingnet-(start|status|leaks|v1|latency|stop|prior|chain_eval|samples))$ ]]; then WHAT=${JOB/-/ }
+    if [[ "$JOB" =~ ^(update|artifacts|promoter-(status|start|stop|restart)|freeze-(status|pilot|start|report)|schwingnet-(start|status|leaks|v1|latency|stop|prior|chain_eval|samples))$ ]]; then WHAT=${JOB/-/ }
     elif [[ "$JOB" =~ ^schwingnet-(fetch|census|cancel)-([a-z0-9_]{1,40})$ ]]; then WHAT="schwingnet ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
-    else echo "::error::the job is one of update, artifacts, promoter-status, promoter-start, promoter-stop, promoter-restart, freeze-status, freeze-pilot, freeze-start, schwingnet-start, schwingnet-status, schwingnet-leaks, schwingnet-v1, schwingnet-latency, schwingnet-stop, schwingnet-prior, schwingnet-chain_eval, schwingnet-samples, schwingnet-fetch-<id>, schwingnet-census-<id> or schwingnet-cancel-<job>"; exit 1; fi
+    else echo "::error::the job is one of update, artifacts, promoter-status, promoter-start, promoter-stop, promoter-restart, freeze-status, freeze-pilot, freeze-start, freeze-report, schwingnet-start, schwingnet-status, schwingnet-leaks, schwingnet-v1, schwingnet-latency, schwingnet-stop, schwingnet-prior, schwingnet-chain_eval, schwingnet-samples, schwingnet-fetch-<id>, schwingnet-census-<id> or schwingnet-cancel-<job>"; exit 1; fi
     LOGFILE="job-$JOB";;
   # one of the owner's service keys (hpcworker #36, his choice of 2026-10-23: "all my keys should go
   # that route"): the workflow hands this step only the secret the name picks, as KEY_VALUE, and the
