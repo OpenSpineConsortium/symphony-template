@@ -26,4 +26,4 @@ The zip was kept and nothing was deleted: none of its members is unpacked on dis
 
 ## What this thread does not own
 
-#86/#159 and #111/#147 belong to the thread "Handoff merges and grid checks". The size rule refuses every fetch until another thread's fix lands (SchwingNet #170, #171), so no fetch is resent from here. VinDr-PCXR is tabled and its job 40704982 is left alone.
+#86/#159 and #111/#147 belong to the thread "Handoff merges and grid checks". The size rule refuses every fetch until another thread's fix lands (SchwingNet #170, #171), so no fetch is resent from here; at 18:10 UTC every fetch was refused because the volume's room could not be read, and SchwingNet #173 (a draft) is the fix, after which one schwingnet-status word gives Used and Free. Unpacking RSPECT would need about 980 GB of that room. VinDr-PCXR is tabled and its job 40704982 is left alone.
