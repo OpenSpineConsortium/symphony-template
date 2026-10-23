@@ -1,13 +1,13 @@
 {
- "at": "2026-10-23T12:47:53Z",
+ "at": "2026-10-23T13:13:02Z",
  "lines": [
-  "HPCW-GRID-GATE update ok 1330def56f4c..c06937ff0dda",
+  "HPCW-GRID-GATE update ok c06937ff0dda..4a9855b40205",
   "HPCW-GRID-GATE framework 28"
  ],
  "rc": 0,
- "request": "keyroute-update",
+ "request": "",
  "said": [
-  "HPCW-GRID-GATE update ok 1330def56f4c..c06937ff0dda",
+  "HPCW-GRID-GATE update ok c06937ff0dda..4a9855b40205",
   "HPCW-GRID-GATE framework 28"
  ],
  "v": 1,
