@@ -24,11 +24,11 @@ prints, which is what a request needs.
   2137, received 1 April 2024, published 30 May 2024, CC BY 4.0 for the paper. The corresponding
   authors are Erkang Cheng (ekcheng@iim.ac.cn) and Bo Song (songbo@iim.ac.cn), Institute of
   Intelligent Machines, Hefei Institutes of Physical Science, Chinese Academy of Sciences; the first
-  author is Yu Zeng (yzeng@iim.ac.cn), School of Biomedical Engineering, Anhui Medical University and
-  the same institute. The paper prints every author's address.
+  author is Yu Zeng (yzeng@iim.ac.cn), School of Biomedical Engineering, Anhui Medical University
+  and the same institute. The paper prints every author's address.
 - The set (section 4.1): "We use a mobile dual-mode G-arm X-ray machine (Geelin500-A) to collect 208
-  1024 x 1024 lumbar spine X-ray anterior view images during surgical procedures", focal spot 0.6 mm,
-  target angle 10 degrees, "from patients suffering from lumbar disc herniation or vertebral
+  1024 x 1024 lumbar spine X-ray anterior view images during surgical procedures", focal spot
+  0.6 mm, target angle 10 degrees, "from patients suffering from lumbar disc herniation or vertebral
   compression fractures", 148 for training and 60 for testing, L1 to L5 annotated, 537 vertebrae in
   all, with Table 2 counting the level combinations. No hospital, no dates, no ethics approval.
 - The Data Availability Statement, in full: "Our code and data are available at
@@ -71,14 +71,14 @@ prints, which is what a request needs.
 | Where | How | Found |
 |---|---|---|
 | The web | the set's name, the paper's title, the device, the author's handle, in English and Chinese | the paper and the repository, nothing else |
-| The Drive id | the web; grep.app over public GitHub code, for the id and for spine_train.json | the repository's own page; 0 code hits |
+| The Drive id | the web; grep.app, over the part of public GitHub code it indexes, for the id and for spine_train.json | the repository's own page; 0 code hits |
 | Zenodo | the records the search returned | LUMOS (18173664, osteoporosis X-ray and CT) and spineFE (15313259, CT); neither |
 | Roboflow Universe | the search class:lumbar, 31 entries on its first page | the nearest, researchRun (206 images, one class "lumbar", February 2022, CC BY 4.0), predates the paper; L1-L5 Lumbar Crop (706 images) is a crop set; none is the set |
 | Kaggle | the search's one vertebra X-ray set | scoliosis, spondylolisthesis and normal, a classification set; not the set |
 | Dataset lists | the READMEs of openmedlab/Awesome-Medical-Dataset, adalca/medical-datasets, sfikas/medical-imaging-datasets, beamandrew/medical-data, linhandev/dataset and aaekay/radiology-datasets | none lists it; the spine X-ray rows are VinDr-SpineXR and the Mendeley vertebrae set |
 | Surveys | arXiv 2510.03318 (lumbar spine, 2025), both halves | its dataset tables name no X-ray set of this kind |
 | Papers citing it | OpenAlex, 3 works | Xie et al., CMIG 2025, a methodological survey (not read); Ben Fredj et al., YOLO11-MSCA, Electronics 2026, uses BUU-LSPINE alone and cites the paper in its reference list only; Xiao, Xiong and Wang, ITOEC 2025, the group's own, whose page could not be read |
-| Forks | the repository's last rendering | 0 |
+| Forks | the repository's last rendering, a cache | 0; a fork made after that rendering would not show, and a fork of a deleted repository lives on under its own name |
 
 So no public copy was found anywhere the session could read, and the set, as far as the public
 record shows, was only ever the one Drive file.
@@ -109,8 +109,8 @@ terms and the approval, not only the files.
    Statement, as MDPI's ethics page lays out.
 4. The company beside the group: Chimed Intelligent Machinery Co. Ltd is a co-author affiliation on
    the group's ITOEC 2025 paper. Whether it makes the Geelin G-arm, and so holds the raw images, is
-   not established; the maker's page on the Anhui association site (www.ahyyxh.cn, "Geelin500") could
-   not be read from the session.
+   not established; the maker's page on the Anhui association site (www.ahyyxh.cn, "Geelin500")
+   could not be read from the session.
 5. Software Heritage can give the whole revision, not only src/: on the snapshot page, Download >
    bare repository or tar.gz for the root directory. git log on it gives the 18 commits' dates and
    whether the README ever carried another link (a Baidu share, say); the session cannot reach the
