@@ -24,12 +24,14 @@ SchwingNet #168 builds this as the gate word `explore <id>`, passed by hpcworker
 
 ## The fetch keeps its zip, and the grid log hides long names
 
-The fetch unpacks every zip beside itself and keeps the zip. A listing that reads both counts each file twice: the fracture set first showed 21,162 images, where it holds 10,581. RSPECT's landing held its 534 GB Kaggle zip next to the 980 GB it unpacked. The status listing's 534 GB figure for RSPECT was the zip, not the set. Explore now counts a member whose unpacked twin has the same size once, from disk (SchwingNet #169).
+The fetch unpacks every zip beside itself and keeps the zip. A listing that reads both counts each file twice: the fracture set first showed 21,162 images, where it holds 10,581. RSPECT's landing was read the same way at first, as its 534 GB Kaggle zip beside 980 GB unpacked, and that was wrong (below, Deleting a zip through the gate). Explore now counts a member whose unpacked twin has the same size once, from disk (SchwingNet #169).
 
 tools/grid_accounts.py hides any run of 32 or more letters, digits, `_`, `+`, `=` or `-` as `[hidden]`, so a token cannot reach the public log. The fracture set's folder names are such runs, so the report shows a long name's underscores as spaces.
 
-What the second look found: the Kaggle fracture set is one folder, "Bone Fracture Binary Classification". It holds 10,581 images split train 9,246, val 829 and test 506, each into fractured and not fractured, so there are no per-region folders to map from. RSPECT held 1,937,447 DICOM files and 3 CSVs. That is 1,937,450 files and 980.24 GB, exactly the competition page's figures.
+What the second look found: the Kaggle fracture set is one folder, "Bone Fracture Binary Classification". It holds 10,581 images split train 9,246, val 829 and test 506, each into fractured and not fractured, so there are no per-region folders to map from. RSPECT's zip holds 1,937,447 DICOM files and 3 CSVs, 1,937,450 files and 980.24 GB unpacked, exactly the competition page's figures.
 
 ## Deleting a zip through the gate
 
 No gate word could delete anything. On 2026-10-23 the owner said to delete RSPECT's zip and asked for it through Actions, not the VPN. SchwingNet #174 adds `dropzip <id>`, passed by hpcworker #40 and by grid-accounts.yml's job schwingnet-dropzip-<id>. It queues one batch job, which deletes a zip only when every file in it sits beside it, inside the raw folder, at the same size; anything less keeps the zip. The next send prints what it deleted. It is refused while a fetch of the set, or a look at it, is live.
+
+What it found (job 40751186, 2026-10-23): the zip was kept, since none of its 1,937,450 members is on disk beside it, and nothing was freed. The Kaggle path of the fetch never unpacked RSPECT: the set on the grid is the 533.7 GB zip alone, which the status listing's 534 GB already said. Explore counted the zip's members, so its figures describe the zip's content, complete, and not files on disk. Deleting that zip would have deleted the set; the check that every member sits beside it is what kept it. Before any second try, the set has to be unpacked, and that is a job of its own for the owner's word, needing about 980 GB of room under the size rule.
