@@ -4,7 +4,7 @@
 # grid for the panel (tools/grid_accounts.py masks it; a sign-in link is sealed for the panel's key and
 # never printed). Reads its inputs from the environment the workflow sets.
 set -euo pipefail
-case "$ACTION" in list|use|login|code|usage|auto-on|auto-off|forget|worker-start|worker-stop|log|job) ;; *) echo "::error::unknown action $ACTION"; exit 1;; esac
+case "$ACTION" in list|use|login|code|usage|auto-on|auto-off|forget|worker-start|worker-stop|log|job|key) ;; *) echo "::error::unknown action $ACTION"; exit 1;; esac
 case "$ACTION" in use|login|code|forget|worker-start)
   [[ "$SLOT" =~ ^([1-9]|[12][0-9]|3[0-2])$ ]] || { echo "::error::the account is a number from 1 to 32"; exit 1; };;
 esac
@@ -31,11 +31,24 @@ case "$ACTION" in
     elif [[ "$JOB" =~ ^schwingnet-(fetch|census|cancel)-([a-z0-9_]{1,40})$ ]]; then WHAT="schwingnet ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
     else echo "::error::the job is one of update, artifacts, promoter-status, promoter-start, promoter-stop, promoter-restart, schwingnet-start, schwingnet-status, schwingnet-leaks, schwingnet-v1, schwingnet-latency, schwingnet-stop, schwingnet-prior, schwingnet-chain_eval, schwingnet-samples, schwingnet-fetch-<id>, schwingnet-census-<id> or schwingnet-cancel-<job>"; exit 1; fi
     LOGFILE="job-$JOB";;
+  # one of the owner's service keys (hpcworker #36, his choice of 2026-10-23: "all my keys should go
+  # that route"): the workflow hands this step only the secret the name picks, as KEY_VALUE, and the
+  # gate takes it on standard input and writes it to the one file SchwingNet's jobs read it from
+  key) [[ "$NAME" =~ ^(kaggle|hf|zenodo|redivis|wandb|physionet|ratic)$ ]] \
+         || { echo "::error::the key is one of kaggle, hf, zenodo, redivis, wandb, physionet or ratic"; exit 1; }
+    WHAT="key $NAME"; LOGFILE="key-$NAME";;
 esac
 [[ "$REQUEST" =~ ^[A-Za-z0-9_-]{0,64}$ ]] || { echo "::error::the request is a short plain name"; exit 1; }
 if [ "$ACTION" = code ]; then
   [ -n "$CODE" ] && echo "::add-mask::$CODE"
   [[ "$CODE" =~ ^[A-Za-z0-9_#.~-]{8,512}$ ]] || { echo "::error::that is not a code Anthropic's page shows"; exit 1; }
+fi
+if [ "$ACTION" = key ]; then
+  KEY_VALUE=${KEY_VALUE:-}
+  # each part masked, so neither the PhysioNet password nor the whole line can show in the log
+  set -f; for part in "$KEY_VALUE" ${KEY_VALUE}; do [ -z "$part" ] || echo "::add-mask::$part"; done; set +f
+  [ -n "${KEY_VALUE// /}" ] && [ "${KEY_VALUE# }" = "$KEY_VALUE" ] && [ "${KEY_VALUE% }" = "$KEY_VALUE" ] \
+    || { echo "::error::the secret for $NAME is not set: add it to the environment grid (docs/setup/grid.md, Service keys)"; exit 1; }
 fi
 [ -n "$KEY" ] && [ -n "$ACCESS_ID" ] && [ -n "$HOST_KEY" ] \
   || { echo "::error::the environment grid needs the secret GRID_GATE_KEY and the variables GRID_ACCESS_ID and GRID_HOST_KEY (docs/setup/grid.md, The ssh gate)"; exit 1; }
@@ -134,6 +147,10 @@ case "$ACTION" in
       | python3 tools/grid_accounts.py log "$d/log.json" --what "$WHAT" --request "$REQUEST" --rc "$rc"
     grep '^HPCW-GRID-GATE' "$d/out" || true
     say accounts > /dev/null || true;;
+  key)
+    say "$WHAT" "$KEY_VALUE"$'\n' > /dev/null || rc=$?
+    KEY_VALUE=""
+    grep '^HPCW-GRID-GATE' "$d/out" || true;;
   auto-on) say "accounts auto on" || rc=$?;;
   auto-off) say "accounts auto off" || rc=$?;;
   usage)
