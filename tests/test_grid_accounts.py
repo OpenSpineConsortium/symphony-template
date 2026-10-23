@@ -165,10 +165,11 @@ class Words(unittest.TestCase):
                           ("schwingnet-fetch-vindr_pcxr", "schwingnet fetch vindr_pcxr"),
                           ("schwingnet-prior", "schwingnet prior"), ("schwingnet-chain_eval", "schwingnet chain_eval"),
                           ("schwingnet-census-all", "schwingnet census all"), ("schwingnet-samples", "schwingnet samples"),
+                          ("schwingnet-explore-kaggle_scoliosis_yolov5", "schwingnet explore kaggle_scoliosis_yolov5"),
                           ("schwingnet-cancel-40704982", "schwingnet cancel 40704982")):
             self.assertEqual(self.run_script("job", job=job)[1], [word, "accounts"], job)
         for job in ("", "update now", "artifacts-now", "artifacts now", "promoter start abc", "promoter-restart-now", "promoter restart", "freeze-stop", "freeze-start-4", "freeze-pilot-amos22", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
-                    "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
+                    "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-explore-", "schwingnet-explore-Bad", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
             rc, words, _ = self.run_script("job", job=job)
             self.assertNotEqual(rc, 0, job)
             self.assertEqual(words, [], job)
