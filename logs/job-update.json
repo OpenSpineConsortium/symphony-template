@@ -1,13 +1,13 @@
 {
- "at": "2026-10-23T14:48:16Z",
+ "at": "2026-10-23T18:04:40Z",
  "lines": [
-  "HPCW-GRID-GATE update ok 4a9855b40205..995e62f6030d",
+  "HPCW-GRID-GATE update ok 995e62f6030d..a6e6fe2a39c3",
   "HPCW-GRID-GATE framework 28"
  ],
  "rc": 0,
- "request": "",
+ "request": "dz-update-1",
  "said": [
-  "HPCW-GRID-GATE update ok 4a9855b40205..995e62f6030d",
+  "HPCW-GRID-GATE update ok 995e62f6030d..a6e6fe2a39c3",
   "HPCW-GRID-GATE framework 28"
  ],
  "v": 1,
