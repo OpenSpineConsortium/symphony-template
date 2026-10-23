@@ -1,38 +1,38 @@
 # Stale branches in OpenSpineConsortium/symphony-template
 
-Read 2026-10-23T11:46:49Z from GitHub's history: 352 merged pull requests, 3 closed without a merge.
+Read 2026-10-23T12:07:28Z from GitHub's history: 353 merged pull requests, 3 closed without a merge.
 
 | measure | value |
 |---|---|
-| merged pull requests that had to take main in | 149 (0.423) |
-| catch-up merges in all (by GitHub's Update branch) | 243 (18) |
+| merged pull requests that had to take main in | 150 (0.425) |
+| catch-up merges in all (by GitHub's Update branch) | 244 (18) |
 | forced pushes (rebases or amends, not told apart) | 32 |
-| landings under a pull request in its life, median / mean | 1.0 / 1.64 |
-| finished and green, then made stale before landing | 94 (0.267) |
-| wall-clock from first green to merge where it went stale | 85.9 h, median 14.6 min |
-| check runs / on catch-up heads alone | 648 / 199 (0.307) |
-| runner hours of the check / redone | 32.0 h / 10.6 h |
+| landings under a pull request in its life, median / mean | 1 / 1.67 |
+| finished and green, then made stale before landing | 95 (0.269) |
+| wall-clock from first green to merge where it went stale | 93.8 h, median 14.6 min |
+| check runs / on catch-up heads alone | 650 / 200 (0.308) |
+| runner hours of the check / redone | 32.2 h / 10.7 h |
 | re-runs of a run | 5 |
 | board's main-moved comments / conflicting | 0 / 0 |
-| seen live: snapshots / pull requests behind / in conflict | 88 / 0 / 6 |
+| seen live: snapshots / pull requests behind / in conflict | 89 / 0 / 6 |
 | closed unmerged / whose branch landed later | 3 / 2 |
 
 ## By the parallel work beside each pull request
 
 | other pull requests open in its life | merged | took main in | stale after green | runs | redone | stale hours |
 |---|---|---|---|---|---|---|
-| 0 | 68 | 5 (0.074) | 0 | 79 | 4 | 0.0 |
-| 1-2 | 104 | 28 (0.269) | 17 | 147 | 26 | 8.68 |
-| 3-5 | 117 | 59 (0.504) | 44 | 243 | 78 | 28.61 |
+| 0 | 66 | 5 (0.076) | 0 | 77 | 4 | 0.0 |
+| 1-2 | 104 | 28 (0.269) | 17 | 146 | 26 | 8.68 |
+| 3-5 | 119 | 59 (0.496) | 44 | 246 | 78 | 28.61 |
 | 6-10 | 51 | 47 (0.922) | 28 | 148 | 78 | 18.29 |
-| 11+ | 12 | 10 (0.833) | 5 | 31 | 13 | 30.33 |
+| 11+ | 13 | 11 (0.846) | 6 | 33 | 14 | 38.21 |
 
 ## Claim branches against other branches
 
 | branch | merged | took main in | stale after green | runs | redone | stale hours |
 |---|---|---|---|---|---|---|
 | claim | 10 | 3 (0.3) | 0 | 50 | 2 | 0.0 |
-| no_claim | 342 | 146 (0.427) | 94 | 598 | 197 | 85.9 |
+| no_claim | 343 | 147 (0.429) | 95 | 600 | 198 | 93.79 |
 
 ## By day of merge
 
@@ -52,7 +52,7 @@ Read 2026-10-23T11:46:49Z from GitHub's history: 352 merged pull requests, 3 clo
 | 2026-10-20 | 51 | 30 | 19 | 109 | 41 | 10.53 |
 | 2026-10-21 | 25 | 1 | 0 | 26 | 1 | 0.0 |
 | 2026-10-22 | 34 | 4 | 0 | 39 | 2 | 0.0 |
-| 2026-10-23 | 20 | 6 | 2 | 25 | 5 | 5.63 |
+| 2026-10-23 | 21 | 7 | 3 | 27 | 6 | 13.51 |
 
 ## The landings that made the most others catch up
 
