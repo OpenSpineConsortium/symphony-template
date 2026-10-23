@@ -1,8 +1,8 @@
 {
- "at": "2026-10-23T01:04:12Z",
+ "at": "2026-10-23T02:05:54Z",
  "lines": [
   "  the volume's quota: 21991 GB",
-  "  data: 9605 GB in all",
+  "  data: 9637 GB in all",
   "    868 or_ready",
   "    863 idc_ldct_and_projection_data",
   "    809 cobra2026",
@@ -22,9 +22,9 @@
   "    163 ctspine1k",
   "    162 zenodo_unitochest",
   "    157 ribfrac",
+  "    147 zenodo_vsd_fullbody",
   "    139 nhanes2_cdc_films",
   "    115 vindr_spinexr",
-  "    115 zenodo_vsd_fullbody",
   "    111 deepfluoro_vendor",
   "    104 carmlspine",
   "    103 amos22",
@@ -254,7 +254,7 @@
   "  40697702 dp_idc_nsclc_radiomics COMPLETED 00:03:55 0:0 csc1",
   "  40697703 dp_idc_nsclc_radiogenomics COMPLETED 00:07:43 0:0 csc1",
   "  40697704 dp_zenodo_unitochest COMPLETED 03:26:08 0:0 csc1",
-  "  40697705 dp_zenodo_vsd_fullbody RUNNING 01:52:53 0:0 csc1",
+  "  40697705 dp_zenodo_vsd_fullbody RUNNING 02:54:36 0:0 csc1",
   "  40697706 dp_hf_abdomenatlas2_0_mini PENDING 00:00:00 0:0 None assigned",
   "  40697707 dp_idc_lidc_idri PENDING 00:00:00 0:0 None assigned",
   "  40697708 probe COMPLETED 00:00:13 0:0 hao1",
@@ -346,7 +346,7 @@
   "  40703320 samples_merge COMPLETED 04:55:53 0:0 mem6",
   "  40704984 xr_bank PENDING 00:00:00 0:0 None assigned",
   "  40704986 xr_catalog PENDING 00:00:00 0:0 None assigned",
-  "  40704982 xr_fetch RUNNING 09:24:57 0:0 csc1",
+  "  40704982 xr_fetch RUNNING 10:26:40 0:0 csc1",
   "  40710713 dp_hf_cads_unique PENDING 00:00:00 0:0 None assigned",
   "  40711923 xr_fetch FAILED 00:02:26 1:0 amy1",
   "  40711925 xr_bank FAILED 00:00:02 1:0 amy1",
@@ -365,7 +365,7 @@
   "  40732922 xr_fetch FAILED 00:00:09 1:0 mmi3",
   "  40732924 xr_bank COMPLETED 00:00:03 0:0 mmi3",
   "  40732926 xr_catalog PENDING 00:00:00 0:0 None assigned",
-  "  fetch of vindr_pcxr (job 40704982): 88 files, 327 MB, last write 10s ago",
+  "  fetch of vindr_pcxr (job 40704982): 95 files, 356 MB, last write 15s ago",
   "## 40697693 (dp_tcia_ct_colonography) ended FAILED after 00:00:01, exit 1:0",
   "    DP_FETCH start 2026-10-22 12:17:12 on hao1 job 40697693",
   "    DP_FETCH_RC=1 2026-10-22 12:17:13",
@@ -403,7 +403,7 @@
   "HPCW-GRID-GATE schwingnet status ok"
  ],
  "rc": 0,
- "request": "paperwork-status-2026-10-23",
+ "request": "",
  "said": [
   "HPCW-GRID-GATE schwingnet pull current ddb8ecad54a1",
   "HPCW-GRID-GATE schwingnet status ok"
