@@ -199,7 +199,8 @@ its English or its Chinese name, so the letters, the forms and the introductions
 them; spine-datasets #222 records the answers that had come by 2026-10-23. The search adds one
 record, MTDDH (spine-datasets, with this note), and changes no other. Nothing was fetched and no
 fetch is asked for: MTDDH waits, like the registry's other Science Data Bank set, on the owner
-reading whether the site asks for a login and on a fetch route for Science Data Bank.
+reading whether the site asks for a login and on a fetch route for Science Data Bank
+(answered later that day: no login; section 9).
 
 ## 8. What was not searched or was cut short
 
@@ -210,14 +211,86 @@ reading whether the site asks for a login and on a fetch route for Science Data 
   results a search, and the other-hosts part ran past its twenty minutes on the Science Data Bank
   phrases.
 - Whether OpenDataLab mirrors the files of the seven sets it lists was not read.
-- OSF (z2jby) could not be read from the session.
+- OSF (z2jby) could not be read from the session; the owner's paste answered it (section 9).
 - The raw answers and the run's own summary are on the owner's computer, in the Desktop folder
   opendatalab-search-2 (odl, odl_get and hf with every answer, odl_relevant.csv, hf_relevant.csv,
   hf_all_ids.txt, other_relevant.csv, other_counts.csv, other/tianchi_results.json, the scripts
   and SUMMARY.md), outside any repository; the cloud session cannot open that folder while a
   Remote Control session runs, and had no need to after the run reported.
 
-## 9. Read
+## 9. What the owner's pages answered, later on 2026-10-23
+
+The owner opened the two pages the session could not and pasted them into the thread, and a second
+Remote Control session read the file lists on the owner's computer, where the answers are in the
+Desktop folder dataset-links.
+
+- OSF z2jby is the Bournemouth group's deposit for the MRC grant MR/X005372/1, "AI for automatic
+  vertebral motion tracking of fluoroscopic images" (UKRI Gateway to Research, pasted by the owner:
+  Bournemouth University, Faculty of Science and Technology, principal investigator Marcin Budka,
+  65,073 pounds, August 2022 to February 2023, closed), which worked on the quantitative fluoroscopy
+  database Professor Breen's team had collected over years of earlier research, whose participants
+  consented to future research use, with an independent sample from the Royal Hampshire County
+  Hospital as a check. The project is public, made 2023-02-15 by Rantilini Samaratunga with
+  Alexander Breen, Alan Breen and Marcin Budka, DOI 10.17605/OSF.IO/Z2JBY, no licence stated
+  (node_license null), no description beyond the grant line, and three files in OSF Storage. Its
+  code is the GitHub repository dsibournemouth/project-maid (GPL-3.0, six commits, two inference
+  notebooks and two Python files), whose README says the image dataset (1.4 GB) and the pre-trained
+  models are downloaded from the OSF project, and whose two sample GIFs (WB_FLEX-NS048, clean and
+  obstructed) are lateral lumbar fluoroscopy frames of 224 by 224 pixels with five tracked vertebral
+  boxes, weight-bearing flexion; the paper is Samaratunga, Budka, Breen and Breen, "Automatic
+  detection of the lumbar spine using transfer learning for Quantitative Fluoroscopy", Procedia
+  Computer Science 2025, vol. 270, pp. 2291-2300 (doi 10.1016/j.procs.2025.09.350; a TechRxiv
+  preprint of 2024-03-04), on sagittal lumbar fluoroscopy sequences; the grant page also lists
+  "Automated Lumbar Spine Tracking in Quantitative Fluoroscopy" as in preparation. The files, read
+  through OSF's API (api.osf.io/v2/nodes/z2jby/files/osfstorage/) on the owner's computer:
+  preproc_224_wb_flex.zip, 1,492,963,815 bytes, uploaded 2023-02-20, sha256
+  b43de4c185dd751ed2e3e04d75e8eef10aa6c3e09bf4393accffbecd6805bb26, download
+  https://osf.io/download/xjt4f/; rn50-224-wb-flex-50ep-bs500.pth, 383,648,577 bytes, 2023-02-21;
+  and shape-rn50-224-wb-flex-38ep-bs500.pth, 459,107,325 bytes, 2023-03-13; no folders. So the image
+  set is the weight-bearing flexion frames preprocessed to 224 pixels, a subset of the 2021
+  database, and the two .pth files are the paper's ResNet-50 weights. Each osf.io/download link
+  answers with no login (a 302 to files.de-1.osf.io, whose HEAD gives 200 with the same size, then a
+  60-second presigned object-storage address, so a manifest keeps the osf.io/download form). The
+  lumbar record says so (spine-datasets #224). Dr Branney is checking with his research department,
+  and the owner chose not to chase him with a question about the deposit's terms; they are asked
+  when he answers. Since OSF states no licence, the registry's promoter cannot take the deposit
+  until Bournemouth's grant is recorded (spine-datasets manifests/README.md).
+- MTDDH downloads from Science Data Bank with no login: the owner downloaded it on 2026-10-23 with
+  no account. The paper is Qi, Jiao, Li and others, "A dataset for quality evaluation of pelvic
+  X-ray and diagnosis of developmental dysplasia of the hip", Scientific Data 2025 (doi
+  10.1038/s41597-025-05146-x, PMC12106846): one film per child, ages 5 to 40 months, file names
+  randomised; the first part 1,250 children (781 girls, 469 boys, mean age 14.6 months), JPG in
+  Training, Validation and Test folders with JSON annotations for the first two, and a segmentation
+  part of the same shape without a test split, the four quality regions being both obturator
+  foramina and both ilia; the second part 906 children (558 girls, 384 boys, mean age 14.3 months),
+  PNG with COCO-format annotations; three paediatric orthopaedic surgeons annotated; the hospital's
+  ethics committee approval 2023-IRB-0287-P-01 waived consent and approved the public release; the
+  corresponding authors are Guoqiang Zhao and Gang Yu (Zhejiang University). The same authors posted
+  MTDDH.rar (1,871,869,324 bytes, CC BY 4.0, 2024-12-11, doi 10.6084/m9.figshare.27999131.v1, served
+  from ndownloader.figshare.com; figshare's API gave no md5) five months before the Science Data
+  Bank version the paper cites (V1, 2025-04-29, 4,053,482,052 bytes in three files), so the figshare
+  copy is an older and smaller fallback, and a Kaggle re-upload (amirmmahdavikia/mtddh-pelvic-x-ray)
+  is a third party's and not a source. Science Data Bank's page is a Nuxt shell whose API base is
+  www.scidb.cn/api: the dataset details endpoint (sdb-dataset-service/dataset/details) answers
+  "PERMISSION NO ACCESS" without a login, but the public ones carry everything: gin-sdb-
+  croissant/public/getCroissant gives the record as Croissant JSON-LD (conditionsOfAccess PUBLIC, CC
+  BY 4.0, version 1.0.0, 2025-04-29, 4,053,482,052 bytes), POST gin-sdb-
+  filetree/public/file/childrenFileListByPath with the dataSetId, version V1 and path /V1 gives the
+  file list, and sdb-filetree-service/getAllUrl gives one download address a line. The three files,
+  each a plain download from download.scidb.cn with no login (HEAD 200 with the same Content-Length,
+  a Range request 206, no redirect): JPG_DICOM.rar, 1,165,024,411 bytes, md5
+  2029b761e5077e61280f4a5fb9308a32, fileId 6598e44aa54eb418af5add89c199fd9f; MTDDH.zip,
+  1,872,032,279 bytes, md5 1508164e97c35b7063a163726bf4ef05, fileId
+  c4ecee1aec98deb8327888bce3e07901; and code.zip, 1,016,425,362 bytes, md5
+  a91952a0f1b6fc0989e8a1d53cd0432e, fileId b4c4789e608dc5f66e654b47f072d5f1, each at
+  https://download.scidb.cn/download?fileId=ID&path=/V1/NAME&fileName=NAME; no sha256 is published.
+  The figshare rar carries supplied_md5 697c3c29b6a1faf69a2032e22486400e and is not the same archive
+  as MTDDH.zip. The manifest and the record's fetching status wait on the owner's word, since the
+  promoter fetches a merged manifest, and on the promoter learning download.scidb.cn as a host
+  Science Data Bank serves files from, a one-line change to tools/promote.py that reaches the grid
+  only through the owner's gate word.
+
+## 10. Read
 
 OpenDataLab's search and lookup APIs and Hugging Face's dataset API from the owner's computer;
 from the session, Hugging Face's /api/datasets/<id> for the five ids above, DataCite's records of
