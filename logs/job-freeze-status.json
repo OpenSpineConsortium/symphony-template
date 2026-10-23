@@ -1,0 +1,24 @@
+{
+ "at": "2026-10-23T13:29:43Z",
+ "lines": [
+  "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
+  "frozen so far: 1 of 98",
+  "measured amos22: {\"by\":\"tools/freeze.py\",\"bytes\":102615496477,\"files\":3067,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
+  "HPCW-JOB 40702556 promoter CANCELLED on amy1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40702556.out",
+  "HPCW-JOB 40702557 promoter CANCELLED exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40702557.out",
+  "HPCW-JOB 40702867 promoter FAILED on amy1 exit 0:15 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40702867.out",
+  "HPCW-JOB 40702868 promoter COMPLETED on arw2 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40702868.out",
+  "HPCW-JOB 40710490 promoter COMPLETED on mem4 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40710490.out",
+  "HPCW-JOB 40733943 promoter RUNNING on mdt14 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40733943.out",
+  "HPCW-JOB 40741949 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40741949.out",
+  "HPCW-JOB 40744799 freeze COMPLETED on amy1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40744799.out",
+  "HPCW-GRID-GATE freeze status ok"
+ ],
+ "rc": 0,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE freeze status ok"
+ ],
+ "v": 1,
+ "what": "freeze status"
+}
