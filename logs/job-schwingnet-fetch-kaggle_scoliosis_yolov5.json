@@ -1,0 +1,26 @@
+{
+ "at": "2026-10-23T14:03:14Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 129a5a98ff5c",
+  "schwingnet fetch kaggle_scoliosis_yolov5 at commit 129a5a9 on warrior 2026-10-23 14:03:13 UTC",
+  "  size budget: 1 entries, 0 GB stated; /rs/rs_grp_oschome has 5881188 GB free, margin 5000 GB",
+  "  no size stated for: kaggle_scoliosis_yolov5 (counted as 0; read the page)",
+  "  2026-10-23 10:03:14 fetch=40746797 bank=40746799 catalog=40746801 only=kaggle_scoliosis_yolov5 credentialed=0 size_gb=0 pydrv=/wsu/home/go/go24/go2432/SchwingNet/grid/bin/train-cpu-python",
+  "  submitted: 1 fetch 40746797 -> 2 bank-ingest 40746799 (afterany) -> 3 catalog 40746801 (afterany)",
+  "  ETA: stage 1 is network-bound, about 1 hour per 20 GB on a compute node (0 GB stated, so about 1 hours; a 4-day wall time, requeued on preemption); stage 2 minutes per source (hashing and copying; a JPG set converts at a few hundred frames a minute); stage 3 under a minute.",
+  "  watch: the gate word status; the reports: /wsu/home/go/go24/go2432/SchwingNet/grid/logs/0*-STAGE-REPORT.md",
+  "  xr_fetch: job 40746797",
+  "  xr_bank: job 40746799",
+  "  xr_catalog: job 40746801",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "fetch-k24",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 129a5a98ff5c",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch kaggle_scoliosis_yolov5"
+}
