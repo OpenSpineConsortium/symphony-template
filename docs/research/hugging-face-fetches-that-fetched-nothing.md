@@ -46,7 +46,7 @@ gdown exits non-zero when it cannot fetch (a file it may not read, or a quota pa
   - `fetch hf_fluoroseg`: about 2,650 GB.
   - `fetch hf_rexgradient_160k`: 156 GB.
   - `fetch hf_cads_unique`: 123.3 GB stated in the line, 83.4 GB of it CT-TRI.
-  The submit script refuses any set beyond the volume's free space minus 5 TB.
+  The submit script then refused any set beyond the volume's free space minus 5 TB. It read that free space with df, which on CephFS is the whole Ceph pool. SchwingNet #161 replaces it with the owner's size rule, under which each set is admitted whole by its exact size against the quota, or refused (lab-volume-room.md).
 - CADS's VISCERAL part has no line of its own, so no gate word fetches it yet.
 - hf-get itself still returns 0 when its pattern matches nothing. It lives in spinesurg-ct-nnunet, which SchwingNet reads and never changes, so the check sits in SchwingNet's job script.
 - Not asked for, but it would have caught this a day sooner: the status word could show each ended fetch's landing, its files and size from the CephFS attributes, as it already does for a live X-ray fetch. A COMPLETED job with an empty landing would then read as one.
