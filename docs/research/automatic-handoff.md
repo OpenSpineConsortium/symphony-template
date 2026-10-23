@@ -12,6 +12,10 @@ Mechanically yes, for the account; no, for the conversation. On the grid the swa
 
 So the speed of a swap is limited by what the next session must read to carry on, and that is what the handoff fixes: a committed page of a few thousand tokens, named by the session-start hook, in place of a conversation that cannot cross accounts. The other limits are each account's own windows (all sessions of one account share them), each worker's Slurm allocation, Remote Control being on the plan, the one sign-in sitting per account with a browser, the probe's word that auto mode spends every half hour, and the terms-of-service question about rotating accounts, which the owner decided on 2026-10-13 knowing it (docs/research/grid-claude-accounts.md).
 
+## Switching which worker a claude.ai tab shows
+
+The owner's follow-up at 02:32 UTC: he meant Beethoven on his own side switching which worker the claude.ai tab shows. Between workers on one account that is a change of link, instant. Between accounts it is not: claude.ai's sign-in lives in the browser profile, so one tab shows one account's sessions, and a Chrome extension has no call that opens a tab in another profile. The way that works is Beethoven in one Chrome profile per account, each opening its own account's workers and pointing to the right profile for the rest; asked of the coordinator as a thread of its own on beethoven-extension. The owner wants both: that switch of view, and the same worker moving itself to another account at the limit, which hpcworker's auto mode does and which now waits for the handoff.
+
 ## What can see the weekly window, measured in the binary
 
 - The status line's input carries `rate_limits.five_hour` and `rate_limits.seven_day`, each with `used_percentage` (0 to 100) and `resets_at` (unix seconds), for subscribers after the first response. This is the only place an interactive session's own usage reaches a command the repository can name.
