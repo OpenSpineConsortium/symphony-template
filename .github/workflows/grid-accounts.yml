@@ -18,7 +18,7 @@
 # #23): update, which brings the gate's own clone to hpcworker's main; artifacts, which keeps the
 # artifacts/ folders of this repository and SchwingNet in the owner's ~/claude-artifacts on the grid
 # (artifacts-grid.yml); the spine-datasets promoter's status, start, stop and restart (hpcworker #31);
-# the freeze of the sets already on the grid, freeze-status, -pilot and -start (hpcworker #37);
+# the freeze of the sets already on the grid, freeze-status, -pilot, -start and -report (hpcworker #37 and #39);
 # and SchwingNet's own grid/gate.sh words at its main (start, status, leaks,
 # v1, latency, stop, fetch-<id>), so a session runs them in the owner's place (his choice of 2026-10-21); the answer is logs/job-<job>.json.
 # The action key sends one of the owner's service keys, an environment secret of grid picked by the
@@ -55,7 +55,7 @@ on:
         required: false
         default: ""
       job:
-        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, freeze-status|pilot|start, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples, or schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id> or schwingnet-cancel-<job>"
+        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, freeze-status|pilot|start|report, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples, or schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id> or schwingnet-cancel-<job>"
         required: false
         default: ""
       request:
