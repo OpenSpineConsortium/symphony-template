@@ -33,9 +33,12 @@ Nothing was submitted; the owner submits.
 - The two that fit are AI for Science (the owner applies, the advisors named) and the Team plan
   (Dr. Han verifies as PI). The advisor's name is Han, not Hahn, as the AIDaS packet in
   spine-program spells it.
-- Credits are API credits, and the project's standing rule is no API billing and no
-  ANTHROPIC_API_KEY in coordbench's measured runs. Using credits means a key held only in the
-  owner's Console, never in a repository or a secret, and a recorded change to that rule before a
-  benchmark run spends them; that decision is the owner's.
+- The application form itself, as the owner pasted it later on 2026-10-23, says otherwise than
+  the help article: the award is extra usage credits, up to 50,000 USD, usable across all claude.ai
+  tools including Claude Science, applied to a claude.ai Organization ID, with the PI emailed to
+  approve. So credits need no API key and fit the project's rule of no API billing, and the lab's
+  Team plan for scientists (the AIDaS budget's line C1) is the natural organization to hold them.
+  The form treats every answer as non-confidential, so the answers leave out preliminary accuracy
+  figures and wait for the provisional patent filing.
 - The drafts name only the clinical problem, public datasets and public repositories; SchwingNet's
   results stay in SchwingNet.
