@@ -26,7 +26,7 @@ SchwingNet #168 builds this as the gate word `explore <id>`, passed by hpcworker
 
 The fetch unpacks every zip beside itself and keeps the zip. A listing that reads both counts each file twice: the fracture set first showed 21,162 images, where it holds 10,581. RSPECT's landing held its 534 GB Kaggle zip next to the 980 GB it unpacked. The status listing's 534 GB figure for RSPECT was the zip, not the set. Explore now counts a member whose unpacked twin has the same size once, from disk (SchwingNet #169).
 
-grid-accounts.py hides any run of 32 or more letters, digits, `_`, `+`, `=` or `-` as `[hidden]`, so a token cannot reach the public log. The fracture set's folder names are such runs, so the report shows a long name's underscores as spaces.
+tools/grid_accounts.py hides any run of 32 or more letters, digits, `_`, `+`, `=` or `-` as `[hidden]`, so a token cannot reach the public log. The fracture set's folder names are such runs, so the report shows a long name's underscores as spaces.
 
 What the second look found: the Kaggle fracture set is one folder, "Bone Fracture Binary Classification". It holds 10,581 images split train 9,246, val 829 and test 506, each into fractured and not fractured, so there are no per-region folders to map from. RSPECT held 1,937,447 DICOM files and 3 CSVs. That is 1,937,450 files and 980.24 GB, exactly the competition page's figures.
 
