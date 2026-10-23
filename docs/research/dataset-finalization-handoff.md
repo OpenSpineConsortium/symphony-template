@@ -12,7 +12,11 @@ A new gate word, `dropzip <id>`, does it in one batch job that deletes a zip onl
 - symphony-template #424, grid-accounts.yml takes `schwingnet-dropzip-<id>`: merged.
 - SchwingNet #174, the word itself (tools/dropzip.py, grid/dropzip.sbatch, grid/gate.sh): merged at 18:07 UTC.
 
-## The next steps, in order
+## What the job found
+
+The zip was kept and nothing was deleted: none of its members is unpacked on disk, so RSPECT is held only as the 533.7 GB zip (exploring-fetched-sets.md, the last section). The spine-datasets record rsna_rspect.json says the files sit unpacked beside the zip; that is wrong and needs correcting by pull request. Unpacking it (about 980 GB) or keeping it zipped is the owner's choice; no job runs without his word.
+
+## The steps as first written, now superseded after step 3
 
 1. Done: SchwingNet #174 merged at 18:07 UTC.
 2. Done: the one approved job was sent at 18:16 UTC (request dz-rspect-1) and queued as job 40751186; the grid's SchwingNet pulled to e064e3c first. Do not send the word again while that job is live, or it is refused; never queue a second.
