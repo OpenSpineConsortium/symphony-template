@@ -21,3 +21,15 @@ The plan for #23 was to compare the sha256 of every image with the AASCE copies 
 The check that can work is a content comparison. A percentile 8-bit reduction squashed to a square absorbs resizing and stretching. A perceptual hash finds candidates, with each image's mirror tried too, and NCC64 at 0.97 confirms them, which is the leak checks' rule. File names help once Roboflow's `_jpg.rf.<hash>` suffix is cut. Crops and rotations beyond a few degrees escape both checks, so "no match" there is a floor, not a proof of new people.
 
 SchwingNet #168 builds this as the gate word `explore <id>`, passed by hpcworker #38 and by grid-accounts.yml's job schwingnet-explore-<id>. The first send queues one read-only job; the next send prints the report.
+
+## The fetch keeps its zip, and the grid log hides long names
+
+The fetch unpacks every zip beside itself and keeps the zip. A listing that reads both counts each file twice: the fracture set first showed 21,162 images, where it holds 10,581. RSPECT's landing held its 534 GB Kaggle zip next to the 980 GB it unpacked. The status listing's 534 GB figure for RSPECT was the zip, not the set. Explore now counts a member whose unpacked twin has the same size once, from disk (SchwingNet #169).
+
+tools/grid_accounts.py hides any run of 32 or more letters, digits, `_`, `+`, `=` or `-` as `[hidden]`, so a token cannot reach the public log. The fracture set's folder names are such runs, so the report shows a long name's underscores as spaces.
+
+What the second look found: the Kaggle fracture set is one folder, "Bone Fracture Binary Classification". It holds 10,581 images split train 9,246, val 829 and test 506, each into fractured and not fractured, so there are no per-region folders to map from. RSPECT held 1,937,447 DICOM files and 3 CSVs. That is 1,937,450 files and 980.24 GB, exactly the competition page's figures.
+
+## Deleting a zip through the gate
+
+No gate word could delete anything. On 2026-10-23 the owner said to delete RSPECT's zip and asked for it through Actions, not the VPN. SchwingNet #174 adds `dropzip <id>`, passed by hpcworker #40 and by grid-accounts.yml's job schwingnet-dropzip-<id>. It queues one batch job, which deletes a zip only when every file in it sits beside it, inside the raw folder, at the same size; anything less keeps the zip. The next send prints what it deleted. It is refused while a fetch of the set, or a look at it, is live.
