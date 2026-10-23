@@ -1,20 +1,14 @@
 {
- "at": "2026-10-23T13:30:26Z",
+ "at": "2026-10-23T20:05:31Z",
  "lines": [
-  "queueing 20 sets: cobra2026 pengwin2026 idc_ldct_and_projection_data idc_cptac_ucec zenodo_lumvbcanseg idc_tcga_kirc idc_midrc_ricord_1b ipcai2025_xray_ct idc_ctpred_sunitinib_pannet idc_tcga_lihc csi2014 idc_adrenal_acc_ki67_seg idc_cmb_mml idc_cmb_ov veterinary_pig_levelcheck vindr_spinexr pengwin",
-  "HPCW-JOB submitted 40745721 freeze reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745721.out",
-  "queueing 24 sets: abdomenatlas3_mini idc_psma_pet_ct_lesions lumos kidney_thoraxabdomen zenodo_medpelvis3d idc_lung_pet_ct_dx deep_psma kub_stonex idc_rider_lung_pet_ct curvas_pdacvi idc_cptac_pda zenodo_ts_task_pleural_effusion idc_cptac_luad idc_midrc_ricord_1a idc_colorectal_liver_metastases idc_",
-  "HPCW-JOB submitted 40745722 freeze reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745722.out",
-  "queueing 26 sets: tcia_fdg_pet_ct_lesions panorama carmlspine zenodo_unitochest idc_pediatric_ct_seg zenodo_ts_task_liver_lesions idc_eay131 curvas idc_nsclc_radiomics barts_crl dysphagiabank idc_acrin_nsclc_fdg_pet idc_cmb_lca idc_cptac_lscc idc_cptac_ccrcc idc_tcga_stad idc_covid_19_ar idc_hcc_tac",
-  "HPCW-JOB submitted 40745723 freeze reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745723.out",
-  "queueing 27 sets: aws_stoic2021 rsna_2022_cervical zenodo_vsd_fullbody idc_covid_19_ny_sbu waw_tace nlst_pilot idc_spinal_multiple_myeloma_seg idc_nsclc_radiogenomics idc_mediastinal_lymph_node_seg quadra_hc idc_spine_mets_ct_seg aortaseg60 idc_tcga_blca zenodo_ts_task_hip_implant idc_cptac_stad zen",
-  "HPCW-JOB submitted 40745724 freeze reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745724.out",
-  "HPCW-GRID-GATE freeze start ok at 0ece3de1ab73"
+  "queueing 3 sets: idc_ldct_and_projection_data rsna_rspect ctpelvic1k ",
+  "HPCW-JOB submitted 40752526 freeze reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40752526.out",
+  "HPCW-GRID-GATE freeze start ok at 0a21c5b1d9ac"
  ],
  "rc": 0,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE freeze start ok at 0ece3de1ab73"
+  "HPCW-GRID-GATE freeze start ok at 0a21c5b1d9ac"
  ],
  "v": 1,
  "what": "freeze start"
