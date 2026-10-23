@@ -80,7 +80,7 @@ prints, which is what a request needs.
 | Papers citing it | OpenAlex, 3 works | Xie et al., CMIG 2025, a methodological survey (not read); Ben Fredj et al., YOLO11-MSCA, Electronics 2026, uses BUU-LSPINE alone and cites the paper in its reference list only; Xiao, Xiong and Wang, ITOEC 2025, the group's own, whose page could not be read |
 | Forks | the repository's last rendering, a cache | 0; a fork made after that rendering would not show, and a fork of a deleted repository lives on under its own name |
 | Hugging Face | its datasets API, which matches dataset names, for spine, vertebra, lumbar, xray, x-ray, radiograph, fluoro, arm, lspine, buu, zeng, neighbor, cmspine, cm_spine, cm-spine and L1, on 2026-10-23, with the file lists of the nearest names | 30 spine, 42 vertebra, 5 lumbar, 11 fluoro and over 130 xray and x-ray names, none a lumbar radiograph set; ImNotTam/LumbarSpine (October 2025) holds only .gitattributes; SpineBench's 40,263 spine images come from BUU Spine, CSXA, RSNA and VinDr-SpineXR; cmspine, cm_spine and cm-spine match nothing |
-| OpenDataLab | a web search restricted to opendatalab.com, whose pages reach the session as a JavaScript shell, for lumbar spine X-ray and spine X-ray vertebrae | MRSpineSeg (MR), chest and CT sets; no lumbar radiograph set |
+| OpenDataLab | its search API (POST api/datasets/list, the call its Python SDK makes), run on the owner's own computer on 2026-10-23 through a Remote Control session, since the session's proxy refuses the host, with 23 English keywords (lumbar, spine, spinal, vertebra, vertebrae, vertebral, scoliosis, x-ray, xray, radiograph, radiography, fluoroscopy, c-arm, intraoperative, orthopedic, orthopaedic, CM Spine, cmspine, cm_spine, neighbor, zeng, Hefei, Institute of Intelligent Machines) and 20 Chinese ones (in pinyin: yaozhui lumbar spine, jizhu and jichui spine, zhugu vertebra, zhuti vertebral body, X guang, X xian and X shexian X-ray, toushi fluoroscopy, shuzhong intraoperative, C bi and G bi C-arm and G-arm, jizhu cewan and cewan scoliosis, guke orthopaedics, guzhe fracture, fangshe radiology, Hefei, Zhongkeyuan the Chinese Academy of Sciences, Zhineng Jixie Yanjiusuo the Institute of Intelligent Machines), 100 a page, paged with pageNo, the hit count read from data.selected (data.total is the whole catalogue, 5,452); the API splits a Chinese keyword into characters, so the broad ones match thousands of unrelated sets and a record carrying the word would not be missed; and the single-dataset lookup, GET api/datasets/<name>?backend=false from the session, for CM_Spine, CMSpine, CM-Spine, cmspine, CM_Spine_Dataset and Neighbor | 49 distinct spine or X-ray records, none a plain radiograph of the spine: the spine sets are MRI and CT (Lumbar_Spine_MRI, MRSpineSeg_Challenge, IVDM3Seg, VerSe, xVertSeg, CSI_2014_Spine_and_Vertebrae_Segmentation, CSI_2014_Vertebrae_Localization, CTSpine1K, MESCC), the one fluoroscopy set is DeepFluoroLabeling-IPCAI2020 (hip and pelvis, Johns Hopkins), and the other X-ray hits are chest, cephalometric, limb, knee, breast and baggage sets; the six names answer id 0, no such dataset; CM Spine and cm_spine match only Lumbar_Spine_MRI and CSI 2014 on the word spine, Neighbor, Cheng and Song only nearest-neighbour text, music and satellite records, Zeng and Hefei nothing |
 
 So no public copy was found anywhere the session could read, and the set, as far as the public
 record shows, was only ever the one Drive file.
@@ -124,9 +124,12 @@ terms and the approval, not only the files.
    archive.
 6. Hugging Face and OpenDataLab were searched on 2026-10-23 (section 4) and hold nothing; what the
    session still cannot search is Google Dataset Search and Academic Torrents, each by "lumbar spine
-   X-ray"; a hit with 208 images or the classes L1 to L5 would be worth opening. OpenDataLab's own
-   search page could not be linked (the owner's link answered 404 and the session sees only a
-   JavaScript shell), so it is the search box on its home page.
+   X-ray"; a hit with 208 images or the classes L1 to L5 would be worth opening. OpenDataLab's
+   search is a POST its pages make, which the session's proxy refuses, so it ran on the owner's
+   computer (a Remote Control session, whose raw answers and summary are in the Desktop folder
+   opendatalab-search there, outside any repository); its single-dataset lookup, GET
+   api/datasets/<name>?backend=false, answers the session's fetch tool and gives id 0 for a name it
+   does not hold, and its search page is the search box on its home page.
 
 ## 7. Read
 
@@ -143,8 +146,10 @@ terms and the approval, not only the files.
   Roboflow Universe's search and the researchRun page; the Kaggle page; the six dataset lists'
   READMEs; arXiv 2510.03318's HTML; the web searches of section 4.
 - Hugging Face's datasets API (api/datasets?search=..., which matches dataset names) and the file
-  lists of the nearest names; SpineBench's README and arXiv 2510.12267's abstract; the web search
-  restricted to opendatalab.com.
+  lists of the nearest names; SpineBench's README and arXiv 2510.12267's abstract; OpenDataLab's
+  search API from the owner's computer and its single-dataset records through the fetch tool, the
+  endpoints read from the opendatalab SDK 0.0.10 on PyPI; the web search restricted to
+  opendatalab.com.
 - The owner's Sent Items, through the Microsoft 365 connector, for the September emails to the
   authors.
 
@@ -153,8 +158,10 @@ terms and the approval, not only the files.
 web.archive.org and archive.org (blocked), archive.softwareheritage.org (a browser check, Anubis),
 api.openalex.org and api.semanticscholar.org by curl (OpenAlex answers the fetch tool, Semantic
 Scholar refuses it), api.crossref.org, gitee.com, huggingface.co's dataset pages (its API answers
-the fetch tool; curl reaches no Hugging Face host, hf-mirror.com included), opendatalab.com
-(JavaScript), academictorrents.com (a browser check), ieeexplore.ieee.org, www.ahyyxh.cn, GitHub's
-HTML pages by curl and its commits and tree pages by the fetch tool (robots), grep.app by curl later
-the same day (the proxy refused the tunnel), and GH Archive by BigQuery (no credentials). The GitHub
-API was not used, since the session's GitHub access is scoped to its own repositories.
+the fetch tool; curl reaches no Hugging Face host, hf-mirror.com included), opendatalab.com's pages
+(JavaScript; the proxy refuses the host, so its search, a POST, ran on the owner's computer, while
+its single-dataset API answers the fetch tool), academictorrents.com (a browser check),
+ieeexplore.ieee.org, www.ahyyxh.cn, GitHub's HTML pages by curl and its commits and tree pages by
+the fetch tool (robots), grep.app by curl later the same day (the proxy refused the tunnel), and GH
+Archive by BigQuery (no credentials). The GitHub API was not used, since the session's GitHub access
+is scoped to its own repositories.
