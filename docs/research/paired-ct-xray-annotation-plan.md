@@ -14,7 +14,7 @@ The tiers are #179's: A on the grid, B open and not fetched, C behind a request,
 | A | Ljubljana 2D/3D gold standard | L1 to L5 | 1 cadaver | 18 | stored | none | ND, read-only |
 | B | Digital-twin cadaver (spine-datasets #170) | mid-femur to T2 | 1 cadaver, 4 CTs | 80 (46 viewpoints) | navigation, to confirm on unzip | to confirm on unzip | not stated |
 | B | LUMOS (spine-datasets #27) | lumbar, diagnostic films | 280 of 803 patients | the films of those 280, out of 1,620 | none: registration needed | to confirm | CC BY-NC 4.0 per SchwingNet; the record still says to confirm |
-| C | LevelCheck (Johns Hopkins, #60) | thoracolumbar | 178 patients, plus 24 | 398 radiographs, plus 61 | registration to the labelled CT | level per vertebra | a data use agreement |
+| C | LevelCheck (Johns Hopkins, #60) | cervical to lumbar (De Silva 2016); thoracolumbar (Ketcha 2017) | 178 patients, plus 24 | 398 radiographs, plus 61 | registration to the labelled CT | level per vertebra | a data use agreement |
 | C | Huashan, Fudan (#61) | L1 to L5 | 140 patients | AP and lateral films of each | none stated | none stated | a data use agreement |
 | C | NIT Warangal and NIMS | L1 to L5 | 9 patients | at most 49 unique C-arm frames | none; level-named centroids from the CT | centroids public, CT by request | not recorded |
 | D | Balgrist ex-vivo lumbar | lumbar | - | - | - | - | refused 2026-10-21 (proprietary) |
@@ -28,7 +28,7 @@ Two corrections the census needs, both already settled in SchwingNet's registry 
 
 Not in a tier because no reader is needed: the synthetic pairs, PENGWIN task 2 (50,000 renders of 100 pelvic CTs at real C-arm poses, CC BY 4.0, todo) and FluoroSeg (spine-datasets #171, gated), whose labels are exact by construction. The held CTs that make renders (DRRs) with exact labels are VerSe (374 series), CTSpinoPelvic1K (802), TotalSegmentator (1,228 and 1,935), CTSpine1K (1,005) and RSNA 2022 cervical (2,019, the C1, C2 and C7 anchors); SchwingNet already holds 12,929 rare-anatomy renders from them.
 
-What is missing everywhere: no cervical pair, and one thoracic pair (the digital-twin cadaver, one specimen, so a test only). LevelCheck is the one candidate that would add living thoracolumbar pairs at scale.
+What is missing everywhere: no cervical pair, and one thoracic pair (the digital-twin cadaver, one specimen, so a test only). LevelCheck is the one candidate that would add living cervical, thoracic and lumbar pairs at scale; it waits on the Johns Hopkins answer.
 
 ## 2. Which sets, in what order
 
@@ -77,7 +77,7 @@ Growing without a restart follows from three rules: every step reads pairs.csv a
 
 ## 5. The reader budget and who reads
 
-- First reader, correcting: the owner, in ITK-SNAP, on the automatic pass. TotalSegmentator has no L6 class, so every sixth lumbar body is the owner's to draw and flag.
+- First reader, correcting: the owner, in ITK-SNAP, on the automatic pass. TotalSegmentator has no L6 class, so every sixth lumbar body is the owner's to draw and flag, and on a lumbarised spine its labels can shift by one level, so the correction concentrates on transitional spines.
 - Second reader, verifying: Dr Tech, marking each body verified or returned in review.csv.
 - A third reader for disagreements is not named yet: the owner's choice (Ashley, who already takes spine-datasets tasks, is one possibility, if the owner wants it).
 
@@ -94,5 +94,5 @@ The counts are the owner's. What the numbers say: 30 verified cases give about p
 ## 7. What waits on the owner
 
 - The word and count for the automatic pass on the tier A spine CTs (149 + 692 + 6 + 1 = 848 CTs, or a smaller first batch such as C-ArmLSpine's 149).
-- The word and count for the LUMOS fetch (46.4 GB) and, after #170's fetch, the unzip check.
+- The non-commercial licence decision for LUMOS (CC BY-NC 4.0, as COBRA and DeepFluoro already are), then the word and count for its fetch (46.4 GB) and, after #170's fetch, the unzip check.
 - How many C-ArmLSpine cases the owner and Dr Tech read before the talk on 2 November, and whether a third reader is named.
