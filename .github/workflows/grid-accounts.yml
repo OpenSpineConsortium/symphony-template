@@ -55,7 +55,7 @@ on:
         required: false
         default: ""
       job:
-        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, freeze-status|pilot|start|report, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples, or schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id> or schwingnet-cancel-<job>"
+        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, freeze-status|pilot|start|report, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples, or schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id>, schwingnet-dropzip-<id> or schwingnet-cancel-<job>"
         required: false
         default: ""
       request:
