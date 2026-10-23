@@ -1,0 +1,18 @@
+{
+ "at": "2026-10-23T03:51:40Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull ok ddb8ecad54a1..1f0de11533af",
+  "schwingnet cancel 40704982 at commit 1f0de11 on warrior 2026-10-23 03:51:40 UTC",
+  "cancelled (fetch:vindr_pcxr): 40704982 40704984 40704986 ",
+  "schwingnet cancel: exit 0",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "rc": 0,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull ok ddb8ecad54a1..1f0de11533af",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "v": 1,
+ "what": "schwingnet cancel 40704982"
+}
