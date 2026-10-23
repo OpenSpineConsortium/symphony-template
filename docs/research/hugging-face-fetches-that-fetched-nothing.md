@@ -14,7 +14,7 @@ The owner asked why the fetches of the night before ended in seconds. Five sourc
 | 40731313 | dp_ipcai2025_robotic_xray_drive | 11 s |
 | 40731321 | dp_hf_fluoroseg | 20 s |
 
-The answer cannot show whether anything landed. It includes the log only of a job that failed, and its space list stops at the 80 largest sets, the smallest of which was 4 GB. None of the five landings is in that list.
+The answer cannot show whether anything landed. It includes the log only of a job that failed or was cancelled, and its space list stops at the 80 largest sets, the smallest of which was 4 GB. None of the five landings is in that list.
 
 ## Why the three Hugging Face fetches fetched nothing
 
