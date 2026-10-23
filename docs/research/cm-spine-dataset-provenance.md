@@ -79,6 +79,8 @@ prints, which is what a request needs.
 | Surveys | arXiv 2510.03318 (lumbar spine, 2025), both halves | its dataset tables name no X-ray set of this kind |
 | Papers citing it | OpenAlex, 3 works | Xie et al., CMIG 2025, a methodological survey (not read); Ben Fredj et al., YOLO11-MSCA, Electronics 2026, uses BUU-LSPINE alone and cites the paper in its reference list only; Xiao, Xiong and Wang, ITOEC 2025, the group's own, whose page could not be read |
 | Forks | the repository's last rendering, a cache | 0; a fork made after that rendering would not show, and a fork of a deleted repository lives on under its own name |
+| Hugging Face | its datasets API, which matches dataset names, for spine, vertebra, lumbar, xray, x-ray, radiograph, fluoro, arm, lspine, buu, zeng, neighbor, cmspine, cm_spine, cm-spine and L1, on 2026-10-23, with the file lists of the nearest names | 30 spine, 42 vertebra, 5 lumbar, 11 fluoro and over 130 xray and x-ray names, none a lumbar radiograph set; ImNotTam/LumbarSpine (October 2025) holds only .gitattributes; SpineBench's 40,263 spine images come from BUU Spine, CSXA, RSNA and VinDr-SpineXR; cmspine, cm_spine and cm-spine match nothing |
+| OpenDataLab | a web search restricted to opendatalab.com, whose pages reach the session as a JavaScript shell, for lumbar spine X-ray and spine X-ray vertebrae | MRSpineSeg (MR), chest and CT sets; no lumbar radiograph set |
 
 So no public copy was found anywhere the session could read, and the set, as far as the public
 record shows, was only ever the one Drive file.
@@ -102,11 +104,16 @@ terms and the approval, not only the files.
 1. Open the Drive link signed in to the owner's Google account. "You need access" offers Request
    access, one press that mails the file's owner, who is most likely the first author; "the file you
    have requested does not exist" means it is gone. The API cannot tell the two apart.
-2. Send the letter in spine-datasets' letters/cm_spine_drive_file.md to Cheng and Song, Zeng in
-   copy; it is also an Outlook draft in the owner's mailbox. It asks for the 208 images and labels,
-   the terms, the ethics approval and the de-identification.
-3. After two weeks without an answer: the Electronics editorial office, citing the Data Availability
-   Statement, as MDPI's ethics page lays out.
+2. The letter in spine-datasets' letters/cm_spine_drive_file.md went from the owner's mailbox to
+   Cheng and Song, Zeng in copy, on 2026-10-23. It asks for the 208 images and labels, the terms,
+   the ethics approval and the de-identification, and says that the owner had written to the same
+   three on 10 and 20 September 2026 about the dead Drive link, with no answer (the owner's Sent
+   Items, read on 2026-10-23).
+3. The Electronics editorial office (electronics@mdpi.com) was written to the same day, the
+   corresponding authors in copy, citing the Data Availability Statement as MDPI's ethics page lays
+   out, since the September emails had already been the step the page asks for first; the ethics
+   team (publication.ethics@mdpi.com) is next if the office does not answer. The record stands at
+   requested, which the census shows as asked.
 4. The company beside the group: Chimed Intelligent Machinery Co. Ltd is a co-author affiliation on
    the group's ITOEC 2025 paper. Whether it makes the Geelin G-arm, and so holds the raw images, is
    not established; the maker's page on the Anhui association site (www.ahyyxh.cn, "Geelin500")
@@ -115,9 +122,11 @@ terms and the approval, not only the files.
    bare repository or tar.gz for the root directory. git log on it gives the 18 commits' dates and
    whether the README ever carried another link (a Baidu share, say); the session cannot reach the
    archive.
-6. The hubs the session could not search: Google Dataset Search, OpenDataLab, Hugging Face datasets
-   and Academic Torrents, each by "lumbar spine X-ray"; a hit with 208 images or the classes L1 to
-   L5 would be worth opening.
+6. Hugging Face and OpenDataLab were searched on 2026-10-23 (section 4) and hold nothing; what the
+   session still cannot search is Google Dataset Search and Academic Torrents, each by "lumbar spine
+   X-ray"; a hit with 208 images or the classes L1 to L5 would be worth opening. OpenDataLab's own
+   search page could not be linked (the owner's link answered 404 and the session sees only a
+   JavaScript shell), so it is the search box on its home page.
 
 ## 7. Read
 
@@ -133,13 +142,19 @@ terms and the approval, not only the files.
 - grep.app's API for the Drive id and for spine_train.json; Zenodo records 18173664 and 15313259;
   Roboflow Universe's search and the researchRun page; the Kaggle page; the six dataset lists'
   READMEs; arXiv 2510.03318's HTML; the web searches of section 4.
+- Hugging Face's datasets API (api/datasets?search=..., which matches dataset names) and the file
+  lists of the nearest names; SpineBench's README and arXiv 2510.12267's abstract; the web search
+  restricted to opendatalab.com.
+- The owner's Sent Items, through the Microsoft 365 connector, for the September emails to the
+  authors.
 
 ## 8. Not readable from the session
 
 web.archive.org and archive.org (blocked), archive.softwareheritage.org (a browser check, Anubis),
 api.openalex.org and api.semanticscholar.org by curl (OpenAlex answers the fetch tool, Semantic
-Scholar refuses it), api.crossref.org, gitee.com, huggingface.co, opendatalab.com (JavaScript),
-academictorrents.com (a browser check), ieeexplore.ieee.org, www.ahyyxh.cn, GitHub's HTML pages
-by curl and its commits and tree pages by the fetch tool (robots), and GH Archive by BigQuery (no
-credentials). The GitHub API was not used, since the session's GitHub access is scoped to its own
-repositories.
+Scholar refuses it), api.crossref.org, gitee.com, huggingface.co's dataset pages (its API answers
+the fetch tool; curl reaches no Hugging Face host, hf-mirror.com included), opendatalab.com
+(JavaScript), academictorrents.com (a browser check), ieeexplore.ieee.org, www.ahyyxh.cn, GitHub's
+HTML pages by curl and its commits and tree pages by the fetch tool (robots), grep.app by curl later
+the same day (the proxy refused the tunnel), and GH Archive by BigQuery (no credentials). The GitHub
+API was not used, since the session's GitHub access is scoped to its own repositories.
