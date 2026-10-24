@@ -1,9 +1,10 @@
 {
- "at": "2026-10-24T01:42:14Z",
+ "at": "2026-10-24T07:53:29Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
-  "          40752526      reqp spine-da   go2432  R    5:36:33      1 amy1",
-  "frozen so far: 96 of 99",
+  "          40752526      reqp spine-da   go2432  R   11:47:49      1 amy1",
+  "frozen so far: 97 of 99",
+  "measured idc_ldct_and_projection_data: {\"by\":\"tools/freeze.py\",\"bytes\":862724923831,\"files\":8044941,\"frozen\":\"2026-10-24\",\"tree_sha256\":\"[hidden]\"}",
   "measured cadica: {\"by\":\"tools/freeze.py\",\"bytes\":3076112179,\"files\":1,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured buu_lspine: {\"by\":\"tools/freeze.py\",\"bytes\":35225321802,\"files\":46723,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured ctspine1k: {\"by\":\"tools/freeze.py\",\"bytes\":162350473572,\"files\":2020,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
@@ -23,19 +24,18 @@
   "measured aortaseg60: {\"by\":\"tools/freeze.py\",\"bytes\":15929004557,\"files\":310,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured idc_spine_mets_ct_seg: {\"by\":\"tools/freeze.py\",\"bytes\":18724919264,\"files\":35531,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured quadra_hc: {\"by\":\"tools/freeze.py\",\"bytes\":20413498578,\"files\":966,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
-  "measured idc_mediastinal_lymph_node_seg: {\"by\":\"tools/freeze.py\",\"bytes\":25695564010,\"files\":48770,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
-  "HPCW-JOB 40733943 promoter RUNNING on hao1 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40733943.out",
-  "HPCW-JOB 40741949 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40741949.out",
   "HPCW-JOB 40744799 freeze COMPLETED on amy1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40744799.out",
   "HPCW-JOB 40745721 freeze OUT_OF_MEMORY on amy1 exit 0:125 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745721.out",
   "HPCW-JOB 40745722 freeze COMPLETED on csc1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745722.out",
   "HPCW-JOB 40745723 freeze COMPLETED on mdt46 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745723.out",
   "HPCW-JOB 40745724 freeze COMPLETED on hao1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745724.out",
   "HPCW-JOB 40752526 freeze RUNNING on amy1 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40752526.out",
+  "HPCW-JOB 40754479 promoter RUNNING on hao1 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754479.out",
+  "HPCW-JOB 40754484 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754484.out",
   "HPCW-GRID-GATE freeze status ok"
  ],
  "rc": 0,
- "request": "",
+ "request": "thread-freeze-check",
  "said": [
   "HPCW-GRID-GATE freeze status ok"
  ],
