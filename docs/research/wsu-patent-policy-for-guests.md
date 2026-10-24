@@ -27,3 +27,9 @@ From the start date the policy binds the inventor as an employee, and section 2.
 ## What to confirm
 
 Whether a newer WSU IP policy, a student IP policy or Grid account terms apply (this statute predates Stanford v. Roche); whether the inventor ever signed a WSU patent agreement as a student or research assistant; and a section 2.2 waiver from WSU Technology Commercialization, with patent counsel reading the report of invention first. A patent application may be filed in the inventor's name before ownership is settled.
+
+## Federal fellowships and WSU's standard MOU
+
+An individual Kirschstein-NRSA fellowship (an F30, F31 or F32) brings no federal rights: 35 U.S.C. 212 bars a fellowship made "primarily to an awardee for educational purposes" from giving the agency "any rights to inventions made by the awardee", and the NIH Grants Policy Statement, 11.2.13.5, puts such fellowships outside 37 CFR 401 and outside invention reporting (read 2026-10-24; verify). What the fellowship does do is place the fellow at WSU as a student, which section 2.2 names.
+
+WSU's invention disclosure form (version of 1/25/2024) carries the Memorandum of Understanding on its pages 11 to 13. It is a present assignment, "the Inventors hereby assign to the University all their right, title, and interest in and to the subject invention(s)", of an invention it never defines. Its reversion (clause 7) runs only from 24 months "following issuance of any corresponding patent", so it never runs if WSU does not file. Its commitment to file is "if warranted". Its clause 8 makes the 1984 statute binding "other provisions of this Memorandum notwithstanding". Before signing, an inventor would reasonably ask for a schedule defining the subject invention, a reversion that also runs if WSU does not file, a filing date, and, for a founder, an option to an exclusive licence. The form's own signature page asks department and dean signatures of "WSU Faculty and other Employees".
