@@ -1,13 +1,13 @@
 {
- "at": "2026-10-23T22:11:49Z",
+ "at": "2026-10-24T08:35:35Z",
  "lines": [
-  "HPCW-GRID-GATE update ok ea47ca56aeef..6ef8731beeab",
+  "HPCW-GRID-GATE update ok 6ef8731beeab..e19eeb1d2b0e",
   "HPCW-GRID-GATE framework 28"
  ],
  "rc": 0,
- "request": "upd-unpack-1",
+ "request": "paired-update-0835",
  "said": [
-  "HPCW-GRID-GATE update ok ea47ca56aeef..6ef8731beeab",
+  "HPCW-GRID-GATE update ok 6ef8731beeab..e19eeb1d2b0e",
   "HPCW-GRID-GATE framework 28"
  ],
  "v": 1,
