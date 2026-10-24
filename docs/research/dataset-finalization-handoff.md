@@ -18,6 +18,10 @@ The one approved unpack was sent on 2026-10-24 at 02:18 UTC (request unpack-rspe
 
 The status word at 07:53 UTC on 2026-10-24 (request status-rspect-0752) read job 40754822 as COMPLETED, exit 0:0, after 01:58:17 on mdt13. rsna_rspect_pe now holds 1,514 GB on the data root (534 GB of zip and about 980 GB unpacked), and Room fell from 4,883 GB to 3,903 GB, which matches. Step 1 is done. The resumed thread's own permission check refused sending the read word for step 2, so steps 2 and 3 wait for the owner to start them from the Actions page.
 
+## Finished, 2026-10-24
+
+The unpack's report, read at 08:16 UTC (request unpack-rspect-read), said 1,937,450 files written (980.2 GB), 0.0 GB still to land. The owner sent the one approved dropzip at 15:52 UTC, and it ran as job 40774460: COMPLETED, exit 0, after 17 min 30 s. The status word at 17:15 UTC read rsna_rspect_pe at 981 GB, down from 1,514 GB, and Room at 4,437 GB, up 534 GB, so the zip is gone and the unpacked files stay. The dropzip's own report was not printed before this was written; the deletion rests on those sizes. spine-datasets #236 updates datasets/rsna_rspect.json. Another thread started the freeze of the set at 17:15 UTC (freeze-start). Nothing in the steps below is left for this thread.
+
 ## The steps left
 
 1. Done 2026-10-24 07:53 UTC: job 40754822 COMPLETED. Check job 40754822 with the status word (job `schwingnet-status` in grid-accounts.yml). Never send `schwingnet-unpack-rsna_rspect_pe` while that job is live, and never queue a second unpack.
