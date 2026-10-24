@@ -1,14 +1,14 @@
 {
- "at": "2026-10-22T09:04:21Z",
+ "at": "2026-10-24T01:49:00Z",
  "lines": [
   "stopped",
-  "HPCW-JOB submitted 40702867 promoter reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40702867.out",
-  "HPCW-GRID-GATE promoter restart ok at e7e54ace7bb7"
+  "HPCW-JOB submitted 40754479 promoter reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754479.out",
+  "HPCW-GRID-GATE promoter restart ok at 20e1b097e29a"
  ],
  "rc": 0,
- "request": "jr9apa-restart-2",
+ "request": "mtddh-restart",
  "said": [
-  "HPCW-GRID-GATE promoter restart ok at e7e54ace7bb7"
+  "HPCW-GRID-GATE promoter restart ok at 20e1b097e29a"
  ],
  "v": 1,
  "what": "promoter restart"
