@@ -1,0 +1,21 @@
+larger-not-taken|if [ -n "$held" ] && [ "$held" -gt "$sum" ]; then echo "$held attribute"; else echo "$sum entries"; fi|echo "$sum entries"
+attribute-floor-dropped|[ -n "$held" ] && [ "$held" -ge "$3" ] || return 1|[ -n "$held" ] || return 1
+stat-count-dropped|[ -n "$seen" ] && [ "$(size_by_stat "$1")" = "$entries" ] || return 1|[ -n "$seen" ] || return 1
+seen-dropped|[ -n "$seen" ] && [ "$(size_by_stat "$1")" = "$entries" ] || return 1|[ "$(size_by_stat "$1")" = "$entries" ] || return 1
+mount-check-dropped|    ! is_mount_point "$points" "$entry" || return 1
+|
+overflow-check-dropped|bytes=$(entry_bytes "$entry" "$device") && [ -n "$bytes" ] && fits_in_count "$sum" "$bytes" || return 1|bytes=$(entry_bytes "$entry" "$device") && [ -n "$bytes" ] || return 1
+device-check-dropped|bytes=$(entry_bytes "$entry" "$device") && [ -n "$bytes" ]|bytes=$(entry_bytes "$entry" "$("$RULE_STAT" -c %d "$entry")") && [ -n "$bytes" ]
+least-is-most|if [ -z "$least" ] || [ "$room" -lt "$least" ]; then least=$room at=$height; fi|if [ -z "$least" ] || [ "$room" -gt "$least" ]; then least=$room at=$height; fi
+above-never-binds|if [ -n "$above" ] && [ "$above" -lt "$free" ]; then|if [ -n "$above" ] && [ "$above" -gt "$free" ]; then
+intermediate-skipped|for (( height = 1; height <= top; height++ )); do|for (( height = top; height <= top; height++ )); do
+child-not-carried|    child=$folder
+  done|  done
+settle-kind-whole|[ "${second_from%%-*}" = "${first_from%%-*}" ]|[ "$second_from" = "$first_from" ]
+zero-quota-counted|    [ -z "$quota" ] || [ "$quota" = 0 ] || echo "$height $quota"|    [ -z "$quota" ] || echo "$height $quota"
+df-beside-above|  [ -z "$used" ] && [ "$below" = 1 ] || return 1|  [ -z "$used" ] || return 1
+above-unread-ignored|      above=$(room_above "$volume" "$used") || return 1|      above=$(room_above "$volume" "$used")
+readout-tie-to-above|    if [ "$left" -lt "$least" ]; then|    if [ "$left" -le "$least" ]; then
+readout-unread-ignored|    [ -z "$ABOVE_UNREAD" ] || below=$ABOVE_UNREAD|    :
+mount-root-not-read|    quota=$(xattr_whole ceph.quota.max_bytes "${folder:-/}") || return 1|    is_mount_point "$points" "${folder:-/}" \&\& break; quota=$(xattr_whole ceph.quota.max_bytes "${folder:-/}") || return 1
+quota-unread-as-none|    quota=$(xattr_whole ceph.quota.max_bytes "${folder:-/}") || return 1|    quota=$(xattr_whole ceph.quota.max_bytes "${folder:-/}")
