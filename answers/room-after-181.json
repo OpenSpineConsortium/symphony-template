@@ -1,6 +1,6 @@
 {
  "action": "job",
- "at": "2026-10-22T23:19:33Z",
+ "at": "2026-10-24T00:25:10Z",
  "list": {
   "accounts": [
    {
@@ -55,34 +55,34 @@
   ],
   "auto": false,
   "current": "1",
-  "framework": 27,
+  "framework": 28,
   "usage_job": null,
   "v": 1,
   "worker": {
    "account": null,
    "age_s": 9,
-   "job": "40703073",
-   "link": "https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5",
-   "message": "Open in Claude: https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5 and find Wayne State grid (or tap Code in the Claude app). space to show QR code",
+   "job": "40743348",
+   "link": "https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m",
+   "message": "Open in Claude: https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m (or tap Code in the Claude app). space to show QR code",
    "name": "worker",
-   "node": "hao1",
+   "node": "mdt13",
    "state": "online",
-   "updated_at": "2026-10-22T23:19:24Z"
+   "updated_at": "2026-10-24T00:25:01Z"
   },
   "workers": [
    {
     "account": null,
     "age_s": 9,
-    "link": "https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5",
+    "link": "https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m",
     "name": "worker",
-    "node": "hao1",
+    "node": "mdt13",
     "pinned": null,
     "state": "online"
    }
   ]
  },
  "rc": 0,
- "request": "granted-fluorosam-1",
+ "request": "room-after-181",
  "said": [
   "HPCW-GRID-GATE accounts ok"
  ],
