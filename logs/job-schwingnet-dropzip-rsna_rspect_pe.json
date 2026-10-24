@@ -1,25 +1,17 @@
 {
- "at": "2026-10-23T18:23:52Z",
+ "at": "2026-10-24T15:52:28Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current e064e3c6d23a",
-  "schwingnet dropzip rsna_rspect_pe at commit e064e3c on warrior 2026-10-23 18:23:52 UTC",
-  "## DROPZIP-rsna_rspect_pe.md (2026-10-23 14:17:48)",
-  "# dropzip rsna_rspect_pe",
-  "  zips: 1",
-  "  [hidden].zip: kept, 533.7 GB: 1,937,450 of 1,937,450 files are not unpacked beside it",
-  "    not on disk: sample_submission.csv",
-  "    not on disk: test/64c98f189e15/52b9a559846d/fc559a130f3e.dcm",
-  "    not on disk: test/64c98f189e15/52b9a559846d/c2925408b35b.dcm",
-  "    not on disk: test/64c98f189e15/52b9a559846d/1e21f7760382.dcm",
-  "    not on disk: test/64c98f189e15/52b9a559846d/d367ff2c7180.dcm",
-  "  freed: 0.0 GB",
+  "HPCW-GRID-GATE schwingnet pull ok 8986a2847c16..e66bbd8c6669",
+  "schwingnet dropzip rsna_rspect_pe at commit e66bbd8 on warrior 2026-10-24 15:52:27 UTC",
+  "  dropzip: job 40774460",
+  "submitted one job. Send dropzip rsna_rspect_pe again once it ends to read what it deleted.",
   "schwingnet dropzip: exit 0",
   "HPCW-GRID-GATE schwingnet dropzip ok"
  ],
  "rc": 0,
- "request": "dz-rspect-report",
+ "request": "dropzip-rspect-1",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current e064e3c6d23a",
+  "HPCW-GRID-GATE schwingnet pull ok 8986a2847c16..e66bbd8c6669",
   "HPCW-GRID-GATE schwingnet dropzip ok"
  ],
  "v": 1,
