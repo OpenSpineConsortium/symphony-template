@@ -1,13 +1,13 @@
 {
- "at": "2026-10-23T19:42:22Z",
+ "at": "2026-10-24T08:07:36Z",
  "lines": [
-  "reported 96 frozen sets to freeze-report at 2f0448352ccc",
-  "HPCW-GRID-GATE freeze report ok at 0886930daf00"
+  "reported 97 frozen sets to freeze-report at 6c790c766b50",
+  "HPCW-GRID-GATE freeze report ok at 5314bfd15b41"
  ],
  "rc": 0,
- "request": "",
+ "request": "thread-freeze-report",
  "said": [
-  "HPCW-GRID-GATE freeze report ok at 0886930daf00"
+  "HPCW-GRID-GATE freeze report ok at 5314bfd15b41"
  ],
  "v": 1,
  "what": "freeze report"
