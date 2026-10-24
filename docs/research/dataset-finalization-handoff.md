@@ -16,9 +16,11 @@ Another thread's SchwingNet #181 and #191 made the size rule count every quota o
 
 The one approved unpack was sent on 2026-10-24 at 02:18 UTC (request unpack-rspect-1). The grid answered "unpack: job 40754822" at commit 7a475c0. The job unpacks about 980 GB, with a wall time of up to one day. At 06:05 UTC it had not been checked again.
 
+The status word at 07:53 UTC on 2026-10-24 (request status-rspect-0752) read job 40754822 as COMPLETED, exit 0:0, after 01:58:17 on mdt13. rsna_rspect_pe now holds 1,514 GB on the data root (534 GB of zip and about 980 GB unpacked), and Room fell from 4,883 GB to 3,903 GB, which matches. Step 1 is done. The resumed thread's own permission check refused sending the read word for step 2, so steps 2 and 3 wait for the owner to start them from the Actions page.
+
 ## The steps left
 
-1. Check job 40754822 with the status word (job `schwingnet-status` in grid-accounts.yml). Never send `schwingnet-unpack-rsna_rspect_pe` while that job is live, and never queue a second unpack.
+1. Done 2026-10-24 07:53 UTC: job 40754822 COMPLETED. Check job 40754822 with the status word (job `schwingnet-status` in grid-accounts.yml). Never send `schwingnet-unpack-rsna_rspect_pe` while that job is live, and never queue a second unpack.
 2. Once the job has ended, send `schwingnet-unpack-rsna_rspect_pe` once. Since the report exists, this send queues nothing: it prints logs/UNPACK-rsna_rspect_pe.md and removes it. Expect "still to land: 0.0 GB" and about 980 GB written. If it says "refused for space" or any GB still to land, report that to the owner and stop.
 3. If nothing is left to land, send `schwingnet-dropzip-rsna_rspect_pe` once (approved), and later send it again to print its report. Expect "deleted" and about 534 GB freed. A "kept" line means nothing was deleted; report it and stop.
 4. In spine-datasets, by pull request, update datasets/rsna_rspect.json:
