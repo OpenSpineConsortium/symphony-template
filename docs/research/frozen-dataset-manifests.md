@@ -106,3 +106,18 @@ Next steps, in order:
 2. If any of the three froze, send job freeze-report. Then, in spine-datasets, extract origin/freeze-report's frozen/ to a scratch folder and run `python3 tools/freeze.py apply <scratch>/frozen` and `bash scripts/check.sh`. Open the pull request with its Adversarial review section and merge it once green. Apply rewrites only the sets the copies name, so the 96 already in come back unchanged.
 3. If a set is still unfrozen after the job ends, find out why before anything else: read freeze_40752526.out in the hpcworker log folder, which needs a gate word that tails a job log, or the owner's shell. Any new job needs the owner's word and the count.
 4. The three sets whose grid_path names several folders (aasce, deepfluoro, totalsegmentator) are still to be frozen by hand, on the owner's word with the count of jobs.
+
+## Handoff, 2026-10-24 08:20 UTC (resumed after the full stop)
+
+This replaces the next steps of the handoff above.
+
+Done:
+- freeze status at 07:53 UTC showed job 40752526 at 11h48m of its 12h, and idc_ldct_and_projection_data frozen (862,724,923,831 bytes, 8,044,941 files), 97 of 99.
+- freeze status at 08:06 UTC showed the job ended FAILED, exit 0:15: Slurm stopped it at its wall time. rsna_rspect and ctpelvic1k were not frozen.
+- freeze-report sent 97 public copies to spine-datasets' branch freeze-report at 6c790c766b50; `freeze.py apply` changed only idc_ldct_and_projection_data, which spine-datasets #234 adds.
+- The record states 16.5 GB for idc_ldct_and_projection_data and the freeze read 862.7 GB, so the stated figure likely counts the CT images alone and not the projection data.
+
+Next steps, in order, each needing the owner's word and the count of jobs:
+1. rsna_rspect: wait for the Dataset finalization thread's unpack job 40754822 to finish, since freezing a folder still being unpacked records the wrong bytes.
+2. ctpelvic1k: one job, after reading freeze_40752526.out to see whether the job was partway through it (a .FROZEN.partial resumes). The 12h wall time ran out with one 863 GB set done, so a set as large as idc_ldct needs a job of its own.
+3. aasce, deepfluoro and totalsegmentator, whose grid_path names several folders, are still to be frozen by hand.
