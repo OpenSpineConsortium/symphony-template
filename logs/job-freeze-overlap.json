@@ -1,0 +1,15 @@
+{
+ "at": "2026-10-24T17:52:38Z",
+ "lines": [
+  "queueing one lineage job: every frozen set's file list and DICOM headers, no image read",
+  "HPCW-JOB submitted 40775283 lineage reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/lineage_40775283.out",
+  "HPCW-GRID-GATE freeze overlap ok at 02ac5fb6d119"
+ ],
+ "rc": 0,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE freeze overlap ok at 02ac5fb6d119"
+ ],
+ "v": 1,
+ "what": "freeze overlap"
+}
