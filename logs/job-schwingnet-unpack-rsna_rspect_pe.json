@@ -1,0 +1,19 @@
+{
+ "at": "2026-10-24T02:18:43Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 7a475c00f1d9",
+  "schwingnet unpack rsna_rspect_pe at commit 7a475c0 on warrior 2026-10-24 02:18:42 UTC",
+  "  unpack: job 40754822",
+  "submitted one job. It starts writing only once the size rule admits it; send unpack rsna_rspect_pe again once it ends to read what it wrote.",
+  "schwingnet unpack: exit 0",
+  "HPCW-GRID-GATE schwingnet unpack ok"
+ ],
+ "rc": 0,
+ "request": "unpack-rspect-1",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 7a475c00f1d9",
+  "HPCW-GRID-GATE schwingnet unpack ok"
+ ],
+ "v": 1,
+ "what": "schwingnet unpack rsna_rspect_pe"
+}
