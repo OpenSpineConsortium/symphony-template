@@ -33,3 +33,22 @@ Whether a newer WSU IP policy, a student IP policy or Grid account terms apply (
 An individual Kirschstein-NRSA fellowship (an F30, F31 or F32) brings no federal rights: 35 U.S.C. 212 bars a fellowship made "primarily to an awardee for educational purposes" from giving the agency "any rights to inventions made by the awardee", and the NIH Grants Policy Statement, 11.2.13.5, puts such fellowships outside 37 CFR 401 and outside invention reporting (read 2026-10-24; verify). What the fellowship does do is place the fellow at WSU as a student, which section 2.2 names.
 
 WSU's invention disclosure form (version of 1/25/2024) carries the Memorandum of Understanding on its pages 11 to 13. It is a present assignment, "the Inventors hereby assign to the University all their right, title, and interest in and to the subject invention(s)", of an invention it never defines. Its reversion (clause 7) runs only from 24 months "following issuance of any corresponding patent", so it never runs if WSU does not file. Its commitment to file is "if warranted". Its clause 8 makes the 1984 statute binding "other provisions of this Memorandum notwithstanding". Before signing, an inventor would reasonably ask for a schedule defining the subject invention, a reversion that also runs if WSU does not file, a filing date, and, for a founder, an option to an exclusive licence. The form's own signature page asks department and dean signatures of "WSU Faculty and other Employees".
+
+## Filing, inventorship and the policy's clocks
+
+Added 2026-10-24 from the same thread. A provisional application needs no inventor's signature,
+so the university's counsel can file one without the inventor; a later full application needs
+the inventor's declaration, or a substitute statement from a party that shows a proprietary
+interest (37 CFR 1.46 and 1.64; from memory, verify). Filing does not move ownership: the inventor
+holds title until a written assignment (35 U.S.C. 261), and an applicant or assignee named on the
+cover sheet or data sheet is the place an ownership claim enters the record, so an inventor who
+means to keep title asks to be named applicant with no assignee. Inventorship is a separate fact:
+only those who conceived the claims are inventors, a university never is, and a wrongly added
+co-inventor is the real risk, since each co-owner may license without the others (35 U.S.C. 262).
+The policy itself sets two clocks from the report of invention: a written determination within
+twenty working days under section 2.1, and a decision to acquire or waive within four calendar
+months under section 2.2. It does not say what silence means. Its definition of University
+support includes "facilities, equipment or services not available to the general public", which
+reads on a research computing cluster, so a guest's strongest points lie outside the policy's
+words: that they never assented to it and that section 2.2 promises an assignment rather than
+making one.
