@@ -31,6 +31,12 @@ token or e-mail is written here.
   Control runs are on the owner's computer, in the Desktop folders opendatalab-search-2 and
   dataset-links, outside any repository; the notes carry what matters.
 
+- Resumed 2026-10-24 at 07:52 UTC on the owner's word, by a new session on the same thread
+  title: it checked that spine-datasets #232 and #233 are on main (5314bfd), closed the released
+  draft #157, and merged this page. No answer from Branney, Wasserthal or Dr Zhang is recorded
+  yet; a session cannot read the owner's mailbox, so each answer reaches the records when the
+  owner forwards it or says so.
+
 ## Open work
 
 - ReXGradient-160K (spine-datasets, datasets/rexgradient_160k.json, status held; issue #11 still
@@ -45,10 +51,10 @@ token or e-mail is written here.
   2. Read the view-position metadata and keep only the lateral studies, deleting the rest, as the
      note promised; that is a grid job and waits for the owner's word and count.
   3. The landing pass checks the files kept, and a freeze follows on the owner's word.
-  4. Tidy: the released claim's draft #157 is still open although the board renamed its branch
-     claude/11 to released/11-27c16cf on 2026-10-23; its history is now in the record, so it can
-     be closed. SchwingNet's own data/sources/rexgradient_160k.json still says not fetched, which
-     is the SchwingNet thread's to correct.
+  4. Tidy: the released claim's draft #157 was closed on 2026-10-24 at 07:58 UTC, its history
+     being in the record and its branch renamed to released/11-27c16cf. SchwingNet's own
+     data/sources/rexgradient_160k.json still says not fetched, which is the SchwingNet thread's
+     to correct.
 - The Bournemouth lumbar cine (datasets/bournemouth_lumbar_qf.json, requested; the cervical set
   datasets/bournemouth_cervical_qf.json rides in the same thread). The group's public OSF deposit
   z2jby holds preproc_224_wb_flex.zip (1,492,963,815 bytes, sha256 in the record,
