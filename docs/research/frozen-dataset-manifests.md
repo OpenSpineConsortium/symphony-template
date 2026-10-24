@@ -88,3 +88,21 @@ Next steps, in order, none of them a new grid job:
 4. In a spine-datasets checkout: `git fetch origin freeze-report`, extract its frozen/ to a scratch folder, run `python3 tools/freeze.py apply <scratch>/frozen`, `bash scripts/check.sh`, and open the pull request (with its Adversarial review section) that adds frozen/<id>.json and each record's measured block; the census then shows frozen sizes, file counts and tree hashes.
 5. Freeze by hand the three sets whose grid_path names several folders (aasce, deepfluoro, totalsegmentator), only on the owner's word with the count of jobs.
 6. A set that failed in a job is retried only with the owner's word: `freeze-start` again queues only the unfrozen sets, as new jobs.
+
+## Handoff, 2026-10-24 06:05 UTC (the owner asked every thread to stop and checkpoint)
+
+This replaces the next steps of the handoff above. Every step up to step 4 is done and merged, and nothing lives only in a cloud session.
+
+Done:
+- hpcworker #39 is merged. freeze-report sent 96 public copies to spine-datasets' branch freeze-report.
+- spine-datasets #227 merged frozen/<id>.json and each record's measured block for those 96 sets.
+- Job 40745721 ran out of memory at 8G, so ctpelvic1k and idc_ldct_and_projection_data stayed unfrozen. rsna_rspect landed after the plan was written.
+- On 2026-10-23 at 19:54 UTC the owner approved one more job at 32G ("yes"). spine-datasets #229 made three changes: grid/freeze.sh now asks for 32G, `start` takes one job unless told otherwise, and grid/freeze-plan.tsv gained rsna_rspect.
+- freeze-start then queued job 40752526 at 20:05 UTC on amy1, with idc_ldct_and_projection_data, rsna_rspect and ctpelvic1k in one share.
+- At 01:42 UTC on 2026-10-24 that job had run 5h37m (wall time 12h) and none of the three was frozen yet. freeze status prints no job log lines, so it is not known which set it was on.
+
+Next steps, in order:
+1. Send job freeze-status through grid-accounts.yml and read logs/job-freeze-status.json on symphony-template's branch grid. The job either finished, ran out its 12h, or was requeued; a half-read set resumes from its .FROZEN.partial.
+2. If any of the three froze, send job freeze-report. Then, in spine-datasets, extract origin/freeze-report's frozen/ to a scratch folder and run `python3 tools/freeze.py apply <scratch>/frozen` and `bash scripts/check.sh`. Open the pull request with its Adversarial review section and merge it once green. Apply rewrites only the sets the copies name, so the 96 already in come back unchanged.
+3. If a set is still unfrozen after the job ends, find out why before anything else: read freeze_40752526.out in the hpcworker log folder, which needs a gate word that tails a job log, or the owner's shell. Any new job needs the owner's word and the count.
+4. The three sets whose grid_path names several folders (aasce, deepfluoro, totalsegmentator) are still to be frozen by hand, on the owner's word with the count of jobs.
