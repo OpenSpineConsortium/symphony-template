@@ -1,14 +1,14 @@
 {
- "at": "2026-10-24T17:15:54Z",
+ "at": "2026-10-24T21:37:11Z",
  "lines": [
-  "queueing 2 sets: rsna_rspect ctpelvic1k ",
-  "HPCW-JOB submitted 40775152 freeze reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40775152.out",
-  "HPCW-GRID-GATE freeze start ok at c8c1728d6327"
+  "queueing 1 sets: ctpelvic1k ",
+  "HPCW-JOB submitted 40777657 freeze reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40777657.out",
+  "HPCW-GRID-GATE freeze start ok at 772215161860"
  ],
  "rc": 0,
- "request": "thread-freeze-start-rspect-ctpelvic",
+ "request": "",
  "said": [
-  "HPCW-GRID-GATE freeze start ok at c8c1728d6327"
+  "HPCW-GRID-GATE freeze start ok at 772215161860"
  ],
  "v": 1,
  "what": "freeze start"
