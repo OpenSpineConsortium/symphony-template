@@ -1,17 +1,21 @@
 {
- "at": "2026-10-24T02:18:43Z",
+ "at": "2026-10-24T08:16:10Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 7a475c00f1d9",
-  "schwingnet unpack rsna_rspect_pe at commit 7a475c0 on warrior 2026-10-24 02:18:42 UTC",
-  "  unpack: job 40754822",
-  "submitted one job. It starts writing only once the size rule admits it; send unpack rsna_rspect_pe again once it ends to read what it wrote.",
+  "HPCW-GRID-GATE schwingnet pull current fa7cc181fe31",
+  "schwingnet unpack rsna_rspect_pe at commit fa7cc18 on warrior 2026-10-24 08:16:10 UTC",
+  "## UNPACK-rsna_rspect_pe.md (2026-10-24 00:17:18)",
+  "# unpack rsna_rspect_pe",
+  "  zips: 1",
+  "  [hidden].zip: 1,937,450 files; 1,937,450 written (980.2 GB), 0 already there, 0 named outside the raw folder and left",
+  "  written: 980.2 GB",
+  "  still to land: 0.0 GB of 980.2 GB",
   "schwingnet unpack: exit 0",
   "HPCW-GRID-GATE schwingnet unpack ok"
  ],
  "rc": 0,
- "request": "unpack-rspect-1",
+ "request": "unpack-rspect-read",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 7a475c00f1d9",
+  "HPCW-GRID-GATE schwingnet pull current fa7cc181fe31",
   "HPCW-GRID-GATE schwingnet unpack ok"
  ],
  "v": 1,
