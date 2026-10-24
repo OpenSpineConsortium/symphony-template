@@ -159,7 +159,7 @@ class Words(unittest.TestCase):
     def test_a_job_says_its_one_word_and_nothing_else(self):
         for job, word in (("update", "update"), ("artifacts", "artifacts"), ("promoter-status", "promoter status"), ("promoter-start", "promoter start"),
                           ("promoter-stop", "promoter stop"), ("promoter-restart", "promoter restart"),
-                          ("freeze-status", "freeze status"), ("freeze-pilot", "freeze pilot"), ("freeze-start", "freeze start"), ("freeze-report", "freeze report"),
+                          ("freeze-status", "freeze status"), ("freeze-pilot", "freeze pilot"), ("freeze-start", "freeze start"), ("freeze-report", "freeze report"), ("freeze-overlap", "freeze overlap"),
                           ("schwingnet-status", "schwingnet status"),
                           ("schwingnet-start", "schwingnet start"), ("schwingnet-v1", "schwingnet v1"),
                           ("schwingnet-fetch-vindr_pcxr", "schwingnet fetch vindr_pcxr"),
@@ -170,7 +170,7 @@ class Words(unittest.TestCase):
                           ("schwingnet-unpack-rsna_rspect_pe", "schwingnet unpack rsna_rspect_pe"),
                           ("schwingnet-cancel-40704982", "schwingnet cancel 40704982")):
             self.assertEqual(self.run_script("job", job=job)[1], [word, "accounts"], job)
-        for job in ("", "update now", "artifacts-now", "artifacts now", "promoter start abc", "promoter-restart-now", "promoter restart", "freeze-stop", "freeze-start-4", "freeze-report-now", "freeze-pilot-amos22", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
+        for job in ("", "update now", "artifacts-now", "artifacts now", "promoter start abc", "promoter-restart-now", "promoter restart", "freeze-stop", "freeze-start-4", "freeze-report-now", "freeze-overlap-now", "freeze-pilot-amos22", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
                     "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-explore-", "schwingnet-explore-Bad", "schwingnet-dropzip-", "schwingnet-dropzip-a-b", "schwingnet-unpack-", "schwingnet-unpack-a-b", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-nodequota-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
             rc, words, _ = self.run_script("job", job=job)
             self.assertNotEqual(rc, 0, job)

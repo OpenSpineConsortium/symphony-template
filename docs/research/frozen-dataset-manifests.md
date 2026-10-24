@@ -121,3 +121,7 @@ Next steps, in order, each needing the owner's word and the count of jobs:
 1. rsna_rspect: wait for the Dataset finalization thread's unpack job 40754822 to finish, since freezing a folder still being unpacked records the wrong bytes.
 2. ctpelvic1k: one job, after reading freeze_40752526.out to see whether the job was partway through it (a .FROZEN.partial resumes). The 12h wall time ran out with one 863 GB set done, so a set as large as idc_ldct needs a job of its own.
 3. aasce, deepfluoro and totalsegmentator, whose grid_path names several folders, are still to be frozen by hand.
+
+## From freezes to an overlap ledger, 2026-10-24
+
+The owner asked to remove sets for more useful ones under the oschome cap with no data lost, one patient once across sets, and every set rebuildable. The freezes make most of that possible already: a removed set's file list and tree hash prove a refetch or a rebuild identical. The design is spine-datasets docs/research/lineage-and-retirement.md (spine-datasets #235). Its first measurement is tools/lineage.py there (spine-datasets #237), queued by the gate word freeze overlap (hpcworker #43, this repository's grid-accounts allowlist) as one read-only job on the owner's word of 2026-10-24: it joins every frozen file list on sha256 and reads a few DICOM headers per folder for the study and series UIDs, and only counts come back, as lineage/OVERLAP.json through freeze report.
