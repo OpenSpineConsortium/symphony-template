@@ -1,5 +1,5 @@
 {
- "at": "2026-10-24T08:06:25Z",
+ "at": "2026-10-24T16:08:41Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
   "frozen so far: 97 of 99",
@@ -23,18 +23,18 @@
   "measured aortaseg60: {\"by\":\"tools/freeze.py\",\"bytes\":15929004557,\"files\":310,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured idc_spine_mets_ct_seg: {\"by\":\"tools/freeze.py\",\"bytes\":18724919264,\"files\":35531,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured quadra_hc: {\"by\":\"tools/freeze.py\",\"bytes\":20413498578,\"files\":966,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
-  "HPCW-JOB 40744799 freeze COMPLETED on amy1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40744799.out",
   "HPCW-JOB 40745721 freeze OUT_OF_MEMORY on amy1 exit 0:125 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745721.out",
   "HPCW-JOB 40745722 freeze COMPLETED on csc1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745722.out",
   "HPCW-JOB 40745723 freeze COMPLETED on mdt46 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745723.out",
   "HPCW-JOB 40745724 freeze COMPLETED on hao1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745724.out",
   "HPCW-JOB 40752526 freeze FAILED on amy1 exit 0:15 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40752526.out",
-  "HPCW-JOB 40754479 promoter RUNNING on hao1 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754479.out",
-  "HPCW-JOB 40754484 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754484.out",
+  "HPCW-JOB 40754479 promoter COMPLETED on hao1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754479.out",
+  "HPCW-JOB 40754484 promoter RUNNING on hao1 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754484.out",
+  "HPCW-JOB 40772366 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40772366.out",
   "HPCW-GRID-GATE freeze status ok"
  ],
  "rc": 0,
- "request": "thread-freeze-check-2",
+ "request": "thread-freeze-check-3",
  "said": [
   "HPCW-GRID-GATE freeze status ok"
  ],
