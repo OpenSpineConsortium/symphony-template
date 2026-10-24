@@ -1,8 +1,7 @@
 {
- "at": "2026-10-24T07:53:29Z",
+ "at": "2026-10-24T08:06:25Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
-  "          40752526      reqp spine-da   go2432  R   11:47:49      1 amy1",
   "frozen so far: 97 of 99",
   "measured idc_ldct_and_projection_data: {\"by\":\"tools/freeze.py\",\"bytes\":862724923831,\"files\":8044941,\"frozen\":\"2026-10-24\",\"tree_sha256\":\"[hidden]\"}",
   "measured cadica: {\"by\":\"tools/freeze.py\",\"bytes\":3076112179,\"files\":1,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
@@ -29,13 +28,13 @@
   "HPCW-JOB 40745722 freeze COMPLETED on csc1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745722.out",
   "HPCW-JOB 40745723 freeze COMPLETED on mdt46 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745723.out",
   "HPCW-JOB 40745724 freeze COMPLETED on hao1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745724.out",
-  "HPCW-JOB 40752526 freeze RUNNING on amy1 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40752526.out",
+  "HPCW-JOB 40752526 freeze FAILED on amy1 exit 0:15 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40752526.out",
   "HPCW-JOB 40754479 promoter RUNNING on hao1 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754479.out",
   "HPCW-JOB 40754484 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754484.out",
   "HPCW-GRID-GATE freeze status ok"
  ],
  "rc": 0,
- "request": "thread-freeze-check",
+ "request": "thread-freeze-check-2",
  "said": [
   "HPCW-GRID-GATE freeze status ok"
  ],
