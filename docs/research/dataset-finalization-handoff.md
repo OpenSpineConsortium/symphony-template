@@ -1,29 +1,41 @@
 # Handoff: the thread "Dataset finalization"
 
-Source: the thread "Dataset finalization", 2026-10-23, written at 18:15 UTC when the owner's weekly limit reached 92 percent. Nothing of this thread lives only in its cloud session: every change is pushed and every finding is in exploring-fetched-sets.md beside this file.
+Source: the thread "Dataset finalization". First written 2026-10-23 at 18:15 UTC, when the owner's weekly limit reached 92 percent. Rewritten 2026-10-24 at 06:05 UTC, when the owner asked every thread to stop and push. Nothing of this thread lives only in its cloud session: every change is merged, and the findings are in exploring-fetched-sets.md beside this file.
 
 ## Where it stopped
 
-The owner asked, on 2026-10-23, for RSPECT's 534 GB Kaggle zip to be deleted ("you can delete it"), through GitHub Actions rather than the grid's shell. The zip sits beside the 1,937,450 files the fetch unpacked from it, at /rs/rs_grp_oschome/go2432/data/rsna_rspect_pe/raw; explore proved those files complete (980.24 GB, the competition page's figures).
+RSPECT (rsna_rspect_pe) is held on the grid only as its 533.7 GB Kaggle zip, at /rs/rs_grp_oschome/go2432/data/rsna_rspect_pe/raw. On 2026-10-23 at 18:16 UTC the dropzip job 40751186 kept the zip, because none of its 1,937,450 members is unpacked on disk. On 2026-10-23 at 19:53 UTC the owner chose "Unpack once room is readable". His word covers exactly one unpack job and one dropzip job, and only after the room check passes.
 
-A new gate word, `dropzip <id>`, does it in one batch job that deletes a zip only when every member sits unpacked beside it at the same size. Three pull requests carry it:
+The gate word `unpack <id>` was built for this and is live:
 
-- hpcworker #40, the gate admits `schwingnet dropzip <id>`: merged, and the grid's clone took it by the `update` job word at 18:04 UTC (`update ok ..a6e6fe2a39c3`, framework 28).
-- symphony-template #424, grid-accounts.yml takes `schwingnet-dropzip-<id>`: merged.
-- SchwingNet #174, the word itself (tools/dropzip.py, grid/dropzip.sbatch, grid/gate.sh): merged at 18:07 UTC.
+- SchwingNet #184: tools/unpack.py, grid/unpack.sbatch and the word in grid/gate.sh, held to the size rule. Merged 2026-10-23 at 22:16 UTC.
+- hpcworker #41: the gate admits `schwingnet unpack <id>`. Merged, and the grid's clone took it with the `update` word at 22:11 UTC (6ef8731).
+- symphony-template #433: grid-accounts.yml takes `schwingnet-unpack-<id>`. Merged.
 
-## What the job found
+Another thread's SchwingNet #181 and #191 made the size rule count every quota on the path. The status word at 02:17 UTC on 2026-10-24 read Room = 4,883 GB.
 
-The zip was kept and nothing was deleted: none of its members is unpacked on disk, so RSPECT is held only as the 533.7 GB zip (exploring-fetched-sets.md, the last section). The spine-datasets record rsna_rspect.json says the files sit unpacked beside the zip; that is wrong and needs correcting by pull request. Unpacking it (about 980 GB) or keeping it zipped is the owner's choice; no job runs without his word.
+The one approved unpack was sent on 2026-10-24 at 02:18 UTC (request unpack-rspect-1). The grid answered "unpack: job 40754822" at commit 7a475c0. The job unpacks about 980 GB, with a wall time of up to one day. At 06:05 UTC it had not been checked again.
 
-## The steps as first written, now superseded after step 3
+## The steps left
 
-1. Done: SchwingNet #174 merged at 18:07 UTC.
-2. Done: the one approved job was sent at 18:16 UTC (request dz-rspect-1) and queued as job 40751186; the grid's SchwingNet pulled to e064e3c first. Do not send the word again while that job is live, or it is refused; never queue a second.
-3. Check it with the status word (job `schwingnet-status`) until the job is done, then send the same dropzip word again: it prints logs/DROPZIP-rsna_rspect_pe.md once. Expect "deleted, 534 GB ... all 1,937,450 files" (the zip holds 1,937,450 members; the exact size printed is the zip's own) and "freed" near 534 GB. Any "kept" line means nothing was deleted; report it to the owner and stop.
-4. In spine-datasets, by pull request, update datasets/rsna_rspect.json: a history entry that the zip was deleted (the job id and the freed size), the obstacle about the zip removed, and `next` left as "the census counts the CT volumes". Run bash scripts/check.sh first; the record's issue #88 is already closed, so the branch is not a claim branch.
-5. Correct the team memory grid-deletions-are-greg-shell: a deletion of a set's own download zip now goes through `dropzip`; anything else is still the owner's shell.
+1. Check job 40754822 with the status word (job `schwingnet-status` in grid-accounts.yml). Never send `schwingnet-unpack-rsna_rspect_pe` while that job is live, and never queue a second unpack.
+2. Once the job has ended, send `schwingnet-unpack-rsna_rspect_pe` once. Since the report exists, this send queues nothing: it prints logs/UNPACK-rsna_rspect_pe.md and removes it. Expect "still to land: 0.0 GB" and about 980 GB written. If it says "refused for space" or any GB still to land, report that to the owner and stop.
+3. If nothing is left to land, send `schwingnet-dropzip-rsna_rspect_pe` once (approved), and later send it again to print its report. Expect "deleted" and about 534 GB freed. A "kept" line means nothing was deleted; report it and stop.
+4. In spine-datasets, by pull request, update datasets/rsna_rspect.json:
+   - a history entry for the unpack job and the dropzip job, with their ids and sizes;
+   - remove the obstacle about the zip;
+   - set `next` to "the census counts the CT volumes".
+
+   Run bash scripts/check.sh first. The branch is not a claim branch, since the record's issue #88 is closed.
+5. Update this handoff and the team memory rspect-unpack-approved.
+
+## A permission quirk
+
+After the unpack send, this session's own permission check refused even reading the grid branch (`git fetch origin +refs/heads/grid:...`, then `git show origin/grid:logs/job-<job>.json`). The owner pasted the answer by hand. A fresh thread may read it, or may ask the owner for the file https://github.com/OpenSpineConsortium/symphony-template/blob/grid/logs/job-schwingnet-unpack-rsna_rspect_pe.json.
 
 ## What this thread does not own
 
-#86/#159 and #111/#147 belong to the thread "Handoff merges and grid checks". The size rule refuses every fetch until another thread's fix lands (SchwingNet #170, #171), so no fetch is resent from here; at 18:10 UTC every fetch was refused because the volume's room could not be read, and SchwingNet #173 (a draft) is the fix, after which one schwingnet-status word gives Used and Free. Unpacking RSPECT would need about 980 GB of that room. VinDr-PCXR is tabled and its job 40704982 is left alone.
+- #86/#159 and #111/#147 belong to the thread "Handoff merges and grid checks".
+- The size rule belongs to the thread that made SchwingNet #173, #181 and #191.
+- VinDr-PCXR is tabled, and its job 40704982 is left alone.
+- No fetch is sent from this thread.
