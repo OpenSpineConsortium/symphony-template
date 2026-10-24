@@ -1,5 +1,5 @@
 {
- "at": "2026-10-24T21:50:38Z",
+ "at": "2026-10-24T22:25:12Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
   "frozen so far: 98 of 99",
@@ -24,7 +24,6 @@
   "measured aortaseg60: {\"by\":\"tools/freeze.py\",\"bytes\":15929004557,\"files\":310,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured idc_spine_mets_ct_seg: {\"by\":\"tools/freeze.py\",\"bytes\":18724919264,\"files\":35531,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "overlap: \"built_at\": \"2026-10-24T17:59:50Z\", 0 pairs share something",
-  "HPCW-JOB 40752526 freeze FAILED on amy1 exit 0:15 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40752526.out",
   "HPCW-JOB 40754479 promoter COMPLETED on hao1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754479.out",
   "HPCW-JOB 40754484 promoter COMPLETED on hao1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40754484.out",
   "HPCW-JOB 40772366 promoter RUNNING on hao1 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40772366.out",
@@ -32,10 +31,11 @@
   "HPCW-JOB 40775152 freeze COMPLETED on hao1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40775152.out",
   "HPCW-JOB 40775283 lineage COMPLETED on csc1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/lineage_40775283.out",
   "HPCW-JOB 40777657 freeze COMPLETED on csc1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40777657.out",
+  "HPCW-JOB 40777731 lineage RUNNING on csc1 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/lineage_40777731.out",
   "HPCW-GRID-GATE freeze status ok"
  ],
  "rc": 0,
- "request": "thread-voxel",
+ "request": "thread-log",
  "said": [
   "HPCW-GRID-GATE freeze status ok"
  ],
