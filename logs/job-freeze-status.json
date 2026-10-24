@@ -1,8 +1,8 @@
 {
- "at": "2026-10-23T22:40:24Z",
+ "at": "2026-10-24T01:42:14Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
-  "          40752526      reqp spine-da   go2432  R    2:34:44      1 amy1",
+  "          40752526      reqp spine-da   go2432  R    5:36:33      1 amy1",
   "frozen so far: 96 of 99",
   "measured cadica: {\"by\":\"tools/freeze.py\",\"bytes\":3076112179,\"files\":1,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured buu_lspine: {\"by\":\"tools/freeze.py\",\"bytes\":35225321802,\"files\":46723,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
@@ -24,7 +24,7 @@
   "measured idc_spine_mets_ct_seg: {\"by\":\"tools/freeze.py\",\"bytes\":18724919264,\"files\":35531,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured quadra_hc: {\"by\":\"tools/freeze.py\",\"bytes\":20413498578,\"files\":966,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
   "measured idc_mediastinal_lymph_node_seg: {\"by\":\"tools/freeze.py\",\"bytes\":25695564010,\"files\":48770,\"frozen\":\"2026-10-23\",\"tree_sha256\":\"[hidden]\"}",
-  "HPCW-JOB 40733943 promoter RUNNING on mdt49 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40733943.out",
+  "HPCW-JOB 40733943 promoter RUNNING on hao1 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40733943.out",
   "HPCW-JOB 40741949 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40741949.out",
   "HPCW-JOB 40744799 freeze COMPLETED on amy1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40744799.out",
   "HPCW-JOB 40745721 freeze OUT_OF_MEMORY on amy1 exit 0:125 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40745721.out",
