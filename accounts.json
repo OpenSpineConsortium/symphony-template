@@ -1,6 +1,6 @@
 {
  "action": "job",
- "at": "2026-10-24T21:12:13Z",
+ "at": "2026-10-24T21:26:21Z",
  "list": {
   "accounts": [
    {
@@ -67,7 +67,7 @@
    "name": "worker",
    "node": "hao1",
    "state": "online",
-   "updated_at": "2026-10-24T21:12:00Z"
+   "updated_at": "2026-10-24T21:26:08Z"
   },
   "workers": [
    {
@@ -82,7 +82,7 @@
   ]
  },
  "rc": 0,
- "request": "artifacts-grid",
+ "request": "",
  "said": [
   "HPCW-GRID-GATE accounts ok"
  ],
