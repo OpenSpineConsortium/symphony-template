@@ -1,6 +1,6 @@
 {
  "action": "job",
- "at": "2026-10-24T20:25:35Z",
+ "at": "2026-10-24T20:26:36Z",
  "list": {
   "accounts": [
    {
@@ -67,7 +67,7 @@
    "name": "worker",
    "node": "hao1",
    "state": "online",
-   "updated_at": "2026-10-24T20:25:31Z"
+   "updated_at": "2026-10-24T20:26:32Z"
   },
   "workers": [
    {

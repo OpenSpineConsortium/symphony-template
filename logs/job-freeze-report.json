@@ -1,13 +1,14 @@
 {
- "at": "2026-10-24T08:07:36Z",
+ "at": "2026-10-24T20:26:34Z",
  "lines": [
-  "reported 97 frozen sets to freeze-report at 6c790c766b50",
-  "HPCW-GRID-GATE freeze report ok at 5314bfd15b41"
+  "with lineage/OVERLAP.json",
+  "reported 98 frozen sets to freeze-report at e377e04dce16",
+  "HPCW-GRID-GATE freeze report ok at 02ac5fb6d119"
  ],
  "rc": 0,
- "request": "thread-freeze-report",
+ "request": "",
  "said": [
-  "HPCW-GRID-GATE freeze report ok at 5314bfd15b41"
+  "HPCW-GRID-GATE freeze report ok at 02ac5fb6d119"
  ],
  "v": 1,
  "what": "freeze report"
