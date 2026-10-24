@@ -7,15 +7,17 @@ token or e-mail is written here.
 
 ## Where this session stands
 
-- Branch claude/project-thread-tn9lgv at 7e3f261 plus the commit that adds this page; nothing is
-  on this branch that is not on origin.
-- No file changed and not committed, here or in spine-datasets, whose branch of the same name was
-  recreated from main at 2d18c10 after #224 merged and holds nothing of its own.
-- The pull requests this thread opened today: symphony-template #422 (the OpenDataLab search for
-  CM Spine) and #423 (the Chinese dataset hosts), merged; spine-datasets #223 (the MTDDH record)
-  and #224 (the Bournemouth group's OSF deposit and MTDDH's no-login download, both records),
-  merged; symphony-template #425 (section 9 of the Chinese hosts note, and this page), ready and
-  merging once its check is green on the owner's standing permission.
+- Updated 2026-10-24 at 02:45 UTC by the same thread, which carried on after this page was
+  written: the MTDDH fetch and the Harms Study Group letter are done, as the sections below now
+  say. The branch claude/project-thread-tn9lgv stands at origin/main in both repositories and
+  holds nothing of its own; no file is changed and not committed.
+- The pull requests this thread opened, all merged: symphony-template #422 (the OpenDataLab
+  search for CM Spine), #423 (the Chinese dataset hosts) and #425 (section 9 of the Chinese hosts
+  note, and this page); spine-datasets #223 (the MTDDH record), #224 (the Bournemouth group's OSF
+  deposit and MTDDH's no-login download, both records), #226 (the owner's reply to Uneri
+  recorded), #228 (the MTDDH manifest, and Science Data Bank as a host the promoter knows), #230
+  (the Harms Study Group request recorded as sent) and #231 (the promoter's own record of MTDDH on
+  the grid).
 - Nothing of this thread lives only in the cloud session. The research is in
   docs/research/spine-datasets-on-chinese-hosts.md (section 2 says what was searched and how,
   section 9 what the owner's pages and computer answered, with every endpoint used) and
@@ -25,36 +27,13 @@ token or e-mail is written here.
 
 ## Open work
 
-- MTDDH onto the grid (spine-datasets, datasets/scidb_mtddh.json, status todo, route download).
-  The three Science Data Bank files download with no account: JPG_DICOM.rar, 1,165,024,411 bytes,
-  md5 2029b761e5077e61280f4a5fb9308a32; MTDDH.zip, 1,872,032,279 bytes, md5
-  1508164e97c35b7063a163726bf4ef05; code.zip, 1,016,425,362 bytes, md5
-  a91952a0f1b6fc0989e8a1d53cd0432e; 4,053,482,052 bytes in all, each at
-  https://download.scidb.cn/download?fileId=ID&path=/V1/NAME&fileName=NAME, the whole links in
-  the record's how_to_get; licence CC BY 4.0. Nothing is fetched yet, since no fetch runs without
-  the owner's word and count.
-  1. On the owner's word: write manifests/scidb_mtddh.json on the shape manifests/README.md gives
-     (source the record's link, licence the record's line word for word, the three files as
-     raw/NAME with url, bytes, md5 and verified_against naming Science Data Bank's file-list API
-     of 2026-10-23), set the record's status to fetching with the history entry "manifest ready;
-     the promoter fetches after merge" and next "the promoter installs it after merge", and run
-     python3 tools/census.py check, python3 tools/pipeline.py check and
-     python3 tools/dataset_review.py diff --base origin/main.
-  2. In the same pull request add "scidb.cn": ("download.scidb.cn",) to DOWNLOAD_HOSTS in
-     tools/promote.py, since same_site otherwise refuses download.scidb.cn beside the record's
-     www.scidb.cn link, and a line in tests/test_promote.py's class Hosts asserting
-     same_site("download.scidb.cn", "scidb.cn"); tools/dataset_review.py marks a change to
-     promote.py in a pull request opened as the owner as a NOTE, not a failure. Run
-     bash scripts/check.sh and merge once green.
-  3. The promoter on the grid does not take that code by itself, since the pull request's commits
-     carry a session's Claude-Session trailer: the owner sends the gate word promoter-restart
-     (below), which installs main's copy; the next pass fetches the manifest within about ten
-     minutes, installs it at /rs/rs_grp_oschome/shared/datasets/scidb_mtddh/raw and opens the
-     record's fetched pull request from promote/scidb_mtddh; merge it.
-  4. If Science Data Bank refuses the grid, the fallback is the authors' older figshare copy
-     (MTDDH.rar, 1,871,869,324 bytes, md5 697c3c29b6a1faf69a2032e22486400e, CC BY 4.0, served
-     from ndownloader.figshare.com, a host the promoter already knows), a smaller earlier version
-     named in the same how_to_get.
+- MTDDH is on the grid: done. The owner gave the word for one set of 4.05 GB at 19:54 UTC on
+  2026-10-23; spine-datasets #228 brought the manifest and the host entry; the owner's restart word
+  reached the grid at 01:49 UTC on 2026-10-24 (logs/job-promoter-restart.json on the branch grid,
+  promoter job 40754479); the promoter fetched the three files, 4,053,482,052 bytes, installed them
+  at /rs/rs_grp_oschome/shared/datasets/scidb_mtddh/raw, froze the set (frozen/scidb_mtddh.json)
+  and opened #231, merged at 02:38 UTC. The record datasets/scidb_mtddh.json says fetched with its
+  grid path and measured block. Nothing is open.
 - The Bournemouth lumbar cine (spine-datasets, datasets/bournemouth_lumbar_qf.json, status
   requested). The group's public OSF deposit z2jby holds preproc_224_wb_flex.zip (1,492,963,815
   bytes, sha256 in the record, https://osf.io/download/xjt4f/) with no licence stated, so the
@@ -70,13 +49,15 @@ token or e-mail is written here.
      the 302 from osf.io/download to files.de-1.osf.io, which that link form needs.
 - The letters and replies still out, each a record in spine-datasets with its dates: James Coyle
   (pittsburgh_swallow, requested; the owner sends one short follow-up if nothing by 2026-10-28),
-  Daradia (daradia_vertebroplasty, requested; one follow-up if nothing by 2026-11-04), Uneri's
-  introduction to the Harms Study Group (hsg_ais_registry todo and levelcheck_jhu refused: the
-  owner sends the drafted reply accepting it), and Wasserthal (the three zenodo_ts_task records,
-  held: the owner sends the drafted follow-up). The reply drafts to Uneri and Wasserthal wait in
-  the owner's Outlook Drafts folder, unsent, since a send needs the owner's word. Radiopaedia's
-  licence application is the owner's own, and the site is never fetched by script.
-- symphony-template #425: nothing left but the merge; if it is still open, merge it once green.
+  Daradia (daradia_vertebroplasty, requested; one follow-up if nothing by 2026-11-04), the Harms
+  Study Group (hsg_ais_registry, requested: Uneri introduced the owner to Michelle Marks,
+  Executive/Research Director of Setting Scoliosis Straight, on 2026-10-23, and the letter
+  letters/hsg_ais_registry.md went to her at 20:24 UTC as the owner's reply-all with Uneri in copy,
+  #230; her review is awaited, and the owner follows up in the same thread if nothing has come by
+  2026-11-06; levelcheck_jhu stays refused), and Wasserthal (the three zenodo_ts_task records, held:
+  the owner sends the drafted follow-up, which waits in the owner's Outlook Drafts folder, unsent,
+  since a send needs the owner's word). Radiopaedia's licence application is the owner's own, and
+  the site is never fetched by script.
 
 ## Durable facts for the next checkpoint
 
@@ -87,27 +68,29 @@ carries these into them:
 - Decision (the owner, 2026-10-23): Dr Branney is not chased by e-mail; the OSF deposit's terms
   are asked when he answers.
 - Decision (the owner, 2026-10-23, standing): every fetch waits for the owner's word and its
-  count; MTDDH's word has not been given.
+  count; MTDDH's word was given at 19:54 UTC on 2026-10-23 for one set of 4.05 GB, and the set is
+  on the grid since 2026-10-24.
 - Constraint: the cloud container cannot reach osf.io, api.osf.io, www.scidb.cn or
   download.scidb.cn (the proxy refuses the CONNECT), and both sites' pages are JavaScript shells
   to WebFetch; the owner's computer reads them through Remote Control, OSF by
   api.osf.io/v2/nodes/ID/files/osfstorage/ and Science Data Bank by the public file-list
   endpoints named in section 9 of the Chinese hosts note.
-- Constraint: the promoter's DOWNLOAD_HOSTS knows figshare, Mendeley and Zenodo only; a host that
-  serves files from a name other than the record's link needs an entry there and the gate word
-  promoter-restart after the merge.
+- Constraint: the promoter's DOWNLOAD_HOSTS knows figshare, Mendeley, Zenodo and, since #228,
+  Science Data Bank (download.scidb.cn); a host that serves files from a name other than the
+  record's link needs an entry there and the gate word promoter-restart after the merge, since the
+  promoter takes a session's commit only through that word.
+- Constraint: grid-accounts.yml's action input defaults to list, so a run with promoter-restart in
+  the job field and the action left on list only lists the accounts (the owner's run of 01:35 UTC
+  on 2026-10-24 did); the action must be set to job. A session may send the job word itself once
+  the owner has given it (the owner's choice of 2026-10-21), as this thread did at 01:49 UTC.
 
 ## Waiting on the owner
 
-1. The MTDDH fetch: say the word and the count (one set, 4.05 GB) in the thread "Dataset census
-   and roadmap" or to the next account, which then does steps 1 and 2 above.
-2. After that pull request merges: open
-   https://github.com/OpenSpineConsortium/symphony-template/actions/workflows/grid-accounts.yml,
-   press "Run workflow", choose the action "job", type promoter-restart in the job field and press
-   "Run workflow"; the answer lands on the branch grid as logs/job-promoter-restart.json.
-3. Nothing to send to Bournemouth: the next step is Dr Branney's.
-4. The Uneri and Wasserthal replies: open Outlook's Drafts folder, read each and press Send, or
-   say the word and a session sends them.
+1. Nothing for MTDDH, which is on the grid, nor for the Harms Study Group, whose answer is
+   awaited.
+2. Nothing to send to Bournemouth: the next step is Dr Branney's.
+3. The Wasserthal follow-up: open Outlook's Drafts folder, read it and press Send, or say the word
+   and a session sends it. The Uneri reply went on 2026-10-23 at 16:56 UTC.
 
 ## Resume
 
