@@ -51,8 +51,9 @@ name: Checks
 # a pull request is asked of every contributor; editing the body re-runs it.
 # Those three events bring no commit, so on them each part first asks
 # GitHub, with tools/earlier_pass.py and the run's own token, whether the
-# newest earlier run on the same head passed it, and skips its work where it
-# did:
+# newest earlier run on the same head passed every part, and skips its work
+# where it did, the parts judged as one since a moved base branch can move a
+# test from one part into another:
 # the job check then holds the body to its rules as always, and the parts,
 # which read only the commit, cost a minute each instead of their tests
 # (39 of SchwingNet's 124 pull-request runs on 2026-10-25 were such re-runs,
@@ -137,7 +138,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           JOB: check part ${{ matrix.part }}
-        run: python3 tools/earlier_pass.py --job "$JOB"
+        run: python3 tools/earlier_pass.py --job "$JOB" --prefix "check part "
 
       - name: Clone symphony-protocol, the library the copy is held to
         if: steps.earlier.outputs.passed != 'true'
