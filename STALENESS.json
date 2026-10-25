@@ -1,7 +1,7 @@
 {
  "default_branch": "main",
  "format": 1,
- "generated_at": "2026-10-25T14:41:30Z",
+ "generated_at": "2026-10-25T14:55:28Z",
  "pulls": [
   {
    "auto_merge_enabled": null,
@@ -15236,6 +15236,36 @@
    "runs_cancelled": 0,
    "stale_seconds": 0,
    "started": "2026-10-25T14:29:08Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-lvz8qc",
+   "catch_ups": 0,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [],
+   "check_runs": 1,
+   "check_runs_redone": 0,
+   "check_seconds": 277,
+   "check_seconds_redone": 0,
+   "claim": false,
+   "closed": "2026-10-25T14:55:11Z",
+   "commits": 1,
+   "first_green": "2026-10-25T14:53:01Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 0,
+   "merged": "2026-10-25T14:55:11Z",
+   "number": 478,
+   "opened": "2026-10-25T14:48:21Z",
+   "ready": "2026-10-25T14:48:21Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-25T14:48:07Z"
   }
  ],
  "repository": "OpenSpineConsortium/symphony-template",
@@ -15406,10 +15436,10 @@
    },
    "2026-10-25": {
     "catch_ups": 10,
-    "check_runs": 37,
+    "check_runs": 38,
     "check_runs_redone": 9,
-    "merged": 22,
-    "share_with_catch_up": 0.364,
+    "merged": 23,
+    "share_with_catch_up": 0.348,
     "stale_after_green": 6,
     "stale_hours": 345.0,
     "with_catch_up": 8
@@ -15418,10 +15448,10 @@
   "by_parallel_work": {
    "0": {
     "catch_ups": 5,
-    "check_runs": 78,
+    "check_runs": 79,
     "check_runs_redone": 4,
-    "merged": 67,
-    "share_with_catch_up": 0.075,
+    "merged": 68,
+    "share_with_catch_up": 0.074,
     "stale_after_green": 0,
     "stale_hours": 0.0,
     "with_catch_up": 5
@@ -15480,10 +15510,10 @@
    },
    "no_claim": {
     "catch_ups": 252,
-    "check_runs": 693,
+    "check_runs": 694,
     "check_runs_redone": 210,
-    "merged": 414,
-    "share_with_catch_up": 0.382,
+    "merged": 415,
+    "share_with_catch_up": 0.381,
     "stale_after_green": 101,
     "stale_hours": 438.78,
     "with_catch_up": 158
@@ -15492,9 +15522,9 @@
   "catch_ups": 257,
   "catch_ups_by_button": 23,
   "catch_ups_max": 6,
-  "check_hours": 39.05,
+  "check_hours": 39.13,
   "check_hours_redone": 11.54,
-  "check_runs": 743,
+  "check_runs": 744,
   "check_runs_redone": 212,
   "closed_unmerged": 3,
   "closed_unmerged_branch_landed_later": 2,
@@ -15550,25 +15580,25 @@
     "success": 21
    },
    "2026-10-25": {
-    "success": 18
+    "success": 19
    }
   },
   "force_pushes": 32,
   "landings_after_green_total": 666,
-  "landings_during_life_mean": 2.68,
-  "landings_during_life_median": 1.0,
+  "landings_during_life_mean": 2.67,
+  "landings_during_life_median": 1,
   "live": {
    "pulls_seen": 61,
    "pulls_seen_behind": 0,
    "pulls_seen_dirty": 12,
    "since": "2026-10-20T21:50:52Z",
-   "snapshots": 160
+   "snapshots": 161
   },
-  "merged": 424,
+  "merged": 425,
   "reruns": 6,
   "share_runs_redone": 0.285,
   "share_stale_after_green": 0.238,
-  "share_with_catch_up": 0.38,
+  "share_with_catch_up": 0.379,
   "stale_after_green": 101,
   "stale_hours_total": 438.78,
   "stale_minutes_median": 16.9,
