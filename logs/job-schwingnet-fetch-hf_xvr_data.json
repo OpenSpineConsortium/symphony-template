@@ -1,0 +1,24 @@
+{
+ "at": "2026-10-25T09:29:10Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current dac62069ffdf",
+  "schwingnet fetch hf_xvr_data at commit dac6206 on warrior 2026-10-25 09:29:09 UTC",
+  "  size budget: 1 sources, 5 GB stated; /rs/rs_grp_oschome has 4432 GB free under its quota, 0 GB of it owed to 0 running fetches",
+  "  each job starts its fetch only if the exact size its source states fits the room then; one that does not lands nothing (grid/size-rule.sh)",
+  "  hf_xvr_data: job 40780691 hf-token 4.8GB",
+  "  2026-10-25 05:29:09 platform chain: hf_xvr_data=40780691 size_gb=5",
+  "  ETA: network-bound, about 1 hour per 20 GB, so about 1 hours for 5 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
+  "  ",
+  "  dp_hf_xvr_data: job 40780691",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current dac62069ffdf",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch hf_xvr_data"
+}
