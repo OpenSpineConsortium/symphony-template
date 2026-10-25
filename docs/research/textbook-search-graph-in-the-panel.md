@@ -15,3 +15,13 @@ Explore has a switch: Task dependencies, the view as it was, and Textbook search
 The book is confidential until the provisional is filed and the site is public, so the panel holds none of it: it reads the chapters from the private repository through GitHub's API as the signed-in person, only when the view opens, and keeps them in the page's memory alone. An account that cannot read SchwingNet sees a sentence and no graph. The alternatives were refused: embedding the built index in the site would publish the book, and reading the members-only Pages site from openspineconsortium.com is cross-origin and carries no GitHub sign-in.
 
 The panel's search differs from the book's in detail (no 300-word cut of long sections, no stem block), so scores are not identical; the ranking rule is the same.
+
+## Why retrieval and not a trained model
+
+The owner asked, the same day, what it means that the search is BM25 and not a trained model, and why not train one. Only the search is untrained: in the reader the viewer's own Claude writes the answer from the passages the search picks.
+
+- BM25 matches words, not meaning, so a question in other words than the book's ("how fast is it" for "latency") can miss; that is its real weakness. In return it is exact on names and numbers, instant, runs in the reader's browser with nothing sent anywhere, and needs no retraining when the book changes. In the reader Claude calls the search as a tool and can search again in other words, which closes much of the gap.
+- The evaluation's 54 questions were written from the chapters and likely reuse their wording, which probably flatters a lexical search; no reworded set has been scored yet. This is an inference, not a measurement.
+- Fine-tuning is not open to a Claude subscription, and a fine-tuned model cannot cite where a fact came from and goes stale with each edition, which is why retrieval suits a book that changes.
+- The realistic upgrade is a trained embedding model beside BM25, in the embed slot rag.py already keeps (none today). It stays empty because the project keeps no API key, a subscription token makes no embeddings, and a local model is a new dependency, which needs an issue and the owner's word, and a large download for the in-browser search.
+- The suggested order: score about 20 reworded questions first, and add an embedding block only if recall falls.
