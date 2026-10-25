@@ -40,10 +40,10 @@ Four causes account for most of it.
 
 - **SchwingNet's gate** asks GitHub for the newest commit of main it passed on a push. It runs the symbolic lane only where a change touches a path that lane reads since that commit: src/, tests/schwingnet/, vendor/, conftest.py, pyproject.toml, pixi.toml, pixi.lock or the workflow itself. Every other lane still runs. It also runs the lane in full once a day on main, by hand, and wherever the comparison cannot be made. Expected saving: about 1,800 of SchwingNet's 2,030 gate minutes a day. The change was written and tested in the thread, with eight scripted cases, actionlint and zizmor. It goes to SchwingNet by pull request from the thread's branch once SchwingNet #392 merges.
 - **beethoven-qa 8.0.0** (beethoven-qa #13) runs the six standards groups as steps of the one required job, standards (every group green), and Scorecard on main and by hand only. That takes a run from eight billed minutes to about three, about 500 minutes a day in SchwingNet. A repository takes it with `python -m beethoven_qa vendor --into . --ref v8.0.0 --kit`. Since #13 changes a workflow file, the kit's automerge would arm it with GITHUB_TOKEN, whose merge starts no push workflow, so release.yml would not tag v8.0.0. It is merged by a person or a session once green.
+- **Docs on the owner's call.** The Docs workflow rebuilt the site on every merge, about 350 billed minutes that day (151 in SchwingNet and 199 here). A daily build was first left out, since the owner's standing rule is that a schedule is never the only trigger. At 17:25 UTC the owner decided instead that Docs builds only when the owner starts it: docs.yml here and in SchwingNet keep only workflow_dispatch, with no push and no schedule. A page the site shows is then as old as its last run.
 
 ## Left as it is, and why
 
-- **Docs on every merge, in both repositories.** A daily build would save about 300 minutes a day. But the owner's standing rule is that a schedule is a fallback and never the only trigger (CLAUDE.md, Durable decisions, "As few moving parts as possible").
 - **symphony-template's Checks in five parts.** Joining the parts would save the rounding on each, about 300 minutes a day. But it gives back the wall time the parts were split to save (docs/research/faster-backend-than-actions.md).
 
 ## What would cut more, not yet done
