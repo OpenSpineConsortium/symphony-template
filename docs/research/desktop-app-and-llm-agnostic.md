@@ -40,7 +40,8 @@ asked.
   runner interface between Symphony and the agent, keeps Claude Code first, and adds others behind
   it (LLM-agnostic, below).
 - The terms question on offering a claude.ai sign-in is settled by the owner's written permission
-  from Anthropic (Decisions for the owner, 1); code signing is still the owner's to decide.
+  from Anthropic (Decisions for the owner, 1); Electron, unsigned builds until the app is offered
+  to anyone else, and Ollama first were decided on 2026-10-25, with phase 1 after SchwingNet #391.
 
 ## Flag for the owner: where credentials live
 
@@ -232,9 +233,19 @@ in symphony-protocol and the template.
    project's records, outside git if it is private, so the permission can be shown when the app is
    published. On that permission the app may offer its own claude.ai sign-in; driving each person's
    installed Claude Code stays the default where it is simpler.
-2. Electron (recommended) or Tauri.
+2. Electron (recommended) or Tauri. Decided: Electron. The owner answered "idk" on 2026-10-25 at
+   21:09 UTC and asked for the recommended option on every such answer.
 3. Code signing: an Apple Developer membership for notarising the Mac build, and a Windows
    code-signing certificate, both paid each year; unsigned builds warn on every install.
+   Decided the same way, on the recommendation given then: no paid signing yet. Phase 1 builds
+   unsigned while the owner is its only user, and both are bought when the app is first offered to
+   anyone else, before that release.
 4. Merge the two extensions into one (recommended) or keep both.
 5. Which local runtime comes first: Ollama on the desktop (recommended, least setup) or vLLM on the
-   grid.
+   grid. Decided: Ollama on the desktop first.
+
+When phase 1 starts, decided with the same answer: after the FleXray audit of SchwingNet #391,
+which the owner made the lab's objective on 2026-10-25 with other work coming earlier only where
+the audit needs it. The app's new repository is made then, by the owner, since no session can
+create one; nothing is needed from the owner for the app before that. Item 4 was not asked and
+stays open, with one extension recommended.
