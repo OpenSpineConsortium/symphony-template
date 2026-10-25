@@ -1,6 +1,6 @@
 {
  "action": "job",
- "at": "2026-10-25T08:01:13Z",
+ "at": "2026-10-25T08:02:08Z",
  "list": {
   "accounts": [
    {
@@ -67,7 +67,7 @@
    "name": "worker",
    "node": "mdt46",
    "state": "online",
-   "updated_at": "2026-10-25T08:01:10Z"
+   "updated_at": "2026-10-25T08:02:05Z"
   },
   "workers": [
    {
