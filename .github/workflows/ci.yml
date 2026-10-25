@@ -49,6 +49,15 @@ name: Checks
 # marked ready, whoever opened it, to a section "## Adversarial review" in
 # its body (CONTRIBUTING.md), so the review the owner's sessions make before
 # a pull request is asked of every contributor; editing the body re-runs it.
+# Those three events bring no commit, so on them each part first asks
+# GitHub, with tools/earlier_pass.py and the run's own token, whether the
+# newest earlier run on the same head passed it, and skips its work where it
+# did:
+# the job check then holds the body to its rules as always, and the parts,
+# which read only the commit, cost a minute each instead of their tests
+# (39 of SchwingNet's 124 pull-request runs on 2026-10-25 were such re-runs,
+# docs/research/actions-minutes-2026-10-25.md). An edit that changes the
+# base branch, and every other event, runs the parts in full.
 # On a pull request the job overlap says whether the change must bring the
 # default branch in (docs/agents/PROTOCOL.md, Locks): what the default
 # branch changed since the branch left it, with what that code depends on,
@@ -112,14 +121,30 @@ jobs:
       matrix:
         part: [rest, 1/4, 2/4, 3/4, 4/4]
     name: check part ${{ matrix.part }}
+    permissions:
+      contents: read
+      # to read this workflow's earlier runs on the head (tools/earlier_pass.py)
+      actions: read
     steps:
       - uses: actions/checkout@v7
 
+      - name: Whether an earlier run on this head passed this part
+        id: earlier
+        # an event that brings no commit: the body edited, not the base branch;
+        # marked ready; turned back to draft
+        if: github.event_name == 'pull_request' && contains(fromJSON('["edited", "ready_for_review", "converted_to_draft"]'), github.event.action) && !github.event.changes.base
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          JOB: check part ${{ matrix.part }}
+        run: python3 tools/earlier_pass.py --job "$JOB"
+
       - name: Clone symphony-protocol, the library the copy is held to
+        if: steps.earlier.outputs.passed != 'true'
         run: git clone --quiet https://github.com/OpenSpineConsortium/symphony-protocol "$RUNNER_TEMP/symphony-protocol"
 
       - name: Install the workflow linters, pinned by hash
-        if: matrix.part == 'rest'
+        if: matrix.part == 'rest' && steps.earlier.outputs.passed != 'true'
         # actionlint and zizmor, which scripts/check.sh runs (issue #248).
         run: |
           set -eu
@@ -135,14 +160,14 @@ jobs:
           echo "$RUNNER_TEMP/lint/bin" >> "$GITHUB_PATH"
 
       - name: Run the checks but the tests
-        if: matrix.part == 'rest'
+        if: matrix.part == 'rest' && steps.earlier.outputs.passed != 'true'
         env:
           SDLC_PROTOCOL: ${{ runner.temp }}/symphony-protocol
           CHECK_TESTS: none
         run: bash scripts/check.sh
 
       - name: Run this part of the tests
-        if: matrix.part != 'rest'
+        if: matrix.part != 'rest' && steps.earlier.outputs.passed != 'true'
         env:
           SDLC_PROTOCOL: ${{ runner.temp }}/symphony-protocol
           PART: ${{ matrix.part }}
