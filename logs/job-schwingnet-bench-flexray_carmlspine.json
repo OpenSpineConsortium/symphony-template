@@ -1,17 +1,20 @@
 {
- "at": "2026-10-25T11:47:41Z",
+ "at": "2026-10-25T13:13:38Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 26e7e7bf2132",
-  "schwingnet bench flexray_carmlspine at commit 26e7e7b on warrior 2026-10-25 11:47:39 UTC",
-  "refusing: the environments are not ready; 'start' makes them first",
-  "schwingnet bench: exit 75",
-  "HPCW-GRID-GATE schwingnet bench failed 75"
+  "HPCW-GRID-GATE schwingnet pull ok 26e7e7bf2132..fc027a6c1837",
+  "schwingnet bench flexray_carmlspine at commit fc027a6 on warrior 2026-10-25 13:13:38 UTC",
+  "  setup: job 40781568",
+  "  the environments: after the setup job that rebuilds them (40781568)",
+  "  bench_flexray_carmlspine: job 40781570",
+  "submitted the benchmark. Send bench flexray_carmlspine again once it ends to read its report, logs/BENCH-flexray_carmlspine.md.",
+  "schwingnet bench: exit 0",
+  "HPCW-GRID-GATE schwingnet bench ok"
  ],
- "rc": 75,
+ "rc": 0,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 26e7e7bf2132",
-  "HPCW-GRID-GATE schwingnet bench failed 75"
+  "HPCW-GRID-GATE schwingnet pull ok 26e7e7bf2132..fc027a6c1837",
+  "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "v": 1,
  "what": "schwingnet bench flexray_carmlspine"
