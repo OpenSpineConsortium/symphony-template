@@ -160,7 +160,7 @@ class Words(unittest.TestCase):
         for job, word in (("update", "update"), ("artifacts", "artifacts"), ("promoter-status", "promoter status"), ("promoter-start", "promoter start"),
                           ("promoter-stop", "promoter stop"), ("promoter-restart", "promoter restart"),
                           ("freeze-status", "freeze status"), ("freeze-pilot", "freeze pilot"), ("freeze-start", "freeze start"), ("freeze-report", "freeze report"), ("freeze-overlap", "freeze overlap"),
-                          ("storage-status", "storage status"), ("storage-report", "storage report"), ("storage-apply-20261024T210000Z", "storage apply 20261024T210000Z"), ("storage-retire-20261024T210000Z", "storage retire 20261024T210000Z"),
+                          ("storage-status", "storage status"), ("storage-report", "storage report"), ("storage-survey", "storage survey"), ("storage-apply-20261024T210000Z", "storage apply 20261024T210000Z"), ("storage-retire-20261024T210000Z", "storage retire 20261024T210000Z"),
                           ("schwingnet-status", "schwingnet status"),
                           ("schwingnet-start", "schwingnet start"), ("schwingnet-v1", "schwingnet v1"),
                           ("schwingnet-fetch-vindr_pcxr", "schwingnet fetch vindr_pcxr"),
@@ -174,7 +174,7 @@ class Words(unittest.TestCase):
                           ("schwingnet-bank-vindr_spinexr", "schwingnet bank vindr_spinexr"),
                           ("schwingnet-cancel-40704982", "schwingnet cancel 40704982")):
             self.assertEqual(self.run_script("job", job=job)[1], [word, "accounts"], job)
-        for job in ("", "update now", "artifacts-now", "artifacts now", "promoter start abc", "promoter-restart-now", "promoter restart", "freeze-stop", "freeze-start-4", "freeze-report-now", "freeze-overlap-now", "freeze-pilot-amos22", "storage-apply", "storage-apply-x", "storage-apply-20261024T210000Z-1", "storage-retire", "storage-retire-x", "storage-delete-20261024T210000Z", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
+        for job in ("", "update now", "artifacts-now", "artifacts now", "promoter start abc", "promoter-restart-now", "promoter restart", "freeze-stop", "freeze-start-4", "freeze-report-now", "freeze-overlap-now", "freeze-pilot-amos22", "storage-apply", "storage-apply-x", "storage-apply-20261024T210000Z-1", "storage-retire", "storage-retire-x", "storage-delete-20261024T210000Z", "storage-survey-x", "storage survey", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
                     "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-explore-", "schwingnet-explore-Bad", "schwingnet-dropzip-", "schwingnet-dropzip-a-b", "schwingnet-unpack-", "schwingnet-unpack-a-b", "schwingnet-experiment-", "schwingnet-experiment-1-2", "schwingnet-sweep-", "schwingnet-sweep-two-source", "schwingnet-sweep-Real", "schwingnet-bank-", "schwingnet-bank-a-b", "schwingnet-bank-VinDr", "schwingnet-bank-a/b", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-nodequota-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
             rc, words, _ = self.run_script("job", job=job)
             self.assertNotEqual(rc, 0, job)
