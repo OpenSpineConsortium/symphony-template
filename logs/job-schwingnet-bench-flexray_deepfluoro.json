@@ -1,12 +1,17 @@
 {
- "at": "2026-10-25T11:13:48Z",
+ "at": "2026-10-25T11:48:42Z",
  "lines": [
-  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+  "HPCW-GRID-GATE schwingnet pull current 26e7e7bf2132",
+  "schwingnet bench flexray_deepfluoro at commit 26e7e7b on warrior 2026-10-25 11:48:42 UTC",
+  "refusing: the environments are not ready; 'start' makes them first",
+  "schwingnet bench: exit 75",
+  "HPCW-GRID-GATE schwingnet bench failed 75"
  ],
- "rc": 126,
+ "rc": 75,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+  "HPCW-GRID-GATE schwingnet pull current 26e7e7bf2132",
+  "HPCW-GRID-GATE schwingnet bench failed 75"
  ],
  "v": 1,
  "what": "schwingnet bench flexray_deepfluoro"
