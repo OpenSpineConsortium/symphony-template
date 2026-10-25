@@ -26,10 +26,14 @@ lands on another after the text moved.
   python3 tools/docx_review.py panel FILE.docx --lens "Name=REVISIONS" [...] [--out OUT.docx]
   python3 tools/docx_review.py sample OUT.docx            a small paper to try
 
-A paragraph holding anything but plain text runs (a field, a picture, a
-hyperlink, a tracked change already there) is refused by apply, which names
-it, since rewriting it could lose what it holds; the author revises it by
-hand. Comments marked done in Word are left out of the sheet and the tasks,
+A citation, another field, a hyperlink or a content control in a paragraph
+is kept whole: a revision rewrites the words around it, and its words must
+stand in the new text as they are, except that a field whose words are gone
+is deleted as a tracked deletion. The sheet lists those words under the
+paragraph ("keep as written"). A paragraph holding anything else (a picture,
+an equation, a tracked change already there) is refused by apply, which
+names it, and the sheet says so; the author revises it by hand or accepts
+the earlier changes first. Comments marked done in Word are left out of the sheet and the tasks,
 and so are Claude's own, which answer comments and are no new work.
 
 watch is what .github/workflows/papers.yml runs when a document changes on
@@ -254,10 +258,21 @@ def extract(path):
         comment.update(marks.get(comment["id"], {"paragraphs": [], "anchor": ""}))
     return {
         "file": str(path),
-        "paragraphs": [{"index": i, "style": paragraph_style(p), "text": paragraph_text(p)}
+        "paragraphs": [{"index": i, "style": paragraph_style(p), "text": paragraph_text(p), **held(p, i)}
                        for i, p in enumerate(paragraphs(root))],
         "comments": comments,
     }
+
+
+def held(paragraph, index):
+    """What the sheet tells a worker before it writes a revision: the words
+    of the citations, fields and links apply keeps whole, or why apply
+    refuses the paragraph."""
+    try:
+        units = old_atoms(paragraph, index)[3]
+    except Refused as refusal:
+        return {"keep": [], "refused": str(refusal)}
+    return {"keep": [unit.text.strip() for unit in units if unit.text.strip()], "refused": ""}
 
 
 def open_comments(review):
@@ -282,6 +297,10 @@ def sheet(review):
             continue
         style = f" ({paragraph['style']})" if paragraph["style"] else ""
         lines.append(f"[{paragraph['index']}]{style} {paragraph['text']}")
+        if paragraph.get("keep"):
+            lines.append("> keep as written: " + ", ".join(f'"{words}"' for words in paragraph["keep"]))
+        if paragraph.get("refused") and paragraph["text"].strip():
+            lines.append(f"> apply refuses this paragraph: {paragraph['refused'].split(' ', 2)[-1]}")
         for comment in by_paragraph.get(paragraph["index"], []):
             lines.extend(comment_lines(comment))
         lines.append("")
@@ -293,7 +312,8 @@ def sheet(review):
 def comment_lines(comment):
     reply = f", replying to comment {comment['reply_to']}" if comment["reply_to"] else ""
     span = ", ".join(str(i) for i in comment["paragraphs"]) or "none"
-    lines = [f"> Comment {comment['id']} by {comment['author']}{reply}, on paragraphs {span}:"]
+    noun = "paragraph" if len(comment["paragraphs"]) == 1 else "paragraphs"
+    lines = [f"> Comment {comment['id']} by {comment['author']}{reply}, on {noun} {span}:"]
     if comment["anchor"].strip():
         lines.append(f'> marks "{comment["anchor"].strip()}"')
     lines.extend("> " + line for line in comment["text"].splitlines() or [""])
@@ -546,7 +566,7 @@ def sort_lens(path, revisions):
         current = paragraph_text(paragraph)
         why = str(revision.get("why", ""))
         try:
-            old_atoms(paragraph, index)
+            rewrite_plan(paragraph, text, index)
             fits = current == revision.get("old")
         except Refused:
             fits = False
@@ -589,13 +609,13 @@ class IdSource:
 
 
 def rewrite(paragraph, new_text, author, stamp, ids, index):
-    atoms, markers, runs = old_atoms(paragraph, index)
+    atoms, markers, runs, units, marked = rewrite_plan(paragraph, new_text, index)
     old_text = "".join(ch for ch, _ in atoms)
-    pieces = diff_pieces(old_text, new_text)
+    pieces = diff_pieces(old_text, marked)
     for child in list(paragraph):
         if child.tag != W + "pPr":
             paragraph.remove(child)
-    emitted = []  # (kind, run index or marker element, char)
+    emitted = []  # (kind, run index, unit or marker element, char)
     pending = list(markers)
 
     def markers_through(position):
@@ -608,27 +628,79 @@ def rewrite(paragraph, new_text, author, stamp, ids, index):
             # after the words it replaces, comes after it, so the comment
             # still covers the replacement.
             markers_through(old_start)
-            source = atoms[old_start - 1][1] if old_start > 0 else (atoms[0][1] if atoms else None)
+            source = formatting_source(atoms, old_start)
             emitted.extend(("ins", source, ch) for ch in inserted)
             continue
         for offset in range(old_start, old_end):
             markers_through(offset + 1)
-            emitted.append((kind, atoms[offset][1], atoms[offset][0]))
+            source = atoms[offset][1]
+            if isinstance(source, Unit):
+                emitted.append(("unit-" + kind, source, None))
+            else:
+                emitted.append((kind, source, atoms[offset][0]))
     markers_through(len(atoms) + 1)
     for element in group(emitted, runs, author, stamp, ids):
         paragraph.append(element)
 
 
+def rewrite_plan(paragraph, new_text, index):
+    """What rewrite needs, refused before anything changes: the old
+    characters, the markers, the runs' formatting, the pieces kept whole,
+    and the new text with each kept piece's words standing for it."""
+    atoms, markers, runs, units = old_atoms(paragraph, index)
+    return atoms, markers, runs, units, marked_text(new_text, units, index)
+
+
+class Unit:
+    """A piece of a paragraph rewrite keeps whole: a citation or another
+    field, a hyperlink, a content control. Its words stand in the text as
+    one character, so a revision moves the words around it and keeps it,
+    or, for a field, deletes it as a tracked deletion."""
+
+    def __init__(self, number, elements, text, kind):
+        self.number, self.elements, self.text, self.kind = number, elements, text, kind
+        self.char = chr(UNIT_BASE + number)
+
+
+UNIT_BASE = 0xE000
+KEPT_WHOLE = {W + "hyperlink": "a link", W + "sdt": "a content control, such as Mendeley Cite's citation",
+              W + "fldSimple": "a field"}
+FIELD_RUN = {W + "rPr", W + "t", W + "tab", W + "fldChar", W + "instrText", W + "noProof",
+             W + "lastRenderedPageBreak"}
+
+
 def old_atoms(paragraph, index):
-    """The paragraph's characters, each with the run it came from, and the
-    markers (comment ranges, bookmarks, comment references) by position."""
-    atoms, markers, runs = [], [], []
+    """The paragraph's characters, each with the run it came from or the
+    piece kept whole it stands for, the markers (comment ranges, bookmarks,
+    comment references, pieces that show no words) by position, the runs'
+    formatting and the pieces kept whole."""
+    atoms, markers, runs, units = [], [], [], []
+    field, depth = [], 0
     for child in paragraph:
+        if depth:
+            field.append(child)
+            depth = field_depth(child, depth, index)
+            if not depth:
+                add_unit(field, "field", atoms, markers, units, index)
+                field = []
+            continue
+        if child.tag in KEPT_WHOLE:
+            add_unit([child], KEPT_WHOLE[child.tag], atoms, markers, units, index)
+            continue
+        if child.tag in TRACKED:
+            raise Refused(f"paragraph {index} holds a tracked change; accept or reject it in Word first")
         if child.tag not in PLAIN_PARAGRAPH:
             raise Refused(f"paragraph {index} holds {local(child.tag)}; revise it by hand")
         if child.tag in MARKERS:
             markers.append((len(atoms), child))
         elif child.tag == W + "r":
+            if child.find(W + "fldChar") is not None:
+                if child.find(W + "fldChar").get(W + "fldCharType") != "begin":
+                    raise Refused(f"paragraph {index} holds a field's end with no beginning; revise it by hand")
+                field, depth = [child], field_depth(child, 0, index)
+                if not depth:
+                    add_unit(field, "field", atoms, markers, units, index)
+                continue
             kinds = {c.tag for c in child}
             if kinds - PLAIN_RUN:
                 raise Refused(f"paragraph {index} holds {local(sorted(kinds - PLAIN_RUN)[0])}; revise it by hand")
@@ -641,7 +713,86 @@ def old_atoms(paragraph, index):
             for element in child:
                 text = element.text or "" if element.tag == W + "t" else "\t" if element.tag == W + "tab" else ""
                 atoms.extend((ch, len(runs) - 1) for ch in text)
-    return atoms, markers, runs
+        else:
+            markers.append((len(atoms), child))
+    if depth:
+        raise Refused(f"paragraph {index} holds a field that goes on past it; revise it by hand")
+    if any(UNIT_BASE <= ord(ch) < UNIT_BASE + 0x1000 for ch, source in atoms if not isinstance(source, Unit)):
+        raise Refused(f"paragraph {index} holds a private-use character; revise it by hand")
+    return atoms, markers, runs, units
+
+
+def field_depth(child, depth, index):
+    """How many fields are open after this element of a field's span."""
+    if child.tag in TRACKED:
+        raise Refused(f"paragraph {index} holds a tracked change in a field; accept it first")
+    if child.tag != W + "r":
+        return depth
+    if {c.tag for c in child} - FIELD_RUN:
+        raise Refused(f"paragraph {index} holds a field with {local(sorted({c.tag for c in child} - FIELD_RUN)[0])}"
+                      " in it; revise it by hand")
+    if child.find(W + "fldChar") is not None and child.find(W + "t") is not None:
+        raise Refused(f"paragraph {index} holds a field sharing a run with text; revise it by hand")
+    for mark in child.iter(W + "fldChar"):
+        kind = mark.get(W + "fldCharType")
+        depth += 1 if kind == "begin" else -1 if kind == "end" else 0
+    return depth
+
+
+def add_unit(elements, kind, atoms, markers, units, index):
+    holder = ET.Element(W + "p")
+    holder.extend(elements)
+    text = paragraph_text(holder)
+    if text != paragraph_text(holder, "rejected"):
+        raise Refused(f"paragraph {index} holds a tracked change inside {kind}; accept it first")
+    unit = Unit(len(units), elements, text, kind)
+    units.append(unit)
+    if not text:
+        for element in elements:
+            markers.append((len(atoms), element))
+        return
+    atoms.append((unit.char, unit))
+
+
+def marked_text(new_text, units, index):
+    """The new text with each kept piece's words, found in order, standing
+    as its one character. A field whose words are gone is deleted; any
+    other piece must stay."""
+    marked, at = [], 0
+    for unit in units:
+        if not unit.text:
+            continue
+        found = new_text.find(unit.text, at)
+        if found < 0:
+            if unit.kind != "field":
+                raise Refused(f"paragraph {index}: the revision drops or changes {unit.kind}, "
+                              f"{one_line(unit.text)!r}; keep its words as they are")
+            continue
+        marked.append(new_text[at:found] + unit.char)
+        at = found + len(unit.text)
+    return "".join(marked) + new_text[at:]
+
+
+def formatting_source(atoms, position):
+    """The run whose formatting an insertion at position takes: the nearest
+    run of text before it, else after it."""
+    before = [source for _, source in atoms[:position] if not isinstance(source, Unit)]
+    after = [source for _, source in atoms[position:] if not isinstance(source, Unit)]
+    return before[-1] if before else after[0] if after else None
+
+
+def deleted(elements):
+    """A field's runs as a tracked deletion would hold them."""
+    out = []
+    for element in elements:
+        element = copy.deepcopy(element)
+        for part in element.iter():
+            if part.tag == W + "t":
+                part.tag = W + "delText"
+            elif part.tag == W + "instrText":
+                part.tag = W + "delInstrText"
+        out.append(element)
+    return out
 
 
 def local(tag):
@@ -700,9 +851,17 @@ def group(emitted, runs, author, stamp, ids):
     of a deletion or an insertion go inside one w:del or w:ins."""
     out, wrapper, current = [], None, None
     for kind, source, ch in emitted:
-        if kind == "marker":
-            out.append(source)
+        if kind in ("marker", "unit-eq"):
+            out.extend([source] if kind == "marker" else source.elements)
             wrapper = current = None
+            continue
+        if kind == "unit-del":
+            if wrapper is None or wrapper.tag != W + "del":
+                wrapper = ET.Element(W + "del", {W + "id": ids.take(), W + "author": author, W + "date": stamp})
+                out.append(wrapper)
+            for element in deleted(source.elements):
+                (wrapper if element.tag == W + "r" else out).append(element)
+            current = None
             continue
         if current is None or current["kind"] != kind or current["source"] != source:
             run = make_run(runs[source] if source is not None and runs else None)
@@ -837,25 +996,25 @@ def run_xml(text, rpr):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("extract").add_argument("file")
-    sub.add_parser("sheet").add_argument("files", nargs="+")
-    queue = sub.add_parser("tasks")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
+    sub.add_parser("extract", help="print the paragraphs and comments as JSON").add_argument("file")
+    sub.add_parser("sheet", help="write <name>.review.md beside each document").add_argument("files", nargs="+")
+    queue = sub.add_parser("tasks", help="one task per document with open comments")
     queue.add_argument("folder")
     queue.add_argument("--gh", action="store_true", help="open or update the issues with gh")
-    watching = sub.add_parser("watch")
+    watching = sub.add_parser("watch", help="queue new comments on each document's issue (papers.yml)")
     watching.add_argument("files", nargs="*")
-    write = sub.add_parser("apply")
+    write = sub.add_parser("apply", help="write a revisions file into the document as tracked changes")
     write.add_argument("file")
-    write.add_argument("revisions")
-    write.add_argument("--out")
-    write.add_argument("--author", default="Claude")
-    lensing = sub.add_parser("panel")
+    write.add_argument("revisions", help="the <name>.revisions.json a worker wrote")
+    write.add_argument("--out", help="write to this copy; the document itself by default")
+    write.add_argument("--author", default="Claude", help="the name Word shows on each change (default Claude)")
+    lensing = sub.add_parser("panel", help="several reviewers' revisions, each under its own name")
     lensing.add_argument("file")
     lensing.add_argument("--lens", action="append", required=True, help="Author=revisions.json, once per reviewer")
-    lensing.add_argument("--out")
-    sub.add_parser("sample").add_argument("out")
+    lensing.add_argument("--out", help="write to this copy; the document itself by default")
+    sub.add_parser("sample", help="write a small paper with three comments to try the loop").add_argument("out")
     args = parser.parse_args(argv)
     try:
         if args.command == "extract":

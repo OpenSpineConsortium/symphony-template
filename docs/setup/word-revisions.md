@@ -57,16 +57,65 @@ comments, the answers, queue nothing. A connected Google Drive or OneDrive
 brings documents in and takes revisions back by itself
 (docs/research/drive-sync.md).
 
-`python3 tools/docx_review.py sample papers/sample.docx` writes a small paper
-with three comments to try the loop on.
+## Try it in five minutes
+
+Every command below runs in a clone with Python 3.12 and nothing else, on a
+made-up paper, so a new person sees the whole loop before touching a real
+document. Each tool also explains itself with `--help`.
+
+    python3 tools/docx_review.py sample papers/sample.docx
+    python3 tools/docx_review.py sheet papers/sample.docx
+    # read papers/sample.review.md, then write papers/sample.revisions.json:
+    # [{"paragraph": 2, "old": "<paragraph 2 exactly as the sheet shows it>",
+    #   "text": "<the new text>", "comment": "1", "why": "<one line>"}]
+    python3 tools/docx_review.py apply papers/sample.docx papers/sample.revisions.json --out papers/sample-revised.docx
+
+Open papers/sample-revised.docx in Word and walk the changes with Review,
+Next. Citations follow the same way (Citations, below): export a few
+references from Zotero, Mendeley or EndNote, run `refs`, write a cites file
+and run docx_cite.py.
+
+## Citations
+
+A paper's paragraphs mostly hold citations, and a revision keeps them:
+
+- Revising around a citation. A citation, whichever manager put it there
+  (Word's own, Zotero's or EndNote's field, Mendeley Cite's content
+  control), and a hyperlink or another field, is kept whole. The sheet lists
+  its words under the paragraph as "keep as written"; a revision keeps those
+  words as they are and changes the words around them. Leaving a field's
+  words out of the new text deletes that field as a tracked deletion the
+  author can reject; a link or a content control must stay.
+- Adding citations. `python3 tools/notebook.py refs --export library.bib
+  --out references.json` reads a BibTeX, RIS or CSL JSON export (Zotero:
+  File, Export Library, or right-click a collection; Mendeley: File, Export;
+  EndNote: File, Export, RIS), keeping each reference's kind, venue, volume,
+  issue, pages and publisher. A cites file names where each goes,
+  `[{"paragraph": 3, "after": "Table 1", "refs": ["smith2020"]}]`, numbered as
+  the sheet numbers paragraphs, and
+  `python3 tools/docx_cite.py papers/paper.docx --refs references.json
+  --cite cites.json --out papers/paper-cited.docx` writes them as tracked
+  insertions in a copy. The default form is Word's own citations, which any
+  Word fills in with no add-in (References, Bibliography, Insert
+  Bibliography; Update Field on a citation); `--form zotero` writes Zotero's
+  field instead, for a paper cited with Zotero, which needs each item's
+  library address and so a library read through Zotero's web API, or a CSL
+  JSON export of a synced library (docs/research/notebooks.md). A paragraph
+  takes another citation once the earlier ones are accepted.
+- OneDrive. A document in a tracked OneDrive folder comes into the
+  repository and its revisions go back beside it by themselves
+  (docs/research/drive-sync.md), once the folder is picked on the control
+  panel's Folders tab.
 
 ## What apply refuses
 
-A paragraph that holds anything but plain text runs, comment marks and
-bookmarks (a field such as a citation or a cross-reference, a picture, a
-hyperlink, an equation, or a tracked change already there) is refused with
-its number, since rewriting it could lose what it holds: the author revises
-it by hand, or accepts the earlier changes first. A revision whose "old" no
+A paragraph that holds a picture, an equation, a run of something other
+than text, or a tracked change already there is refused with its number,
+and the review sheet says so under the paragraph, since rewriting it could
+lose what it holds: the author revises it by hand, or accepts the earlier
+changes first. Citations, fields, links and content controls are kept whole
+(Citations, above); a field that runs on past its paragraph, or a revision
+that drops a link's or a content control's words, is refused. A revision whose "old" no
 longer matches is refused too, as are two entries for one paragraph, a new
 text holding a line break (a paragraph's text is one line; tabs are kept), a
 tracked format change still waiting in the paragraph, and a "why" in a

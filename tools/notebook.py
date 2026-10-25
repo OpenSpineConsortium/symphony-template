@@ -14,6 +14,7 @@ unless the owner says so.
   python3 tools/notebook.py show --notebooks NOTEBOOKS.json --catalog catalog.json
   python3 tools/notebook.py make --notebooks NOTEBOOKS.json --catalog catalog.json --slug SLUG --out DIR
   python3 tools/notebook.py refs --export FILE --out references.json
+  python3 tools/notebook.py refs --zotero ANSWER.json --library users/<id> --out references.json
 
 notebooks.json is the session's proposal, written beside catalog.json on the
 branch drive-catalog, where the control panel reads both: a list of notebooks,
@@ -24,9 +25,15 @@ catalog, show prints each notebook's counts, and make writes the files a
 notebook's repository starts with: notebook.json, every item with its drive
 id, item id and link; NOTEBOOK.md, the same as a page to read; and the
 folders research/ and drafts/. refs reads a citation manager's export, BibTeX
-(.bib) or RIS (.ris), which Mendeley, EndNote and Zotero all write, into
-references.json, so a notebook takes its references with no connector, key
-or account of its own.
+(.bib) or RIS (.ris), which Mendeley, EndNote and Zotero all write, or CSL
+JSON (.json), which Zotero writes, into references.json, so a notebook takes
+its references with no connector, key or account of its own. Each reference
+keeps its kind (article, book, chapter, paper, thesis, report, web page,
+dataset), its venue, volume, issue, pages and publisher, so the bibliography
+Word or Zotero builds from it is whole, and an organization's name written
+in braces, {World Health Organization}, stays one name. Exported again, the library keeps every key the
+earlier references.json gave the same work, matched by DOI or by title and
+year, so the citations already written still find their references.
 
 A notebook names a person's files: its repository is private, and a proposal
 lives only on a private repository's branch drive-catalog. Standard library
@@ -37,6 +44,7 @@ import argparse
 import json
 import re
 import sys
+import unicodedata
 from collections import Counter
 from pathlib import Path
 
@@ -197,6 +205,11 @@ BIB_START = re.compile(r"@(\w+)\s*([{(])")
 BIB_NAME = re.compile(r"\s*(\w[\w-]*)\s*=\s*")
 RIS_LINE = re.compile(r"^([A-Z][A-Z0-9])  - ?(.*)$")
 ACCENT = re.compile(r"\{?\\[\"'`^~=.]\{?(\w)\}?\}?")
+# What Mendeley Desktop and others escape in a field: & % $ # _ { } and a
+# lone tilde, written \& or {\_} or \~{}, which a DOI or a link must lose.
+ESCAPED = re.compile(r"\\([&%$#_{}])")
+LONE_TILDE = re.compile(r"\\~\{\}|\{\\textasciitilde\}|\\textasciitilde\{\}")
+DOI_PREFIX = re.compile(r"^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)", re.I)
 
 
 def closing(text, start, opener):
@@ -229,7 +242,10 @@ def bib_value(body, at):
     return match.group(), at + match.end()
 
 
-def bib_fields(body):
+def bib_fields(body, raw=()):
+    """The entry's fields by lower-cased name, braces taken off all but the
+    raw ones, whose braces still mean something (an author's name kept
+    whole)."""
     fields, at = {}, 0
     while True:
         match = BIB_NAME.match(body, at)
@@ -240,7 +256,8 @@ def bib_fields(body):
             at = comma + 1
             continue
         value, at = bib_value(body, match.end())
-        fields[match.group(1).lower()] = unbraced(value)
+        name = match.group(1).lower()
+        fields[name] = " ".join(value.split()) if name in raw else unbraced(value)
         comma = body.find(",", at)
         if comma < 0:
             return fields
@@ -248,8 +265,11 @@ def bib_fields(body):
 
 
 def unbraced(value):
-    value = ACCENT.sub(r"\1", value)
-    return " ".join(value.replace("{", "").replace("}", "").split())
+    value = LONE_TILDE.sub("~", value.replace("$\\backslash$", "\\"))
+    value = ESCAPED.sub(lambda match: {"{": "\x01", "}": "\x02"}.get(match.group(1), match.group(1)),
+                        ACCENT.sub(r"\1", value))
+    value = value.replace("{", "").replace("}", "").replace("\x01", "{").replace("\x02", "}")
+    return " ".join(value.split())
 
 
 def bibtex(text):
@@ -260,11 +280,37 @@ def bibtex(text):
         if match.group(1).lower() in ("comment", "string", "preamble"):
             continue
         key, _, body = text[match.end():end].partition(",")
-        fields = bib_fields(body)
-        authors = [" ".join(name.split()) for name in fields.get("author", "").split(" and ") if name.strip()]
-        references.append(reference(key.strip(), fields.get("title"), authors, fields.get("year"), fields.get("doi"),
-                                    fields.get("journal") or fields.get("booktitle"), fields.get("url")))
+        fields = bib_fields(body, raw=("author",))
+        references.append(reference(key.strip(), fields.get("title"), bib_authors(fields.get("author", "")),
+                                    fields.get("year") or fields.get("date"), fields.get("doi"),
+                                    fields.get("journal") or fields.get("journaltitle") or fields.get("booktitle"),
+                                    fields.get("url"), kind=BIB_TYPES.get(match.group(1).lower(), "document"),
+                                    volume=fields.get("volume"), issue=fields.get("number") or fields.get("issue"),
+                                    pages=fields.get("pages"),
+                                    publisher=fields.get("publisher") or fields.get("institution")
+                                    or fields.get("school")))
     return references
+
+
+def bib_authors(field):
+    """BibTeX's author list, split on "and" outside braces; a name wholly
+    in braces, such as {World Health Organization}, is one name kept as it
+    is written, and stays in braces so no one splits it later."""
+    names, depth, start = [], 0, 0
+    for at, char in enumerate(field):
+        depth += char == "{"
+        depth -= char == "}"
+        if depth == 0 and re.match(r"\sand\s", field[at:at + 5]):
+            names.append(field[start:at])
+            start = at + 5
+    names.append(field[start:])
+    out = []
+    for name in (each.strip() for each in names):
+        if not name:
+            continue
+        whole = name.startswith("{") and name.endswith("}") and closing(name, 1, "{") == len(name) - 1
+        out.append("{" + unbraced(name[1:-1]) + "}" if whole else unbraced(name))
+    return out
 
 
 def ris(text):
@@ -275,26 +321,87 @@ def ris(text):
             continue
         tag, value = match.groups()
         if tag == "TY":
-            entry = {"authors": []}
+            entry = {"authors": [], "kind": RIS_TYPES.get(value.strip().upper(), "document")}
         elif entry is None:
             continue
         elif tag == "ER":
+            pages = "-".join(part for part in (entry.get("SP"), entry.get("EP")) if part)
             references.append(reference(entry.get("ID"), entry.get("TI"), entry["authors"], entry.get("PY"),
-                                        entry.get("DO"), entry.get("JO"), entry.get("UR")))
+                                        entry.get("DO"), entry.get("JO") or entry.get("BT"), entry.get("UR"),
+                                        kind=entry["kind"], volume=entry.get("VL"), issue=entry.get("IS"),
+                                        pages=pages, publisher=entry.get("PB")))
             entry = None
-        elif tag in ("AU", "A1"):
+        elif tag in ("AU", "A1") and value.strip():
             entry["authors"].append(value.strip())
         else:
-            entry.setdefault({"T1": "TI", "Y1": "PY", "T2": "JO", "JF": "JO"}.get(tag, tag), value.strip())
+            entry.setdefault({"T1": "TI", "Y1": "PY", "DA": "PY", "T2": "JO", "JF": "JO", "J2": "JO"}.get(tag, tag),
+                             value.strip())
     return references
 
 
-def reference(key, title, authors, year, doi, venue, url=None, uri=""):
+def reference(key, title, authors, year, doi, venue, url=None, uri="", kind="document", volume=None, issue=None,
+              pages=None, publisher=None):
     """One reference: url is where it was found, uri the item in a Zotero
-    library, so a citation written from it names its own source."""
-    year = re.search(r"\d{4}", year or "")
+    library, so a citation written from it names its own source. kind is
+    the CSL type (article-journal, book, chapter, paper-conference, thesis,
+    report, webpage, dataset, document), which Word and Zotero style by."""
+    year = re.search(r"\d{4}", str(year or ""))
     return {"key": key or "", "title": title or "", "authors": authors, "year": year.group() if year else "",
-            "doi": (doi or "").strip().lower(), "venue": venue or "", "url": (url or "").strip(), "uri": uri}
+            "doi": DOI_PREFIX.sub("", (doi or "").strip()).lower(), "venue": venue or "", "url": (url or "").strip(), "uri": uri,
+            "type": kind if kind in KINDS else "document", "volume": str(volume or "").strip(),
+            "issue": str(issue or "").strip(), "pages": re.sub(r"\s*-+\s*", "-", str(pages or "").strip()),
+            "publisher": str(publisher or "").strip()}
+
+
+KINDS = ("article-journal", "article", "book", "chapter", "paper-conference", "thesis", "report", "webpage",
+         "dataset", "document")
+BIB_TYPES = {"article": "article-journal", "book": "book", "inbook": "chapter", "incollection": "chapter",
+             "inproceedings": "paper-conference", "conference": "paper-conference",
+             "proceedings": "paper-conference", "phdthesis": "thesis", "mastersthesis": "thesis",
+             "thesis": "thesis", "techreport": "report", "report": "report", "online": "webpage",
+             "electronic": "webpage", "www": "webpage", "dataset": "dataset"}
+RIS_TYPES = {"JOUR": "article-journal", "JFULL": "article-journal", "EJOUR": "article-journal",
+             "MGZN": "article-journal", "BOOK": "book", "EBOOK": "book", "EDBOOK": "book", "CHAP": "chapter",
+             "ECHAP": "chapter", "CONF": "paper-conference", "CPAPER": "paper-conference", "THES": "thesis",
+             "RPRT": "report", "ELEC": "webpage", "WEB": "webpage", "DATA": "dataset", "UNPB": "article"}
+ZOTERO_TYPES = {"journalArticle": "article-journal", "magazineArticle": "article-journal", "book": "book",
+                "bookSection": "chapter", "conferencePaper": "paper-conference", "thesis": "thesis",
+                "report": "report", "webpage": "webpage", "dataset": "dataset", "preprint": "article"}
+CSL_TYPES = {"article-magazine": "article-journal", "article-newspaper": "article-journal",
+             "post-weblog": "webpage", "post": "webpage", "manuscript": "document"}
+
+
+def csl_json(items):
+    """References from CSL JSON, which Zotero (Export Library, CSL JSON),
+    Better BibTeX and most citation managers write."""
+    if isinstance(items, dict):
+        items = items.get("items", [items])
+    if not isinstance(items, list):
+        raise NotebookError("the CSL JSON is not a list of items")
+    found = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        kind = item.get("type", "document")
+        parts = ((item.get("issued") or {}).get("date-parts") or [[""]])[0] or [""]
+        year = item.get("issued", {}).get("raw") if not parts[0] else parts[0]
+        key = str(item.get("id", ""))
+        uri = key if ZOTERO_URI.fullmatch(key) else ""
+        found.append(reference(key.rsplit("/", 1)[-1] if uri else key, item.get("title"),
+                               [csl_name(each) for each in item.get("author", []) if isinstance(each, dict)],
+                               str(year or ""), item.get("DOI"), item.get("container-title"), item.get("URL"), uri,
+                               kind=CSL_TYPES.get(kind, kind), volume=item.get("volume"), issue=item.get("issue"),
+                               pages=item.get("page"), publisher=item.get("publisher")))
+    return found
+
+
+ZOTERO_URI = re.compile(r"http://zotero\.org/(users|groups)/\d{1,12}/items/[A-Z0-9]{8}")
+
+
+def csl_name(name):
+    if name.get("literal"):
+        return "{" + str(name["literal"]) + "}"
+    return ", ".join(str(part) for part in (name.get("family"), name.get("given")) if part)
 
 
 def zotero(items, library):
@@ -315,8 +422,11 @@ def zotero(items, library):
         doi = data.get("DOI") or extra_doi(data.get("extra"))
         venue = data.get("publicationTitle") or data.get("bookTitle") or data.get("proceedingsTitle")
         found.append(reference(data.get("key"), data.get("title"), [a for a in authors if a], data.get("date"),
-                               doi, venue or data.get("conferenceName"),
-                               data.get("url"), f"http://zotero.org/{library}/items/{data.get('key')}"))
+                               doi, venue or data.get("conferenceName") or data.get("websiteTitle"),
+                               data.get("url"), f"http://zotero.org/{library}/items/{data.get('key')}",
+                               kind=ZOTERO_TYPES.get(data.get("itemType"), "document"), volume=data.get("volume"),
+                               issue=data.get("issue"), pages=data.get("pages"),
+                               publisher=data.get("publisher") or data.get("institution") or data.get("university")))
     return found
 
 
@@ -328,21 +438,98 @@ def extra_doi(extra):
 
 def creator_name(creator):
     if creator.get("name"):
-        return str(creator["name"])
+        return "{" + str(creator["name"]) + "}"
     return ", ".join(str(part) for part in (creator.get("lastName"), creator.get("firstName")) if part)
 
 
 def read_references(path):
     text = Path(path).read_text(encoding="utf-8-sig", errors="replace").replace("\r\n", "\n")
-    found = ris(text) if re.search(r"^TY  - ", text, re.M) else bibtex(text)
+    if text.lstrip()[:1] in ("[", "{") and not text.lstrip().startswith("{\\"):
+        try:
+            found = csl_json(json.loads(text))
+        except ValueError:
+            raise NotebookError(f"{path} looks like JSON but could not be read as CSL JSON") from None
+    else:
+        found = ris(text) if re.search(r"^TY  - ", text, re.M) else bibtex(text)
     if text.strip() and not found:
-        raise NotebookError(f"{path} holds no BibTeX or RIS reference")
-    for number, entry in enumerate(found, 1):
-        entry["key"] = entry["key"] or f"ref{number}"
+        raise NotebookError(f"{path} holds no BibTeX, RIS or CSL JSON reference")
+    keyed(found)
     return found
 
 
+def keyed(found, previous=()):
+    """Give every reference a key no other one has, and the key it had in
+    the previous references.json where it is the same work, so citations
+    written from an earlier export still find it after the library is
+    exported again. Returns how many kept an earlier key."""
+    earlier = {}
+    for entry in previous:
+        if isinstance(entry, dict) and entry.get("key"):
+            for mark in identities(entry):
+                earlier.setdefault(mark, entry["key"])
+    used, fresh = set(), set()
+    for entry in found:
+        carried = next((earlier[mark] for mark in identities(entry)
+                        if mark in earlier and earlier[mark] not in used), None)
+        if carried:
+            entry["key"] = carried
+            used.add(carried)
+        else:
+            fresh.add(id(entry))
+    reserved = used | {entry["key"] for entry in found if id(entry) in fresh and entry["key"]}
+    for number, entry in enumerate(found, 1):
+        if id(entry) in fresh:
+            entry["key"] = unique(entry["key"] or author_year(entry, number), used, reserved)
+            used.add(entry["key"])
+    return len(found) - len(fresh)
+
+
+def unique(key, used, reserved):
+    """key, or key with a, b, ... after it as citation managers do, where
+    another reference already took it."""
+    if key not in used:
+        return key
+    for suffix in (chr(code) for code in range(ord("a"), ord("z") + 1)):
+        if key + suffix not in used and key + suffix not in reserved:
+            return key + suffix
+    number = 2
+    while f"{key}-{number}" in used:
+        number += 1
+    return f"{key}-{number}"
+
+
+def identities(entry):
+    """What says two records are the same work: the DOI, else the title
+    with its year, letters and digits alone."""
+    marks = []
+    if entry.get("doi"):
+        marks.append("doi:" + entry["doi"])
+    title = re.sub(r"[^a-z0-9]", "", str(entry.get("title", "")).lower())
+    if title:
+        marks.append(f"title:{title}:{entry.get('year', '')}")
+    return marks
+
+
+def author_year(entry, number):
+    """A key in the form citation managers write, Smith2021, for a record
+    whose export gave none, as Mendeley's RIS does not."""
+    authors = entry.get("authors") or [""]
+    surname = authors[0].split(",")[0].split()[-1] if authors[0].strip() else ""
+    surname = re.sub(r"[^A-Za-z]", "", unicodedata.normalize("NFKD", surname))
+    return surname + entry.get("year", "") if surname and entry.get("year") else f"ref{number}"
+
+
 # The command line
+
+def previous_references(path):
+    """The references.json an earlier refs wrote, whose keys the new one
+    keeps; nothing where there is none or it cannot be read."""
+    try:
+        found = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return found if isinstance(found, list) else []
+
 
 def load(path):
     try:
@@ -352,8 +539,8 @@ def load(path):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    commands = parser.add_subparsers(dest="command", required=True)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
     for name in ("check", "show", "make"):
         command = commands.add_parser(name)
         command.add_argument("--notebooks", required=True)
@@ -361,9 +548,9 @@ def main(argv=None):
         if name == "make":
             command.add_argument("--slug", required=True)
             command.add_argument("--out", required=True)
-    refs = commands.add_parser("refs")
+    refs = commands.add_parser("refs", help="read a citation manager's export into references.json")
     source = refs.add_mutually_exclusive_group(required=True)
-    source.add_argument("--export", help="a BibTeX or RIS file")
+    source.add_argument("--export", help="a BibTeX (.bib), RIS (.ris) or CSL JSON (.json) export")
     source.add_argument("--zotero", help="a Zotero web API answer, saved as JSON")
     refs.add_argument("--library", help="users/<id> or groups/<id>, with --zotero")
     refs.add_argument("--out", required=True)
@@ -379,8 +566,9 @@ def main(argv=None):
 def run(args):
     if args.command == "refs":
         found = zotero(load(args.zotero), args.library) if args.zotero else read_references(args.export)
+        kept = keyed(found, previous_references(args.out))
         Path(args.out).write_text(json.dumps(found, indent=1, ensure_ascii=True) + "\n", encoding="utf-8")
-        return {"references": len(found), "with_doi": sum(1 for each in found if each["doi"])}
+        return {"references": len(found), "with_doi": sum(1 for each in found if each["doi"]), "kept_keys": kept}
     made = load(args.catalog)
     proposal = checked(load(args.notebooks), made)
     known = files_by_path(made)

@@ -64,7 +64,7 @@ class DocxReviewTest(unittest.TestCase):
         [written] = docx_review.write_sheets([self.paper])
         sheet = Path(written).read_text(encoding="utf-8")
         self.assertIn("[1] " + FIRST, sheet)
-        self.assertIn("> Comment 0 by Reviewer 1, on paragraphs 1:", sheet)
+        self.assertIn("> Comment 0 by Reviewer 1, on paragraph 1:", sheet)
         self.assertTrue(sheet.isascii())
 
     def test_one_task_per_document_in_the_task_forms_shape(self):
@@ -170,7 +170,7 @@ class DocxReviewTest(unittest.TestCase):
         docx_review.apply(self.paper, [{"paragraph": 1, "old": FIRST, "text": FIRST_NEW}])
         with self.assertRaises(docx_review.Refused) as refusal:
             docx_review.apply(self.paper, [{"paragraph": 1, "old": FIRST_NEW, "text": FIRST}])
-        self.assertIn("revise it by hand", str(refusal.exception))
+        self.assertIn("accept or reject it in Word first", str(refusal.exception))
 
     def test_the_command_line_runs_the_loop(self):
         revisions = self.folder / "paper.revisions.json"
@@ -313,6 +313,68 @@ class WordShapesTest(unittest.TestCase):
         path = self.shaped("<w:p><w:r><w:t>Hello</w:t></w:r></w:p>")
         with self.assertRaises(docx_review.Refused):
             docx_review.apply(path, [{"paragraph": 0, "old": "Hello", "text": "Hello\nworld"}])
+
+
+
+ZOTERO_CODE = ' ADDIN ZOTERO_ITEM CSL_CITATION {"citationItems":[{"uris":["http://zotero.org/users/1/items/AB"]}]} '
+CITED = ('<w:p><w:r><w:t xml:space="preserve">Readers agree most of the time</w:t></w:r>'
+         '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+         f'<w:r><w:instrText xml:space="preserve">{ZOTERO_CODE}</w:instrText></w:r>'
+         '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+         '<w:r><w:t xml:space="preserve"> (Smith, 2020)</w:t></w:r>'
+         '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+         '<w:r><w:t xml:space="preserve">, as shown before.</w:t></w:r></w:p>')
+LINKED = ('<w:p><w:r><w:t xml:space="preserve">See </w:t></w:r><w:hyperlink r:id="rId9" '
+          'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+          '<w:r><w:t>the data</w:t></w:r></w:hyperlink><w:r><w:t xml:space="preserve"> online.</w:t></w:r></w:p>')
+OLD_CITED = "Readers agree most of the time (Smith, 2020), as shown before."
+
+
+class CitedParagraphsTest(unittest.TestCase):
+    """A paper's paragraphs mostly hold citations, so a revision moves the
+    words around a citation and keeps the citation's field whole."""
+
+    def shaped(self, body):
+        folder, path = document_with(body)
+        self.addCleanup(shutil.rmtree, folder)
+        return path
+
+    def test_words_around_a_citation_are_revised_and_the_field_kept(self):
+        path = self.shaped(CITED)
+        new = "Readers agree in most cases (Smith, 2020), as shown before."
+        docx_review.apply(path, [{"paragraph": 0, "old": OLD_CITED, "text": new}])
+        self.assertEqual(texts(path, "accepted"), [new])
+        self.assertEqual(texts(path, "rejected"), [OLD_CITED])
+        document = zipfile.ZipFile(path).read(docx_review.DOCUMENT).decode("utf-8")
+        self.assertEqual(document.count("ZOTERO_ITEM CSL_CITATION"), 1)
+        self.assertNotIn("delInstrText", document)
+
+    def test_a_citation_dropped_from_the_text_is_a_tracked_deletion(self):
+        path = self.shaped(CITED)
+        new = "Readers agree most of the time, as shown before."
+        docx_review.apply(path, [{"paragraph": 0, "old": OLD_CITED, "text": new}])
+        self.assertEqual(texts(path, "accepted"), [new])
+        self.assertEqual(texts(path, "rejected"), [OLD_CITED])
+        document = zipfile.ZipFile(path).read(docx_review.DOCUMENT).decode("utf-8")
+        self.assertIn("delInstrText", document)
+
+    def test_the_review_sheet_names_the_citations_to_keep(self):
+        path = self.shaped(CITED)
+        self.assertIn('> keep as written: "(Smith, 2020)"', docx_review.sheet(docx_review.extract(path)))
+
+    def test_a_link_is_kept_and_may_not_be_dropped(self):
+        path = self.shaped(LINKED)
+        docx_review.apply(path, [{"paragraph": 0, "old": "See the data online.", "text": "See the data here."}])
+        self.assertEqual(texts(path, "accepted"), ["See the data here."])
+        with self.assertRaises(docx_review.Refused) as refusal:
+            docx_review.apply(self.shaped(LINKED), [{"paragraph": 0, "old": "See the data online.",
+                                                     "text": "See it."}])
+        self.assertIn("a link", str(refusal.exception))
+
+    def test_a_field_left_open_is_refused(self):
+        path = self.shaped('<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:t>x</w:t></w:r></w:p>')
+        with self.assertRaises(docx_review.Refused):
+            docx_review.apply(path, [{"paragraph": 0, "old": "x", "text": "y"}])
 
 
 if __name__ == "__main__":
