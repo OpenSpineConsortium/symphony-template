@@ -4,6 +4,7 @@ document's source list, or as Zotero fields naming each item's library URI.
 Every name here is made up."""
 
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -103,6 +104,49 @@ class Cite(unittest.TestCase):
         with self.assertRaises(docx_cite.Refused):
             docx_cite.cite(self.out, REFS, [{"paragraph": 3, "after": "Results", "refs": ["smith2020"]}],
                            self.folder / "x.docx", "word")
+
+    def test_a_book_by_an_organization_is_a_book_in_words_source_list(self):
+        book = {"key": "who2019", "title": "A Handbook", "authors": ["{World Health Organization}"],
+                "year": "2019", "doi": "", "venue": "", "url": "", "uri": "", "type": "book",
+                "volume": "", "issue": "", "pages": "", "publisher": "WHO Press"}
+        docx_cite.cite(self.paper, [book], [{"paragraph": 3, "after": "Table 1", "refs": ["who2019"]}],
+                       self.out, "word")
+        parts = self.document()
+        sources = next(data for name, data in parts.items() if b"b:Sources" in data and name.startswith("customXml/item"))
+        self.assertIn(b"<b:SourceType>Book</b:SourceType>", sources)
+        self.assertIn(b"<b:Last>World Health Organization</b:Last>", sources)
+        self.assertIn(b"<b:Publisher>WHO Press</b:Publisher>", sources)
+        paragraph = dr.paragraphs(ET.fromstring(parts[dr.DOCUMENT]))[3]
+        self.assertTrue(dr.paragraph_text(paragraph).endswith("(World Health Organization, 2019)."))
+
+    def accepted_copy(self):
+        """The cited copy with its tracked insertions accepted, as the
+        author leaves it in Word."""
+        parts = dr.read_parts(self.out)
+        text = parts[dr.DOCUMENT].decode("utf-8")
+        text = re.sub(r"<w:ins [^>]*>", "", text).replace("</w:ins>", "")
+        parts[dr.DOCUMENT] = text.encode("utf-8")
+        accepted = self.folder / "accepted.docx"
+        dr.write_parts(self.out, parts, accepted)
+        return accepted
+
+    def test_an_accepted_citation_leaves_its_paragraph_open_to_another(self):
+        docx_cite.cite(self.paper, REFS, [{"paragraph": 3, "after": "Table 1", "refs": ["smith2020"]}],
+                       self.out, "word")
+        again = self.folder / "again.docx"
+        docx_cite.cite(self.accepted_copy(), REFS, [{"paragraph": 3, "after": "Results", "refs": ["jones2019"]}],
+                       again, "word")
+        paragraph = dr.paragraphs(ET.fromstring(zipfile.ZipFile(again).read(dr.DOCUMENT)))[3]
+        self.assertEqual(dr.paragraph_text(paragraph),
+                         "Results (Jones et al., 2019) are shown in Table 1 (Smith and Lee, 2020).")
+
+    def test_a_citation_never_goes_inside_another(self):
+        docx_cite.cite(self.paper, REFS, [{"paragraph": 3, "after": "Table 1", "refs": ["smith2020"]}],
+                       self.out, "word")
+        with self.assertRaises(docx_cite.Refused) as refusal:
+            docx_cite.cite(self.accepted_copy(), REFS, [{"paragraph": 3, "after": "(Smith", "refs": ["jones2019"]}],
+                           self.folder / "x.docx", "word")
+        self.assertIn("inside a citation", str(refusal.exception))
 
     def test_two_citations_in_one_paragraph_in_one_pass(self):
         docx_cite.cite(self.paper, REFS, [

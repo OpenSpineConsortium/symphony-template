@@ -6,8 +6,11 @@ each document (paragraphs numbered, open comments under them), makes one task
 per document (never per comment, since two workers in one .docx would meet),
 and applies the worker's <name>.revisions.json as word-level tracked changes
 with a comment of Claude's for each "why"; each entry carries the paragraph's
-exact old text, and a paragraph with a field, picture, hyperlink or earlier
-tracked change is refused. The procedure is docs/setup/word-revisions.md and
+exact old text. Citations, other fields, links and content controls are kept
+whole (the sheet lists their words as "keep as written"; a field left out of
+the new text is a tracked deletion), and a paragraph with a picture, an
+equation or an earlier tracked change is refused, which the sheet says
+(2026-10-22, the thread "Word, OneDrive and Zotero workflow"). The procedure is docs/setup/word-revisions.md and
 the research, with the OneDrive routes, docs/research/word-revisions-from-onedrive.md:
 the owner's own computer through the folder tools is the recommended sync,
 with no credential; Microsoft Graph in Actions would store one and is the
