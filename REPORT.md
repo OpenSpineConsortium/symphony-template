@@ -1,20 +1,20 @@
 # Stale branches in OpenSpineConsortium/symphony-template
 
-Read 2026-10-25T11:38:20Z from GitHub's history: 414 merged pull requests, 3 closed without a merge.
+Read 2026-10-25T11:40:18Z from GitHub's history: 415 merged pull requests, 3 closed without a merge.
 
 | measure | value |
 |---|---|
-| merged pull requests that had to take main in | 158 (0.382) |
-| catch-up merges in all (by GitHub's Update branch) | 254 (22) |
+| merged pull requests that had to take main in | 159 (0.383) |
+| catch-up merges in all (by GitHub's Update branch) | 255 (23) |
 | forced pushes (rebases or amends, not told apart) | 32 |
-| landings under a pull request in its life, median / mean | 1.0 / 2.43 |
-| finished and green, then made stale before landing | 99 (0.239) |
-| wall-clock from first green to merge where it went stale | 356.7 h, median 15.7 min |
-| check runs / on catch-up heads alone | 730 / 209 (0.286) |
-| runner hours of the check / redone | 38.1 h / 11.3 h |
+| landings under a pull request in its life, median / mean | 1 / 2.7 |
+| finished and green, then made stale before landing | 100 (0.241) |
+| wall-clock from first green to merge where it went stale | 437.7 h, median 16.3 min |
+| check runs / on catch-up heads alone | 732 / 210 (0.287) |
+| runner hours of the check / redone | 38.2 h / 11.4 h |
 | re-runs of a run | 6 |
 | board's main-moved comments / conflicting | 0 / 0 |
-| seen live: snapshots / pull requests behind / in conflict | 150 / 0 / 12 |
+| seen live: snapshots / pull requests behind / in conflict | 151 / 0 / 12 |
 | closed unmerged / whose branch landed later | 3 / 2 |
 
 ## By the parallel work beside each pull request
@@ -22,17 +22,17 @@ Read 2026-10-25T11:38:20Z from GitHub's history: 414 merged pull requests, 3 clo
 | other pull requests open in its life | merged | took main in | stale after green | runs | redone | stale hours |
 |---|---|---|---|---|---|---|
 | 0 | 66 | 5 (0.076) | 0 | 77 | 4 | 0.0 |
-| 1-2 | 80 | 25 (0.312) | 17 | 122 | 25 | 8.68 |
-| 3-5 | 167 | 60 (0.359) | 42 | 296 | 77 | 22.98 |
-| 6-10 | 83 | 53 (0.639) | 30 | 190 | 84 | 23.92 |
-| 11+ | 18 | 15 (0.833) | 10 | 45 | 19 | 301.16 |
+| 1-2 | 79 | 25 (0.316) | 17 | 121 | 25 | 8.68 |
+| 3-5 | 146 | 57 (0.39) | 42 | 271 | 75 | 22.98 |
+| 6-10 | 105 | 56 (0.533) | 30 | 216 | 86 | 23.92 |
+| 11+ | 19 | 16 (0.842) | 11 | 47 | 20 | 382.09 |
 
 ## Claim branches against other branches
 
 | branch | merged | took main in | stale after green | runs | redone | stale hours |
 |---|---|---|---|---|---|---|
 | claim | 10 | 3 (0.3) | 0 | 50 | 2 | 0.0 |
-| no_claim | 404 | 155 (0.384) | 99 | 680 | 207 | 356.73 |
+| no_claim | 405 | 156 (0.385) | 100 | 682 | 208 | 437.66 |
 
 ## By day of merge
 
@@ -54,17 +54,17 @@ Read 2026-10-25T11:38:20Z from GitHub's history: 414 merged pull requests, 3 clo
 | 2026-10-22 | 34 | 4 | 0 | 39 | 2 | 0.0 |
 | 2026-10-23 | 44 | 10 | 3 | 53 | 9 | 13.51 |
 | 2026-10-24 | 26 | 0 | 0 | 30 | 0 | 0.0 |
-| 2026-10-25 | 12 | 5 | 4 | 24 | 6 | 262.95 |
+| 2026-10-25 | 13 | 6 | 5 | 26 | 7 | 343.88 |
 
 ## The landings that made the most others catch up
 
+- #402 (claude/project-thread-1sqoqr): 8
+- #405 (claude/project-thread-ii4m8j): 8
+- #406 (claude/project-thread-wpsves): 8
 - #95 (claude/symphony-control-website-ma7g9x): 7
 - #99 (claude/research-notes-rt4tg6): 7
 - #120 (claude/symphony-control-website-ma7g9x): 7
-- #402 (claude/project-thread-1sqoqr): 7
-- #405 (claude/project-thread-ii4m8j): 7
-- #406 (claude/project-thread-wpsves): 7
-- #97 (claude/symphony-versus-competitors-c7mc4k): 6
-- #102 (claude/symphony-control-website-ma7g9x): 6
-- #122 (claude/beethoven-worker-opening-ujxy67): 6
-- #113 (dependabot/github_actions/actions/create-github-app-token-3): 6
+- #400 (claude/project-thread-tn9lgv): 7
+- #403 (claude/project-thread-xiwixf): 7
+- #407 (claude/project-thread-p348x5): 7
+- #397 (claude/project-thread-c1982w): 7

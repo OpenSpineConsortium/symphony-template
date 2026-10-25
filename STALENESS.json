@@ -1,7 +1,7 @@
 {
  "default_branch": "main",
  "format": 1,
- "generated_at": "2026-10-25T11:38:20Z",
+ "generated_at": "2026-10-25T11:40:18Z",
  "pulls": [
   {
    "auto_merge_enabled": null,
@@ -11008,6 +11008,149 @@
    "base": "main",
    "board_conflicts": 0,
    "board_main_moved": 0,
+   "branch": "claude/project-thread-jvo4zg",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 1,
+   "caused_by": [
+    [
+     "4d71fa4f376a5b1bb6f3a0cfc9177dda839f7496",
+     [
+      349,
+      360,
+      361,
+      363,
+      318,
+      362,
+      364,
+      366,
+      365,
+      367,
+      368,
+      369,
+      371,
+      372,
+      373,
+      374,
+      344,
+      375,
+      376,
+      378,
+      379,
+      380,
+      381,
+      382,
+      377,
+      383,
+      384,
+      370,
+      385,
+      387,
+      389,
+      390,
+      391,
+      393,
+      395,
+      394,
+      392,
+      396,
+      398,
+      402,
+      400,
+      403,
+      405,
+      406,
+      407,
+      404,
+      397,
+      408,
+      409,
+      410,
+      401,
+      411,
+      412,
+      413,
+      414,
+      415,
+      417,
+      416,
+      420,
+      418,
+      419,
+      421,
+      422,
+      423,
+      424,
+      426,
+      425,
+      427,
+      428,
+      429,
+      430,
+      431,
+      432,
+      433,
+      434,
+      435,
+      436,
+      437,
+      438,
+      439,
+      440,
+      441,
+      442,
+      444,
+      445,
+      443,
+      446,
+      447,
+      448,
+      449,
+      450,
+      451,
+      452,
+      453,
+      454,
+      456,
+      458,
+      457,
+      459,
+      460,
+      461,
+      462,
+      463,
+      464,
+      465,
+      466,
+      467
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 526,
+   "check_seconds_redone": 265,
+   "claim": false,
+   "closed": "2026-10-25T11:39:24Z",
+   "commits": 2,
+   "first_green": "2026-10-22T02:43:40Z",
+   "force_pushes": 0,
+   "landings_after_green": 111,
+   "landings_during_life": 112,
+   "merged": "2026-10-25T11:39:24Z",
+   "number": 350,
+   "opened": "2026-10-22T02:39:15Z",
+   "ready": "2026-10-22T02:39:15Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 291344,
+   "started": "2026-10-22T02:39:04Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
    "branch": "claude/project-thread-2gwz22",
    "catch_ups": 1,
    "catch_ups_after_green": 1,
@@ -14970,14 +15113,14 @@
     "with_catch_up": 0
    },
    "2026-10-25": {
-    "catch_ups": 7,
-    "check_runs": 24,
-    "check_runs_redone": 6,
-    "merged": 12,
-    "share_with_catch_up": 0.417,
-    "stale_after_green": 4,
-    "stale_hours": 262.95,
-    "with_catch_up": 5
+    "catch_ups": 8,
+    "check_runs": 26,
+    "check_runs_redone": 7,
+    "merged": 13,
+    "share_with_catch_up": 0.462,
+    "stale_after_green": 5,
+    "stale_hours": 343.88,
+    "with_catch_up": 6
    }
   },
   "by_parallel_work": {
@@ -14993,43 +15136,43 @@
    },
    "1-2": {
     "catch_ups": 29,
-    "check_runs": 122,
+    "check_runs": 121,
     "check_runs_redone": 25,
-    "merged": 80,
-    "share_with_catch_up": 0.312,
+    "merged": 79,
+    "share_with_catch_up": 0.316,
     "stale_after_green": 17,
     "stale_hours": 8.68,
     "with_catch_up": 25
    },
    "11+": {
-    "catch_ups": 26,
-    "check_runs": 45,
-    "check_runs_redone": 19,
-    "merged": 18,
-    "share_with_catch_up": 0.833,
-    "stale_after_green": 10,
-    "stale_hours": 301.16,
-    "with_catch_up": 15
+    "catch_ups": 27,
+    "check_runs": 47,
+    "check_runs_redone": 20,
+    "merged": 19,
+    "share_with_catch_up": 0.842,
+    "stale_after_green": 11,
+    "stale_hours": 382.09,
+    "with_catch_up": 16
    },
    "3-5": {
-    "catch_ups": 90,
-    "check_runs": 296,
-    "check_runs_redone": 77,
-    "merged": 167,
-    "share_with_catch_up": 0.359,
+    "catch_ups": 87,
+    "check_runs": 271,
+    "check_runs_redone": 75,
+    "merged": 146,
+    "share_with_catch_up": 0.39,
     "stale_after_green": 42,
     "stale_hours": 22.98,
-    "with_catch_up": 60
+    "with_catch_up": 57
    },
    "6-10": {
-    "catch_ups": 104,
-    "check_runs": 190,
-    "check_runs_redone": 84,
-    "merged": 83,
-    "share_with_catch_up": 0.639,
+    "catch_ups": 107,
+    "check_runs": 216,
+    "check_runs_redone": 86,
+    "merged": 105,
+    "share_with_catch_up": 0.533,
     "stale_after_green": 30,
     "stale_hours": 23.92,
-    "with_catch_up": 53
+    "with_catch_up": 56
    }
   },
   "by_protocol": {
@@ -15044,23 +15187,23 @@
     "with_catch_up": 3
    },
    "no_claim": {
-    "catch_ups": 249,
-    "check_runs": 680,
-    "check_runs_redone": 207,
-    "merged": 404,
-    "share_with_catch_up": 0.384,
-    "stale_after_green": 99,
-    "stale_hours": 356.73,
-    "with_catch_up": 155
+    "catch_ups": 250,
+    "check_runs": 682,
+    "check_runs_redone": 208,
+    "merged": 405,
+    "share_with_catch_up": 0.385,
+    "stale_after_green": 100,
+    "stale_hours": 437.66,
+    "with_catch_up": 156
    }
   },
-  "catch_ups": 254,
-  "catch_ups_by_button": 22,
+  "catch_ups": 255,
+  "catch_ups_by_button": 23,
   "catch_ups_max": 6,
-  "check_hours": 38.11,
-  "check_hours_redone": 11.29,
-  "check_runs": 730,
-  "check_runs_redone": 209,
+  "check_hours": 38.25,
+  "check_hours_redone": 11.36,
+  "check_runs": 732,
+  "check_runs_redone": 210,
   "closed_unmerged": 3,
   "closed_unmerged_branch_landed_later": 2,
   "default_branch_checks": {
@@ -15119,25 +15262,40 @@
    }
   },
   "force_pushes": 32,
-  "landings_after_green_total": 548,
-  "landings_during_life_mean": 2.43,
-  "landings_during_life_median": 1.0,
+  "landings_after_green_total": 659,
+  "landings_during_life_mean": 2.7,
+  "landings_during_life_median": 1,
   "live": {
    "pulls_seen": 60,
    "pulls_seen_behind": 0,
    "pulls_seen_dirty": 12,
    "since": "2026-10-20T21:50:52Z",
-   "snapshots": 150
+   "snapshots": 151
   },
-  "merged": 414,
+  "merged": 415,
   "reruns": 6,
-  "share_runs_redone": 0.286,
-  "share_stale_after_green": 0.239,
-  "share_with_catch_up": 0.382,
-  "stale_after_green": 99,
-  "stale_hours_total": 356.73,
-  "stale_minutes_median": 15.7,
+  "share_runs_redone": 0.287,
+  "share_stale_after_green": 0.241,
+  "share_with_catch_up": 0.383,
+  "stale_after_green": 100,
+  "stale_hours_total": 437.66,
+  "stale_minutes_median": 16.3,
   "top_causes": [
+   {
+    "branch": "claude/project-thread-1sqoqr",
+    "catch_ups_caused": 8,
+    "number": 402
+   },
+   {
+    "branch": "claude/project-thread-ii4m8j",
+    "catch_ups_caused": 8,
+    "number": 405
+   },
+   {
+    "branch": "claude/project-thread-wpsves",
+    "catch_ups_caused": 8,
+    "number": 406
+   },
    {
     "branch": "claude/symphony-control-website-ma7g9x",
     "catch_ups_caused": 7,
@@ -15154,39 +15312,24 @@
     "number": 120
    },
    {
-    "branch": "claude/project-thread-1sqoqr",
+    "branch": "claude/project-thread-tn9lgv",
     "catch_ups_caused": 7,
-    "number": 402
+    "number": 400
    },
    {
-    "branch": "claude/project-thread-ii4m8j",
+    "branch": "claude/project-thread-xiwixf",
     "catch_ups_caused": 7,
-    "number": 405
+    "number": 403
    },
    {
-    "branch": "claude/project-thread-wpsves",
+    "branch": "claude/project-thread-p348x5",
     "catch_ups_caused": 7,
-    "number": 406
+    "number": 407
    },
    {
-    "branch": "claude/symphony-versus-competitors-c7mc4k",
-    "catch_ups_caused": 6,
-    "number": 97
-   },
-   {
-    "branch": "claude/symphony-control-website-ma7g9x",
-    "catch_ups_caused": 6,
-    "number": 102
-   },
-   {
-    "branch": "claude/beethoven-worker-opening-ujxy67",
-    "catch_ups_caused": 6,
-    "number": 122
-   },
-   {
-    "branch": "dependabot/github_actions/actions/create-github-app-token-3",
-    "catch_ups_caused": 6,
-    "number": 113
+    "branch": "claude/project-thread-c1982w",
+    "catch_ups_caused": 7,
+    "number": 397
    }
   ],
   "top_pairs": [
@@ -15242,7 +15385,7 @@
    }
   ],
   "with_board_conflict": 0,
-  "with_catch_up": 158
+  "with_catch_up": 159
  },
  "unread": 0,
  "workflow": "ci.yml"
