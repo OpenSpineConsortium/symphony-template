@@ -1,9 +1,9 @@
 {
- "at": "2026-10-25T06:59:34Z",
+ "at": "2026-10-25T07:52:55Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current ba1eca935325",
-  "schwingnet folders at commit ba1eca9 on warrior 2026-10-25 06:59:33 UTC",
-  "  folders: job 40780131",
+  "HPCW-GRID-GATE schwingnet pull ok ba1eca935325..5a40a4e4c80c",
+  "schwingnet folders at commit 5a40a4e on warrior 2026-10-25 07:52:54 UTC",
+  "  folders: job 40780339",
   "submitted one job. Send folders again once it ends to print its report, one page a send.",
   "schwingnet folders: exit 0",
   "HPCW-GRID-GATE schwingnet folders ok"
@@ -11,7 +11,7 @@
  "rc": 0,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current ba1eca935325",
+  "HPCW-GRID-GATE schwingnet pull ok ba1eca935325..5a40a4e4c80c",
   "HPCW-GRID-GATE schwingnet folders ok"
  ],
  "v": 1,
