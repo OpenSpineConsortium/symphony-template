@@ -1,10 +1,15 @@
 # The living documentation site (docs/learn/README.md): the guide to the
 # lessons, which live in symphony-protocol, the capabilities page, a
 # reference made from the code's own docstrings and the test suite's
-# results, built by tools/living_docs.py on every push to the default branch
-# and published with GitHub Pages. The test report is written even when a
-# test fails, so the Tests page shows the failure rather than hiding the
-# page.
+# results, built by tools/living_docs.py and published with GitHub Pages.
+# The test report is written even when a test fails, so the Tests page shows
+# the failure rather than hiding the page.
+#
+# It runs only when the owner starts it (Actions, Docs, Run workflow on the
+# default branch), never on a push or a schedule: the owner's call of
+# 2026-10-25, since a build on every merge spent about 200 Actions minutes a
+# day here and the site is read far less often than it was rebuilt
+# (docs/research/actions-minutes-2026-10-25.md).
 #
 # Publishing needs Pages set to deploy from GitHub Actions, which the
 # workflow's token cannot set, and the repository variable SYMPHONY_DOCS set
@@ -16,7 +21,6 @@
 name: Docs
 
 on:
-  push:
   workflow_dispatch:
 
 permissions:
