@@ -22,9 +22,12 @@ merges. A change reaches the consumers in a release, with one exception:
 a change the template's own check must answer, a rendered string its tests
 pin or a function it calls that changes, comes here first, by a pull
 request that vendors the library's branch (symphony-protocol's README, "A
-change a consumer must answer"). From 0.4.1 each release waits for the
-owner's approval in symphony-protocol's environment release (its
-release.yml), and its workflow Sync, which follows the Release run, weekly
+change a consumer must answer"). From 0.4.1 to 0.5.1 each release waited
+for the owner's approval in symphony-protocol's environment release (its
+release.yml); since 2026-10-20 the merge that raises the version releases
+on its own, and the approval comes back only in Developer mode (the
+variable SYMPHONY_DEVELOPER_MODE on, symphony-protocol's README,
+Releases). Its workflow Sync, which follows the Release run, weekly
 and by hand, carries only the newest published release, from the commit
 that raised main to its version, never main's head. Sync
 vendors that release into the template and opens, or updates, the pull
@@ -36,28 +39,27 @@ repository takes which modules, and its ECOSYSTEM.md, generated from that
 list, maps all five.
 
 So between such a pull request and the release that carries its change,
-the template runs ahead of the newest release. From symphony-template#78
-(2026-10-14) symphony-protocol's fixes after 0.4.1 were here, recorded as
-0.4.1 with their commit; since 2026-10-16 the copy is 0.5.0's, the
-version symphony-protocol's main raised that day, which waits for the
-owner's approval. Its VENDORED names 0.5.0 and a8e0e56, the last commit
-that changed the package before the tag, since symphony-protocol's
-scripts/vendor.py records that commit and not the one it copies from, so
-the sync of the tag v0.5.0 finds the copy level, opens nothing and closes
-a sync pull request still open. A copy made from the template meanwhile
-starts on 0.5.0, and its protocol.yml takes no older tag. Until the
-owner approves 0.5.0, Sync, weekly and by hand, knows only 0.4.1, the
-newest published release, so it opens `symphony-protocol/sync` taking
-the template's copy back to 0.4.1, with auto-merge armed. That pull
-request is a downgrade: close it each time it comes back, and never
-turn it green, by regenerating a fixture or otherwise. The fixture of
-the board's Given to workers heading keeps it red meanwhile.
+the template runs ahead of the newest release. Its VENDORED then names
+the version symphony-protocol's main raised and the last commit that
+changed the package, since symphony-protocol's scripts/vendor.py records
+that commit and not the one it copies from, so the sync of that release
+finds the copy level, opens nothing and closes a sync pull request still
+open; the template ran ahead so from symphony-template#78 (2026-10-14)
+until 0.5.0 was published. A sync pull request that brings a release
+newer than the version VENDORED names merges once the template's check
+is green, as 0.7.0's did on 2026-10-25 (symphony-template#472). One that
+would take the copy back below that version, as the sync of 0.4.1 did
+while 0.5.0 waited for its approval, is a downgrade: close it each time
+it comes back, and never turn it green, by regenerating a fixture or
+otherwise.
 
 A repository made from the template is not on that list, so no sync pull
-request reaches it. Its own .github/workflows/protocol.yml takes each
+request of symphony-protocol's reaches it, and the template's own offer to
+adopted repositories (tools/sync_adopted.py) leaves a whole template's
+copy alone. Its own .github/workflows/protocol.yml takes each
 release instead: symphony-protocol's release.yml tags each version that
-reaches its main once the owner approves its release, and the copy's
-workflow, weekly and by hand,
+reaches its main, after the owner's approval in Developer mode, and the
+copy's workflow, weekly and by hand,
 vendors the newest tag when it is newer than tools/VENDORED, on the branch
 `symphony-protocol/sync`, and opens the pull request with GITHUB_TOKEN, or
 an issue linking it where GitHub Actions may not open pull requests. A
@@ -77,6 +79,16 @@ change copied in (docs/start/protocol.md, step 7): 0.5.0 changes the
 board's Given to workers heading, which tests/fixtures/board-STATE.md
 pins in a copy made before symphony-template#78.
 
+In a copy whose ruleset requires more than the check, such as
+SchwingNet's, which also requires gate, standards (every group green) and
+owner-ok, the update's pull request does not land by itself: on
+2026-10-25 GitHub created the pull_request runs of the one GITHUB_TOKEN
+opened there (SchwingNet#313, 0.5.1 to 0.7.0) as action_required, with no
+job run until someone who may write approved them on the pull request's
+page, and owner-ok asks for the owner's tap on any pull request a bot
+opened. Only the check that protocol.yml starts on the branch runs
+without them, so such an update waits for the owner.
+
 The template's push guard hook, tools/guard_push.py, calls the library's
 simple_commands, push_arguments and refusal itself, never
 guard.refused_push, so a guard fix that lives in refused_push's readings
@@ -94,4 +106,6 @@ Source: symphony-protocol 0.5.0, its ecosystem.json, scripts/vendor.py,
 sync.yml and its README's sections "How a change reaches the other
 repositories", "The owner's one-time setup for the sync" and "Releases";
 this repository's .github/workflows/protocol.yml and
-tools/protocol_update.py.
+tools/protocol_update.py. The releases' paragraphs were brought up to date
+on 2026-10-25, after 0.7.0's release and sync, from symphony-protocol's
+README, Releases, and this repository's tools/sync_adopted.py.
