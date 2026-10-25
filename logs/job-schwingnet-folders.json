@@ -1,0 +1,13 @@
+{
+ "at": "2026-10-25T05:53:40Z",
+ "lines": [
+  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+ ],
+ "rc": 126,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+ ],
+ "v": 1,
+ "what": "schwingnet folders"
+}
