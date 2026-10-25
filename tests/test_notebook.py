@@ -132,7 +132,8 @@ class References(unittest.TestCase):
         [entry] = self.read(BIB, ".bib")
         self.assertEqual(entry, {"key": "smith2020", "title": "A Fast Matching", "authors": ["Smith, Ann", "Lee, Bo"],
                                  "year": "2020", "doi": "10.1000/abc", "venue": "J. Graphs",
-                                 "url": "", "uri": ""})
+                                 "url": "", "uri": "", "type": "article-journal", "volume": "", "issue": "",
+                                 "pages": "", "publisher": ""})
 
     def test_zotero_items_carry_their_library_uri(self):
         items = [{"key": "ABCD1234", "data": {"key": "ABCD1234", "itemType": "journalArticle", "title": "T",
@@ -142,7 +143,7 @@ class References(unittest.TestCase):
                  {"key": "ANNO0001", "data": {"key": "ANNO0001", "itemType": "annotation"}}]
         [entry] = notebook.zotero(items, "users/42")
         self.assertEqual((entry["authors"], entry["year"], entry["uri"], entry["url"]),
-                         (["Smith, Ann", "A Consortium"], "2021", "http://zotero.org/users/42/items/ABCD1234",
+                         (["Smith, Ann", "{A Consortium}"], "2021", "http://zotero.org/users/42/items/ABCD1234",
                           "https://example.test/t"))
         with self.assertRaises(notebook.NotebookError):
             notebook.zotero(items, "users/../x")
@@ -175,6 +176,33 @@ class References(unittest.TestCase):
         self.assertEqual((first["title"], first["year"], first["doi"]), ("A Fast Matching", "2020", "10.1000/abc"))
         self.assertEqual((second["key"], second["title"]), ("ref2", "Untitled Book"))
 
+    def test_a_book_and_a_chapter_keep_their_kind_and_where_they_are_found(self):
+        text = ("@book{lee,\n title={Fluoroscopy},\n author={{World Health Organization} and Lee, Ann},\n"
+                " publisher={Example Press}, year={2019}}\n"
+                "@incollection{roe,\n title={A Chapter}, booktitle={The Book}, pages={10--20},\n"
+                " author={Roe, Ed}, year={2018}}\n"
+                "@article{kim,\n title={T}, journal={Spine}, volume={45}, number={2}, pages={1 - 9}, year={2020}}\n")
+        book, chapter, article = self.read(text, ".bib")
+        self.assertEqual((book["type"], book["publisher"], book["authors"]),
+                         ("book", "Example Press", ["{World Health Organization}", "Lee, Ann"]))
+        self.assertEqual((chapter["type"], chapter["venue"], chapter["pages"]), ("chapter", "The Book", "10-20"))
+        self.assertEqual((article["volume"], article["issue"], article["pages"]), ("45", "2", "1-9"))
+
+    def test_ris_keeps_kind_volume_and_pages(self):
+        [entry] = self.read("TY  - CHAP\nTI  - C\nBT  - The Book\nSP  - 3\nEP  - 7\nVL  - 2\nPB  - P\nER  - \n", ".ris")
+        self.assertEqual((entry["type"], entry["venue"], entry["pages"], entry["volume"], entry["publisher"]),
+                         ("chapter", "The Book", "3-7", "2", "P"))
+
+    def test_csl_json_as_zotero_exports_it(self):
+        items = [{"id": "http://zotero.org/users/1/items/ABCD1234", "type": "article-journal", "title": "T",
+                  "author": [{"family": "Smith", "given": "Ann"}, {"literal": "A Consortium"}],
+                  "issued": {"date-parts": [[2021, 3]]}, "DOI": "10.1/X", "container-title": "J",
+                  "volume": "4", "page": "5-6"}]
+        [entry] = self.read(json.dumps(items), ".json")
+        self.assertEqual((entry["authors"], entry["year"], entry["doi"], entry["type"], entry["pages"]),
+                         (["Smith, Ann", "{A Consortium}"], "2021", "10.1/x", "article-journal", "5-6"))
+        self.assertEqual((entry["key"], entry["uri"]), ("ABCD1234", "http://zotero.org/users/1/items/ABCD1234"))
+
     def test_mendeley_desktop_escapes_are_undone(self):
         text = ("@article{Smith2021,\nauthor = {Smith, John and {World Health Organization}},\n"
                 "doi = {https://doi.org/10.1016/J.X{\\_}1},\ntitle = {{Five {\\%} {\\&} more}},\n"
@@ -182,7 +210,7 @@ class References(unittest.TestCase):
         [entry] = self.read(text, ".bib")
         self.assertEqual((entry["doi"], entry["title"], entry["url"], entry["authors"][1]),
                          ("10.1016/j.x_1", "Five % & more", "https://example.test/a_b?c=1&d=~e",
-                          "World Health Organization"))
+                          "{World Health Organization}"))
 
     def test_every_key_is_unique_and_ris_keys_read_as_author_and_year(self):
         found = self.read("@article{Lee2020, title={A}, year={2020}}\n@article{Lee2020, title={B}, year={2020}}\n", ".bib")

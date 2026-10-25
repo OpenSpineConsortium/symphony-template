@@ -179,6 +179,13 @@ class TheScripts(unittest.TestCase):
         compile("import json, sys\n" + python, "the leg's standing", "exec")
         self.assertNotIn("${{", LEG + REGISTRY_STEP + UNBLOCK)
 
+    def test_no_script_leans_on_gnu_alternation(self):
+        """A \\| in a basic expression is an alternation only to GNU's sed and
+        grep; a Mac's BSD tools read it as a bar, so the scripts would pass
+        on the runner and fail on a Mac. -E says the same on both."""
+        for script in (LEG, REGISTRY_STEP, UNBLOCK):
+            self.assertNotIn("\\|", script)
+
 
 class TheUnblock(unittest.TestCase):
     """The coordinator's step that starts a task's worker again once the

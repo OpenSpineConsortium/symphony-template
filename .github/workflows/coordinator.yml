@@ -291,7 +291,10 @@ jobs:
             echo "#$TASK is still blocked; it waits for the owner of the repository"
             exit 0
           fi
-          named=$(printf '%s\n' "$labels" | sed -n 's/^\(worker\|agent\|account\)://p' | sort -u)
+          # sed -E, since alternation in a basic expression (a backslash and
+          # a bar) is GNU's alone: a Mac's BSD sed reads a literal bar there
+          # and names nobody.
+          named=$(printf '%s\n' "$labels" | sed -nE 's/^(worker|agent|account)://p' | sort -u)
           worker=$(printf '%s\n' "$named" | head -n 1)
           in_actions=$(python3 tools/workers.py --dir "$REGISTRY" list --runs actions)
           # A task the labels of several workers give goes to the first of
