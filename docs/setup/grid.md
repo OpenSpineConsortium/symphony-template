@@ -63,6 +63,28 @@ Several workers at once (framework 22): Start a worker on an account runs a work
 
 The one step this needs: the gate's clone on the grid has to carry framework 21. In Beethoven, open Settings, unfold "For your lab lead" and press "Connect GitHub Actions" with this repository, OpenSpineConsortium/symphony-template, as it was set up the first time; that pulls the clone and writes the gate's line again. By hand it is `cd ~/hpcworker && git checkout main && git pull && chmod -R go-w tools framework` in the grid's shell. The first press of the Grid tab then makes the existing sign-in folder account 1, by a rename and a link.
 
+## Service keys
+
+The owner's dataset and service keys reach the grid without his shell (his choice of 2026-10-23: "all my keys should go that route"). Each is a secret of the environment grid, and the action key of .github/workflows/grid-accounts.yml sends the one its name picks to the gate's word key (hpcworker #36). The gate writes it to the file SchwingNet's jobs read it from, 0600 in a 0700 folder, replacing only that key's line. The key is masked in the run's log. It goes to the grid only over ssh's standard input, never in a word or a log.
+
+| Name | Secret in the environment grid | File on the grid |
+| --- | --- | --- |
+| kaggle | KAGGLE_API_TOKEN | ~/.fluorocap/credentials.env, KAGGLE_API_TOKEN=... |
+| hf | HF_TOKEN | ~/.hf/token.env, HF_TOKEN=... |
+| zenodo | ZENODO_TOKEN | ~/.zenodo/token.env, ZENODO_TOKEN=... |
+| redivis | REDIVIS_API_TOKEN | ~/.redivis/token.env, REDIVIS_API_TOKEN=... |
+| wandb | WANDB_API_KEY | ~/.wandb/token.env, WANDB_API_KEY=... |
+| physionet | PHYSIONET_USERNAME and PHYSIONET_PASSWORD | ~/.netrc, machine physionet.org login ... password ... |
+| ratic | RATIC_LINK | ~/.rsna/ratic_link, the presigned link alone |
+
+To add or change a key:
+
+1. Open https://github.com/OpenSpineConsortium/symphony-template/settings/environments, press grid, and under Environment secrets press Add environment secret.
+2. Name it as the table says, paste the key, and press Add secret.
+3. Run Grid accounts with action key and name set to the key's name: https://github.com/OpenSpineConsortium/symphony-template/actions/workflows/grid-accounts.yml, then Run workflow. A session can run it for him.
+
+The gate's clone must carry hpcworker #36 first; the action job with update brings it.
+
 ## A GPU chain for a training run
 
 A training, a render or an inference run reaches the grid the same way as the check: one grid.yml dispatch, on a chain started with a GPU. At Wayne State the GPU partitions take only the QoS gpu, so the chain is started with `--partition gmsap --qos gpu --gres gpu:nvidia_h200:1` (gmsap is four nodes of four H200 each; galhp holds L40S and gvohp older Tesla cards, per the owner's infrastructure record of 2026-10-08), sized with `--cpus` and `--mem` for the job, and with `--hours` and `--margin` so the run ends inside the wall time less the margin, since the wall time cuts a job off and GitHub reports the runner lost. With `--gres` naming a GPU the chain gives the container the node's GPU; that this works on the grid's Apptainer 1.2.2 is not yet measured (hpcworker's docs/OPEN_QUESTIONS.md), so the first GPU chain runs `nvidia-smi` as its command before anything else. A step never reaches Slurm, so a run that needs several nodes is several dispatches, each on a chain of its own. The container sees no home and no lab volume, by design (above), so how a training run's data reaches the node and where its checkpoints go is not settled by this page: the repository's command fetches what it reads and keeps what it writes through a credential of that job's own (a release asset, an artifact, a store the repository's own secret names), and a chain started with a bind of one data folder would be a change to hpcworker that the owner decides. The first GPU chain measures this with `nvidia-smi` and one file fetched, before any run; the owner's word and number come before any run that spends GPU hours (docs/research/README.md).
