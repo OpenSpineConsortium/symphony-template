@@ -1,0 +1,24 @@
+{
+ "at": "2026-10-25T13:22:15Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current fc027a6c1837",
+  "schwingnet bank vindr_spinexr at commit fc027a6 on warrior 2026-10-25 13:21:14 UTC",
+  "  the checkout holds still at fc027a6 while the run that took it (job 40781587) lasts",
+  "  raw copy: 39 GB of dcm, which bank.py windows to an 8-bit PNG; the bank and its shard: 78 GB held, and the job asks for more before it writes where their frames' pixels need it",
+  "  room: 4421 GB free under its quota after 0 GB owed to 0 running fetches",
+  "  setup: the environments match pixi.lock; no job",
+  "  bank: job 40781621",
+  "  catalog: job 40781623",
+  "submitted. 'status' shows the stage reports and counts the bank's room as owed while it lasts; a sweep of a plan with:vindr_spinexr sent while the build is live waits on it.",
+  "schwingnet bank: exit 0",
+  "HPCW-GRID-GATE schwingnet bank ok"
+ ],
+ "rc": 0,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current fc027a6c1837",
+  "HPCW-GRID-GATE schwingnet bank ok"
+ ],
+ "v": 1,
+ "what": "schwingnet bank vindr_spinexr"
+}
