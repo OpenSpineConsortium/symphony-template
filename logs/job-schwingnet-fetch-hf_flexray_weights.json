@@ -1,0 +1,25 @@
+{
+ "at": "2026-10-25T09:28:05Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current dac62069ffdf",
+  "schwingnet fetch hf_flexray_weights at commit dac6206 on warrior 2026-10-25 09:28:05 UTC",
+  "  size budget: 1 sources, 0 GB stated; /rs/rs_grp_oschome has 4432 GB free under its quota, 0 GB of it owed to 0 running fetches",
+  "  each job starts its fetch only if the exact size its source states fits the room then; one that does not lands nothing (grid/size-rule.sh)",
+  "  no size stated on the line for: hf_flexray_weights (the job reads it from the source)",
+  "  hf_flexray_weights: job 40780681 hf-token 0GB",
+  "  2026-10-25 05:28:05 platform chain: hf_flexray_weights=40780681 size_gb=0",
+  "  ETA: network-bound, about 1 hour per 20 GB, so about 1 hours for 0 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
+  "  ",
+  "  dp_hf_flexray_weights: job 40780681",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current dac62069ffdf",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch hf_flexray_weights"
+}
