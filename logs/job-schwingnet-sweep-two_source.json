@@ -1,0 +1,23 @@
+{
+ "at": "2026-10-25T13:22:46Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40781587 [hidden]",
+  "schwingnet sweep two_source at commit fc027a6 on warrior 2026-10-25 13:22:45 UTC",
+  "  the checkout holds still at fc027a6 while the run that took it (job 40781587) lasts",
+  "  catalog: none qualifies yet (the newest version with C-ArmLSpine (catalog-000007-44ddbdf5de5a.sqlite) holds no vindr_spinexr train part); after the live catalog build, job 40781623",
+  "  setup: the environments match pixi.lock; no job",
+  "  the checkout: after the live runs that hold it (afterany:40781587,afterany:40781593,afterany:40781617)",
+  "  sweep: job 40781628",
+  "submitted. 'status' shows the plan's PROGRESS.txt once the sweep writes it; the same word again after a cut sweep ends resumes it.",
+  "schwingnet sweep: exit 0",
+  "HPCW-GRID-GATE schwingnet sweep ok"
+ ],
+ "rc": 0,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40781587 fc027a6c1837da68fc0efcd63a38b5feaebc3048",
+  "HPCW-GRID-GATE schwingnet sweep ok"
+ ],
+ "v": 1,
+ "what": "schwingnet sweep two_source"
+}
