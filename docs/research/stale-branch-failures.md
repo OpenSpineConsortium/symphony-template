@@ -140,7 +140,9 @@ library's protocol check still fails a pull request pushed, marked ready
 or edited while behind main, so catch-up merges between 23:04 UTC and that
 sync are the protocol check's, not the up-to-date rule's; the clean
 "after" starts with the 0.6.1 sync (docs/research/overlap-check-instead-of-up-to-date.md,
-section 5).
+section 5), which landed in symphony-template at 00:25 UTC on 2026-10-21
+(#317). A repository made from the template starts its clean "after" when
+its own weekly protocol workflow brings 0.6.1 in.
 
 ## What history can and cannot recover
 

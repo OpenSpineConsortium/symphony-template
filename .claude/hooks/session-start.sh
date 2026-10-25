@@ -66,6 +66,12 @@ else
   printf 'Branch %s; %s is not known here (%s).\n' "$branch" "$upstream" "$fetched"
 fi
 
+# The newest handoff of the last three days (tools/handoff.py latest), which a
+# session on a new account reads before anything else.
+if handoff=$(python3 tools/handoff.py latest 2>/dev/null) && [ -n "$handoff" ]; then
+  printf 'The latest handoff is %s: read it first when this session carries on work another account began.\n' "$handoff"
+fi
+
 if git rev-parse --verify --quiet refs/remotes/origin/board >/dev/null 2>&1 \
    && board=$(git show origin/board:STATE.md 2>/dev/null); then
   printf '\nThe board (origin/board:STATE.md, as last fetched), first 120 lines:\n'

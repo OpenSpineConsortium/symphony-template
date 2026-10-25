@@ -45,6 +45,10 @@ name: Checks
 # issue, a head in this repository. The extra event types are the moments
 # those facts change without a push: marked ready, converted back to draft,
 # the body edited.
+# The same job runs tools/review_record.py, which holds every pull request
+# marked ready, whoever opened it, to a section "## Adversarial review" in
+# its body (CONTRIBUTING.md), so the review the owner's sessions make before
+# a pull request is asked of every contributor; editing the body re-runs it.
 # On a pull request the job overlap says whether the change must bring the
 # default branch in (docs/agents/PROTOCOL.md, Locks): what the default
 # branch changed since the branch left it, with what that code depends on,
@@ -166,6 +170,10 @@ jobs:
       - name: Hold a claude/ pull request to the claim protocol
         if: github.event_name == 'pull_request'
         run: python3 tools/check_protocol.py
+
+      - name: Hold a pull request marked ready to its review record
+        if: github.event_name == 'pull_request'
+        run: python3 tools/review_record.py
 
       - name: Every part of the check passed
         env:
