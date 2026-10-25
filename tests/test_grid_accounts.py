@@ -157,18 +157,76 @@ class Words(unittest.TestCase):
             self.assertEqual(words, [], (slot, name))
 
     def test_a_job_says_its_one_word_and_nothing_else(self):
-        for job, word in (("update", "update"), ("promoter-status", "promoter status"), ("promoter-start", "promoter start"),
-                          ("promoter-stop", "promoter stop"), ("schwingnet-status", "schwingnet status"),
+        for job, word in (("update", "update"), ("artifacts", "artifacts"), ("promoter-status", "promoter status"), ("promoter-start", "promoter start"),
+                          ("promoter-stop", "promoter stop"), ("promoter-restart", "promoter restart"),
+                          ("freeze-status", "freeze status"), ("freeze-pilot", "freeze pilot"), ("freeze-start", "freeze start"), ("freeze-report", "freeze report"), ("freeze-overlap", "freeze overlap"),
+                          ("storage-status", "storage status"), ("storage-report", "storage report"), ("storage-survey", "storage survey"), ("storage-apply-20261024T210000Z", "storage apply 20261024T210000Z"), ("storage-retire-20261024T210000Z", "storage retire 20261024T210000Z"),
+                          ("schwingnet-status", "schwingnet status"),
                           ("schwingnet-start", "schwingnet start"), ("schwingnet-v1", "schwingnet v1"),
                           ("schwingnet-fetch-vindr_pcxr", "schwingnet fetch vindr_pcxr"),
                           ("schwingnet-prior", "schwingnet prior"), ("schwingnet-chain_eval", "schwingnet chain_eval"),
-                          ("schwingnet-census-all", "schwingnet census all"), ("schwingnet-samples", "schwingnet samples")):
+                          ("schwingnet-census-all", "schwingnet census all"), ("schwingnet-samples", "schwingnet samples"), ("schwingnet-nodequota", "schwingnet nodequota"),
+                          ("schwingnet-folders", "schwingnet folders"),
+                          ("schwingnet-explore-kaggle_scoliosis_yolov5", "schwingnet explore kaggle_scoliosis_yolov5"),
+                          ("schwingnet-dropzip-rsna_rspect_pe", "schwingnet dropzip rsna_rspect_pe"),
+                          ("schwingnet-unpack-rsna_rspect_pe", "schwingnet unpack rsna_rspect_pe"),
+                          ("schwingnet-experiment-250", "schwingnet experiment 250"),
+                          ("schwingnet-sweep-two_source", "schwingnet sweep two_source"),
+                          ("schwingnet-bank-vindr_spinexr", "schwingnet bank vindr_spinexr"),
+                          ("schwingnet-bench-flexray_carmlspine", "schwingnet bench flexray_carmlspine"),
+                          ("schwingnet-cancel-40704982", "schwingnet cancel 40704982")):
             self.assertEqual(self.run_script("job", job=job)[1], [word, "accounts"], job)
-        for job in ("", "update now", "promoter start abc", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
-                    "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
+        for job in ("", "update now", "artifacts-now", "artifacts now", "promoter start abc", "promoter-restart-now", "promoter restart", "freeze-stop", "freeze-start-4", "freeze-report-now", "freeze-overlap-now", "freeze-pilot-amos22", "storage-apply", "storage-apply-x", "storage-apply-20261024T210000Z-1", "storage-retire", "storage-retire-x", "storage-delete-20261024T210000Z", "storage-survey-x", "storage survey", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
+                    "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-explore-", "schwingnet-explore-Bad", "schwingnet-dropzip-", "schwingnet-dropzip-a-b", "schwingnet-unpack-", "schwingnet-unpack-a-b", "schwingnet-experiment-", "schwingnet-experiment-1-2", "schwingnet-sweep-", "schwingnet-sweep-two-source", "schwingnet-sweep-Real", "schwingnet-bank-", "schwingnet-bank-a-b", "schwingnet-bank-VinDr", "schwingnet-bank-a/b", "schwingnet-bench-", "schwingnet-bench-FleXray", "schwingnet-bench-a b", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-nodequota-x", "schwingnet-folders-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
             rc, words, _ = self.run_script("job", job=job)
             self.assertNotEqual(rc, 0, job)
             self.assertEqual(words, [], job)
+
+    def run_key(self, name, value):
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = Path(td) / "bin"
+            bin_dir.mkdir()
+            said, given = Path(td) / "said", Path(td) / "stdin"
+            fake = bin_dir / "ssh"
+            fake.write_text('#!/bin/bash\necho "${@: -1}" >> "%s"\ncat >> "%s"\necho "HPCW-GRID-GATE key ok"\n' % (said, given))
+            fake.chmod(0o755)
+            git = bin_dir / "git"
+            git.write_text("#!/bin/bash\nexit 1\n")
+            git.chmod(0o755)
+            env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}", ACTION="key", SLOT="", NAME=name, COUNT="", JOB="",
+                       CODE="", KEY_VALUE=value, PANEL_KEY="", REQUEST="r1", KEY="k", ACCESS_ID="go2432", HOST_KEY="h",
+                       HOST="grid", GH_TOKEN="", REPO="o/r", RUNNER_TEMP=td)
+            env.pop("GITHUB_STEP_SUMMARY", None)
+            proc = subprocess.run(["bash", "scripts/grid-accounts.sh"], cwd=ROOT, env=env, capture_output=True, text=True)
+            words = said.read_text().splitlines() if said.exists() else []
+            sent = given.read_text() if given.exists() else ""
+            return proc.returncode, words, sent, proc.stdout + proc.stderr
+
+    def test_a_key_goes_on_stdin_and_is_masked(self):
+        # the stand-in git fails the branch's publish, so the run's own exit is not read here
+        _, words, sent, out = self.run_key("kaggle", "KGAT_testonly0123")
+        self.assertEqual(words[0], "key kaggle")
+        self.assertTrue(sent.startswith("KGAT_testonly0123\n"))
+        self.assertIn("::add-mask::KGAT_testonly0123", out)
+        self.assertNotIn("KGAT_testonly0123", out.replace("::add-mask::KGAT_testonly0123", ""))
+        _, words, sent, out = self.run_key("physionet", "greg pass1234")
+        self.assertEqual(words[0], "key physionet")
+        self.assertIn("::add-mask::pass1234", out)
+        self.assertTrue(sent.startswith("greg pass1234\n"))
+
+    def test_a_bad_name_or_a_missing_secret_reaches_no_gate(self):
+        for name, value in (("foo", "tok_0123456789"), ("hf;id", "tok_0123456789"), ("", "tok_0123456789"),
+                            ("hf", ""), ("physionet", " "), ("physionet", "greg "), ("physionet", " pass")):
+            rc, words, _, _ = self.run_key(name, value)
+            self.assertNotEqual(rc, 0, (name, value))
+            self.assertEqual(words, [], (name, value))
+
+    def test_the_workflow_hands_the_step_only_the_named_secret(self):
+        flow = (ROOT / ".github/workflows/grid-accounts.yml").read_text()
+        for name, secret in (("kaggle", "KAGGLE_API_TOKEN"), ("hf", "HF_TOKEN"), ("zenodo", "ZENODO_TOKEN"),
+                             ("redivis", "REDIVIS_API_TOKEN"), ("wandb", "WANDB_API_KEY"), ("ratic", "RATIC_LINK")):
+            self.assertIn(f"inputs.name == '{name}' && secrets.{secret}", flow)
+        self.assertIn("${{ inputs.action == 'key' && (", flow)
 
     def test_a_busy_gate_is_asked_again(self):
         words = self.run_script("worker-start", "2", "teamb", busy=2)[1]

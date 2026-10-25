@@ -2,7 +2,7 @@
 
 Source: the thread "Ashley's handoff and parallel work" in the symphony_2 Project, 2026-10-22, on the owner's ask of 02:12 UTC for a handoff Ashley Schehr (GitHub aschehr) can pick up to continue the dataset collection in OpenSpineConsortium/spine-datasets, and for other work she can do beside his aims. Written from spine-datasets' main at 9912438 (the records under datasets/, tasks/TASKS.md, manifests/README.md, docs/ONBOARDING.md), its open issues and its pull requests #99 and #119 to #121, part 6 of docs/checkpoints/2026-10-22/handoff.md, and the Project memory on spine-datasets and the dataset promoter. The owner's Outlook was searched at 02:15 UTC for answers to the three letters of 2026-10-21; none had come.
 
-Part 6 is the work the owner approved for her on 2026-10-22 at 02:23 UTC: tasks A, B, E and F. C, D and G were proposed and left for later.
+Part 6 is the work the owner approved for her on 2026-10-22 at 02:23 UTC: tasks A, B, E and F, and at 02:32 UTC two more, H and I. C, D and G were proposed and left for later.
 
 ## 1. Where to start
 
@@ -47,7 +47,7 @@ Her pull request carries the record at status `fetching` and manifests/<id>.json
 3. Open-i (#35) and NIH ChestX-ray14 (#37) are large chest sets; ask the owner for the size first.
 4. CT downloads (#44 to #59) only after the X-ray ones.
 
-## 6. Work beside the owner's aims (approved: A, B, E and F)
+## 6. Work beside the owner's aims (approved: A, B, E, F, H and I)
 
 Chosen so that nothing touches what the owner's open threads hold: the SchwingNet video demo, latency and ONNX, the 3D CT priors (all confidential SchwingNet work, which she is not given), the Beethoven grid and the promoter restart, and the button home screen (site #136, symphony-app #89, symphony-template #344).
 
@@ -55,5 +55,7 @@ Chosen so that nothing touches what the owner's open threads hold: the SchwingNe
 - B. Neurosurgical Focus: Video (#43): screen the CC BY articles in a browser for live fluoroscopy and list the ones worth a download in the record. Browser work only, since a proof-of-work gate stops scripts.
 - E. Symphony on a Mac: make the five TheUnblock tests pass on macOS (BSD shell tools) as well as on Linux, in symphony-template, the source the copies take it from. No thread holds it.
 - F. Symphony's proof, as the second person: her claims and pull requests in spine-datasets are the field metrics' several-people setting, the case the coordination measurement needs; and she walks docs/ONBOARDING.md as a fresh user on her Mac, filing every point of friction as an issue in symphony-template, as her three findings of 2026-10-21 already were.
+- H. Word, OneDrive and Zotero: test the workflow of revising a Word document with citations, synced with OneDrive, as a new user would, and make it effortless and user-friendly; each rough spot an issue in symphony-template, fixed where she can (tools/docx_review.py, tools/docx_cite.py, tools/notebook.py, docs/research/drive-sync.md, docs/research/notebooks.md).
+- I. Mendeley: make the integration seamless, for references (a library export into references.json) and for dataset manifests (tools/dataset_review.py manifest --mendeley in spine-datasets).
 
 Left for later, on the owner's choice: reading the five forms (#9 to #13) field by field, a figshare source for the manifest command, and a no-scroll audit of the control panel's tabs once site #136 merges.
