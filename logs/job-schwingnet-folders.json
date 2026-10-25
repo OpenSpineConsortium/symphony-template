@@ -1,17 +1,18 @@
 {
- "at": "2026-10-25T06:14:55Z",
+ "at": "2026-10-25T06:47:08Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull ok 1f34a85945bb..2774384ca060",
-  "schwingnet folders at commit 2774384 on warrior 2026-10-25 06:14:55 UTC",
-  "refusing: the environments are not ready; 'start' makes them first",
-  "schwingnet folders: exit 75",
-  "HPCW-GRID-GATE schwingnet folders failed 75"
+  "HPCW-GRID-GATE schwingnet pull ok 2774384ca060..ba1eca935325",
+  "schwingnet folders at commit ba1eca9 on warrior 2026-10-25 06:47:07 UTC",
+  "  folders: job 40780088",
+  "submitted one job. Send folders again once it ends to print its report, one page a send.",
+  "schwingnet folders: exit 0",
+  "HPCW-GRID-GATE schwingnet folders ok"
  ],
- "rc": 75,
+ "rc": 0,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull ok 1f34a85945bb..2774384ca060",
-  "HPCW-GRID-GATE schwingnet folders failed 75"
+  "HPCW-GRID-GATE schwingnet pull ok 2774384ca060..ba1eca935325",
+  "HPCW-GRID-GATE schwingnet folders ok"
  ],
  "v": 1,
  "what": "schwingnet folders"
