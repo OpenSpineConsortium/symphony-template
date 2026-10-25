@@ -1,0 +1,22 @@
+# Why a worker launched from the control panel did nothing, and what a grid worker's link opens
+
+Source: the thread "Fix worker launch in control panel" in the claude.ai project "symphony3", 2026-10-25. The owner pressed Run the workers now for OpenSpineConsortium/SchwingNet and pasted the log of its Workers run #457, which printed `workers in Actions: []; this run: []` and ended green. The fix is OpenSpineConsortium/openspineconsortium.github.io#142.
+
+## The launch
+
+- .github/workflows/workers.yml runs only the registry's workers that say `"runs": "actions"` (tools/workers.py list --runs actions). SchwingNet's .github/symphony/workers/ held only its README on 2026-10-25, so the list was empty and the run ended in its first job, green, having done nothing. A run started by the schedule or a label ends the same way.
+- The control panel's Run the workers now dispatched workers.yml without reading the registry, so nothing on the page said why. It now reads the registry first and, with no worker in Actions, says so and opens the Workers tab; a repository needs one worker file with `"runs": "actions"`, added by + Add worker (Where it runs: actions) and its pull request, and the secret CLAUDE_CODE_OAUTH_TOKEN, before a cloud worker can run there.
+- A worker in Actions now has its own Run control (workers.yml dispatched with `worker` set), and a queued, given or blocker task has one that launches it: the task is given to a worker in Actions by its label, which wakes that worker at once (workers.yml's issues: labeled trigger), and a given task comes before the queue (docs/agents/PROTOCOL.md, Pick).
+- Ordering the queue is not in the protocol: tools/sdlc_protocol/team.py deals the open issues by number, oldest first, after a worker's own claim and the tasks given to it. A priority the panel sets reaches the workers only through a change in symphony-protocol, whose release waits for the owner; until then giving a task to a worker is the way to put it first. The owner was asked on 2026-10-25 which way to take.
+
+## What Open the session on a grid worker opens
+
+- A grid worker is Claude Code run with Remote Control in a Slurm job (hpcworker's framework), signed in to one of the grid's Claude accounts: the slot kept to it, else the grid's current one. Its link is that Remote Control environment, `https://claude.ai/code?environment=env_...` (or a resumed session's own `https://claude.ai/code/session_...`), as docs/research/beethoven-worker-opening.md records.
+- claude.ai shows an environment only to a tab signed in to the account that registered it, and a browser profile holds one claude.ai sign-in at a time (docs/research/beethoven-multi-account-workers.md). A tab signed in to any other account opens on that account's own claude.ai page, which is what the owner saw.
+- The panel now names the account on the worker's line and offers Copy link, so the link can be opened in a browser profile signed in to that account, as Beethoven's one-profile-per-account design does.
+- The owner then asked for the link to open straight in the Chrome profile signed in to that account, as a tab or else a new window. No web page and no extension can open a tab in another Chrome profile, and a window belongs to one profile; the one way code starts Chrome on another profile is a native helper (`chrome --profile-directory=...`), which needs the permission nativeMessaging, and Beethoven's CLAUDE.md forbids it since 16.0.0 removed the bridge that used it. Chrome's own Open link as, on a link's right-click menu, does it natively: it opens the link in the chosen profile's window, or a new window of that profile, and Chrome lists it once it has a second profile.
+- So the Grid tab asks which grid account this Chrome profile is signed in to, kept in the profile's own localStorage as Beethoven's Settings keeps the same answer, opens a worker on that account with a plain press, and for a worker on another account says to right-click and choose Open link as, a plain press showing that instead of opening claude.ai on the wrong account (openspineconsortium.github.io#143). One-click switching would need that native helper, kept outside Beethoven; it was offered to the owner and not built.
+
+## Several repositories at once
+
+The panel kept one repository at a time behind a select. Every listed repository is now a tab, and the first tab, All, reads each one's open issues and running workers runs and sets them side by side (the same pull request).
