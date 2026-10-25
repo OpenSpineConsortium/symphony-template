@@ -18,3 +18,7 @@ The organization variable CWS_ON_PUSH is publish for every repository since 2026
 4. From then on every push to main uploads and submits. Every submission is reviewed again; "Cancel review" in the dashboard withdraws one.
 
 Not checked from the container: whether https://openspineconsortium.com/symphony/privacy.html answers 200 (the site is blocked here), and whether CWS_ITEM_ID is in fact an organization secret (the proxy refuses the secrets API).
+
+## The listing on the site (2026-10-24)
+
+The thread "Add Chrome Web Store badge to Symphony card", 2026-10-24. The listing exists: the site's tools/build_site.py sets SYMPHONY_STORE_URL to https://chromewebstore.google.com/detail/symphony/hfljomhibljegapnfiglenfolnmpopoi, and /symphony/ shows the store badge and an "Open it on the Chrome Web Store" button from it. The home page's products section had the badge on Beethoven's card only, because that card is plain markup in tools/pages/index/body.html with no build marker; openspineconsortium.github.io pull request 141 adds the same badge to the Symphony card, in the same place, so both cards' rows stay level. A change of the listing's address is therefore made in two places: SYMPHONY_STORE_URL, and the home card in tools/pages/index/body.html.

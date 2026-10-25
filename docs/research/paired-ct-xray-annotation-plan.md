@@ -95,4 +95,29 @@ The counts are the owner's. What the numbers say: 30 verified cases give about p
 
 - The word and count for the automatic pass on the tier A spine CTs (149 + 692 + 6 + 1 = 848 CTs, or a smaller first batch such as C-ArmLSpine's 149).
 - The non-commercial licence decision for LUMOS (CC BY-NC 4.0, as COBRA and DeepFluoro already are), then the word and count for its fetch (46.4 GB) and, after #170's fetch, the unzip check.
-- How many C-ArmLSpine cases the owner and Dr Tech read before the talk on 2 November, and whether a third reader is named.
+- How many C-ArmLSpine cases the owner and Dr Tech read before the talk on 2 November, and whether a third reader is named: none, and no third reader (section 10).
+
+## 8. Update, 2026-10-23 09:30 UTC: both of the owner's yeses were already done on the grid
+
+The owner said yes at 09:25 UTC to the automatic pass on C-ArmLSpine's 149 CBCTs and to LUMOS's non-commercial licence and fetch. The status word at 09:29 UTC (job schwingnet-status, the branch grid's logs/job-schwingnet-status.json) and the scripts that wrote the data show that neither needs a new grid job:
+
+- C-ArmLSpine's TotalSegmentator pass exists. spinesurg-ct-nnunet's slurm/carmlspine_seg.sh (branch L6_Class, bf1432f) ran TotalSegmentator over every CBCT in carmlspine/cases.csv into /rs/rs_grp_oschome/go2432/data/carmlspine/ts/<case>/, one mask per structure (vertebrae T9 to L5, the sacrum, both hips and femora) with a DONE marker, and SPINEPS's masks sit beside them in carmlspine/spineps/. These are the two labellers whose agreement gives the 814 of 910 bodies. The sample index counts 2,981 NIfTI files under carmlspine and carmlspine_sweeps. The script skips any case that already has a DONE marker, so sending it again would change nothing. The silver layer of section 4 is therefore these files. The next step is the owner's correction in ITK-SNAP, starting with the first five cases timed.
+- COBRA has the same pair of labellers in /rs/rs_grp_oschome/go2432/data/cobra2026/seg (slurm/realxray_cobra_compare.sh, TotalSegmentator against SPINEPS on every deformed planning CT, into seg/levels.json).
+- LUMOS is on the grid. The status lists 77 GB under /rs/rs_grp_oschome/go2432/data/zenodo_lumos, fetched by the platform chain (grid/run-platform-fetch.sh's open list). The Zenodo record states 46.4 GB of zips, so the extra 31 GB is presumably what has been unpacked; nobody has checked that yet. The gate's fetch word would refuse zenodo_lumos anyway, since it takes only the X-ray list and the gated and owner-named platform sources. Nothing has segmented LUMOS's 280 CTs yet, so that pass is the one new grid job LUMOS needs, after its pair key (spine-datasets #207).
+
+## 9. Update, 2026-10-24 08:12 UTC: the owner's yes to all four items
+
+The thread "Finish paired CT/X-ray datasets" asked the owner for four words (symphony-template #444's handoff) and the owner answered "yes to all". What each yes started:
+
+- The compute-node probe (lab-volume-room.md, finding 4 of #191): no gate word ran on a compute node, so SchwingNet #209 adds the word nodequota, with hpcworker #42 and this repository's grid-accounts.sh passing it on. It sends one batch job.
+- The automatic pass on C-ArmLSpine's 149 CBCTs and LUMOS's licence and fetch: section 8 already found both done on the grid on 2026-10-23, so neither sends a job. The status word of 2026-10-24 08:13 UTC still lists zenodo_lumos at 77 GB. LUMOS's licence, CC BY-NC 4.0, is now accepted for this work as COBRA's and DeepFluoro's are.
+- Section 7's reading plan: the yes covers starting the correction of the silver masks in ITK-SNAP, beginning with the first five C-ArmLSpine cases, timed. How many cases the owner and Dr Tech read before 2 November, and whether a third reader is named, are numbers and a name the owner has not given yet.
+
+## 10. Update, 2026-10-25 03:27 UTC: no readers before the talk
+
+Asked how many cases the owner and Dr Tech read before 2 November and whether a third reader is named, the owner answered "no readers". So nobody reads a case before the talk and no third reader is named. What follows from the rules above:
+
+- Every mask stays silver (section 6): the automatic pass and its two labellers' agreement, unread. Silver may train, and is never reported as truth.
+- No gold layer exists before the talk, so no number shown on 2 November rests on these masks, and no two-reader agreement is reported.
+- The correction in ITK-SNAP that section 9's yes allowed is not started before the talk; the first five timed cases wait until the owner says to begin.
+- Section 5's roles stand for after the talk, unchanged, until the owner says otherwise.

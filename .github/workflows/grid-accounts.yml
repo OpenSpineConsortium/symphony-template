@@ -18,17 +18,22 @@
 # #23): update, which brings the gate's own clone to hpcworker's main; artifacts, which keeps the
 # artifacts/ folders of this repository and SchwingNet in the owner's ~/claude-artifacts on the grid
 # (artifacts-grid.yml); the spine-datasets promoter's status, start, stop and restart (hpcworker #31);
+# the freeze of the sets already on the grid, freeze-status, -pilot, -start, -report and -overlap (hpcworker #37, #39 and #43);
+# the planning of a merged spine-datasets storage request, storage-apply-<stamp>, -status and -report, and storage-retire-<stamp>, which deletes only what a reported plan listed, pressed by the owner (hpcworker #44), and storage-survey, one read-only job that sizes the lab volume by folder (hpcworker #46);
 # and SchwingNet's own grid/gate.sh words at its main (start, status, leaks,
 # v1, latency, stop, fetch-<id>), so a session runs them in the owner's place (his choice of 2026-10-21); the answer is logs/job-<job>.json.
+# The action key sends one of the owner's service keys, an environment secret of grid picked by the
+# input name, to the gate's word key (hpcworker #36), which writes it to its file on the grid; the
+# key is masked and goes only over ssh's standard input (docs/setup/grid.md, "Service keys").
 name: Grid accounts
-run-name: "Grid accounts: ${{ inputs.action }} ${{ inputs.slot }}${{ inputs.job }} (${{ inputs.request }})"
+run-name: "Grid accounts: ${{ inputs.action }} ${{ inputs.slot }}${{ inputs.job }}${{ inputs.action == 'key' && inputs.name || '' }} (${{ inputs.request }})"
 on:
   workflow_dispatch:
     inputs:
       action:
         description: What to do with the grid's Claude accounts
         type: choice
-        options: [list, use, login, code, usage, auto-on, auto-off, forget, worker-start, worker-stop, log, job]
+        options: [list, use, login, code, usage, auto-on, auto-off, forget, worker-start, worker-stop, log, job, key]
         default: list
       slot:
         description: The account, 1 to 32 (use, login, code, forget, worker-start; log, for its sign-in's output)
@@ -39,7 +44,7 @@ on:
         required: false
         default: ""
       name:
-        description: The worker's name (worker-start, optional; worker-stop; log, for its output)
+        description: "The worker's name (worker-start, optional; worker-stop; log, for its output); for key, which key: kaggle, hf, zenodo, redivis, wandb, physionet or ratic"
         required: false
         default: ""
       count:
@@ -51,7 +56,7 @@ on:
         required: false
         default: ""
       job:
-        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples, or schwingnet-fetch-<id>, schwingnet-census-<id> or schwingnet-cancel-<job>"
+        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, freeze-status|pilot|start|report|overlap, storage-status|report|survey, storage-apply-<request stamp>, storage-retire-<request stamp>, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples|nodequota|folders, or schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id>, schwingnet-dropzip-<id>, schwingnet-unpack-<id>, schwingnet-experiment-<issue>, schwingnet-sweep-<plan>, schwingnet-bank-<id>, schwingnet-bench-<name> or schwingnet-cancel-<job>"
         required: false
         default: ""
       request:
@@ -96,6 +101,18 @@ jobs:
           PANEL_KEY: ${{ inputs.key }}
           REQUEST: ${{ inputs.request }}
           KEY: ${{ secrets.GRID_GATE_KEY }}
+          # the action key's one secret, picked by its name, so the step never holds the other keys
+          KEY_VALUE: >-
+            ${{ inputs.action == 'key' && (
+                inputs.name == 'kaggle' && secrets.KAGGLE_API_TOKEN ||
+                inputs.name == 'hf' && secrets.HF_TOKEN ||
+                inputs.name == 'zenodo' && secrets.ZENODO_TOKEN ||
+                inputs.name == 'redivis' && secrets.REDIVIS_API_TOKEN ||
+                inputs.name == 'wandb' && secrets.WANDB_API_KEY ||
+                inputs.name == 'ratic' && secrets.RATIC_LINK ||
+                inputs.name == 'physionet' && secrets.PHYSIONET_USERNAME && secrets.PHYSIONET_PASSWORD
+                  && format('{0} {1}', secrets.PHYSIONET_USERNAME, secrets.PHYSIONET_PASSWORD) ||
+                '') || '' }}
           ACCESS_ID: ${{ vars.GRID_ACCESS_ID }}
           HOST_KEY: ${{ vars.GRID_HOST_KEY }}
           HOST: grid.wayne.edu
