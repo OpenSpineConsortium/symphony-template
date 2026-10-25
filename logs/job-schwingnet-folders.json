@@ -1,12 +1,17 @@
 {
- "at": "2026-10-25T05:53:40Z",
+ "at": "2026-10-25T06:14:55Z",
  "lines": [
-  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+  "HPCW-GRID-GATE schwingnet pull ok 1f34a85945bb..2774384ca060",
+  "schwingnet folders at commit 2774384 on warrior 2026-10-25 06:14:55 UTC",
+  "refusing: the environments are not ready; 'start' makes them first",
+  "schwingnet folders: exit 75",
+  "HPCW-GRID-GATE schwingnet folders failed 75"
  ],
- "rc": 126,
+ "rc": 75,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+  "HPCW-GRID-GATE schwingnet pull ok 1f34a85945bb..2774384ca060",
+  "HPCW-GRID-GATE schwingnet folders failed 75"
  ],
  "v": 1,
  "what": "schwingnet folders"
