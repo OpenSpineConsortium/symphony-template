@@ -1,0 +1,19 @@
+{
+ "at": "2026-10-25T23:42:27Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current bd6fdaba5874",
+  "schwingnet anomaly select at commit bd6fdab on warrior 2026-10-25 23:42:26 UTC",
+  "  anomaly_select: job 40785048",
+  "submitted the anomaly stage select. Send anomaly select again once it ends to read its report, logs/ANOMALY-select.md.",
+  "schwingnet anomaly: exit 0",
+  "HPCW-GRID-GATE schwingnet anomaly ok"
+ ],
+ "rc": 0,
+ "request": "anomaly-select-2344",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current bd6fdaba5874",
+  "HPCW-GRID-GATE schwingnet anomaly ok"
+ ],
+ "v": 1,
+ "what": "schwingnet anomaly select"
+}
