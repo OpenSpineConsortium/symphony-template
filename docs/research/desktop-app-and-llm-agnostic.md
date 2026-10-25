@@ -39,8 +39,8 @@ asked.
   worker's runtime (Claude Code, its hooks and skills, claude-code-action). The plan puts a small
   runner interface between Symphony and the agent, keeps Claude Code first, and adds others behind
   it (LLM-agnostic, below).
-- Two things are the owner's before anything is built: the terms question on shipping an app that
-  runs on people's Claude subscriptions, and code signing (Decisions for the owner).
+- The terms question on offering a claude.ai sign-in is settled by the owner's written permission
+  from Anthropic (Decisions for the owner, 1); code signing is still the owner's to decide.
 
 ## Flag for the owner: where credentials live
 
@@ -223,13 +223,15 @@ in symphony-protocol and the template.
 
 ## Decisions for the owner
 
-1. The terms question, first. Anthropic's Agent SDK documentation says, as the author recalls it,
-   that unless previously approved, third-party developers may not offer claude.ai sign-in or
-   rate limits for their products, agents built on the SDK included (to verify). An app the owner
-   uses alone on the owner's own accounts is the owner's call, as with the orchestrator of
-   2026-10-13. An app shipped to others is safest if it drives each person's own installed Claude
-   Code, which they sign in to themselves, and never offers a Claude sign-in of its own; asking
-   Anthropic for approval is the other route.
+1. The terms question, settled by the owner. Anthropic's Agent SDK documentation says, as the
+   author recalls it, that unless previously approved, third-party developers may not offer
+   claude.ai sign-in or rate limits for their products, agents built on the SDK included. The owner
+   said on 2026-10-25 at 11:36 UTC that an Anthropic representative gave the owner written permission for
+   any of the owner's third-party apps to offer a claude.ai sign-in without further approval, given the
+   nature of the owner's research. The session has not seen that writing; it should be kept with the
+   project's records, outside git if it is private, so the permission can be shown when the app is
+   published. On that permission the app may offer its own claude.ai sign-in; driving each person's
+   installed Claude Code stays the default where it is simpler.
 2. Electron (recommended) or Tauri.
 3. Code signing: an Apple Developer membership for notarising the Mac build, and a Windows
    code-signing certificate, both paid each year; unsigned builds warn on every install.
