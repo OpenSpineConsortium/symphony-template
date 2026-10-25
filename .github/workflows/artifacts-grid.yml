@@ -1,0 +1,64 @@
+# The owner's claude.ai artifacts on the grid, so a session on any of his Claude accounts works on them
+# there (the owner's ask of 2026-10-22). They are kept as files in artifacts/ here and in
+# OpenSpineConsortium/SchwingNet (.claude/skills/export-artifacts); the grid gate's job word artifacts
+# (OpenSpineConsortium/hpcworker, tools/grid_gate.sh) fast-forwards a partial clone of each, with only
+# artifacts/ checked out, in ~/claude-artifacts under the owner's grid home, 0700, where every account's
+# worker reads them. It runs on every merge here that changes artifacts/, every six hours for
+# SchwingNet's merges, which no event here sees, and by hand; the export skill starts it after a
+# SchwingNet merge. Where the gate refuses artifacts as a word it does not know, its clone predates the
+# word: the run says update, which brings that clone to hpcworker's main, and asks again; any other
+# failure fails the run as it came. The word is fixed, with no input of anyone's, so the run needs no
+# admin check; the answer goes to the branch grid as logs/job-artifacts.json, as grid-accounts.yml
+# writes it, with the folder counts and commits only. It runs only in this repository, never in a copy
+# made from the template or a fork, and only while the repository is private, since a public
+# repository's run logs are public.
+name: Artifacts to the grid
+on:
+  push:
+    branches: [main]
+    paths: ["artifacts/**"]
+  schedule:
+    - cron: "41 */6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: artifacts-grid
+  cancel-in-progress: false
+jobs:
+  artifacts:
+    if: >-
+      github.repository == 'OpenSpineConsortium/symphony-template'
+      && github.event.repository.private == true && github.event.repository.fork == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: grid
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: the word artifacts, through the grid's gate
+        env:
+          ACTION: job
+          JOB: artifacts
+          SLOT: ""
+          NAME: ""
+          COUNT: "1"
+          CODE: ""
+          PANEL_KEY: ""
+          REQUEST: artifacts-grid
+          KEY: ${{ secrets.GRID_GATE_KEY }}
+          ACCESS_ID: ${{ vars.GRID_ACCESS_ID }}
+          HOST_KEY: ${{ vars.GRID_HOST_KEY }}
+          HOST: grid.wayne.edu
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          said="$RUNNER_TEMP/said"
+          rc=0; bash scripts/grid-accounts.sh > "$said" || rc=$?
+          cat "$said"
+          [ "$rc" != 0 ] || exit 0
+          grep -q '^HPCW-GRID-GATE refused word' "$said" || exit "$rc"
+          echo "::notice::the gate's clone predates the word artifacts; bringing it to hpcworker's main and asking again"
+          JOB=update bash scripts/grid-accounts.sh
+          bash scripts/grid-accounts.sh
