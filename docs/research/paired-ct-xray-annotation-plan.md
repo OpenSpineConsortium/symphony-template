@@ -95,7 +95,7 @@ The counts are the owner's. What the numbers say: 30 verified cases give about p
 
 - The word and count for the automatic pass on the tier A spine CTs (149 + 692 + 6 + 1 = 848 CTs, or a smaller first batch such as C-ArmLSpine's 149).
 - The non-commercial licence decision for LUMOS (CC BY-NC 4.0, as COBRA and DeepFluoro already are), then the word and count for its fetch (46.4 GB) and, after #170's fetch, the unzip check.
-- How many C-ArmLSpine cases the owner and Dr Tech read before the talk on 2 November, and whether a third reader is named.
+- How many C-ArmLSpine cases the owner and Dr Tech read before the talk on 2 November, and whether a third reader is named: none, and no third reader (section 10).
 
 ## 8. Update, 2026-10-23 09:30 UTC: both of the owner's yeses were already done on the grid
 
@@ -112,3 +112,12 @@ The thread "Finish paired CT/X-ray datasets" asked the owner for four words (sym
 - The compute-node probe (lab-volume-room.md, finding 4 of #191): no gate word ran on a compute node, so SchwingNet #209 adds the word nodequota, with hpcworker #42 and this repository's grid-accounts.sh passing it on. It sends one batch job.
 - The automatic pass on C-ArmLSpine's 149 CBCTs and LUMOS's licence and fetch: section 8 already found both done on the grid on 2026-10-23, so neither sends a job. The status word of 2026-10-24 08:13 UTC still lists zenodo_lumos at 77 GB. LUMOS's licence, CC BY-NC 4.0, is now accepted for this work as COBRA's and DeepFluoro's are.
 - Section 7's reading plan: the yes covers starting the correction of the silver masks in ITK-SNAP, beginning with the first five C-ArmLSpine cases, timed. How many cases the owner and Dr Tech read before 2 November, and whether a third reader is named, are numbers and a name the owner has not given yet.
+
+## 10. Update, 2026-10-25 03:27 UTC: no readers before the talk
+
+Asked how many cases the owner and Dr Tech read before 2 November and whether a third reader is named, the owner answered "no readers". So nobody reads a case before the talk and no third reader is named. What follows from the rules above:
+
+- Every mask stays silver (section 6): the automatic pass and its two labellers' agreement, unread. Silver may train, and is never reported as truth.
+- No gold layer exists before the talk, so no number shown on 2 November rests on these masks, and no two-reader agreement is reported.
+- The correction in ITK-SNAP that section 9's yes allowed is not started before the talk; the first five timed cases wait until the owner says to begin.
+- Section 5's roles stand for after the talk, unchanged, until the owner says otherwise.
