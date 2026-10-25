@@ -18,8 +18,10 @@ Decisions for the owner, 1).
   https://platform.claude.com/oauth/code/callback, and hands it to the
   machine that asked. `claude auth login --console` makes the Console key
   the same way, with Claude Code creating the key itself.
-- A value no sign-in can make, such as the Elsevier key and token, is an
-  encrypted GitHub secret under secret scanning and push protection,
+- A value no sign-in can make, such as the Elsevier key and token
+  (ELSEVIER_API_KEY and ELSEVIER_INSTTOKEN, named by the owner on
+  2026-10-25 and sent as Elsevier's headers X-ELS-APIKey and X-ELS-Insttoken),
+  is an encrypted GitHub secret under secret scanning and push protection,
   carried to the grid by the key route
   (docs/research/service-keys-to-the-grid.md); never in git, an issue, a
   log, a URL or browser code.
