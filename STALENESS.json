@@ -1,7 +1,7 @@
 {
  "default_branch": "main",
  "format": 1,
- "generated_at": "2026-10-25T09:53:27Z",
+ "generated_at": "2026-10-25T10:29:45Z",
  "pulls": [
   {
    "auto_merge_enabled": null,
@@ -14218,6 +14218,43 @@
    "runs_cancelled": 0,
    "stale_seconds": 0,
    "started": "2026-10-25T09:47:45Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
+   "branch": "claude/project-thread-lvz8qc",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "3fc1e7fe85ca00e603c05d70bc4c6b36af15544e",
+     [
+      466
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 401,
+   "check_seconds_redone": 203,
+   "claim": false,
+   "closed": "2026-10-25T10:29:09Z",
+   "commits": 3,
+   "first_green": "2026-10-25T10:26:02Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 1,
+   "merged": "2026-10-25T10:29:09Z",
+   "number": 467,
+   "opened": "2026-10-25T09:49:07Z",
+   "ready": "2026-10-25T10:11:45Z",
+   "reruns": 0,
+   "runs_cancelled": 0,
+   "stale_seconds": 0,
+   "started": "2026-10-25T09:48:56Z"
   }
  ],
  "repository": "OpenSpineConsortium/symphony-template",
@@ -14387,36 +14424,36 @@
     "with_catch_up": 0
    },
    "2026-10-25": {
-    "catch_ups": 0,
-    "check_runs": 6,
-    "check_runs_redone": 0,
-    "merged": 6,
-    "share_with_catch_up": 0.0,
+    "catch_ups": 1,
+    "check_runs": 8,
+    "check_runs_redone": 1,
+    "merged": 7,
+    "share_with_catch_up": 0.143,
     "stale_after_green": 0,
     "stale_hours": 0.0,
-    "with_catch_up": 0
+    "with_catch_up": 1
    }
   },
   "by_parallel_work": {
    "0": {
     "catch_ups": 5,
-    "check_runs": 104,
+    "check_runs": 103,
     "check_runs_redone": 4,
-    "merged": 92,
-    "share_with_catch_up": 0.054,
+    "merged": 91,
+    "share_with_catch_up": 0.055,
     "stale_after_green": 0,
     "stale_hours": 0.0,
     "with_catch_up": 5
    },
    "1-2": {
-    "catch_ups": 35,
-    "check_runs": 172,
-    "check_runs_redone": 29,
-    "merged": 127,
-    "share_with_catch_up": 0.244,
+    "catch_ups": 36,
+    "check_runs": 175,
+    "check_runs_redone": 30,
+    "merged": 129,
+    "share_with_catch_up": 0.248,
     "stale_after_green": 17,
     "stale_hours": 8.68,
-    "with_catch_up": 31
+    "with_catch_up": 32
    },
    "11+": {
     "catch_ups": 20,
@@ -14461,23 +14498,23 @@
     "with_catch_up": 3
    },
    "no_claim": {
-    "catch_ups": 242,
-    "check_runs": 662,
-    "check_runs_redone": 201,
-    "merged": 398,
-    "share_with_catch_up": 0.377,
+    "catch_ups": 243,
+    "check_runs": 664,
+    "check_runs_redone": 202,
+    "merged": 399,
+    "share_with_catch_up": 0.378,
     "stale_after_green": 95,
     "stale_hours": 93.79,
-    "with_catch_up": 150
+    "with_catch_up": 151
    }
   },
-  "catch_ups": 247,
+  "catch_ups": 248,
   "catch_ups_by_button": 18,
   "catch_ups_max": 6,
-  "check_hours": 36.89,
-  "check_hours_redone": 10.88,
-  "check_runs": 712,
-  "check_runs_redone": 203,
+  "check_hours": 37.0,
+  "check_hours_redone": 10.94,
+  "check_runs": 714,
+  "check_runs_redone": 204,
   "closed_unmerged": 3,
   "closed_unmerged_branch_landed_later": 2,
   "default_branch_checks": {
@@ -14532,25 +14569,25 @@
     "success": 21
    },
    "2026-10-25": {
-    "success": 5
+    "success": 6
    }
   },
   "force_pushes": 32,
   "landings_after_green_total": 210,
   "landings_during_life_mean": 1.56,
-  "landings_during_life_median": 0.5,
+  "landings_during_life_median": 1,
   "live": {
    "pulls_seen": 57,
    "pulls_seen_behind": 0,
    "pulls_seen_dirty": 9,
    "since": "2026-10-20T21:50:52Z",
-   "snapshots": 144
+   "snapshots": 145
   },
-  "merged": 408,
+  "merged": 409,
   "reruns": 6,
-  "share_runs_redone": 0.285,
-  "share_stale_after_green": 0.233,
-  "share_with_catch_up": 0.375,
+  "share_runs_redone": 0.286,
+  "share_stale_after_green": 0.232,
+  "share_with_catch_up": 0.377,
   "stale_after_green": 95,
   "stale_hours_total": 93.79,
   "stale_minutes_median": 14.6,
@@ -14659,7 +14696,7 @@
    }
   ],
   "with_board_conflict": 0,
-  "with_catch_up": 153
+  "with_catch_up": 154
  },
  "unread": 0,
  "workflow": "ci.yml"
