@@ -31,7 +31,9 @@ its references with no connector, key or account of its own. Each reference
 keeps its kind (article, book, chapter, paper, thesis, report, web page,
 dataset), its venue, volume, issue, pages and publisher, so the bibliography
 Word or Zotero builds from it is whole, and an organization's name written
-in braces, {World Health Organization}, stays one name.
+in braces, {World Health Organization}, stays one name. Exported again, the library keeps every key the
+earlier references.json gave the same work, matched by DOI or by title and
+year, so the citations already written still find their references.
 
 A notebook names a person's files: its repository is private, and a proposal
 lives only on a private repository's branch drive-catalog. Standard library
@@ -42,6 +44,7 @@ import argparse
 import json
 import re
 import sys
+import unicodedata
 from collections import Counter
 from pathlib import Path
 
@@ -202,6 +205,11 @@ BIB_START = re.compile(r"@(\w+)\s*([{(])")
 BIB_NAME = re.compile(r"\s*(\w[\w-]*)\s*=\s*")
 RIS_LINE = re.compile(r"^([A-Z][A-Z0-9])  - ?(.*)$")
 ACCENT = re.compile(r"\{?\\[\"'`^~=.]\{?(\w)\}?\}?")
+# What Mendeley Desktop and others escape in a field: & % $ # _ { } and a
+# lone tilde, written \& or {\_} or \~{}, which a DOI or a link must lose.
+ESCAPED = re.compile(r"\\([&%$#_{}])")
+LONE_TILDE = re.compile(r"\\~\{\}|\{\\textasciitilde\}|\\textasciitilde\{\}")
+DOI_PREFIX = re.compile(r"^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)", re.I)
 
 
 def closing(text, start, opener):
@@ -257,8 +265,11 @@ def bib_fields(body, raw=()):
 
 
 def unbraced(value):
-    value = ACCENT.sub(r"\1", value)
-    return " ".join(value.replace("{", "").replace("}", "").split())
+    value = LONE_TILDE.sub("~", value.replace("$\\backslash$", "\\"))
+    value = ESCAPED.sub(lambda match: {"{": "\x01", "}": "\x02"}.get(match.group(1), match.group(1)),
+                        ACCENT.sub(r"\1", value))
+    value = value.replace("{", "").replace("}", "").replace("\x01", "{").replace("\x02", "}")
+    return " ".join(value.split())
 
 
 def bibtex(text):
@@ -320,7 +331,7 @@ def ris(text):
                                         kind=entry["kind"], volume=entry.get("VL"), issue=entry.get("IS"),
                                         pages=pages, publisher=entry.get("PB")))
             entry = None
-        elif tag in ("AU", "A1"):
+        elif tag in ("AU", "A1") and value.strip():
             entry["authors"].append(value.strip())
         else:
             entry.setdefault({"T1": "TI", "Y1": "PY", "DA": "PY", "T2": "JO", "JF": "JO", "J2": "JO"}.get(tag, tag),
@@ -336,7 +347,7 @@ def reference(key, title, authors, year, doi, venue, url=None, uri="", kind="doc
     report, webpage, dataset, document), which Word and Zotero style by."""
     year = re.search(r"\d{4}", str(year or ""))
     return {"key": key or "", "title": title or "", "authors": authors, "year": year.group() if year else "",
-            "doi": (doi or "").strip().lower(), "venue": venue or "", "url": (url or "").strip(), "uri": uri,
+            "doi": DOI_PREFIX.sub("", (doi or "").strip()).lower(), "venue": venue or "", "url": (url or "").strip(), "uri": uri,
             "type": kind if kind in KINDS else "document", "volume": str(volume or "").strip(),
             "issue": str(issue or "").strip(), "pages": re.sub(r"\s*-+\s*", "-", str(pages or "").strip()),
             "publisher": str(publisher or "").strip()}
@@ -442,12 +453,83 @@ def read_references(path):
         found = ris(text) if re.search(r"^TY  - ", text, re.M) else bibtex(text)
     if text.strip() and not found:
         raise NotebookError(f"{path} holds no BibTeX, RIS or CSL JSON reference")
-    for number, entry in enumerate(found, 1):
-        entry["key"] = entry["key"] or f"ref{number}"
+    keyed(found)
     return found
 
 
+def keyed(found, previous=()):
+    """Give every reference a key no other one has, and the key it had in
+    the previous references.json where it is the same work, so citations
+    written from an earlier export still find it after the library is
+    exported again. Returns how many kept an earlier key."""
+    earlier = {}
+    for entry in previous:
+        if isinstance(entry, dict) and entry.get("key"):
+            for mark in identities(entry):
+                earlier.setdefault(mark, entry["key"])
+    used, fresh = set(), set()
+    for entry in found:
+        carried = next((earlier[mark] for mark in identities(entry)
+                        if mark in earlier and earlier[mark] not in used), None)
+        if carried:
+            entry["key"] = carried
+            used.add(carried)
+        else:
+            fresh.add(id(entry))
+    reserved = used | {entry["key"] for entry in found if id(entry) in fresh and entry["key"]}
+    for number, entry in enumerate(found, 1):
+        if id(entry) in fresh:
+            entry["key"] = unique(entry["key"] or author_year(entry, number), used, reserved)
+            used.add(entry["key"])
+    return len(found) - len(fresh)
+
+
+def unique(key, used, reserved):
+    """key, or key with a, b, ... after it as citation managers do, where
+    another reference already took it."""
+    if key not in used:
+        return key
+    for suffix in (chr(code) for code in range(ord("a"), ord("z") + 1)):
+        if key + suffix not in used and key + suffix not in reserved:
+            return key + suffix
+    number = 2
+    while f"{key}-{number}" in used:
+        number += 1
+    return f"{key}-{number}"
+
+
+def identities(entry):
+    """What says two records are the same work: the DOI, else the title
+    with its year, letters and digits alone."""
+    marks = []
+    if entry.get("doi"):
+        marks.append("doi:" + entry["doi"])
+    title = re.sub(r"[^a-z0-9]", "", str(entry.get("title", "")).lower())
+    if title:
+        marks.append(f"title:{title}:{entry.get('year', '')}")
+    return marks
+
+
+def author_year(entry, number):
+    """A key in the form citation managers write, Smith2021, for a record
+    whose export gave none, as Mendeley's RIS does not."""
+    authors = entry.get("authors") or [""]
+    surname = authors[0].split(",")[0].split()[-1] if authors[0].strip() else ""
+    surname = re.sub(r"[^A-Za-z]", "", unicodedata.normalize("NFKD", surname))
+    return surname + entry.get("year", "") if surname and entry.get("year") else f"ref{number}"
+
+
 # The command line
+
+def previous_references(path):
+    """The references.json an earlier refs wrote, whose keys the new one
+    keeps; nothing where there is none or it cannot be read."""
+    try:
+        found = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return found if isinstance(found, list) else []
+
 
 def load(path):
     try:
@@ -484,8 +566,9 @@ def main(argv=None):
 def run(args):
     if args.command == "refs":
         found = zotero(load(args.zotero), args.library) if args.zotero else read_references(args.export)
+        kept = keyed(found, previous_references(args.out))
         Path(args.out).write_text(json.dumps(found, indent=1, ensure_ascii=True) + "\n", encoding="utf-8")
-        return {"references": len(found), "with_doi": sum(1 for each in found if each["doi"])}
+        return {"references": len(found), "with_doi": sum(1 for each in found if each["doi"]), "kept_keys": kept}
     made = load(args.catalog)
     proposal = checked(load(args.notebooks), made)
     known = files_by_path(made)

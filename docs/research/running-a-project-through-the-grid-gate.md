@@ -89,6 +89,17 @@ split-check a catalog, and train and score a first model run on a GPU node.
   schwingnet-status and comparing the line. Once it ends: sha256sum -c against the set's
   SHA256SUMS, the bank and catalog run on their own, and spine-datasets records the set fetched.
   Never resend the fetch while the job runs.
+- The second reading settled it: 356 MB at 02:05 UTC on 2026-10-23, about 22 MB an hour, two
+  months for the rest against four days of wall time, with twenty of the gate's jobs queued and
+  the gated CT fetches waiting afterany on it. The only cancelling word, stop, would have taken all
+  twenty, so the gate gained cancel <job>: one of its own live jobs with every live job recorded
+  under the same word, a fetch with its bank and catalog, so a part-fetched set is never banked
+  (SchwingNet #148, #149; the word passes through hpcworker's gate, hpcworker #35, and
+  grid-accounts.sh here, #398, after an update word refreshes the gate's clone). At 03:51 UTC
+  schwingnet-cancel-40704982 cancelled jobs 40704982, 40704984 and 40704986 and nothing else. The
+  raw folder keeps what landed, and the fetch resumes partial files. Not done: a faster route, such
+  as parallel downloads of the file list or another PhysioNet route; resending the same fetch would
+  hold the queue the same way (spine-datasets #17).
 
 ## The protocol check and a moving default branch
 
