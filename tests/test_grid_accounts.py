@@ -166,6 +166,7 @@ class Words(unittest.TestCase):
                           ("schwingnet-fetch-vindr_pcxr", "schwingnet fetch vindr_pcxr"),
                           ("schwingnet-prior", "schwingnet prior"), ("schwingnet-chain_eval", "schwingnet chain_eval"),
                           ("schwingnet-census-all", "schwingnet census all"), ("schwingnet-samples", "schwingnet samples"), ("schwingnet-nodequota", "schwingnet nodequota"),
+                          ("schwingnet-folders", "schwingnet folders"),
                           ("schwingnet-explore-kaggle_scoliosis_yolov5", "schwingnet explore kaggle_scoliosis_yolov5"),
                           ("schwingnet-dropzip-rsna_rspect_pe", "schwingnet dropzip rsna_rspect_pe"),
                           ("schwingnet-unpack-rsna_rspect_pe", "schwingnet unpack rsna_rspect_pe"),
@@ -176,7 +177,7 @@ class Words(unittest.TestCase):
                           ("schwingnet-cancel-40704982", "schwingnet cancel 40704982")):
             self.assertEqual(self.run_script("job", job=job)[1], [word, "accounts"], job)
         for job in ("", "update now", "artifacts-now", "artifacts now", "promoter start abc", "promoter-restart-now", "promoter restart", "freeze-stop", "freeze-start-4", "freeze-report-now", "freeze-overlap-now", "freeze-pilot-amos22", "storage-apply", "storage-apply-x", "storage-apply-20261024T210000Z-1", "storage-retire", "storage-retire-x", "storage-delete-20261024T210000Z", "storage-survey-x", "storage survey", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
-                    "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-explore-", "schwingnet-explore-Bad", "schwingnet-dropzip-", "schwingnet-dropzip-a-b", "schwingnet-unpack-", "schwingnet-unpack-a-b", "schwingnet-experiment-", "schwingnet-experiment-1-2", "schwingnet-sweep-", "schwingnet-sweep-two-source", "schwingnet-sweep-Real", "schwingnet-bank-", "schwingnet-bank-a-b", "schwingnet-bank-VinDr", "schwingnet-bank-a/b", "schwingnet-bench-", "schwingnet-bench-FleXray", "schwingnet-bench-a b", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-nodequota-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
+                    "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-explore-", "schwingnet-explore-Bad", "schwingnet-dropzip-", "schwingnet-dropzip-a-b", "schwingnet-unpack-", "schwingnet-unpack-a-b", "schwingnet-experiment-", "schwingnet-experiment-1-2", "schwingnet-sweep-", "schwingnet-sweep-two-source", "schwingnet-sweep-Real", "schwingnet-bank-", "schwingnet-bank-a-b", "schwingnet-bank-VinDr", "schwingnet-bank-a/b", "schwingnet-bench-", "schwingnet-bench-FleXray", "schwingnet-bench-a b", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-nodequota-x", "schwingnet-folders-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
             rc, words, _ = self.run_script("job", job=job)
             self.assertNotEqual(rc, 0, job)
             self.assertEqual(words, [], job)
