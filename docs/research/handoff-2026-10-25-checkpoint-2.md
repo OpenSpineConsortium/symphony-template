@@ -14,7 +14,7 @@ This page is the entry point for the evening's work. The goal itself is unchange
 
 ## 2. The threads at the checkpoint
 
-Four threads still have work; three are done.
+Three threads still have work; four are done.
 
 ### Plan the FleXray audit for #391 (this thread): open
 
