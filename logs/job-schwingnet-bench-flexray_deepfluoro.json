@@ -1,17 +1,20 @@
 {
- "at": "2026-10-25T11:48:42Z",
+ "at": "2026-10-25T13:14:37Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 26e7e7bf2132",
-  "schwingnet bench flexray_deepfluoro at commit 26e7e7b on warrior 2026-10-25 11:48:42 UTC",
-  "refusing: the environments are not ready; 'start' makes them first",
-  "schwingnet bench: exit 75",
-  "HPCW-GRID-GATE schwingnet bench failed 75"
+  "HPCW-GRID-GATE schwingnet pull current fc027a6c1837",
+  "schwingnet bench flexray_deepfluoro at commit fc027a6 on warrior 2026-10-25 13:14:36 UTC",
+  "  the environments: after the setup job that rebuilds them (40781568)",
+  "  the checkout: after the live runs that hold it (afterany:40781570)",
+  "  bench_flexray_deepfluoro: job 40781578",
+  "submitted the benchmark. Send bench flexray_deepfluoro again once it ends to read its report, logs/BENCH-flexray_deepfluoro.md.",
+  "schwingnet bench: exit 0",
+  "HPCW-GRID-GATE schwingnet bench ok"
  ],
- "rc": 75,
+ "rc": 0,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 26e7e7bf2132",
-  "HPCW-GRID-GATE schwingnet bench failed 75"
+  "HPCW-GRID-GATE schwingnet pull current fc027a6c1837",
+  "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "v": 1,
  "what": "schwingnet bench flexray_deepfluoro"
