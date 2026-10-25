@@ -1,13 +1,13 @@
 {
- "at": "2026-10-25T11:46:37Z",
+ "at": "2026-10-25T23:40:47Z",
  "lines": [
-  "HPCW-GRID-GATE update ok 3e23b3577cf4..16414858c6d1",
+  "HPCW-GRID-GATE update ok 16414858c6d1..9ea69bb52365",
   "HPCW-GRID-GATE framework 28"
  ],
  "rc": 0,
- "request": "",
+ "request": "anomaly-route-update-2335",
  "said": [
-  "HPCW-GRID-GATE update ok 3e23b3577cf4..16414858c6d1",
+  "HPCW-GRID-GATE update ok 16414858c6d1..9ea69bb52365",
   "HPCW-GRID-GATE framework 28"
  ],
  "v": 1,
