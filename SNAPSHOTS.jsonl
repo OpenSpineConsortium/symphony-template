@@ -171,3 +171,4 @@
 {"at": "2026-10-25T21:12:14Z", "pulls": [], "up_to_date_required": false}
 {"at": "2026-10-25T21:54:42Z", "pulls": [], "up_to_date_required": false}
 {"at": "2026-10-25T21:55:02Z", "pulls": [], "up_to_date_required": false}
+{"at": "2026-10-25T22:44:33Z", "pulls": [{"branch": "claude/project-thread-7ltron", "draft": true, "mergeable": true, "number": 493, "state": "clean"}], "up_to_date_required": false}
