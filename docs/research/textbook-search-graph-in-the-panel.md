@@ -25,3 +25,12 @@ The owner asked, the same day, what it means that the search is BM25 and not a t
 - Fine-tuning is not open to a Claude subscription, and a fine-tuned model cannot cite where a fact came from and goes stale with each edition, which is why retrieval suits a book that changes.
 - The realistic upgrade is a trained embedding model beside BM25, in the embed slot rag.py already keeps (none today). It stays empty because the project keeps no API key, a subscription token makes no embeddings, and a local model is a new dependency, which needs an issue and the owner's word, and a large download for the in-browser search.
 - The suggested order: score about 20 reworded questions first, and add an embedding block only if recall falls.
+
+## Embeddings and the Console credits
+
+The owner then asked whether about 250 API Console credits a month would pay for an embedding search to feed idea generation in Sakana's AI Scientist (the handoff of 2026-10-25, section 9).
+
+- Anthropic offers no embedding model: its Embeddings page (platform.claude.com/docs/en/build-with-claude/embeddings, read 2026-10-25) points to Voyage AI by MongoDB, whose keys come from MongoDB Atlas and bill there, so Console credits cannot buy embeddings. The cloud proxy refuses mongodb.com, so Voyage's prices were not read.
+- None is needed to start: the book is about 275,000 words in 876 sections, so the existing BM25 search costs nothing, and a small open embedding model on the owner's machine or the grid embeds it in minutes at no cost, keeping the confidential text away from a new third party before the filing.
+- The credits fit AI Scientist's own model calls instead, roughly 20 cents an idea on Sonnet 5.5 by an estimate of about 60,000 tokens read and 6,000 written per idea with its self-review rounds; using them needs an API key, which the project's rule forbids unless the owner decides otherwise (asked on a decision card in the thread).
+- AI Scientist's novelty check searches Semantic Scholar by default, which sends words about each idea to an outside service; it is off or reviewed until the filing.
