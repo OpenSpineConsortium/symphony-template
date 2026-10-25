@@ -41,7 +41,8 @@ asked.
   it (LLM-agnostic, below).
 - The terms question on offering a claude.ai sign-in is settled by the owner's written permission
   from Anthropic (Decisions for the owner, 1); Electron, unsigned builds until the app is offered
-  to anyone else, and Ollama first were decided on 2026-10-25, with phase 1 after SchwingNet #391.
+  to anyone else, and Ollama first were decided on 2026-10-25, with phase 1 after the FleXray audit of
+  SchwingNet #391.
 
 ## Flag for the owner: where credentials live
 
@@ -75,7 +76,8 @@ keeps to it, and says here where each one does live, since a desktop app makes i
   picks), run the local Claude Code in that folder (a session the app shows in a pane, or `claude
   --remote-control` so claude.ai and the phone can reach it), drop files and folders, read the
   keychain, and be the native messaging host for the extension.
-- Updates: electron-updater from the app repository's GitHub releases, signed (Decisions).
+- Updates: electron-updater from the app repository's GitHub releases, signed once signing is
+  bought (Decisions for the owner, 3).
 
 ### Symphony and Beethoven in Chrome
 
@@ -237,7 +239,9 @@ in symphony-protocol and the template.
    21:09 UTC and asked for the recommended option on every such answer.
 3. Code signing: an Apple Developer membership for notarising the Mac build, and a Windows
    code-signing certificate, both paid each year; unsigned builds warn on every install.
-   Decided the same way, on the recommendation given then: no paid signing yet. Phase 1 builds
+   Decided on the thread's recommendation after the owner's "idk" of 21:09 UTC, since neither
+   this section nor the thread's reply of 20:16 UTC had recommended either way: no paid signing
+   yet. Phase 1 builds
    unsigned while the owner is its only user, and both are bought when the app is first offered to
    anyone else, before that release.
 4. Merge the two extensions into one (recommended) or keep both.
