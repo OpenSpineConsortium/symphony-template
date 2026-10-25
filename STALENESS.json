@@ -1,7 +1,7 @@
 {
  "default_branch": "main",
  "format": 1,
- "generated_at": "2026-10-25T11:40:18Z",
+ "generated_at": "2026-10-25T12:08:57Z",
  "pulls": [
   {
    "auto_merge_enabled": null,
@@ -14920,6 +14920,48 @@
    "base": "main",
    "board_conflicts": 0,
    "board_main_moved": 0,
+   "branch": "claude/project-thread-35q4f7",
+   "catch_ups": 1,
+   "catch_ups_after_green": 1,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "4756495edb89ed86b76c45e3d2435db68aa7fae8",
+     [
+      399,
+      388,
+      358,
+      359,
+      469,
+      350
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 573,
+   "check_seconds_redone": 370,
+   "claim": false,
+   "closed": "2026-10-25T12:08:34Z",
+   "commits": 2,
+   "first_green": "2026-10-25T11:01:24Z",
+   "force_pushes": 0,
+   "landings_after_green": 6,
+   "landings_during_life": 6,
+   "merged": "2026-10-25T12:08:34Z",
+   "number": 468,
+   "opened": "2026-10-25T10:57:58Z",
+   "ready": "2026-10-25T10:57:58Z",
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 4030,
+   "started": "2026-10-25T10:57:38Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
    "branch": "claude/project-thread-necwvx",
    "catch_ups": 0,
    "catch_ups_after_green": 0,
@@ -15113,14 +15155,14 @@
     "with_catch_up": 0
    },
    "2026-10-25": {
-    "catch_ups": 8,
-    "check_runs": 26,
-    "check_runs_redone": 7,
-    "merged": 13,
-    "share_with_catch_up": 0.462,
-    "stale_after_green": 5,
-    "stale_hours": 343.88,
-    "with_catch_up": 6
+    "catch_ups": 9,
+    "check_runs": 28,
+    "check_runs_redone": 8,
+    "merged": 14,
+    "share_with_catch_up": 0.5,
+    "stale_after_green": 6,
+    "stale_hours": 345.0,
+    "with_catch_up": 7
    }
   },
   "by_parallel_work": {
@@ -15156,23 +15198,23 @@
    },
    "3-5": {
     "catch_ups": 87,
-    "check_runs": 271,
+    "check_runs": 266,
     "check_runs_redone": 75,
-    "merged": 146,
-    "share_with_catch_up": 0.39,
+    "merged": 145,
+    "share_with_catch_up": 0.393,
     "stale_after_green": 42,
     "stale_hours": 22.98,
     "with_catch_up": 57
    },
    "6-10": {
-    "catch_ups": 107,
-    "check_runs": 216,
-    "check_runs_redone": 86,
-    "merged": 105,
+    "catch_ups": 108,
+    "check_runs": 223,
+    "check_runs_redone": 87,
+    "merged": 107,
     "share_with_catch_up": 0.533,
-    "stale_after_green": 30,
-    "stale_hours": 23.92,
-    "with_catch_up": 56
+    "stale_after_green": 31,
+    "stale_hours": 25.04,
+    "with_catch_up": 57
    }
   },
   "by_protocol": {
@@ -15187,23 +15229,23 @@
     "with_catch_up": 3
    },
    "no_claim": {
-    "catch_ups": 250,
-    "check_runs": 682,
-    "check_runs_redone": 208,
-    "merged": 405,
-    "share_with_catch_up": 0.385,
-    "stale_after_green": 100,
-    "stale_hours": 437.66,
-    "with_catch_up": 156
+    "catch_ups": 251,
+    "check_runs": 684,
+    "check_runs_redone": 209,
+    "merged": 406,
+    "share_with_catch_up": 0.387,
+    "stale_after_green": 101,
+    "stale_hours": 438.78,
+    "with_catch_up": 157
    }
   },
-  "catch_ups": 255,
+  "catch_ups": 256,
   "catch_ups_by_button": 23,
   "catch_ups_max": 6,
-  "check_hours": 38.25,
-  "check_hours_redone": 11.36,
-  "check_runs": 732,
-  "check_runs_redone": 210,
+  "check_hours": 38.41,
+  "check_hours_redone": 11.47,
+  "check_runs": 734,
+  "check_runs_redone": 211,
   "closed_unmerged": 3,
   "closed_unmerged_branch_landed_later": 2,
   "default_branch_checks": {
@@ -15258,28 +15300,28 @@
     "success": 21
    },
    "2026-10-25": {
-    "success": 10
+    "success": 11
    }
   },
   "force_pushes": 32,
-  "landings_after_green_total": 659,
-  "landings_during_life_mean": 2.7,
-  "landings_during_life_median": 1,
+  "landings_after_green_total": 665,
+  "landings_during_life_mean": 2.71,
+  "landings_during_life_median": 1.0,
   "live": {
    "pulls_seen": 60,
    "pulls_seen_behind": 0,
    "pulls_seen_dirty": 12,
    "since": "2026-10-20T21:50:52Z",
-   "snapshots": 151
+   "snapshots": 152
   },
-  "merged": 415,
+  "merged": 416,
   "reruns": 6,
   "share_runs_redone": 0.287,
-  "share_stale_after_green": 0.241,
-  "share_with_catch_up": 0.383,
-  "stale_after_green": 100,
-  "stale_hours_total": 437.66,
-  "stale_minutes_median": 16.3,
+  "share_stale_after_green": 0.243,
+  "share_with_catch_up": 0.385,
+  "stale_after_green": 101,
+  "stale_hours_total": 438.78,
+  "stale_minutes_median": 16.9,
   "top_causes": [
    {
     "branch": "claude/project-thread-1sqoqr",
@@ -15385,7 +15427,7 @@
    }
   ],
   "with_board_conflict": 0,
-  "with_catch_up": 159
+  "with_catch_up": 160
  },
  "unread": 0,
  "workflow": "ci.yml"
