@@ -1,12 +1,18 @@
 {
- "at": "2026-10-25T01:48:49Z",
+ "at": "2026-10-25T01:57:58Z",
  "lines": [
-  "HPCW-GRID-GATE storage status: no request has been planned"
+  "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
+  "survey: \"read_at\": \"2026-10-25T01:50:53Z\"",
+  "HPCW-JOB 40777731 lineage COMPLETED on csc1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/lineage_40777731.out",
+  "HPCW-JOB 40777940 freeze COMPLETED on csc1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/freeze_40777940.out",
+  "HPCW-JOB 40778504 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40778504.out",
+  "HPCW-JOB 40778779 storage COMPLETED on mdt46 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40778779.out",
+  "HPCW-GRID-GATE storage status ok"
  ],
  "rc": 0,
- "request": "gf4-sst-0149",
+ "request": "gf4-sst-2",
  "said": [
-  "HPCW-GRID-GATE storage status: no request has been planned"
+  "HPCW-GRID-GATE storage status ok"
  ],
  "v": 1,
  "what": "storage status"
