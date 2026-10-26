@@ -113,6 +113,7 @@ Written before this folder existed and left where its links point:
 - OpenSpineConsortium/spine-program: 01_carm_level_detection/grants/aidas_2027/ (the grant's record, evidence and review notes), with SUBMITTED_2026-10-16.md (spine-program#119): the proposal went to the AIDaS office on 2026-10-16 before the deadline, its narrative main.tex at 88871de, Elsevier's update of that day leaving ScienceDirect's text and data mining amendment pending (since settled: Elsevier granted ScienceDirect and Scopus on 2026-10-18, and on 2026-10-19 the Wayne State library and Elsevier confirmed that Claude may read Elsevier text for academic use while the token and the text stay private, spine-program#209), and the changes proposed for the next venues, none made.
 
 ## Outside git, by link
+- [The grid word `schwingnet bordercall <stage>`](schwingnet-bordercall-word.md): the thread "Finish CNS slides with junction predictor", 2026-10-26: the fixed job word `schwingnet-bordercall-<pilot|full>` of grid-accounts.yml, passed through hpcworker to SchwingNet's gate as `bordercall <stage>`, one CPU job a stage on the owner's count of 2026-10-25 (two: pilot, then full); why it is a word of its own beside `anomaly`, what the test holds, and that sending it stays the owner's, status word first and `update` after hpcworker's side merges.
 
 A Claude Doc or an artifact belongs to one account and is read by link; what a session could export is above.
 
