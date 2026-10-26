@@ -173,3 +173,4 @@
 {"at": "2026-10-25T21:55:02Z", "pulls": [], "up_to_date_required": false}
 {"at": "2026-10-25T22:44:33Z", "pulls": [{"branch": "claude/project-thread-7ltron", "draft": true, "mergeable": true, "number": 493, "state": "clean"}], "up_to_date_required": false}
 {"at": "2026-10-25T23:13:08Z", "pulls": [{"branch": "claude/project-thread-7ltron", "draft": true, "mergeable": false, "number": 493, "state": "dirty"}], "up_to_date_required": false}
+{"at": "2026-10-26T01:09:05Z", "pulls": [{"branch": "claude/project-thread-7qoboa", "draft": true, "mergeable": true, "number": 495, "state": "clean"}, {"branch": "claude/project-thread-7ltron", "draft": true, "mergeable": false, "number": 493, "state": "dirty"}], "up_to_date_required": false}
