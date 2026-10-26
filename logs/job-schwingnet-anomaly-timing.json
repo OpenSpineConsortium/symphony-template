@@ -1,0 +1,19 @@
+{
+ "at": "2026-10-26T00:16:21Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull ok bd6fdaba5874..074e3bfc4977",
+  "schwingnet anomaly timing at commit 074e3bf on warrior 2026-10-26 00:16:21 UTC",
+  "  anomaly_timing: job 40785227",
+  "submitted the anomaly stage timing. Send anomaly timing again once it ends to read its report, logs/ANOMALY-timing.md.",
+  "schwingnet anomaly: exit 0",
+  "HPCW-GRID-GATE schwingnet anomaly ok"
+ ],
+ "rc": 0,
+ "request": "anomaly-timing-x16ebc",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull ok bd6fdaba5874..074e3bfc4977",
+  "HPCW-GRID-GATE schwingnet anomaly ok"
+ ],
+ "v": 1,
+ "what": "schwingnet anomaly timing"
+}
