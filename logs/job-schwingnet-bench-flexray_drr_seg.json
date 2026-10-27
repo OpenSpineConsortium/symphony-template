@@ -1,17 +1,17 @@
 {
- "at": "2026-10-27T03:37:13Z",
+ "at": "2026-10-27T03:40:03Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40799410 [hidden]",
-  "schwingnet bench flexray_drr_seg at commit d3b79bb on warrior 2026-10-27 03:37:09 UTC",
-  "  bench_flexray_drr_seg: job 40799494",
+  "HPCW-GRID-GATE schwingnet pull ok d3b79bb8c209..6b2daf468a91",
+  "schwingnet bench flexray_drr_seg at commit 6b2daf4 on warrior 2026-10-27 03:40:01 UTC",
+  "  bench_flexray_drr_seg: job 40799505",
   "submitted the benchmark. Send bench flexray_drr_seg again once it ends to read its report, logs/BENCH-flexray_drr_seg.md.",
   "schwingnet bench: exit 0",
   "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "rc": 0,
- "request": "drr-seg-rerun-0337-d14v3r",
+ "request": "drr-seg-fixed-0342-d14v3r",
  "said": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40799410 d3b79bb8c20933bf4f2df04860706b0ca3c4974d",
+  "HPCW-GRID-GATE schwingnet pull ok d3b79bb8c209..6b2daf468a91",
   "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "v": 1,
