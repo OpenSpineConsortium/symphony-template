@@ -1,17 +1,22 @@
 {
- "at": "2026-10-27T03:40:03Z",
+ "at": "2026-10-27T14:43:21Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull ok d3b79bb8c209..6b2daf468a91",
-  "schwingnet bench flexray_drr_seg at commit 6b2daf4 on warrior 2026-10-27 03:40:01 UTC",
-  "  bench_flexray_drr_seg: job 40799505",
-  "submitted the benchmark. Send bench flexray_drr_seg again once it ends to read its report, logs/BENCH-flexray_drr_seg.md.",
+  "HPCW-GRID-GATE schwingnet pull current 38e5533a31d0",
+  "schwingnet bench flexray_drr_seg at commit 38e5533 on warrior 2026-10-27 14:43:21 UTC",
+  "## BENCH-flexray_drr_seg.md (2026-10-27 01:35:32)",
+  "# bench flexray_drr_seg: job 40799505 on voh5, commit 6b2daf4, 2026-10-27 03:40:22 UTC",
+  "- GPU: Tesla V100-SXM2-16GB, 16384 MiB, 580.119.02",
+  "- environment: moosez==3.2.2 flexray==1.0.2 nanodrr==0.1.5; weights: /rs/rs_grp_oschome/go2432/data/moose_weights/raw; CTs: /rs/rs_grp_oschome/go2432/data/totalsegmentator_v201; masks: /rs/rs_grp_osch",
+  "- results: /rs/rs_grp_oschome/go2432/bench/flexray_drr_seg",
+  "  segment: 27 subjects run, 5 models, 135 files found, 0 not found, written under /rs/rs_grp_oschome/go2432/data/moose",
+  "- exit 0 at 2026-10-27 05:35:32 UTC",
   "schwingnet bench: exit 0",
   "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "rc": 0,
- "request": "drr-seg-fixed-0342-d14v3r",
+ "request": "drr-seg-report-1445-9dubtu",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull ok d3b79bb8c209..6b2daf468a91",
+  "HPCW-GRID-GATE schwingnet pull current 38e5533a31d0",
   "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "v": 1,
