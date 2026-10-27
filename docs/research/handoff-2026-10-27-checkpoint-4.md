@@ -17,7 +17,7 @@ A new claude.ai project sees none of the old one's shared files, memory or threa
 ### The first prompt
 
 ```
-You are picking up the "symphony" project from an earlier project, perhaps on another Claude account. First read docs/research/handoff-2026-10-27-checkpoint-4.md in OpenSpineConsortium/symphony-template, on main, or on the branch claude/project-thread-x16ebc until its pull request merges. Then, in order:
+You are picking up the "symphony" project from an earlier project, perhaps on another Claude account. First read docs/research/handoff-2026-10-27-checkpoint-4.md in OpenSpineConsortium/symphony-template, on main, or on the branch claude/project-thread-x16ebc until its pull request #501 merges. Then, in order:
 1. Write this project's instructions yourself: section 2 of symphony-template's docs/research/handoff-2026-10-25.md, verbatim, with its line "No API key or Claude credential anywhere." replaced by the key rule in that page's section 0, the goal line of its section 11, step 3, at the top, and the standing rules of section 4 of the checkpoint-4 page after it (not its one-off decisions of 2026-10-27). Attach OpenSpineConsortium/FleXray, OpenSpineConsortium/bordercall, OpenSpineConsortium/hpcworker and OpenSpineConsortium/openspineconsortium.github.io with add_repo, and the other repositories the Repos line of that section 2 lists when a thread needs one.
 2. Read SchwingNet's docs/checkpoints/2026-10-27-morning/README.md on main, and write into this project's memory whatever in its project-memory/ folder still holds.
 3. Start one thread for each open thread in section 2 of the checkpoint-4 page, each told to restart from its own handoff as that section says.
@@ -43,7 +43,7 @@ Six threads have work open and one is done. Each was told by the coordinator at 
 
 ### Plan the FleXray audit for #391 (this thread): open
 
-- Merged since the last checkpoint: SchwingNet #410 (the pack stage) and #412 (the folder of the last checkpoint); symphony-template #498 (the last restart page). SchwingNet #421, this checkpoint's folder, merged at 05:06 UTC; this page comes in symphony-template THIS_PR from claude/project-thread-x16ebc.
+- Merged since the last checkpoint: SchwingNet #410 (the pack stage) and #412 (the folder of the last checkpoint); symphony-template #498 (the last restart page). SchwingNet #421, this checkpoint's folder, merged at 05:06 UTC; this page comes in symphony-template #501 from claude/project-thread-x16ebc.
 - Grid: nothing sent since the last checkpoint. The timing stage sent at 00:16 UTC on 2026-10-26 (Slurm 40785227) ended FAILED after 30 minutes, exit 1, by the status read of 2026-10-27 04:08 UTC; its report is not read, so the cause is not known. The pack stage cannot go until a timing report ends in exit 0.
 - Its handoff: SchwingNet docs/checkpoints/2026-10-27-morning/anomaly-route.md, with the next session's steps in order. The first is to send the timing word once, which both prints the failed report and queues the stage once more at the current checkout. The timing code is the same at that checkout as in the failed run, so the rerun helps only if the node was at fault; it waits behind the DRR thread's running job, then holds the gate's checkout for up to 4 hours, so tell the DRR thread first; cancel the rerun at once if the report shows a fault in the code. That page says how.
 
