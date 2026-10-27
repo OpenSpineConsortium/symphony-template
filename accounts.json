@@ -1,6 +1,6 @@
 {
  "action": "job",
- "at": "2026-10-27T04:08:03Z",
+ "at": "2026-10-27T05:36:45Z",
  "list": {
   "accounts": [
    {
@@ -60,29 +60,29 @@
   "v": 1,
   "worker": {
    "account": null,
-   "age_s": 27,
-   "job": "40789505",
-   "link": "https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m",
-   "message": "Open in Claude: https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m (or tap Code in the Claude app). space to show QR code",
+   "age_s": 24,
+   "job": "40792416",
+   "link": "https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5",
+   "message": "Open in Claude: https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5 and find Wayne State grid (or tap Code in the Claude app). space to show QR code",
    "name": "worker",
-   "node": "csc1",
+   "node": "bbc1",
    "state": "online",
-   "updated_at": "2026-10-27T04:07:36Z"
+   "updated_at": "2026-10-27T05:36:21Z"
   },
   "workers": [
    {
     "account": null,
-    "age_s": 27,
-    "link": "https://claude.ai/code/session_019ZPrGthy97wYpKFUbMWp2m",
+    "age_s": 24,
+    "link": "https://claude.ai/code?environment=env_01QZ9wWj2VMmChxCvsjC2JJ5",
     "name": "worker",
-    "node": "csc1",
+    "node": "bbc1",
     "pinned": null,
     "state": "online"
    }
   ]
  },
  "rc": 0,
- "request": "drr-status-0407-d14v3r",
+ "request": "artifacts-grid",
  "said": [
   "HPCW-GRID-GATE accounts ok"
  ],
