@@ -1,0 +1,19 @@
+{
+ "at": "2026-10-27T03:16:16Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40799410 [hidden]",
+  "schwingnet cancel 40799410 at commit d3b79bb on warrior 2026-10-27 03:16:16 UTC",
+  "  the checkout holds still at d3b79bb while the run that took it (job 40799410) lasts",
+  "cancelled (bench:flexray_drr_seg): 40799410 ",
+  "schwingnet cancel: exit 0",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "rc": 0,
+ "request": "drr-cancel-seg-retry-d14v3r",
+ "said": [
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40799410 d3b79bb8c20933bf4f2df04860706b0ca3c4974d",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "v": 1,
+ "what": "schwingnet cancel 40799410"
+}
