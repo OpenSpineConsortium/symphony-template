@@ -15,6 +15,8 @@ Until the owner says otherwise, none of section 2's other threads is restarted. 
 
 ## 1. How to restart, from a new project
 
+The restart kit of 2026-10-27, restart-kit-2026-10-27.md beside this page, gives the new project's goal, its instructions and the first prompt ready to paste, with the memory compacted in SchwingNet's docs/checkpoints/2026-10-27-restart-kit/; its first prompt and steps replace those below, and this section stays as the record.
+
 A new claude.ai project sees none of the old one's shared files, memory or threads, so what only the project symphony held was copied at this checkpoint into SchwingNet's docs/checkpoints/2026-10-27-morning/ (on main since SchwingNet #421 merged at 05:06 UTC): the project's memory word for word as ASCII, this thread's handoff, and a README that names every other thread's handoff by path and says where each of the project's shared files went. That folder is confidential and stays in SchwingNet. Everything else is in git already: the repositories, their pull requests and boards, the grid and its words, the GitHub Apps and the secrets belong to no Claude project or account. Section 6 says what lives nowhere in git.
 
 ### The owner's steps
