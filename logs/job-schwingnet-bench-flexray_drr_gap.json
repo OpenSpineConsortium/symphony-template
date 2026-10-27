@@ -1,0 +1,21 @@
+{
+ "at": "2026-10-27T14:47:43Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 38e5533a31d0",
+  "schwingnet bench flexray_drr_gap at commit 38e5533 on warrior 2026-10-27 14:47:41 UTC",
+  "  the SPINEPS masks: in /rs/rs_grp_oschome/go2432/data/spineps, read where enough CTs have them (the study's summary says how many)",
+  "  the MOOSE masks: in /rs/rs_grp_oschome/go2432/data/moose, read where enough CTs have them (the study's summary says how many)",
+  "  bench_flexray_drr_gap: job 40802322",
+  "submitted the benchmark. Send bench flexray_drr_gap again once it ends to read its report, logs/BENCH-flexray_drr_gap.md.",
+  "schwingnet bench: exit 0",
+  "HPCW-GRID-GATE schwingnet bench ok"
+ ],
+ "rc": 0,
+ "request": "drr-gap-1448-9dubtu",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 38e5533a31d0",
+  "HPCW-GRID-GATE schwingnet bench ok"
+ ],
+ "v": 1,
+ "what": "schwingnet bench flexray_drr_gap"
+}
