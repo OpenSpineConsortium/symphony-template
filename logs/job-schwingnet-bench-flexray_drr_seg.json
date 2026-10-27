@@ -1,24 +1,17 @@
 {
- "at": "2026-10-27T03:13:27Z",
+ "at": "2026-10-27T03:37:13Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current d3b79bb8c209",
-  "schwingnet bench flexray_drr_seg at commit d3b79bb on warrior 2026-10-27 03:13:25 UTC",
-  "## BENCH-flexray_drr_seg.md (2026-10-26 15:14:59)",
-  "# bench flexray_drr_seg: job 40790826 on voh8, commit 5303418, 2026-10-26 19:11:57 UTC",
-  "- GPU: Tesla V100-SXM2-16GB, 16384 MiB, 580.119.02",
-  "- environment: moosez==3.2.2; weights: /rs/rs_grp_oschome/go2432/data/moose_weights/raw; CTs: /rs/rs_grp_oschome/go2432/data/totalsegmentator_v201; masks: /rs/rs_grp_oschome/go2432/data/moose",
-  "- FAILED: domain_gap.py plan ended 1 (ModuleNotFoundError: No module named 'fxr')",
-  "- exit 1 at 2026-10-26 19:14:59 UTC",
-  "  the report above ended in failure on older code: queueing the benchmark again at d3b79bb",
-  "  bench_flexray_drr_seg: job 40799410",
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40799410 [hidden]",
+  "schwingnet bench flexray_drr_seg at commit d3b79bb on warrior 2026-10-27 03:37:09 UTC",
+  "  bench_flexray_drr_seg: job 40799494",
   "submitted the benchmark. Send bench flexray_drr_seg again once it ends to read its report, logs/BENCH-flexray_drr_seg.md.",
   "schwingnet bench: exit 0",
   "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "rc": 0,
- "request": "drr-seg-report-0320-d14v3r",
+ "request": "drr-seg-rerun-0337-d14v3r",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current d3b79bb8c209",
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40799410 d3b79bb8c20933bf4f2df04860706b0ca3c4974d",
   "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "v": 1,
