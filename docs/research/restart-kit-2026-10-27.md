@@ -4,6 +4,15 @@ Source: the thread "Write restart kit for the new account" in the claude.ai proj
 
 This page gives the texts to paste and the steps. It does not replace handoff-2026-10-27-checkpoint-4.md: that page's section 0, the owner's priority of 05:48 UTC, still holds over everything, and its sections 2 to 6 stay the record each paused thread restarts from. Where this page's first prompt and that page's section 1 differ, this page holds. The compacted memory and the research findings are confidential and live in the private OpenSpineConsortium/SchwingNet, at docs/checkpoints/2026-10-27-restart-kit/ (section 6); nothing of them is copied here.
 
+## 0. The checkpoint of 2026-10-27, 11:33 UTC: the state the next project starts from
+
+Written at the owner's words of 11:33 UTC in the thread "Flesh out Panjabi, rewrite in PyMC" ("Restart none of the paused threads and start nothing else until I say so. When I name the next item, it is gold tier 1, 2 and 3 data, bordercall TODO.md item 5, which takes over the tiers thread's drafts. Send nothing to the grid until I say otherwise. When I answer idk, take the option you recommend. Do not copy anything from SchwingNet or bordercall into a public place, and put no career material in git., literally just update the handoff and push i have like no tokens left, if you have to make issues or something u can do that") and of 11:42 UTC ("continue the checkpoint, workpush, handoff update"). Those standing words hold over sections 1, 2 and 5 below.
+
+What changed since this page was written, all of it in the private repositories: item P was widened at 08:10 UTC to four papers and five steps a to e (bordercall TODO.md as pull request 3 merged it); steps a and b are merged (bordercall pull requests 3, 4 and 5); step c is bordercall pull request 6, a draft, unfinished, whose body lists what is left; the owner's queue of 09:44 UTC follows step e. The state and the owner's words are the first section of SchwingNet's docs/checkpoints/2026-10-27-restart-kit/README.md and memory/priority-panjabi-first.md beside it. The first prompt of section 5 is sent with these changes:
+
+- Its item 3 reads: Start one thread, and only one, titled "Flesh out Panjabi, rewrite in PyMC": it reads the first section of SchwingNet's docs/checkpoints/2026-10-27-restart-kit/README.md, then bordercall's README.md and TODO.md, item P as widened, and continues item P from bordercall pull request 6 (step c, then steps d and e, each a pull request in bordercall merged once green, then the queue of 09:44 UTC in its order); it keeps every finding in bordercall, tells me in one line with the link as each step merges, and stops when the queue is done.
+- Where section 1's goal and section 2's instructions name Panjabi's three papers, read four, the articular facets paper of 1993 added, and the steps a to e.
+
 ## 1. The project's goal
 
 What the new project is for, to paste where claude.ai asks for it when the project is made:
