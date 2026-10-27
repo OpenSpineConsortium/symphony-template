@@ -25,6 +25,9 @@
 # The action key sends one of the owner's service keys, an environment secret of grid picked by the
 # input name, to the gate's word key (hpcworker #36), which writes it to its file on the grid; the
 # key is masked and goes only over ssh's standard input (docs/setup/grid.md, "Service keys").
+# Elsevier's key and institutional token are organization secrets the owner saved on 2026-10-25,
+# which a job reads as it reads the environment's; they go as one line, the key, one space and the
+# token, and Semantic Scholar's key as s2 (the owner's word of 2026-10-27).
 name: Grid accounts
 run-name: "Grid accounts: ${{ inputs.action }} ${{ inputs.slot }}${{ inputs.job }}${{ inputs.action == 'key' && inputs.name || '' }} (${{ inputs.request }})"
 on:
@@ -44,7 +47,7 @@ on:
         required: false
         default: ""
       name:
-        description: "The worker's name (worker-start, optional; worker-stop; log, for its output); for key, which key: kaggle, hf, zenodo, redivis, wandb, physionet or ratic"
+        description: "The worker's name (worker-start, optional; worker-stop; log, for its output); for key, which key: kaggle, hf, zenodo, redivis, wandb, physionet, ratic, elsevier or s2"
         required: false
         default: ""
       count:
@@ -56,7 +59,7 @@ on:
         required: false
         default: ""
       job:
-        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, freeze-status|pilot|start|report|overlap, storage-status|report|survey, storage-apply-<request stamp>, storage-retire-<request stamp>, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples|nodequota|folders, or schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id>, schwingnet-dropzip-<id>, schwingnet-unpack-<id>, schwingnet-experiment-<issue>, schwingnet-sweep-<plan>, schwingnet-bank-<id>, schwingnet-bench-<name>, schwingnet-anomaly-<stage>, schwingnet-bordercall-<stage>, schwingnet-realism-<stage> or schwingnet-cancel-<job>"
+        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, freeze-status|pilot|start|report|overlap, storage-status|report|survey, storage-apply-<request stamp>, storage-retire-<request stamp>, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples|nodequota|folders, or schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id>, schwingnet-dropzip-<id>, schwingnet-unpack-<id>, schwingnet-experiment-<issue>, schwingnet-sweep-<plan>, schwingnet-bank-<id>, schwingnet-bench-<name>, schwingnet-anomaly-<stage>, schwingnet-bordercall-<stage>, schwingnet-realism-<stage>, schwingnet-literature-<list> or schwingnet-cancel-<job>"
         required: false
         default: ""
       request:
@@ -112,6 +115,10 @@ jobs:
                 inputs.name == 'ratic' && secrets.RATIC_LINK ||
                 inputs.name == 'physionet' && secrets.PHYSIONET_USERNAME && secrets.PHYSIONET_PASSWORD
                   && format('{0} {1}', secrets.PHYSIONET_USERNAME, secrets.PHYSIONET_PASSWORD) ||
+                inputs.name == 'elsevier' && secrets.ELSEVIER_API_KEY
+                  && (secrets.ELSEVIER_INSTTOKEN && format('{0} {1}', secrets.ELSEVIER_API_KEY, secrets.ELSEVIER_INSTTOKEN)
+                      || secrets.ELSEVIER_API_KEY) ||
+                inputs.name == 's2' && secrets.S2_API_KEY ||
                 '') || '' }}
           ACCESS_ID: ${{ vars.GRID_ACCESS_ID }}
           HOST_KEY: ${{ vars.GRID_HOST_KEY }}

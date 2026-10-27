@@ -177,10 +177,11 @@ class Words(unittest.TestCase):
                           ("schwingnet-anomaly-select", "schwingnet anomaly select"),
                           ("schwingnet-bordercall-pilot", "schwingnet bordercall pilot"), ("schwingnet-bordercall-full", "schwingnet bordercall full"),
                           ("schwingnet-realism-edit", "schwingnet realism edit"), ("schwingnet-realism-lora", "schwingnet realism lora"),
+                          ("schwingnet-literature-synthetic_spine", "schwingnet literature synthetic_spine"),
                           ("schwingnet-cancel-40704982", "schwingnet cancel 40704982")):
             self.assertEqual(self.run_script("job", job=job)[1], [word, "accounts"], job)
         for job in ("", "update now", "artifacts-now", "artifacts now", "promoter start abc", "promoter-restart-now", "promoter restart", "freeze-stop", "freeze-start-4", "freeze-report-now", "freeze-overlap-now", "freeze-pilot-amos22", "storage-apply", "storage-apply-x", "storage-apply-20261024T210000Z-1", "storage-retire", "storage-retire-x", "storage-delete-20261024T210000Z", "storage-survey-x", "storage survey", "schwingnet-xray-chain", "schwingnet-pull", "schwingnet-fetch-",
-                    "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-explore-", "schwingnet-explore-Bad", "schwingnet-dropzip-", "schwingnet-dropzip-a-b", "schwingnet-unpack-", "schwingnet-unpack-a-b", "schwingnet-experiment-", "schwingnet-experiment-1-2", "schwingnet-sweep-", "schwingnet-sweep-two-source", "schwingnet-sweep-Real", "schwingnet-bank-", "schwingnet-bank-a-b", "schwingnet-bank-VinDr", "schwingnet-bank-a/b", "schwingnet-bench-", "schwingnet-bench-FleXray", "schwingnet-bench-a b", "schwingnet-anomaly-", "schwingnet-anomaly-Select", "schwingnet-anomaly-a-b", "schwingnet-anomaly-a b", "schwingnet-bordercall-", "schwingnet-bordercall-Pilot", "schwingnet-bordercall-a-b", "schwingnet-bordercall-a b", "schwingnet-realism-", "schwingnet-realism-Edit", "schwingnet-realism-a-b", "schwingnet-realism-a b", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-nodequota-x", "schwingnet-folders-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
+                    "schwingnet-fetch-VinDr", "schwingnet-census-", "schwingnet-explore-", "schwingnet-explore-Bad", "schwingnet-dropzip-", "schwingnet-dropzip-a-b", "schwingnet-unpack-", "schwingnet-unpack-a-b", "schwingnet-experiment-", "schwingnet-experiment-1-2", "schwingnet-sweep-", "schwingnet-sweep-two-source", "schwingnet-sweep-Real", "schwingnet-bank-", "schwingnet-bank-a-b", "schwingnet-bank-VinDr", "schwingnet-bank-a/b", "schwingnet-bench-", "schwingnet-bench-FleXray", "schwingnet-bench-a b", "schwingnet-anomaly-", "schwingnet-anomaly-Select", "schwingnet-anomaly-a-b", "schwingnet-anomaly-a b", "schwingnet-bordercall-", "schwingnet-bordercall-Pilot", "schwingnet-bordercall-a-b", "schwingnet-bordercall-a b", "schwingnet-realism-", "schwingnet-realism-Edit", "schwingnet-realism-a-b", "schwingnet-realism-a b", "schwingnet-literature-", "schwingnet-literature-Spine", "schwingnet-literature-a-b", "schwingnet-literature-a b", "schwingnet-chain-eval", "schwingnet-prior-x", "schwingnet-samples-x", "schwingnet-nodequota-x", "schwingnet-folders-x", "schwingnet-fetch-a b", "schwingnet-fetch-a;id", "accounts", "id;x"):
             rc, words, _ = self.run_script("job", job=job)
             self.assertNotEqual(rc, 0, job)
             self.assertEqual(words, [], job)
@@ -216,10 +217,19 @@ class Words(unittest.TestCase):
         self.assertEqual(words[0], "key physionet")
         self.assertIn("::add-mask::pass1234", out)
         self.assertTrue(sent.startswith("greg pass1234\n"))
+        _, words, sent, out = self.run_key("elsevier", "els_key_testonly els_tok_testonly")
+        self.assertEqual(words[0], "key elsevier")
+        self.assertTrue(sent.startswith("els_key_testonly els_tok_testonly\n"))
+        for part in ("els_key_testonly", "els_tok_testonly"):
+            self.assertIn(f"::add-mask::{part}", out)
+        _, words, sent, out = self.run_key("s2", "s2_key_testonly0123")
+        self.assertEqual(words[0], "key s2")
+        self.assertTrue(sent.startswith("s2_key_testonly0123\n"))
 
     def test_a_bad_name_or_a_missing_secret_reaches_no_gate(self):
         for name, value in (("foo", "tok_0123456789"), ("hf;id", "tok_0123456789"), ("", "tok_0123456789"),
-                            ("hf", ""), ("physionet", " "), ("physionet", "greg "), ("physionet", " pass")):
+                            ("hf", ""), ("physionet", " "), ("physionet", "greg "), ("physionet", " pass"),
+                            ("elsevier", ""), ("elsevier", "els_key_testonly "), ("s2", ""), ("els", "tok_0123456789")):
             rc, words, _, _ = self.run_key(name, value)
             self.assertNotEqual(rc, 0, (name, value))
             self.assertEqual(words, [], (name, value))
@@ -227,8 +237,11 @@ class Words(unittest.TestCase):
     def test_the_workflow_hands_the_step_only_the_named_secret(self):
         flow = (ROOT / ".github/workflows/grid-accounts.yml").read_text()
         for name, secret in (("kaggle", "KAGGLE_API_TOKEN"), ("hf", "HF_TOKEN"), ("zenodo", "ZENODO_TOKEN"),
-                             ("redivis", "REDIVIS_API_TOKEN"), ("wandb", "WANDB_API_KEY"), ("ratic", "RATIC_LINK")):
+                             ("redivis", "REDIVIS_API_TOKEN"), ("wandb", "WANDB_API_KEY"), ("ratic", "RATIC_LINK"),
+                             ("elsevier", "ELSEVIER_API_KEY"), ("s2", "S2_API_KEY")):
             self.assertIn(f"inputs.name == '{name}' && secrets.{secret}", flow)
+        # the token goes only beside the key, and the key alone where no token is saved
+        self.assertIn("format('{0} {1}', secrets.ELSEVIER_API_KEY, secrets.ELSEVIER_INSTTOKEN)", flow)
         self.assertIn("${{ inputs.action == 'key' && (", flow)
 
     def test_a_busy_gate_is_asked_again(self):

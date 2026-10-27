@@ -24,19 +24,21 @@ case "$ACTION" in
        elif [ -n "$NAME" ]; then [[ "$NAME" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { echo "::error::a worker's name is up to 32 letters, digits, _ or -"; exit 1; }; WHAT="worker $NAME"; LOGFILE="worker-$NAME"
        else WHAT=usage; LOGFILE=usage; fi;;
   # one of the gate's job words (hpcworker #23, the owner's choice of 2026-10-21), named as one word
-  # here: the gate takes these and no other; SchwingNet's fetch, census, explore, dropzip, unpack, experiment, sweep, bank, bench, anomaly, bordercall, realism and cancel carry one id after it
+  # here: the gate takes these and no other; SchwingNet's fetch, census, explore, dropzip, unpack, experiment, sweep, bank, bench, anomaly, bordercall, realism, literature and cancel carry one id after it
   # (schwingnet-fetch-vindr_pcxr), which SchwingNet's grid/gate.sh checks again against its own list
   job) JOB=${JOB:-}
     if [[ "$JOB" =~ ^(update|artifacts|promoter-(status|start|stop|restart)|freeze-(status|pilot|start|report|overlap)|storage-(status|report|survey)|schwingnet-(start|status|leaks|v1|latency|stop|prior|chain_eval|samples|nodequota|folders))$ ]]; then WHAT=${JOB/-/ }
-    elif [[ "$JOB" =~ ^schwingnet-(fetch|census|explore|dropzip|unpack|experiment|sweep|bank|bench|anomaly|bordercall|realism|cancel)-([a-z0-9_]{1,40})$ ]]; then WHAT="schwingnet ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+    elif [[ "$JOB" =~ ^schwingnet-(fetch|census|explore|dropzip|unpack|experiment|sweep|bank|bench|anomaly|bordercall|realism|literature|cancel)-([a-z0-9_]{1,40})$ ]]; then WHAT="schwingnet ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
     elif [[ "$JOB" =~ ^storage-(apply|retire)-([0-9]{8}T[0-9]{6}Z)$ ]]; then WHAT="storage ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
-    else echo "::error::the job is one of update, artifacts, promoter-status, promoter-start, promoter-stop, promoter-restart, freeze-status, freeze-pilot, freeze-start, freeze-report, freeze-overlap, storage-status, storage-report, storage-survey, storage-apply-<request stamp>, storage-retire-<request stamp>, schwingnet-start, schwingnet-status, schwingnet-leaks, schwingnet-v1, schwingnet-latency, schwingnet-stop, schwingnet-prior, schwingnet-chain_eval, schwingnet-samples, schwingnet-nodequota, schwingnet-folders, schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id>, schwingnet-dropzip-<id>, schwingnet-unpack-<id>, schwingnet-experiment-<issue>, schwingnet-sweep-<plan>, schwingnet-bank-<id>, schwingnet-bench-<name>, schwingnet-anomaly-<stage>, schwingnet-bordercall-<stage>, schwingnet-realism-<stage> or schwingnet-cancel-<job>"; exit 1; fi
+    else echo "::error::the job is one of update, artifacts, promoter-status, promoter-start, promoter-stop, promoter-restart, freeze-status, freeze-pilot, freeze-start, freeze-report, freeze-overlap, storage-status, storage-report, storage-survey, storage-apply-<request stamp>, storage-retire-<request stamp>, schwingnet-start, schwingnet-status, schwingnet-leaks, schwingnet-v1, schwingnet-latency, schwingnet-stop, schwingnet-prior, schwingnet-chain_eval, schwingnet-samples, schwingnet-nodequota, schwingnet-folders, schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id>, schwingnet-dropzip-<id>, schwingnet-unpack-<id>, schwingnet-experiment-<issue>, schwingnet-sweep-<plan>, schwingnet-bank-<id>, schwingnet-bench-<name>, schwingnet-anomaly-<stage>, schwingnet-bordercall-<stage>, schwingnet-realism-<stage>, schwingnet-literature-<list> or schwingnet-cancel-<job>"; exit 1; fi
     LOGFILE="job-$JOB";;
   # one of the owner's service keys (hpcworker #36, his choice of 2026-10-23: "all my keys should go
   # that route"): the workflow hands this step only the secret the name picks, as KEY_VALUE, and the
-  # gate takes it on standard input and writes it to the one file SchwingNet's jobs read it from
-  key) [[ "$NAME" =~ ^(kaggle|hf|zenodo|redivis|wandb|physionet|ratic)$ ]] \
-         || { echo "::error::the key is one of kaggle, hf, zenodo, redivis, wandb, physionet or ratic"; exit 1; }
+  # gate takes it on standard input and writes it to the one file SchwingNet's jobs read it from;
+  # elsevier is the key and, after one space, the institutional token where there is one (the
+  # owner's word of 2026-10-27), s2 Semantic Scholar's key
+  key) [[ "$NAME" =~ ^(kaggle|hf|zenodo|redivis|wandb|physionet|ratic|elsevier|s2)$ ]] \
+         || { echo "::error::the key is one of kaggle, hf, zenodo, redivis, wandb, physionet, ratic, elsevier or s2"; exit 1; }
     WHAT="key $NAME"; LOGFILE="key-$NAME";;
 esac
 [[ "$REQUEST" =~ ^[A-Za-z0-9_-]{0,64}$ ]] || { echo "::error::the request is a short plain name"; exit 1; }
@@ -46,7 +48,7 @@ if [ "$ACTION" = code ]; then
 fi
 if [ "$ACTION" = key ]; then
   KEY_VALUE=${KEY_VALUE:-}
-  # each part masked, so neither the PhysioNet password nor the whole line can show in the log
+  # each part masked, so neither the PhysioNet password, the Elsevier token nor the whole line can show in the log
   set -f; for part in "$KEY_VALUE" ${KEY_VALUE}; do [ -z "$part" ] || echo "::add-mask::$part"; done; set +f
   [ -n "${KEY_VALUE// /}" ] && [ "${KEY_VALUE# }" = "$KEY_VALUE" ] && [ "${KEY_VALUE% }" = "$KEY_VALUE" ] \
     || { echo "::error::the secret for $NAME is not set: add it to the environment grid (docs/setup/grid.md, Service keys)"; exit 1; }
