@@ -226,6 +226,23 @@ class Words(unittest.TestCase):
         self.assertEqual(words[0], "key s2")
         self.assertTrue(sent.startswith("s2_key_testonly0123\n"))
 
+    def test_a_line_break_saved_with_a_secret_never_splits_the_line(self):
+        # the key saved with a break at its end, then composed with the token: the break is taken off
+        _, words, sent, out = self.run_key("elsevier", "els_key_testonly\r\n els_tok_testonly\n")
+        self.assertEqual(words[0], "key elsevier")
+        self.assertTrue(sent.startswith("els_key_testonly els_tok_testonly\n"))
+        self.assertEqual(sent.count("\n"), 1)
+        for part in ("els_key_testonly", "els_tok_testonly"):
+            self.assertIn(f"::add-mask::{part}", out)
+        _, words, sent, _ = self.run_key("kaggle", "KGAT_testonly0123\n")
+        self.assertTrue(sent.startswith("KGAT_testonly0123\n") and sent.count("\n") == 1)
+        # a break inside a value is refused before the gate, and its parts are still masked
+        rc, words, _, out = self.run_key("elsevier", "els_key_test\nonly els_tok_testonly")
+        self.assertNotEqual(rc, 0)
+        self.assertEqual(words, [])
+        self.assertIn("line break inside it", out)
+        self.assertNotIn("els_tok_testonly", out.replace("::add-mask::els_tok_testonly", ""))
+
     def test_a_bad_name_or_a_missing_secret_reaches_no_gate(self):
         for name, value in (("foo", "tok_0123456789"), ("hf;id", "tok_0123456789"), ("", "tok_0123456789"),
                             ("hf", ""), ("physionet", " "), ("physionet", "greg "), ("physionet", " pass"),

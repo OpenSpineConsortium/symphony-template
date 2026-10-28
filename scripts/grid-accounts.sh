@@ -48,8 +48,18 @@ if [ "$ACTION" = code ]; then
 fi
 if [ "$ACTION" = key ]; then
   KEY_VALUE=${KEY_VALUE:-}
-  # each part masked, so neither the PhysioNet password, the Elsevier token nor the whole line can show in the log
-  set -f; for part in "$KEY_VALUE" ${KEY_VALUE}; do [ -z "$part" ] || echo "::add-mask::$part"; done; set +f
+  # A secret saved with a line break at its end, as the web form keeps one, would split the Elsevier key
+  # from its token on the gate's one line, the key then written alone: a carriage return is dropped, a
+  # break at the end or just before the token's space taken off, and one left inside refused, since the
+  # gate would write only what came before it. Each part is masked, words first and the whole line once
+  # it holds no break, so neither the PhysioNet password, the Elsevier token nor the line shows in the log.
+  KEY_VALUE=${KEY_VALUE//$'\r'/}
+  while [ "${KEY_VALUE%$'\n'}" != "$KEY_VALUE" ]; do KEY_VALUE=${KEY_VALUE%$'\n'}; done
+  while [ "${KEY_VALUE//$'\n' / }" != "$KEY_VALUE" ]; do KEY_VALUE=${KEY_VALUE//$'\n' / }; done
+  set -f; for part in ${KEY_VALUE}; do echo "::add-mask::$part"; done; set +f
+  [ "${KEY_VALUE//$'\n'/}" = "$KEY_VALUE" ] \
+    || { echo "::error::the secret for $NAME has a line break inside it: save it again as one line"; exit 1; }
+  [ -z "$KEY_VALUE" ] || echo "::add-mask::$KEY_VALUE"
   [ -n "${KEY_VALUE// /}" ] && [ "${KEY_VALUE# }" = "$KEY_VALUE" ] && [ "${KEY_VALUE% }" = "$KEY_VALUE" ] \
     || { echo "::error::the secret for $NAME is not set: add it to the environment grid (docs/setup/grid.md, Service keys)"; exit 1; }
 fi

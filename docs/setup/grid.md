@@ -77,14 +77,14 @@ The owner's dataset and service keys reach the grid without his shell (his choic
 | physionet | PHYSIONET_USERNAME and PHYSIONET_PASSWORD | ~/.netrc, machine physionet.org login ... password ... |
 | ratic | RATIC_LINK | ~/.rsna/ratic_link, the presigned link alone |
 | elsevier | ELSEVIER_API_KEY and ELSEVIER_INSTTOKEN, organization secrets | ~/.elsevier/token.env, ELSEVIER_API_KEY=... and ELSEVIER_INSTTOKEN=... |
-| s2 | S2_API_KEY, an organization secret | ~/.fluorocap/credentials.env, S2_API_KEY=... |
+| s2 | S2_API_KEY, an organization secret | ~/.s2/token.env, S2_API_KEY=... |
 
-Elsevier's two values are organization secrets, saved by the owner on 2026-10-25 (https://github.com/organizations/OpenSpineConsortium/settings/secrets/actions), which the action reads as it reads the environment's: a job sees its organization's secrets beside its environment's, the environment's winning where both have a name. They go to the gate as one line, the key, one space and the token, or the key alone where no token is saved, and the gate replaces both lines of the file each time. Their repository access belongs on Selected repositories, SchwingNet and symphony-template, rather than every private repository, since any workflow of a repository that may read an organization secret can read its value. SchwingNet's word `literature <list>` reads them on a compute node and keeps what it fetches on the grid (SchwingNet's docs/research/literature-on-the-grid.md).
+Elsevier's two values are organization secrets, saved by the owner on 2026-10-25 (https://github.com/organizations/OpenSpineConsortium/settings/secrets/actions), which the action reads as it reads the environment's: a job sees its organization's secrets beside its environment's, the environment's winning where both have a name. They go to the gate as one line, the key, one space and the token, or the key alone where no token is saved, and the gate replaces both lines of the file each time. Their repository access belongs on Selected repositories with symphony-template alone, rather than every private repository, since any workflow of a repository that may read an organization secret can read its value, and only this repository's grid-accounts.yml reads them; SchwingNet's job reads the file the gate writes, never the secret. SchwingNet's word `literature <list>` reads them on a compute node and keeps what it fetches on the grid (SchwingNet's docs/research/literature-on-the-grid.md).
 
 To add or change a key:
 
 1. Open https://github.com/OpenSpineConsortium/symphony-template/settings/environments, press grid, and under Environment secrets press Add environment secret.
-2. Name it as the table says, paste the key, and press Add secret. Elsevier's and Semantic Scholar's are saved once as organization secrets instead, at https://github.com/organizations/OpenSpineConsortium/settings/secrets/actions, with repository access Selected repositories, SchwingNet and symphony-template.
+2. Name it as the table says, paste the key, and press Add secret. Elsevier's and Semantic Scholar's are saved once as organization secrets instead, at https://github.com/organizations/OpenSpineConsortium/settings/secrets/actions, with repository access Selected repositories, symphony-template alone.
 3. Run Grid accounts with action key and name set to the key's name: https://github.com/OpenSpineConsortium/symphony-template/actions/workflows/grid-accounts.yml, then Run workflow. A session can run it for him.
 
 The gate's clone must carry hpcworker #36 first; the action job with update brings it.
