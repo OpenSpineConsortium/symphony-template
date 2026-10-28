@@ -1,0 +1,18 @@
+{
+ "at": "2026-10-28T01:01:16Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 76838c491e1b",
+  "schwingnet cancel 40812341 at commit 76838c4 on warrior 2026-10-28 01:01:16 UTC",
+  "cancelled (bench:flexray_drr_gap): 40812341 40812342 40812360 ",
+  "schwingnet cancel: exit 0",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "rc": 0,
+ "request": "drr-gap-cancel-0058-9dubtu",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 76838c491e1b",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "v": 1,
+ "what": "schwingnet cancel 40812341"
+}
