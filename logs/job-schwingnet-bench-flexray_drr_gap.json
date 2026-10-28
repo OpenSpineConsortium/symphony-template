@@ -1,22 +1,22 @@
 {
- "at": "2026-10-27T22:01:30Z",
+ "at": "2026-10-28T03:08:21Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current f78e0e8ef917",
-  "schwingnet bench flexray_drr_gap at commit f78e0e8 on warrior 2026-10-27 22:01:27 UTC",
+  "HPCW-GRID-GATE schwingnet pull current d3fe57853e4a",
+  "schwingnet bench flexray_drr_gap at commit d3fe578 on warrior 2026-10-28 03:08:19 UTC",
   "  the SPINEPS masks: in /rs/rs_grp_oschome/go2432/data/spineps, read where enough CTs have them (the study's summary says how many)",
   "  the MOOSE masks: in /rs/rs_grp_oschome/go2432/data/moose, read where enough CTs have them (the study's summary says how many)",
-  "  bench_flexray_drr_gap: job 40812341",
-  "  bench_flexray_drr_gap_shard: job 40812342",
-  "  bench_flexray_drr_gap_merge: job 40812360",
-  "  the study: prepare 40812341, then the shard array 40812342 (4 tasks, afterany 40812341), then the merge 40812360 (afterany 40812342), each on gmsap's H200 nodes",
+  "  bench_flexray_drr_gap: job 40828920",
+  "  bench_flexray_drr_gap_shard: job 40828921",
+  "  bench_flexray_drr_gap_merge: job 40828923",
+  "  the study: prepare 40828920, then the shard array 40828921 (16 tasks, afterany 40828920), then the merge 40828923 (afterany 40828921), each on the first card of the gpu class that frees",
   "submitted the study. 'status' shows its progress while it runs; send bench flexray_drr_gap again once its merge ends to read its report, logs/BENCH-flexray_drr_gap.md.",
   "schwingnet bench: exit 0",
   "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "rc": 0,
- "request": "drr-gap-h200-2201-9dubtu",
+ "request": "drr-gap-18-0308-9dubtu",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current f78e0e8ef917",
+  "HPCW-GRID-GATE schwingnet pull current d3fe57853e4a",
   "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "v": 1,
