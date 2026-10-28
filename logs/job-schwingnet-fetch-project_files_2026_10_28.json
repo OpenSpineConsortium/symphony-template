@@ -1,0 +1,19 @@
+{
+ "at": "2026-10-28T18:31:50Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull ok c63495a22227..738fa76aa417",
+  "schwingnet fetch project_files_2026_10_28 at commit 738fa76 on warrior 2026-10-28 18:28:51 UTC",
+  "  room: 4387 GB free under its quota after 0 GB owed to 0 running fetches",
+  "  project_files_2026_10_28: carried at 01435c18c907 from the branch claude/project-thread-rr7in4 of OpenSpineConsortium/bordercall: 3332 files, 1107335194 bytes, each matching SHA256SUMS; the landing project_files_2026_10_28 on the data root, 0700, with meta/CARRIED",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "carry-project-files-2026-10-28-1825",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull ok c63495a22227..738fa76aa417",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch project_files_2026_10_28"
+}
