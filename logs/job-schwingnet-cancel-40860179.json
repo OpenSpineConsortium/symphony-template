@@ -1,0 +1,18 @@
+{
+ "at": "2026-10-29T02:43:32Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current 35a4b6f37e59",
+  "schwingnet cancel 40860179 at commit 35a4b6f on warrior 2026-10-29 02:43:32 UTC",
+  "cancelled (fetch:aws_enhance_pet_labels): 40860179 ",
+  "schwingnet cancel: exit 0",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "rc": 0,
+ "request": "fluxrepro-cancel-labels-0243",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current 35a4b6f37e59",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "v": 1,
+ "what": "schwingnet cancel 40860179"
+}
