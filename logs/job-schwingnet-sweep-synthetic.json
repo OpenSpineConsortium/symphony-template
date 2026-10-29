@@ -1,21 +1,20 @@
 {
- "at": "2026-10-25T13:16:44Z",
+ "at": "2026-10-29T18:43:25Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40781570 [hidden]",
-  "schwingnet sweep synthetic at commit fc027a6 on warrior 2026-10-25 13:16:43 UTC",
-  "  the checkout holds still at fc027a6 while the run that took it (job 40781570) lasts",
+  "HPCW-GRID-GATE schwingnet pull current d6f244dce62b",
+  "schwingnet sweep synthetic at commit d6f244d on warrior 2026-10-29 18:43:22 UTC",
   "  catalog: the synthetic one, which the run finds under the smoke folder or builds afresh there when its arguments or the code that makes it changed",
   "  setup: the environments match pixi.lock; no job",
-  "  the checkout: after the live runs that hold it (afterany:40781570,afterany:40781578,afterany:40781587)",
-  "  sweep: job 40781593",
+  "  the checkout: after the live runs that hold it (afterany:40867573,afterany:40867575)",
+  "  sweep: job 40870220",
   "submitted. 'status' shows the plan's PROGRESS.txt once the sweep writes it; the same word again after a cut sweep ends resumes it.",
   "schwingnet sweep: exit 0",
   "HPCW-GRID-GATE schwingnet sweep ok"
  ],
  "rc": 0,
- "request": "",
+ "request": "metaflow-smoke-sweep-synthetic-1843",
  "said": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40781570 fc027a6c1837da68fc0efcd63a38b5feaebc3048",
+  "HPCW-GRID-GATE schwingnet pull current d6f244dce62b",
   "HPCW-GRID-GATE schwingnet sweep ok"
  ],
  "v": 1,
