@@ -1,12 +1,19 @@
 {
- "at": "2026-10-29T18:36:44Z",
+ "at": "2026-10-29T22:47:13Z",
  "lines": [
-  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+  "HPCW-GRID-GATE schwingnet pull current 5d7842de4b97",
+  "schwingnet morphometry enhance at commit 5d7842d on warrior 2026-10-29 22:47:08 UTC",
+  "  the checkout: after the live runs that hold it (afterany:40867573,afterany:40867575,afterany:40870220,afterany:40870822)",
+  "  morphometry_enhance: job 40872077",
+  "submitted the morphometry job for enhance. Send morphometry enhance again once it ends to read its report, logs/MORPHOMETRY-enhance.md.",
+  "schwingnet morphometry: exit 0",
+  "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
- "rc": 126,
- "request": "morphometry-enhance-20261029T1845Z",
+ "rc": 0,
+ "request": "morphometry-enhance-20261029T2250Z",
  "said": [
-  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+  "HPCW-GRID-GATE schwingnet pull current 5d7842de4b97",
+  "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
  "v": 1,
  "what": "schwingnet morphometry enhance"
