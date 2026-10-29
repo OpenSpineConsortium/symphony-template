@@ -1,8 +1,8 @@
 {
- "at": "2026-10-29T02:13:44Z",
+ "at": "2026-10-29T15:11:24Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current da20aeee0525",
-  "schwingnet bench flexray_drr_gap at commit da20aee on warrior 2026-10-29 02:13:44 UTC",
+  "HPCW-GRID-GATE schwingnet pull current 28f0387aaa0b",
+  "schwingnet bench flexray_drr_gap at commit 28f0387 on warrior 2026-10-29 15:11:23 UTC",
   "## BENCH-flexray_drr_gap.md (2026-10-28 21:04:11)",
   "# bench flexray_drr_gap: job 40859208 on alh3, commit 6e908e6, 2026-10-29 00:30:16 UTC",
   "- code: commit <hex withheld> copied to /rs/rs_grp_oschome/go2432/bench/flexray_drr_gap/code-6e908e6, which every step runs; no step holds the checkout",
@@ -128,13 +128,21 @@
   "  2026-10-29 01:02:07 merge: stage figures done after 19 s",
   "  2026-10-29 01:03:43 merge: results.json, the figures and summary.txt written",
   "- exit 0 at 2026-10-29 01:04:00 UTC",
+  "  the report above is job 40859208's, which BENCH_RERUNS lets the owner's count run once more: queueing the benchmark again at 28f0387",
+  "  the SPINEPS masks: in /rs/rs_grp_oschome/go2432/data/spineps, read where enough CTs have them (the study's summary says how many)",
+  "  the MOOSE masks: in /rs/rs_grp_oschome/go2432/data/moose, read where enough CTs have them (the study's summary says how many)",
+  "  bench_flexray_drr_gap: job 40867572",
+  "  bench_flexray_drr_gap_shard: job 40867573",
+  "  bench_flexray_drr_gap_merge: job 40867575",
+  "  the study: prepare 40867572, then the shard array 40867573 (16 tasks, afterany 40867572), then the merge 40867575 (afterany 40867573), each on the first card of the gpu class that frees",
+  "submitted the study. 'status' shows its progress while it runs; send bench flexray_drr_gap again once its merge ends to read its report, logs/BENCH-flexray_drr_gap.md.",
   "schwingnet bench: exit 0",
   "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "rc": 0,
- "request": "fluxray-bench-0214-rec2",
+ "request": "drr-run3-18-1512",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current da20aeee0525",
+  "HPCW-GRID-GATE schwingnet pull current 28f0387aaa0b",
   "HPCW-GRID-GATE schwingnet bench ok"
  ],
  "v": 1,
