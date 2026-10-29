@@ -1,7 +1,7 @@
 {
  "default_branch": "main",
  "format": 1,
- "generated_at": "2026-10-28T11:19:17Z",
+ "generated_at": "2026-10-29T11:29:58Z",
  "pulls": [
   {
    "auto_merge_enabled": null,
@@ -16052,6 +16052,43 @@
    "base": "main",
    "board_conflicts": 0,
    "board_main_moved": 0,
+   "branch": "claude/project-thread-cstta6",
+   "catch_ups": 1,
+   "catch_ups_after_green": 0,
+   "catch_ups_by_button": 0,
+   "caused_by": [
+    [
+     "d1404f31d3a06c419c1b7581c9420dab3f48743e",
+     [
+      504
+     ]
+    ]
+   ],
+   "check_runs": 2,
+   "check_runs_redone": 1,
+   "check_seconds": 635,
+   "check_seconds_redone": 361,
+   "claim": false,
+   "closed": "2026-10-28T23:09:56Z",
+   "commits": 3,
+   "first_green": "2026-10-27T13:39:39Z",
+   "force_pushes": 0,
+   "landings_after_green": 0,
+   "landings_during_life": 3,
+   "merged": null,
+   "number": 505,
+   "opened": "2026-10-27T11:47:02Z",
+   "ready": null,
+   "reruns": 0,
+   "runs_cancelled": 1,
+   "stale_seconds": 0,
+   "started": "2026-10-27T11:46:36Z"
+  },
+  {
+   "auto_merge_enabled": null,
+   "base": "main",
+   "board_conflicts": 0,
+   "board_main_moved": 0,
    "branch": "claude/project-thread-9dubtu",
    "catch_ups": 0,
    "catch_ups_after_green": 0,
@@ -16318,20 +16355,20 @@
   "by_parallel_work": {
    "0": {
     "catch_ups": 5,
-    "check_runs": 99,
+    "check_runs": 95,
     "check_runs_redone": 4,
-    "merged": 84,
-    "share_with_catch_up": 0.06,
+    "merged": 82,
+    "share_with_catch_up": 0.061,
     "stale_after_green": 0,
     "stale_hours": 0.0,
     "with_catch_up": 5
    },
    "1-2": {
     "catch_ups": 29,
-    "check_runs": 139,
+    "check_runs": 143,
     "check_runs_redone": 25,
-    "merged": 94,
-    "share_with_catch_up": 0.266,
+    "merged": 96,
+    "share_with_catch_up": 0.26,
     "stale_after_green": 17,
     "stale_hours": 8.68,
     "with_catch_up": 25
@@ -16396,7 +16433,7 @@
   "check_hours_redone": 11.7,
   "check_runs": 783,
   "check_runs_redone": 215,
-  "closed_unmerged": 3,
+  "closed_unmerged": 4,
   "closed_unmerged_branch_landed_later": 2,
   "default_branch_checks": {
    "2026-10-09": {
