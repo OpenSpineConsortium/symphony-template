@@ -1,20 +1,20 @@
 {
- "at": "2026-10-29T02:41:25Z",
+ "at": "2026-10-29T02:56:55Z",
  "lines": [
   "HPCW-GRID-GATE schwingnet pull current 35a4b6f37e59",
-  "schwingnet fetch aws_enhance_pet_ct at commit 35a4b6f on warrior 2026-10-29 02:41:25 UTC",
-  "  size budget: 1 sources, 177 GB stated; /rs/rs_grp_oschome has 4386 GB free under its quota, 0 GB of it owed to 0 running fetches",
+  "schwingnet fetch aws_enhance_pet_ct at commit 35a4b6f on warrior 2026-10-29 02:56:55 UTC",
+  "  size budget: 1 sources, 177 GB stated; /rs/rs_grp_oschome has 4376 GB free under its quota, 0 GB of it owed to 0 running fetches",
   "  each job starts its fetch only if the exact size its source states fits the room then; one that does not lands nothing (grid/size-rule.sh)",
-  "  aws_enhance_pet_ct: job 40860195 acq 177GB",
-  "  2026-10-28 22:41:25 platform chain: aws_enhance_pet_ct=40860195 size_gb=177",
+  "  aws_enhance_pet_ct: job 40860413 acq 177GB",
+  "  2026-10-28 22:56:55 platform chain: aws_enhance_pet_ct=40860413 size_gb=177",
   "  ETA: network-bound, about 1 hour per 20 GB, so about 9 hours for 177 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
   "  ",
-  "  dp_aws_enhance_pet_ct: job 40860195",
+  "  dp_aws_enhance_pet_ct: job 40860413",
   "schwingnet fetch: exit 0",
   "HPCW-GRID-GATE schwingnet fetch ok"
  ],
  "rc": 0,
- "request": "fluxrepro-ct-0243",
+ "request": "fluxrepro-ct-0257",
  "said": [
   "HPCW-GRID-GATE schwingnet pull current 35a4b6f37e59",
   "HPCW-GRID-GATE schwingnet fetch ok"
