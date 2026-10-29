@@ -1,6 +1,6 @@
 {
  "action": "job",
- "at": "2026-10-29T22:25:04Z",
+ "at": "2026-10-29T22:26:05Z",
  "list": {
   "accounts": [
    {
@@ -67,7 +67,7 @@
    "name": "worker",
    "node": "zfh15",
    "state": "online",
-   "updated_at": "2026-10-29T22:25:01Z"
+   "updated_at": "2026-10-29T22:26:02Z"
   },
   "workers": [
    {
@@ -82,7 +82,7 @@
   ]
  },
  "rc": 0,
- "request": "metaflow-smoke-status-2224",
+ "request": "",
  "said": [
   "HPCW-GRID-GATE accounts ok"
  ],
