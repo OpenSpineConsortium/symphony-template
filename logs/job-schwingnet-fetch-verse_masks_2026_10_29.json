@@ -1,0 +1,19 @@
+{
+ "at": "2026-10-29T14:11:22Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull ok c01cb46ee670..51e471ee042a",
+  "schwingnet fetch verse_masks_2026_10_29 at commit 51e471e on warrior 2026-10-29 14:09:57 UTC",
+  "  room: 4124 GB free under its quota after 0 GB owed to 0 running fetches",
+  "  verse_masks_2026_10_29: carried at 27d84df3f74b from the branch claude/project-thread-6vy0yb of OpenSpineConsortium/bordercall: 378 files, 387949238 bytes, each matching SHA256SUMS; the landing verse_masks_2026_10_29 on the data root, 0700, with meta/CARRIED",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "rc": 0,
+ "request": "carry-verse-masks-2026-10-29-1410",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull ok c01cb46ee670..51e471ee042a",
+  "HPCW-GRID-GATE schwingnet fetch ok"
+ ],
+ "v": 1,
+ "what": "schwingnet fetch verse_masks_2026_10_29"
+}

@@ -1,6 +1,6 @@
 {
  "action": "job",
- "at": "2026-10-29T14:02:23Z",
+ "at": "2026-10-29T14:11:25Z",
  "list": {
   "accounts": [
    {
@@ -67,7 +67,7 @@
    "name": "worker",
    "node": "zfh15",
    "state": "online",
-   "updated_at": "2026-10-29T14:02:02Z"
+   "updated_at": "2026-10-29T14:11:03Z"
   },
   "workers": [
    {
@@ -82,7 +82,7 @@
   ]
  },
  "rc": 0,
- "request": "fluxrepro-edit-1402",
+ "request": "carry-verse-masks-2026-10-29-1410",
  "said": [
   "HPCW-GRID-GATE accounts ok"
  ],
