@@ -1,0 +1,18 @@
+{
+ "at": "2026-10-30T13:40:50Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current c656299889c8",
+  "schwingnet cancel 40877151 at commit c656299 on warrior 2026-10-30 13:40:50 UTC",
+  "job 40877151 is no longer queued or running; nothing cancelled",
+  "schwingnet cancel: exit 0",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "rc": 0,
+ "request": "cancel-morphometry-verse",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current c656299889c8",
+  "HPCW-GRID-GATE schwingnet cancel ok"
+ ],
+ "v": 1,
+ "what": "schwingnet cancel 40877151"
+}
