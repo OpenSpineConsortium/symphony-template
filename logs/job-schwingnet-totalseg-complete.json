@@ -1,0 +1,13 @@
+{
+ "at": "2026-10-30T14:56:17Z",
+ "lines": [
+  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+ ],
+ "rc": 126,
+ "request": "totalseg-complete-2",
+ "said": [
+  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+ ],
+ "v": 1,
+ "what": "schwingnet totalseg complete"
+}
