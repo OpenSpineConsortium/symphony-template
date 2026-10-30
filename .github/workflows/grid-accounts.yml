@@ -59,7 +59,7 @@ on:
         required: false
         default: ""
       job:
-        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, freeze-status|pilot|start|report|overlap, storage-status|report|survey, storage-apply-<request stamp>, storage-retire-<request stamp>, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples|nodequota|folders, or schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id>, schwingnet-dropzip-<id>, schwingnet-unpack-<id>, schwingnet-experiment-<issue>, schwingnet-sweep-<plan>, schwingnet-bank-<id>, schwingnet-bench-<name>, schwingnet-anomaly-<stage>, schwingnet-bordercall-<stage>, schwingnet-realism-<stage>, schwingnet-morphometry-<set>, schwingnet-literature-<list> or schwingnet-cancel-<job>"
+        description: "The grid job (job): update, artifacts, promoter-status|start|stop|restart, freeze-status|pilot|start|report|overlap, storage-status|report|survey, storage-apply-<request stamp>, storage-retire-<request stamp>, schwingnet-start|status|leaks|v1|latency|stop|prior|chain_eval|samples|nodequota|folders, or schwingnet-fetch-<id>, schwingnet-census-<id>, schwingnet-explore-<id>, schwingnet-dropzip-<id>, schwingnet-unpack-<id>, schwingnet-experiment-<issue>, schwingnet-sweep-<plan>, schwingnet-bank-<id>, schwingnet-bench-<name>, schwingnet-anomaly-<stage>, schwingnet-bordercall-<stage>, schwingnet-totalseg-<stage>, schwingnet-realism-<stage>, schwingnet-morphometry-<set>, schwingnet-literature-<list> or schwingnet-cancel-<job>"
         required: false
         default: ""
       request:
