@@ -1,17 +1,18 @@
 {
- "at": "2026-10-29T22:51:07Z",
+ "at": "2026-10-30T08:25:38Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 5d7842de4b97",
-  "schwingnet morphometry verse at commit 5d7842d on warrior 2026-10-29 22:51:07 UTC",
-  "refusing: a morphometry job is still queued or running (job 40872077 ); send morphometry verse again once it ends",
-  "schwingnet morphometry: exit 75",
-  "HPCW-GRID-GATE schwingnet morphometry failed 75"
+  "HPCW-GRID-GATE schwingnet pull current 3abc2fa1f046",
+  "schwingnet morphometry verse at commit 3abc2fa on warrior 2026-10-30 08:25:37 UTC",
+  "  morphometry_verse: job 40877151",
+  "submitted the morphometry job for verse. Send morphometry verse again once it ends to read its report, logs/MORPHOMETRY-verse.md.",
+  "schwingnet morphometry: exit 0",
+  "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
- "rc": 75,
- "request": "morphometry-verse-20261029T2300Z",
+ "rc": 0,
+ "request": "morphometry-verse-20261030T0826Z",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 5d7842de4b97",
-  "HPCW-GRID-GATE schwingnet morphometry failed 75"
+  "HPCW-GRID-GATE schwingnet pull current 3abc2fa1f046",
+  "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
  "v": 1,
  "what": "schwingnet morphometry verse"
