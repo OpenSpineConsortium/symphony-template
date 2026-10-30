@@ -1,8 +1,8 @@
 {
- "at": "2026-10-30T18:41:25Z",
+ "at": "2026-10-30T19:12:30Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 69371c24b5e9",
-  "schwingnet autoanatomist gold3_latent_smoke at commit 69371c2 on warrior 2026-10-30 18:41:25 UTC",
+  "HPCW-GRID-GATE schwingnet pull ok 69371c24b5e9..432489a1bb99",
+  "schwingnet autoanatomist gold3_latent_smoke at commit 432489a on warrior 2026-10-30 19:12:29 UTC",
   "## [hidden].md (2026-10-30 14:32:16)",
   "# autoanatomist gold3_latent_smoke: job 40884715 on voh5, commit 69371c2, 2026-10-30 18:26:40 UTC",
   "- code: commit <hex withheld> copied to /rs/rs_grp_oschome/go2432/autoanatomist/gold3_latent_smoke/40884715/code-69371c2, which every part of the chain runs",
@@ -31,13 +31,16 @@
   "- figures: /rs/rs_grp_oschome/go2432/autoanatomist/gold3_latent_smoke/40884715/join/curves.png and finals.png, the CLAIM and REFORMS report /rs/rs_grp_oschome/go2432/autoanatomist/gold3_latent_smoke/4",
   "- progress page: /rs/rs_grp_oschome/go2432/metaflow/progress/AutoanatomistFlow/1793385123019889/index.html",
   "- exit 1 at 2026-10-30 18:32:16 UTC",
+  "  the report above ended in failure on older code: queueing the plan again at 432489a",
+  "  [hidden]: job 40885678",
+  "submitted the plan gold3_latent_smoke: one GPU job (40885678) that trains its 2 trials one after another on one card and then joins them, in /rs/rs_grp_oschome/go2432/autoanatomist/gold3_latent_smoke/40885678. Send autoanatomist gold3_latent_smoke again once it ends to read its report, logs/[hidden]",
   "schwingnet autoanatomist: exit 0",
   "HPCW-GRID-GATE schwingnet autoanatomist ok"
  ],
  "rc": 0,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 69371c24b5e9",
+  "HPCW-GRID-GATE schwingnet pull ok 69371c24b5e9..432489a1bb99",
   "HPCW-GRID-GATE schwingnet autoanatomist ok"
  ],
  "v": 1,
