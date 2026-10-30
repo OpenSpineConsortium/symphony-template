@@ -1,12 +1,18 @@
 {
- "at": "2026-10-30T14:56:17Z",
+ "at": "2026-10-30T15:55:40Z",
  "lines": [
-  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+  "HPCW-GRID-GATE schwingnet pull current 2fe153f508dc",
+  "schwingnet totalseg complete at commit 2fe153f on warrior 2026-10-30 15:55:39 UTC",
+  "  totalseg_complete: job 40882547",
+  "submitted the totalseg complete job: one GPU job that runs TotalSegmentator (VerSe, TotalSegmentator) or MOOSE (ENHANCE.PET) on each admitted study's own CT for the C2 or sacrum its release lacks. Send totalseg complete again once it ends to read its report, logs/TOTALSEG-complete.md.",
+  "schwingnet totalseg: exit 0",
+  "HPCW-GRID-GATE schwingnet totalseg ok"
  ],
- "rc": 126,
- "request": "totalseg-complete-2",
+ "rc": 0,
+ "request": "totalseg-complete-3",
  "said": [
-  "HPCW-GRID-GATE refused word: one of start, status or stop (or an accounts, job or key word), and nothing else"
+  "HPCW-GRID-GATE schwingnet pull current 2fe153f508dc",
+  "HPCW-GRID-GATE schwingnet totalseg ok"
  ],
  "v": 1,
  "what": "schwingnet totalseg complete"
