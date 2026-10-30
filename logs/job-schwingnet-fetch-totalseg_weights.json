@@ -1,18 +1,24 @@
 {
- "at": "2026-10-30T09:35:02Z",
+ "at": "2026-10-30T13:42:36Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40877151 [hidden]",
-  "schwingnet fetch totalseg_weights at commit 3abc2fa on warrior 2026-10-30 09:35:02 UTC",
-  "  the checkout holds still at 3abc2fa while the run that took it (job 40877151) lasts",
-  "refusing: totalseg_weights is not an id of grid/fetch-xray.json nor a gated source of grid/run-platform-fetch.sh",
-  "schwingnet fetch: exit 64",
-  "HPCW-GRID-GATE schwingnet fetch failed 64"
+  "HPCW-GRID-GATE schwingnet pull current c656299889c8",
+  "schwingnet fetch totalseg_weights at commit c656299 on warrior 2026-10-30 13:42:35 UTC",
+  "  size budget: 1 sources, 0 GB stated; /rs/rs_grp_oschome has 4118 GB free under its quota, 0 GB of it owed to 0 running fetches",
+  "  each job starts its fetch only if the exact size its source states fits the room then; one that does not lands nothing (grid/size-rule.sh)",
+  "  no size stated on the line for: totalseg_weights (the job reads it from the source)",
+  "  totalseg_weights: job 40879163 url 0GB",
+  "  2026-10-30 09:42:36 platform chain: totalseg_weights=40879163 size_gb=0",
+  "  ETA: network-bound, about 1 hour per 20 GB, so about 1 hours for 0 GB in one chain of 4-day jobs requeued on preemption; watch with the gate word status",
+  "  ",
+  "  dp_totalseg_weights: job 40879163",
+  "schwingnet fetch: exit 0",
+  "HPCW-GRID-GATE schwingnet fetch ok"
  ],
- "rc": 64,
- "request": "totalseg-weights-2026-10-30",
+ "rc": 0,
+ "request": "totalseg-weights-2",
  "said": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40877151 3abc2fa1f046bba124326392685c8d51cc33209d",
-  "HPCW-GRID-GATE schwingnet fetch failed 64"
+  "HPCW-GRID-GATE schwingnet pull current c656299889c8",
+  "HPCW-GRID-GATE schwingnet fetch ok"
  ],
  "v": 1,
  "what": "schwingnet fetch totalseg_weights"
