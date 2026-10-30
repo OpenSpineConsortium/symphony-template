@@ -1,19 +1,22 @@
 {
- "at": "2026-10-30T21:24:09Z",
+ "at": "2026-10-30T22:45:36Z",
  "lines": [
   "HPCW-GRID-GATE schwingnet pull current 5fcd8683eef0",
-  "schwingnet autoanatomist gold3_latent_screen at commit 5fcd868 on warrior 2026-10-30 21:24:08 UTC",
-  "  [hidden]: job 40888943",
-  "  [hidden]: job 40888945",
-  "submitted the plan gold3_latent_screen: the trials' array 40888943 (8 tasks, each on the first card of galhp that frees) and the join 40888945 afterany it on a CPU node, in /rs/rs_grp_oschome/go2432/autoanatomist/gold3_latent_screen/40888943. Send autoanatomist gold3_latent_screen again once they en",
-  "schwingnet autoanatomist: exit 0",
-  "HPCW-GRID-GATE schwingnet autoanatomist ok"
+  "schwingnet autoanatomist gold3_latent_screen at commit 5fcd868 on warrior 2026-10-30 22:45:36 UTC",
+  "refusing: the plan gold3_latent_screen is still queued or running (job 40888943, job 40888945); send autoanatomist gold3_latent_screen again once it ends",
+  "  where each trial of chain 40888943 stands, the last line of its PROGRESS.txt:",
+  "    joint_s1: 2026-10-30 22:23:12 UTC joint_s1: final distance 1.0269910228467218 mm, dice 0.8614403043104317, 504 s",
+  "    joint_s2: 2026-10-30 22:31:44 UTC joint_s2: final distance 1.0709195378984686 mm, dice 0.854815182573302, 498 s",
+  "    lambda_then_w_s1: 2026-10-30 22:40:39 UTC lambda_then_w_s1: final distance 1.0147083989459142 mm, dice 0.8637381128390222, 513 s",
+  "    lambda_then_w_s2: 2026-10-30 22:45:21 UTC crops cut for 90 of 120 rows",
+  "schwingnet autoanatomist: exit 75",
+  "HPCW-GRID-GATE schwingnet autoanatomist failed 75"
  ],
- "rc": 0,
+ "rc": 75,
  "request": "",
  "said": [
   "HPCW-GRID-GATE schwingnet pull current 5fcd8683eef0",
-  "HPCW-GRID-GATE schwingnet autoanatomist ok"
+  "HPCW-GRID-GATE schwingnet autoanatomist failed 75"
  ],
  "v": 1,
  "what": "schwingnet autoanatomist gold3_latent_screen"
