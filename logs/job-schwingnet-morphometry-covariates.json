@@ -1,0 +1,19 @@
+{
+ "at": "2026-10-30T13:07:24Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull current c656299889c8",
+  "schwingnet morphometry covariates at commit c656299 on warrior 2026-10-30 13:07:23 UTC",
+  "  morphometry_covariates: job 40878978",
+  "submitted the morphometry covariates job: one CPU job that reads only, its per-person tables kept on the grid. Send morphometry covariates again once it ends to read its report, logs/MORPHOMETRY-covariates.md, a page a send.",
+  "schwingnet morphometry: exit 0",
+  "HPCW-GRID-GATE schwingnet morphometry ok"
+ ],
+ "rc": 0,
+ "request": "covariates-1307",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull current c656299889c8",
+  "HPCW-GRID-GATE schwingnet morphometry ok"
+ ],
+ "v": 1,
+ "what": "schwingnet morphometry covariates"
+}
