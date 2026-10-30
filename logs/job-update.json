@@ -1,13 +1,13 @@
 {
- "at": "2026-10-29T19:25:52Z",
+ "at": "2026-10-30T15:54:38Z",
  "lines": [
-  "HPCW-GRID-GATE update ok 99300310fb79..e0626a598c79",
+  "HPCW-GRID-GATE update ok e0626a598c79..0f323d46d949",
   "HPCW-GRID-GATE framework 28"
  ],
  "rc": 0,
- "request": "morphometry-update-20261029T1922Z",
+ "request": "update-totalseg-gate",
  "said": [
-  "HPCW-GRID-GATE update ok 99300310fb79..e0626a598c79",
+  "HPCW-GRID-GATE update ok e0626a598c79..0f323d46d949",
   "HPCW-GRID-GATE framework 28"
  ],
  "v": 1,
