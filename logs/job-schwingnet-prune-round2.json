@@ -1,17 +1,26 @@
 {
- "at": "2026-10-31T02:40:13Z",
+ "at": "2026-10-31T02:49:53Z",
  "lines": [
   "HPCW-GRID-GATE schwingnet pull current 59ef8208a014",
-  "schwingnet prune round2 at commit 59ef820 on warrior 2026-10-31 02:40:13 UTC",
-  "refusing: a step of prune round2 is still queued or running (job 40902486); send prune round2 again once it ends",
-  "schwingnet prune: exit 75",
-  "HPCW-GRID-GATE schwingnet prune failed 75"
+  "schwingnet prune round2 at commit 59ef820 on warrior 2026-10-31 02:49:53 UTC",
+  "## PRUNE-round2.plan.md (2026-10-30 22:45:09)",
+  "# prune round2: the plan",
+  "",
+  "- idc_nlst: 5,986,896 files, 3,168.7 GB",
+  "- hf_abdomenatlas2_0_mini: 5,501 files, 330.9 GB",
+  "- zenodo_unitochest: 329,157 files, 161.4 GB",
+  "- hf_rexgradient_160k: 84 files, 155.6 GB",
+  "",
+  "To delete: 3,816.5 GB. Nothing is deleted until the word is sent again after this report.",
+  "Send prune round2 again to delete what this plan lists; a folder that changed since is kept.",
+  "schwingnet prune: exit 0",
+  "HPCW-GRID-GATE schwingnet prune ok"
  ],
- "rc": 75,
- "request": "prune-round2-show",
+ "rc": 0,
+ "request": "prune-round2-show-2",
  "said": [
   "HPCW-GRID-GATE schwingnet pull current 59ef8208a014",
-  "HPCW-GRID-GATE schwingnet prune failed 75"
+  "HPCW-GRID-GATE schwingnet prune ok"
  ],
  "v": 1,
  "what": "schwingnet prune round2"
