@@ -1,14 +1,14 @@
 {
- "at": "2026-10-25T01:49:28Z",
+ "at": "2026-10-31T02:13:50Z",
  "lines": [
   "queueing one read-only job to size the volume by folder; it changes nothing",
-  "HPCW-JOB submitted 40778779 storage reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40778779.out",
-  "HPCW-GRID-GATE storage survey ok at 4d802f80ed9a"
+  "HPCW-JOB submitted 40902375 storage reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902375.out",
+  "HPCW-GRID-GATE storage survey ok at 8134812b4208"
  ],
  "rc": 0,
- "request": "gf4-svy-0150",
+ "request": "prune-round3-survey",
  "said": [
-  "HPCW-GRID-GATE storage survey ok at 4d802f80ed9a"
+  "HPCW-GRID-GATE storage survey ok at 8134812b4208"
  ],
  "v": 1,
  "what": "storage survey"
