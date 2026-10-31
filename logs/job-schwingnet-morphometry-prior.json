@@ -1,18 +1,18 @@
 {
- "at": "2026-10-31T00:55:31Z",
+ "at": "2026-10-31T02:35:46Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40900765 [hidden]",
-  "schwingnet morphometry prior at commit c183bcd on warrior 2026-10-31 00:55:31 UTC",
-  "  the checkout holds still at c183bcd while the run that took it (job 40900765) lasts",
-  "refusing: a morphometry job is still queued or running (job 40900765 ); send morphometry prior again once it ends",
-  "schwingnet morphometry: exit 75",
-  "HPCW-GRID-GATE schwingnet morphometry failed 75"
+  "HPCW-GRID-GATE schwingnet pull ok ab8826a52c09..59ef8208a014",
+  "schwingnet morphometry prior at commit 59ef820 on warrior 2026-10-31 02:35:45 UTC",
+  "  morphometry_prior: job 40902475",
+  "submitted the morphometry prior job: one CPU job that reads the rows and writes the priors under the morphometry root. Send morphometry prior again once it ends to read its report, logs/MORPHOMETRY-prior.md.",
+  "schwingnet morphometry: exit 0",
+  "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
- "rc": 75,
- "request": "prior-fit-2",
+ "rc": 0,
+ "request": "prior-fit-3",
  "said": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40900765 c183bcda4666c5ac0fb39e5671f721d364743591",
-  "HPCW-GRID-GATE schwingnet morphometry failed 75"
+  "HPCW-GRID-GATE schwingnet pull ok ab8826a52c09..59ef8208a014",
+  "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
  "v": 1,
  "what": "schwingnet morphometry prior"
