@@ -1,0 +1,15 @@
+{
+ "at": "2026-10-31T02:19:56Z",
+ "lines": [
+  "queueing one job to plan 10 retirements of request 20261031T010232Z; it deletes nothing",
+  "HPCW-JOB submitted 40902418 storage reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902418.out",
+  "HPCW-GRID-GATE storage apply ok at a92b072242be"
+ ],
+ "rc": 0,
+ "request": "prune-round1-apply",
+ "said": [
+  "HPCW-GRID-GATE storage apply ok at a92b072242be"
+ ],
+ "v": 1,
+ "what": "storage apply 20261031T010232Z"
+}
