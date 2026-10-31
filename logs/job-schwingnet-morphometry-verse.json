@@ -1,8 +1,9 @@
 {
- "at": "2026-10-30T14:19:42Z",
+ "at": "2026-10-31T00:28:06Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull ok c656299889c8..2fe153f508dc",
-  "schwingnet morphometry verse at commit 2fe153f on warrior 2026-10-30 14:19:41 UTC",
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40896342 [hidden]",
+  "schwingnet morphometry verse at commit 45370ca on warrior 2026-10-31 00:28:06 UTC",
+  "  the checkout holds still at 45370ca while the run that took it (job 40896342) lasts",
   "## MORPHOMETRY-verse.md (2026-10-30 08:21:05)",
   "# morphometry verse: job 40877151 on mem4, commit 3abc2fa, 2026-10-30 08:26:02 UTC",
   "- interpreter: /wsu/home/go/go24/go2432/mambaforge/envs/spineps/bin/python (3.11.16) for the measuring",
@@ -84,9 +85,9 @@
   "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
  "rc": 0,
- "request": "verse-report-read-20261030T1420Z",
+ "request": "morph-rerun-verse",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull ok c656299889c8..2fe153f508dc",
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40896342 45370ca07d279a690b55534fbf373ea250422c14",
   "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
  "v": 1,
