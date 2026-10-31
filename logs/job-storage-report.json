@@ -1,13 +1,13 @@
 {
- "at": "2026-10-31T02:31:11Z",
+ "at": "2026-10-31T03:28:03Z",
  "lines": [
-  "reported to storage-report at d9820138c3af",
-  "HPCW-GRID-GATE storage report ok at a92b072242be"
+  "reported to storage-report at 245d73ae3d4d",
+  "HPCW-GRID-GATE storage report ok at 80b1dd8c437c"
  ],
  "rc": 0,
  "request": "prune-round1-report",
  "said": [
-  "HPCW-GRID-GATE storage report ok at a92b072242be"
+  "HPCW-GRID-GATE storage report ok at 80b1dd8c437c"
  ],
  "v": 1,
  "what": "storage report"
