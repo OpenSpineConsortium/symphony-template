@@ -1,7 +1,8 @@
 {
- "at": "2026-10-31T03:26:19Z",
+ "at": "2026-10-31T03:42:59Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
+  "          40902675      reqp spine-da   go2432  R      13:38      1 kbt3",
   "plan idc_midrc_ricord_1b: {\"bytes_kept\":13219,\"bytes_to_delete\":8668708098,\"files_kept\":3,\"files_to_delete\":21221,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"idc_midrc_ricord_1b\",\"planned_at\":\"2026-10-31T03:08:41Z\",\"problems\":[],\"tree_sha256\":\"[hidden]\"}",
   "plan zenodo_ts_task_pleural_effusion: {\"bytes_kept\":111828337,\"bytes_to_delete\":8900944278,\"files_kept\":604,\"files_to_delete\":600,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"zenodo_ts_task_pleural_effusion\",\"planned_at\":\"2026-10-31T03:08:41Z\",\"problems\":[],\"tree_sha256\":\"[hidden]\"}",
   "plan zenodo_ts_task_hip_implant: {\"bytes_kept\":9228885,\"bytes_to_delete\":9120758621,\"files_kept\":74,\"files_to_delete\":72,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"zenodo_ts_task_hip_implant\",\"planned_at\":\"2026-10-31T03:08:41Z\",\"problems\":[],\"tree_sha256\":\"[hidden]\"}",
@@ -13,14 +14,14 @@
   "plan rsna_rspect: {\"bytes_kept\":128384348,\"bytes_to_delete\":980108825708,\"files_kept\":3,\"files_to_delete\":1937447,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"rsna_rspect\",\"planned_at\":\"2026-10-31T02:53:22Z\",\"problems\":[],\"tree_sha256\":\"[hidden]\"}",
   "plan idc_ldct_and_projection_data: {\"bytes_kept\":0,\"bytes_to_delete\":0,\"files_kept\":0,\"files_to_delete\":0,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"idc_ldct_and_projection_data\",\"planned_at\":\"2026-10-31T02:20:24Z\",\"problems\":[\"thefolderhasalinkonitspath\"],\"tree_sha256\":\"[hidden]\"}",
   "survey: \"read_at\": \"2026-10-31T02:15:30Z\"",
-  "HPCW-JOB 40902375 storage COMPLETED on kbt3 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902375.out",
   "HPCW-JOB 40902418 storage FAILED on kbt3 exit 1:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902418.out",
   "HPCW-JOB 40902526 storage OUT_OF_MEMORY on kbt3 exit 0:125 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902526.out",
   "HPCW-JOB 40902530 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40902530.out",
+  "HPCW-JOB 40902675 storage RUNNING on kbt3 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902675.out",
   "HPCW-GRID-GATE storage status ok"
  ],
  "rc": 0,
- "request": "prune-storage-status-2",
+ "request": "prune-storage-status-3",
  "said": [
   "HPCW-GRID-GATE storage status ok"
  ],
