@@ -1,0 +1,16 @@
+{
+ "at": "2026-10-31T03:29:02Z",
+ "lines": [
+  "idc_ldct_and_projection_data: no plan that lists files; send storage apply 20261031T010232Z first, or read its problems",
+  "queueing one job to retire 9 sets of request 20261031T010232Z",
+  "HPCW-JOB submitted 40902675 storage reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902675.out",
+  "HPCW-GRID-GATE storage retire ok at 80b1dd8c437c"
+ ],
+ "rc": 0,
+ "request": "prune-round1-retire",
+ "said": [
+  "HPCW-GRID-GATE storage retire ok at 80b1dd8c437c"
+ ],
+ "v": 1,
+ "what": "storage retire 20261031T010232Z"
+}
