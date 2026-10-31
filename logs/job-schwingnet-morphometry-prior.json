@@ -1,8 +1,8 @@
 {
- "at": "2026-10-31T02:47:34Z",
+ "at": "2026-10-31T05:15:19Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 59ef8208a014",
-  "schwingnet morphometry prior at commit 59ef820 on warrior 2026-10-31 02:47:34 UTC",
+  "HPCW-GRID-GATE schwingnet pull current 386b4073d658",
+  "schwingnet morphometry prior at commit 386b407 on warrior 2026-10-31 05:15:18 UTC",
   "## MORPHOMETRY-prior.md (2026-10-30 22:36:36)",
   "# morphometry prior: job 40902475 on kbt3, commit 59ef820, 2026-10-31 02:36:21 UTC",
   "- interpreter: the SPINEPS environment in the home, Python 3.11.16, numpy 2.2.6",
@@ -129,13 +129,16 @@
   "- totalsegmentator T1..L5: r_level L5: 0.234 0.376 0.373 0.335 0.373 0.403 0.410 0.397 0.355 0.337 0.321 0.338 0.331 0.430 0.459 0.455 1.000",
   "- the fit: done in 11 s",
   "- exit 0 at 2026-10-31 02:36:36 UTC",
+  "  the report above is from older code: fitting again at 386b407",
+  "  morphometry_prior: job 40903052",
+  "submitted the morphometry prior job: one CPU job that reads the rows and writes the priors under the morphometry root. Send morphometry prior again once it ends to read its report, logs/MORPHOMETRY-prior.md.",
   "schwingnet morphometry: exit 0",
   "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
  "rc": 0,
- "request": "prior-read-1",
+ "request": "prior-refit-1",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 59ef8208a014",
+  "HPCW-GRID-GATE schwingnet pull current 386b4073d658",
   "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
  "v": 1,
