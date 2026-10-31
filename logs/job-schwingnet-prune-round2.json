@@ -1,16 +1,16 @@
 {
- "at": "2026-10-31T03:03:23Z",
+ "at": "2026-10-31T03:26:21Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 59ef8208a014",
-  "schwingnet prune round2 at commit 59ef820 on warrior 2026-10-31 03:03:23 UTC",
+  "HPCW-GRID-GATE schwingnet pull current aa75c0f42eaa",
+  "schwingnet prune round2 at commit aa75c0f on warrior 2026-10-31 03:26:21 UTC",
   "refusing: a step of prune round2 is still queued or running (job 40902529); send prune round2 again once it ends",
   "schwingnet prune: exit 75",
   "HPCW-GRID-GATE schwingnet prune failed 75"
  ],
  "rc": 75,
- "request": "prune-round2-done",
+ "request": "prune-round2-done-2",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 59ef8208a014",
+  "HPCW-GRID-GATE schwingnet pull current aa75c0f42eaa",
   "HPCW-GRID-GATE schwingnet prune failed 75"
  ],
  "v": 1,
