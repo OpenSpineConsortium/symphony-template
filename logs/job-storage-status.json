@@ -1,8 +1,8 @@
 {
- "at": "2026-10-31T04:25:32Z",
+ "at": "2026-10-31T04:50:10Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
-  "          40902814      reqp spine-da   go2432  R      13:10      1 kbt3",
+  "          40902814      reqp spine-da   go2432  R      37:48      1 kbt3",
   "plan rsna_rspect: {\"bytes_kept\":0,\"bytes_to_delete\":0,\"files_kept\":0,\"files_to_delete\":0,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"rsna_rspect\",\"planned_at\":\"2026-10-31T04:12:21Z\",\"problems\":[\"[hidden]\"],\"tree_sha256\":\"[hidden]\"}",
   "plan verse_2d_projections: {\"bytes_kept\":12034708,\"bytes_to_delete\":4405051397,\"files_kept\":4,\"files_to_delete\":12,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"verse_2d_projections\",\"planned_at\":\"2026-10-31T04:08:32Z\",\"problems\":[],\"tree_sha256\":\"[hidden]\"}",
   "plan csi2014: {\"bytes_kept\":230,\"bytes_to_delete\":6640701970,\"files_kept\":1,\"files_to_delete\":41,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"csi2014\",\"planned_at\":\"2026-10-31T04:08:31Z\",\"problems\":[],\"tree_sha256\":\"[hidden]\"}",
@@ -39,7 +39,7 @@
   "HPCW-GRID-GATE storage status ok"
  ],
  "rc": 0,
- "request": "prune-storage-status-5",
+ "request": "prune-storage-status-6",
  "said": [
   "HPCW-GRID-GATE storage status ok"
  ],
