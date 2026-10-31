@@ -1,0 +1,21 @@
+{
+ "at": "2026-10-31T01:49:42Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40902026 [hidden]",
+  "schwingnet autoanatomist gold3_latent_screen2 at commit ab8826a on warrior 2026-10-31 01:49:41 UTC",
+  "  the checkout holds still at ab8826a while the run that took it (job 40902026) lasts",
+  "  [hidden]: job 40902102",
+  "  [hidden]: job 40902104",
+  "submitted the plan gold3_latent_screen2: the trials' array 40902102 (12 tasks, each on the first card of galhp that frees) and the join 40902104 afterany it on a CPU node, in /rs/rs_grp_oschome/go2432/autoanatomist/gold3_latent_screen2/40902102. Send autoanatomist gold3_latent_screen2 again once the",
+  "schwingnet autoanatomist: exit 0",
+  "HPCW-GRID-GATE schwingnet autoanatomist ok"
+ ],
+ "rc": 0,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40902026 ab8826a52c096644be58720b00933fbedb438409",
+  "HPCW-GRID-GATE schwingnet autoanatomist ok"
+ ],
+ "v": 1,
+ "what": "schwingnet autoanatomist gold3_latent_screen2"
+}
