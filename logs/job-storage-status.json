@@ -1,7 +1,16 @@
 {
- "at": "2026-10-31T05:21:54Z",
+ "at": "2026-10-31T05:49:28Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
+  "plan verse_2d_projections.retired: {\"bytes_deleted_now\":4405051397,\"complete\":true,\"failure_reasons\":{},\"failures\":0,\"files_deleted_now\":12,\"files_kept\":4,\"files_left_of_listed\":0,\"files_listed\":12,\"format\":\"spine-datasets/retired1\",\"id\":\"verse_2d_projections\",\"problems\":[],\"request\":\"20261031T02192",
+  "plan csi2014.retired: {\"bytes_deleted_now\":6640701970,\"complete\":true,\"failure_reasons\":{},\"failures\":0,\"files_deleted_now\":41,\"files_kept\":1,\"files_left_of_listed\":0,\"files_listed\":41,\"format\":\"spine-datasets/retired1\",\"id\":\"csi2014\",\"problems\":[],\"request\":\"20261031T021925Z\",\"retired_at\":\"2026-10-",
+  "plan ctpelvic1k.retired: {\"bytes_deleted_now\":8825225733,\"complete\":true,\"failure_reasons\":{},\"failures\":0,\"files_deleted_now\":104,\"files_kept\":76,\"files_left_of_listed\":0,\"files_listed\":104,\"format\":\"spine-datasets/retired1\",\"id\":\"ctpelvic1k\",\"problems\":[],\"request\":\"20261031T021925Z\",\"retired_at\":",
+  "plan barts_crl.retired: {\"bytes_deleted_now\":20313374444,\"complete\":true,\"failure_reasons\":{},\"failures\":0,\"files_deleted_now\":221,\"files_kept\":1,\"files_left_of_listed\":0,\"files_listed\":221,\"format\":\"spine-datasets/retired1\",\"id\":\"barts_crl\",\"problems\":[],\"request\":\"20261031T021925Z\",\"retired_at\":\"2",
+  "plan pengwin_task2_xrays.retired: {\"bytes_deleted_now\":34950730625,\"complete\":true,\"failure_reasons\":{},\"failures\":0,\"files_deleted_now\":2,\"files_kept\":4,\"files_left_of_listed\":0,\"files_listed\":2,\"format\":\"spine-datasets/retired1\",\"id\":\"pengwin_task2_xrays\",\"problems\":[],\"request\":\"20261031T021925Z\"",
+  "plan nlst_pilot.retired: {\"bytes_deleted_now\":73543990990,\"complete\":true,\"failure_reasons\":{},\"failures\":0,\"files_deleted_now\":89864,\"files_kept\":1,\"files_left_of_listed\":0,\"files_listed\":89864,\"format\":\"spine-datasets/retired1\",\"id\":\"nlst_pilot\",\"problems\":[],\"request\":\"20261031T021925Z\",\"retired_",
+  "plan ctspine1k.retired: {\"bytes_deleted_now\":161970332092,\"complete\":true,\"failure_reasons\":{},\"failures\":0,\"files_deleted_now\":1006,\"files_kept\":1014,\"files_left_of_listed\":0,\"files_listed\":1006,\"format\":\"spine-datasets/retired1\",\"id\":\"ctspine1k\",\"problems\":[],\"request\":\"20261031T021925Z\",\"retired_",
+  "plan ctspinopelvic1k.retired: {\"bytes_deleted_now\":199493599332,\"complete\":true,\"failure_reasons\":{},\"failures\":0,\"files_deleted_now\":6673,\"files_kept\":6012,\"files_left_of_listed\":0,\"files_listed\":6673,\"format\":\"spine-datasets/retired1\",\"id\":\"ctspinopelvic1k\",\"problems\":[],\"request\":\"20261031T021925",
+  "plan rsna_2022_cervical.retired: {\"bytes_deleted_now\":203321991754,\"complete\":true,\"failure_reasons\":{},\"failures\":0,\"files_deleted_now\":3,\"files_kept\":1,\"files_left_of_listed\":0,\"files_listed\":3,\"format\":\"spine-datasets/retired1\",\"id\":\"rsna_2022_cervical\",\"problems\":[],\"request\":\"20261031T021925Z\",",
   "plan idc_midrc_ricord_1b: {\"bytes_kept\":0,\"bytes_to_delete\":0,\"files_kept\":0,\"files_to_delete\":0,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"idc_midrc_ricord_1b\",\"planned_at\":\"2026-10-31T05:02:18Z\",\"problems\":[\"21221filesmissingsincethefreeze\"],\"tree_sha256\":\"[hidden]\"}",
   "plan zenodo_ts_task_pleural_effusion: {\"bytes_kept\":0,\"bytes_to_delete\":0,\"files_kept\":0,\"files_to_delete\":0,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"zenodo_ts_task_pleural_effusion\",\"planned_at\":\"2026-10-31T05:02:18Z\",\"problems\":[\"600filesmissingsincethefreeze\"],\"tree_sha256\":\"[hidden]\"}",
   "plan zenodo_ts_task_hip_implant: {\"bytes_kept\":0,\"bytes_to_delete\":0,\"files_kept\":0,\"files_to_delete\":0,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"zenodo_ts_task_hip_implant\",\"planned_at\":\"2026-10-31T05:02:17Z\",\"problems\":[\"72filesmissingsincethefreeze\"],\"tree_sha256\":\"[hidden]\"}",
@@ -31,14 +40,14 @@
   "plan aws_stoic2021.retired: {\"bytes_deleted_now\":264277370593,\"complete\":true,\"failures\":0,\"files_deleted_now\":2032,\"files_kept\":2,\"files_left_of_listed\":0,\"files_listed\":2032,\"format\":\"spine-datasets/retired1\",\"id\":\"aws_stoic2021\",\"problems\":[],\"request\":\"20261031T010232Z\",\"retired_at\":\"2026-10-31T",
   "plan rsna_rspect.retired: {\"bytes_deleted_now\":980108825708,\"complete\":true,\"failures\":0,\"files_deleted_now\":1937447,\"files_kept\":3,\"files_left_of_listed\":0,\"files_listed\":1937447,\"format\":\"spine-datasets/retired1\",\"id\":\"rsna_rspect\",\"problems\":[],\"request\":\"20261031T010232Z\",\"retired_at\":\"2026-10-3",
   "survey: \"read_at\": \"2026-10-31T02:15:30Z\"",
-  "HPCW-JOB 40902530 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40902530.out",
   "HPCW-JOB 40902675 storage FAILED on kbt3 exit 1:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902675.out",
   "HPCW-JOB 40902804 storage COMPLETED on kbt3 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902804.out",
   "HPCW-JOB 40902814 storage FAILED on kbt3 exit 1:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902814.out",
+  "HPCW-JOB 40903103 storage COMPLETED on arw1 exit 0:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40903103.out",
   "HPCW-GRID-GATE storage status ok"
  ],
  "rc": 0,
- "request": "prune-storage-status-7",
+ "request": "prune-storage-status-8",
  "said": [
   "HPCW-GRID-GATE storage status ok"
  ],
