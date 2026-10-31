@@ -1,8 +1,8 @@
 {
- "at": "2026-10-31T02:57:57Z",
+ "at": "2026-10-31T03:46:08Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 59ef8208a014",
-  "schwingnet autoanatomist gold3_latent_screen2 at commit 59ef820 on warrior 2026-10-31 02:57:56 UTC",
+  "HPCW-GRID-GATE schwingnet pull current 39f70c8dfec4",
+  "schwingnet autoanatomist gold3_latent_screen2 at commit 39f70c8 on warrior 2026-10-31 03:46:07 UTC",
   "refusing: the plan gold3_latent_screen2 is still queued or running (job 40902102, job 40902104); send autoanatomist gold3_latent_screen2 again once it ends",
   "  where each trial of chain 40902102 stands, the last line of its PROGRESS.txt:",
   "    adaptive_s1: 2026-10-31 02:17:14 UTC adaptive_s1: final distance 0.9955044462797856 mm, dice 0.865014996336024, 469 s",
@@ -11,14 +11,17 @@
   "    ct_only_s2: 2026-10-31 02:40:55 UTC ct_only_s2: final distance 0.9178261807567509 mm, dice 0.8749987925441355, 466 s",
   "    cyclic_s1: 2026-10-31 02:48:57 UTC cyclic_s1: final distance 0.9715630663312335 mm, dice 0.8695558405823035, 473 s",
   "    cyclic_s2: 2026-10-31 02:56:52 UTC cyclic_s2: final distance 0.9835813306682909 mm, dice 0.867969871532259, 470 s",
-  "    lambda_then_w_s1: 2026-10-31 02:57:46 UTC crops cut for 20 of 120 rows",
+  "    lambda_then_w_s1: 2026-10-31 03:04:41 UTC lambda_then_w_s1: final distance 1.0064261493904914 mm, dice 0.8639939195598512, 458 s",
+  "    lambda_then_w_s2: 2026-10-31 03:12:35 UTC lambda_then_w_s2: final distance 1.0658916527282987 mm, dice 0.8542957513979352, 458 s",
+  "    overlapping_s1: 2026-10-31 03:20:10 UTC overlapping_s1: final distance 1.0001373039555377 mm, dice 0.8658475338974443, 447 s",
+  "    overlapping_s2: 2026-10-31 03:28:04 UTC overlapping_s2: final distance 1.0434251795188052 mm, dice 0.8596431357708071, 461 s",
   "schwingnet autoanatomist: exit 75",
   "HPCW-GRID-GATE schwingnet autoanatomist failed 75"
  ],
  "rc": 75,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 59ef8208a014",
+  "HPCW-GRID-GATE schwingnet pull current 39f70c8dfec4",
   "HPCW-GRID-GATE schwingnet autoanatomist failed 75"
  ],
  "v": 1,
