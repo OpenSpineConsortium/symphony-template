@@ -1,19 +1,18 @@
 {
- "at": "2026-10-31T05:35:24Z",
+ "at": "2026-10-31T06:02:04Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current c6af8cd316bc",
-  "schwingnet qaloop qa_smoke at commit c6af8cd on warrior 2026-10-31 05:35:23 UTC",
-  "/wsu/home/go/go24/go2432/SchwingNet/grid/gate.sh: line 3283: /wsu/home/go/go24/go2432/SchwingNet/grid/logs/QALOOP-qa_smoke.chain: No such file or directory",
-  "  qaloop_qa_smoke: job 40903176",
-  "submitted the plan qa_smoke: chain 40903176, 1 GPU link(s) of 12 hours on galhp, each afterany the one before, in /rs/rs_grp_oschome/go2432/qaloop/qa_smoke/40903176. Send qaloop qa_smoke again once they end to read its report, logs/QALOOP-qa_smoke.md.",
-  "schwingnet qaloop: exit 0",
-  "HPCW-GRID-GATE schwingnet qaloop ok"
+  "HPCW-GRID-GATE schwingnet pull current e16ca415a662",
+  "schwingnet qaloop qa_smoke at commit e16ca41 on warrior 2026-10-31 06:02:04 UTC",
+  "refusing: the plan qa_smoke is still queued or running (job 40903176); send qaloop qa_smoke again once its links end",
+  "  no round of chain 40903176 has written its PROGRESS.txt yet: the first starts once its card and environment are ready",
+  "schwingnet qaloop: exit 75",
+  "HPCW-GRID-GATE schwingnet qaloop failed 75"
  ],
- "rc": 0,
- "request": "qaloop-smoke-1",
+ "rc": 75,
+ "request": "qaloop-smoke-2",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current c6af8cd316bc",
-  "HPCW-GRID-GATE schwingnet qaloop ok"
+  "HPCW-GRID-GATE schwingnet pull current e16ca415a662",
+  "HPCW-GRID-GATE schwingnet qaloop failed 75"
  ],
  "v": 1,
  "what": "schwingnet qaloop qa_smoke"
