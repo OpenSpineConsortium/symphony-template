@@ -1,11 +1,12 @@
 {
- "at": "2026-10-31T03:01:08Z",
+ "at": "2026-10-31T04:07:49Z",
  "lines": [
-  "a storage job is already queued or running; not queueing another",
+  "queueing one job to plan 9 retirements of request 20261031T021925Z; it deletes nothing",
+  "HPCW-JOB submitted 40902804 storage reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902804.out",
   "HPCW-GRID-GATE storage apply ok at 80b1dd8c437c"
  ],
  "rc": 0,
- "request": "prune-round3-apply",
+ "request": "prune-round3-apply-2",
  "said": [
   "HPCW-GRID-GATE storage apply ok at 80b1dd8c437c"
  ],
