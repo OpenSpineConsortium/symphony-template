@@ -1,21 +1,13 @@
 {
- "at": "2026-10-25T01:58:35Z",
+ "at": "2026-10-31T02:31:11Z",
  "lines": [
-  "Traceback (most recent call last):",
-  "  File \"/rs/rs_grp_oschome/go2432/spine-datasets-storage/code/retire.py\", line 327, in <module>",
-  "    sys.exit(main())",
-  "  File \"/rs/rs_grp_oschome/go2432/spine-datasets-storage/code/retire.py\", line 316, in main",
-  "    body = bundle(args.folder)",
-  "  File \"/rs/rs_grp_oschome/go2432/spine-datasets-storage/code/retire.py\", line 259, in bundle",
-  "    for name in sorted(os.listdir(folder)):",
-  "FileNotFoundError: [Errno 2] No such file or directory: '/rs/rs_grp_oschome/go2432/spine-datasets-storage/plans'",
-  "reported to storage-report at bc07c3703d26",
-  "HPCW-GRID-GATE storage report ok at 4d802f80ed9a"
+  "reported to storage-report at d9820138c3af",
+  "HPCW-GRID-GATE storage report ok at a92b072242be"
  ],
  "rc": 0,
- "request": "gf4-srp-2",
+ "request": "prune-round1-report",
  "said": [
-  "HPCW-GRID-GATE storage report ok at 4d802f80ed9a"
+  "HPCW-GRID-GATE storage report ok at a92b072242be"
  ],
  "v": 1,
  "what": "storage report"
