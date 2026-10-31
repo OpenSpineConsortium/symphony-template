@@ -177,7 +177,7 @@ class Words(unittest.TestCase):
                           ("schwingnet-anomaly-select", "schwingnet anomaly select"),
                           ("schwingnet-bordercall-pilot", "schwingnet bordercall pilot"), ("schwingnet-bordercall-full", "schwingnet bordercall full"),
                           ("schwingnet-realism-edit", "schwingnet realism edit"), ("schwingnet-realism-lora", "schwingnet realism lora"),
-                          ("schwingnet-totalseg-complete", "schwingnet totalseg complete"), ("schwingnet-autoanatomist-gold3_latent_smoke", "schwingnet autoanatomist gold3_latent_smoke"), ("schwingnet-morphometry-enhance", "schwingnet morphometry enhance"), ("schwingnet-morphometry-verse", "schwingnet morphometry verse"),
+                          ("schwingnet-totalseg-complete", "schwingnet totalseg complete"), ("schwingnet-autoanatomist-gold3_latent_smoke", "schwingnet autoanatomist gold3_latent_smoke"), ("schwingnet-morphometry-enhance", "schwingnet morphometry enhance"), ("schwingnet-prune-round2", "schwingnet prune round2"), ("schwingnet-morphometry-verse", "schwingnet morphometry verse"),
                           ("schwingnet-literature-synthetic_spine", "schwingnet literature synthetic_spine"),
                           ("schwingnet-cancel-40704982", "schwingnet cancel 40704982")):
             self.assertEqual(self.run_script("job", job=job)[1], [word, "accounts"], job)
