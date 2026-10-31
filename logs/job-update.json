@@ -1,13 +1,13 @@
 {
- "at": "2026-10-31T00:07:24Z",
+ "at": "2026-10-31T02:31:21Z",
  "lines": [
-  "HPCW-GRID-GATE update current e8213140faa9",
+  "HPCW-GRID-GATE update ok e8213140faa9..149c9c1aae0f",
   "HPCW-GRID-GATE framework 28"
  ],
  "rc": 0,
- "request": "prior-update-1",
+ "request": "prune-gate-update",
  "said": [
-  "HPCW-GRID-GATE update current e8213140faa9",
+  "HPCW-GRID-GATE update ok e8213140faa9..149c9c1aae0f",
   "HPCW-GRID-GATE framework 28"
  ],
  "v": 1,
