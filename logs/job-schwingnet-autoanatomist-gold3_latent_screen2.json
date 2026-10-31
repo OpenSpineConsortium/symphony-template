@@ -1,20 +1,25 @@
 {
- "at": "2026-10-31T01:49:42Z",
+ "at": "2026-10-31T02:57:57Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40902026 [hidden]",
-  "schwingnet autoanatomist gold3_latent_screen2 at commit ab8826a on warrior 2026-10-31 01:49:41 UTC",
-  "  the checkout holds still at ab8826a while the run that took it (job 40902026) lasts",
-  "  [hidden]: job 40902102",
-  "  [hidden]: job 40902104",
-  "submitted the plan gold3_latent_screen2: the trials' array 40902102 (12 tasks, each on the first card of galhp that frees) and the join 40902104 afterany it on a CPU node, in /rs/rs_grp_oschome/go2432/autoanatomist/gold3_latent_screen2/40902102. Send autoanatomist gold3_latent_screen2 again once the",
-  "schwingnet autoanatomist: exit 0",
-  "HPCW-GRID-GATE schwingnet autoanatomist ok"
+  "HPCW-GRID-GATE schwingnet pull current 59ef8208a014",
+  "schwingnet autoanatomist gold3_latent_screen2 at commit 59ef820 on warrior 2026-10-31 02:57:56 UTC",
+  "refusing: the plan gold3_latent_screen2 is still queued or running (job 40902102, job 40902104); send autoanatomist gold3_latent_screen2 again once it ends",
+  "  where each trial of chain 40902102 stands, the last line of its PROGRESS.txt:",
+  "    adaptive_s1: 2026-10-31 02:17:14 UTC adaptive_s1: final distance 0.9955044462797856 mm, dice 0.865014996336024, 469 s",
+  "    adaptive_s2: 2026-10-31 02:25:04 UTC adaptive_s2: final distance 1.045495049489916 mm, dice 0.8582687805440797, 460 s",
+  "    ct_only_s1: 2026-10-31 02:32:49 UTC ct_only_s1: final distance 0.9121466400071487 mm, dice 0.8746486143071285, 460 s",
+  "    ct_only_s2: 2026-10-31 02:40:55 UTC ct_only_s2: final distance 0.9178261807567509 mm, dice 0.8749987925441355, 466 s",
+  "    cyclic_s1: 2026-10-31 02:48:57 UTC cyclic_s1: final distance 0.9715630663312335 mm, dice 0.8695558405823035, 473 s",
+  "    cyclic_s2: 2026-10-31 02:56:52 UTC cyclic_s2: final distance 0.9835813306682909 mm, dice 0.867969871532259, 470 s",
+  "    lambda_then_w_s1: 2026-10-31 02:57:46 UTC crops cut for 20 of 120 rows",
+  "schwingnet autoanatomist: exit 75",
+  "HPCW-GRID-GATE schwingnet autoanatomist failed 75"
  ],
- "rc": 0,
+ "rc": 75,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40902026 ab8826a52c096644be58720b00933fbedb438409",
-  "HPCW-GRID-GATE schwingnet autoanatomist ok"
+  "HPCW-GRID-GATE schwingnet pull current 59ef8208a014",
+  "HPCW-GRID-GATE schwingnet autoanatomist failed 75"
  ],
  "v": 1,
  "what": "schwingnet autoanatomist gold3_latent_screen2"
