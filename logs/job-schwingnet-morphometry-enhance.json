@@ -1,9 +1,8 @@
 {
- "at": "2026-10-31T00:27:03Z",
+ "at": "2026-10-31T00:50:15Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40896342 [hidden]",
-  "schwingnet morphometry enhance at commit 45370ca on warrior 2026-10-31 00:27:02 UTC",
-  "  the checkout holds still at 45370ca while the run that took it (job 40896342) lasts",
+  "HPCW-GRID-GATE schwingnet pull current c183bcda4666",
+  "schwingnet morphometry enhance at commit c183bcd on warrior 2026-10-31 00:50:14 UTC",
   "## MORPHOMETRY-enhance.md (2026-10-30 01:58:08)",
   "# morphometry enhance: job 40872077 on mem4, commit 6b243e7, 2026-10-30 05:17:20 UTC",
   "- interpreter: /wsu/home/go/go24/go2432/mambaforge/envs/spineps/bin/python (3.11.16) for the measuring",
@@ -45,13 +44,17 @@
   "        36 not_admitted",
   "- every step's full output is under /rs/rs_grp_oschome/go2432/morphometry/enhance/<step>.log (and /rs/rs_grp_oschome/go2432/morphometry/enhance/totalseg/<step>.log); only the aggregates above leave th",
   "- exit 0 at 2026-10-30 05:58:08 UTC",
+  "  logs/MORPHOMETRY-enhance-40872077.md is set aside by the gate at 2026-10-31 00:50:15 UTC for one more job: the rows, step logs, facts and verdicts it names under /rs/rs_grp_oschome/go2432/morphometry/enhance/ are under /rs/rs_grp_oschome/go2432/morphometry/enhance/kept/40872077/ now, and the masks",
+  "  the report above is job 40872077's, which MORPHOMETRY_RERUNS lets the owner's count measure once more: queueing the set again at c183bcd",
+  "  morphometry_enhance: job 40900765",
+  "submitted the morphometry job for enhance. Send morphometry enhance again once it ends to read its report, logs/MORPHOMETRY-enhance.md.",
   "schwingnet morphometry: exit 0",
   "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
  "rc": 0,
- "request": "morph-rerun-enhance",
+ "request": "morph-rerun-enhance2",
  "said": [
-  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40896342 45370ca07d279a690b55534fbf373ea250422c14",
+  "HPCW-GRID-GATE schwingnet pull current c183bcda4666",
   "HPCW-GRID-GATE schwingnet morphometry ok"
  ],
  "v": 1,
