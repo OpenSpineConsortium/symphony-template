@@ -1,6 +1,6 @@
 {
  "action": "job",
- "at": "2026-10-31T03:46:11Z",
+ "at": "2026-10-31T04:00:45Z",
  "list": {
   "accounts": [
    {
@@ -67,7 +67,7 @@
    "name": "worker",
    "node": "bbc1",
    "state": "online",
-   "updated_at": "2026-10-31T03:45:41Z"
+   "updated_at": "2026-10-31T04:00:16Z"
   },
   "workers": [
    {
@@ -81,8 +81,8 @@
    }
   ]
  },
- "rc": 75,
- "request": "",
+ "rc": 0,
+ "request": "gold4-send-1",
  "said": [
   "HPCW-GRID-GATE accounts ok"
  ],

@@ -1,0 +1,20 @@
+{
+ "at": "2026-10-31T04:00:42Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet pull ok 39f70c8dfec4..89bac531a182",
+  "schwingnet totalseg gold4 at commit 89bac53 on warrior 2026-10-31 04:00:40 UTC",
+  "  gold4_totalseg: job 40902775",
+  "  gold4_totalseg_merge: job 40902777",
+  "submitted TotalSegmentator on the gold 4 CTs: the array 40902775 (16 tasks, each on the first card of the gpu class that frees, sharing the CTs; 0 label maps stood before it) and the merge 40902777 afterany it on a CPU node, in /rs/rs_grp_oschome/go2432/gold4-totalseg/chains/40902775. Send totalseg ",
+  "schwingnet totalseg: exit 0",
+  "HPCW-GRID-GATE schwingnet totalseg ok"
+ ],
+ "rc": 0,
+ "request": "gold4-send-1",
+ "said": [
+  "HPCW-GRID-GATE schwingnet pull ok 39f70c8dfec4..89bac531a182",
+  "HPCW-GRID-GATE schwingnet totalseg ok"
+ ],
+ "v": 1,
+ "what": "schwingnet totalseg gold4"
+}
