@@ -1,15 +1,21 @@
 {
- "at": "2026-10-31T03:29:02Z",
+ "at": "2026-10-31T05:50:03Z",
  "lines": [
-  "idc_ldct_and_projection_data: no plan that lists files; send storage apply 20261031T010232Z first, or read its problems",
-  "queueing one job to retire 9 sets of request 20261031T010232Z",
-  "HPCW-JOB submitted 40902675 storage reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902675.out",
-  "HPCW-GRID-GATE storage retire ok at 80b1dd8c437c"
+  "rsna_rspect: no plan that lists files; send storage apply 20261031T010232Z first, or read its problems",
+  "aws_stoic2021: no plan that lists files; send storage apply 20261031T010232Z first, or read its problems",
+  "zenodo_ts_task_liver_lesions: no plan that lists files; send storage apply 20261031T010232Z first, or read its problems",
+  "idc_nsclc_radiomics: no plan that lists files; send storage apply 20261031T010232Z first, or read its problems",
+  "zenodo_ts_task_hip_implant: no plan that lists files; send storage apply 20261031T010232Z first, or read its problems",
+  "zenodo_ts_task_pleural_effusion: no plan that lists files; send storage apply 20261031T010232Z first, or read its problems",
+  "idc_midrc_ricord_1b: no plan that lists files; send storage apply 20261031T010232Z first, or read its problems",
+  "queueing one job to retire 3 sets of request 20261031T010232Z",
+  "HPCW-JOB submitted 40903280 storage reqp/requeue log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40903280.out",
+  "HPCW-GRID-GATE storage retire ok at 5840ffe01101"
  ],
  "rc": 0,
- "request": "prune-round1-retire",
+ "request": "prune-round1-retire-2",
  "said": [
-  "HPCW-GRID-GATE storage retire ok at 80b1dd8c437c"
+  "HPCW-GRID-GATE storage retire ok at 5840ffe01101"
  ],
  "v": 1,
  "what": "storage retire 20261031T010232Z"
