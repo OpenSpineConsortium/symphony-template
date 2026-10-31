@@ -1,8 +1,16 @@
 {
- "at": "2026-10-31T03:42:59Z",
+ "at": "2026-10-31T04:06:09Z",
  "lines": [
   "             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)",
-  "          40902675      reqp spine-da   go2432  R      13:38      1 kbt3",
+  "plan idc_midrc_ricord_1b.retired: {\"bytes_deleted_now\":8668708098,\"complete\":true,\"failures\":0,\"files_deleted_now\":21221,\"files_kept\":3,\"files_left_of_listed\":0,\"files_listed\":21221,\"format\":\"spine-datasets/retired1\",\"id\":\"idc_midrc_ricord_1b\",\"problems\":[],\"request\":\"20261031T010232Z\",\"retired_at\":",
+  "plan zenodo_ts_task_pleural_effusion.retired: {\"bytes_deleted_now\":8900944278,\"complete\":true,\"failures\":0,\"files_deleted_now\":600,\"files_kept\":604,\"files_left_of_listed\":0,\"files_listed\":600,\"format\":\"spine-datasets/retired1\",\"id\":\"zenodo_ts_task_pleural_effusion\",\"problems\":[],\"request\":\"20261031T",
+  "plan zenodo_ts_task_hip_implant.retired: {\"bytes_deleted_now\":9120758621,\"complete\":true,\"failures\":0,\"files_deleted_now\":72,\"files_kept\":74,\"files_left_of_listed\":0,\"files_listed\":72,\"format\":\"spine-datasets/retired1\",\"id\":\"zenodo_ts_task_hip_implant\",\"problems\":[],\"request\":\"20261031T010232Z\",\"ret",
+  "plan idc_nsclc_radiomics.retired: {\"bytes_deleted_now\":26952673507,\"complete\":true,\"failures\":0,\"files_deleted_now\":51231,\"files_kept\":3,\"files_left_of_listed\":0,\"files_listed\":51231,\"format\":\"spine-datasets/retired1\",\"id\":\"idc_nsclc_radiomics\",\"problems\":[],\"request\":\"20261031T010232Z\",\"retired_at\"",
+  "plan zenodo_medpelvis3d.retired: {\"bytes_deleted_now\":0,\"complete\":false,\"failures\":96,\"files_deleted_now\":0,\"files_kept\":100,\"files_left_of_listed\":96,\"files_listed\":96,\"format\":\"spine-datasets/retired1\",\"id\":\"zenodo_medpelvis3d\",\"problems\":[],\"request\":\"20261031T010232Z\",\"retired_at\":\"2026-10-31T0",
+  "plan zenodo_ts_task_liver_lesions.retired: {\"bytes_deleted_now\":38922413985,\"complete\":true,\"failures\":0,\"files_deleted_now\":842,\"files_kept\":846,\"files_left_of_listed\":0,\"files_listed\":842,\"format\":\"spine-datasets/retired1\",\"id\":\"zenodo_ts_task_liver_lesions\",\"problems\":[],\"request\":\"20261031T01023",
+  "plan zenodo_unitochest.retired: {\"bytes_deleted_now\":0,\"complete\":false,\"failures\":2,\"files_deleted_now\":0,\"files_kept\":2,\"files_left_of_listed\":2,\"files_listed\":2,\"format\":\"spine-datasets/retired1\",\"id\":\"zenodo_unitochest\",\"problems\":[],\"request\":\"20261031T010232Z\",\"retired_at\":\"2026-10-31T04:02:36",
+  "plan aws_stoic2021.retired: {\"bytes_deleted_now\":264277370593,\"complete\":true,\"failures\":0,\"files_deleted_now\":2032,\"files_kept\":2,\"files_left_of_listed\":0,\"files_listed\":2032,\"format\":\"spine-datasets/retired1\",\"id\":\"aws_stoic2021\",\"problems\":[],\"request\":\"20261031T010232Z\",\"retired_at\":\"2026-10-31T",
+  "plan rsna_rspect.retired: {\"bytes_deleted_now\":980108825708,\"complete\":true,\"failures\":0,\"files_deleted_now\":1937447,\"files_kept\":3,\"files_left_of_listed\":0,\"files_listed\":1937447,\"format\":\"spine-datasets/retired1\",\"id\":\"rsna_rspect\",\"problems\":[],\"request\":\"20261031T010232Z\",\"retired_at\":\"2026-10-3",
   "plan idc_midrc_ricord_1b: {\"bytes_kept\":13219,\"bytes_to_delete\":8668708098,\"files_kept\":3,\"files_to_delete\":21221,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"idc_midrc_ricord_1b\",\"planned_at\":\"2026-10-31T03:08:41Z\",\"problems\":[],\"tree_sha256\":\"[hidden]\"}",
   "plan zenodo_ts_task_pleural_effusion: {\"bytes_kept\":111828337,\"bytes_to_delete\":8900944278,\"files_kept\":604,\"files_to_delete\":600,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"zenodo_ts_task_pleural_effusion\",\"planned_at\":\"2026-10-31T03:08:41Z\",\"problems\":[],\"tree_sha256\":\"[hidden]\"}",
   "plan zenodo_ts_task_hip_implant: {\"bytes_kept\":9228885,\"bytes_to_delete\":9120758621,\"files_kept\":74,\"files_to_delete\":72,\"format\":\"spine-datasets/retire-plan1\",\"id\":\"zenodo_ts_task_hip_implant\",\"planned_at\":\"2026-10-31T03:08:41Z\",\"problems\":[],\"tree_sha256\":\"[hidden]\"}",
@@ -17,11 +25,11 @@
   "HPCW-JOB 40902418 storage FAILED on kbt3 exit 1:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902418.out",
   "HPCW-JOB 40902526 storage OUT_OF_MEMORY on kbt3 exit 0:125 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902526.out",
   "HPCW-JOB 40902530 promoter PENDING log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/promoter_40902530.out",
-  "HPCW-JOB 40902675 storage RUNNING on kbt3 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902675.out",
+  "HPCW-JOB 40902675 storage FAILED on kbt3 exit 1:0 log /rs/rs_grp_oschome/go2432/hpcworker/jobs/spine-datasets/logs/storage_40902675.out",
   "HPCW-GRID-GATE storage status ok"
  ],
  "rc": 0,
- "request": "prune-storage-status-3",
+ "request": "prune-storage-status-4",
  "said": [
   "HPCW-GRID-GATE storage status ok"
  ],
