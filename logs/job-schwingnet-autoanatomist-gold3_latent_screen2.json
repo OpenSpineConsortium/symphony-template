@@ -1,8 +1,8 @@
 {
- "at": "2026-10-31T03:46:08Z",
+ "at": "2026-10-31T04:27:41Z",
  "lines": [
-  "HPCW-GRID-GATE schwingnet pull current 39f70c8dfec4",
-  "schwingnet autoanatomist gold3_latent_screen2 at commit 39f70c8 on warrior 2026-10-31 03:46:07 UTC",
+  "HPCW-GRID-GATE schwingnet pull current 9c160a98de9e",
+  "schwingnet autoanatomist gold3_latent_screen2 at commit 9c160a9 on warrior 2026-10-31 04:27:41 UTC",
   "refusing: the plan gold3_latent_screen2 is still queued or running (job 40902102, job 40902104); send autoanatomist gold3_latent_screen2 again once it ends",
   "  where each trial of chain 40902102 stands, the last line of its PROGRESS.txt:",
   "    adaptive_s1: 2026-10-31 02:17:14 UTC adaptive_s1: final distance 0.9955044462797856 mm, dice 0.865014996336024, 469 s",
@@ -21,7 +21,7 @@
  "rc": 75,
  "request": "",
  "said": [
-  "HPCW-GRID-GATE schwingnet pull current 39f70c8dfec4",
+  "HPCW-GRID-GATE schwingnet pull current 9c160a98de9e",
   "HPCW-GRID-GATE schwingnet autoanatomist failed 75"
  ],
  "v": 1,
