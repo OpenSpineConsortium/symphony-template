@@ -1,0 +1,19 @@
+{
+ "at": "2026-10-31T00:15:09Z",
+ "lines": [
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40896342 [hidden]",
+  "schwingnet autoanatomist gold3_latent_smoke2 at commit 45370ca on warrior 2026-10-31 00:15:09 UTC",
+  "  the checkout holds still at 45370ca while the run that took it (job 40896342) lasts",
+  "refusing: no plan grid/screens/gold3_latent_smoke2.json at commit 45370ca",
+  "schwingnet autoanatomist: exit 64",
+  "HPCW-GRID-GATE schwingnet autoanatomist failed 64"
+ ],
+ "rc": 64,
+ "request": "",
+ "said": [
+  "HPCW-GRID-GATE schwingnet checkout held by grid/logs/HOLD: 40896342 45370ca07d279a690b55534fbf373ea250422c14",
+  "HPCW-GRID-GATE schwingnet autoanatomist failed 64"
+ ],
+ "v": 1,
+ "what": "schwingnet autoanatomist gold3_latent_smoke2"
+}
