@@ -265,15 +265,43 @@ jobs:
           # The agent the worker runs under, when .github/symphony/agents.json
           # names it (docs/agents/AGENTS.md); none leaves the worker prompt alone.
           echo "agent=$(python3 tools/agents.py for-worker "$WORKER" 2> /dev/null || true)" >> "$GITHUB_OUTPUT"
+      # A repository may keep a leg hook, the executable
+      # .github/symphony/hooks/leg (docs/agents/WORKERS.md, A leg's hook),
+      # which this leg asks how it runs: which runner, agent, model and
+      # effort take this move. The leg copies .github/symphony first, since
+      # the session may leave the checkout on another branch, and takes only
+      # the lines of the shape it knows; a hook that fails or says nothing
+      # leaves the leg as it was without one.
+      - name: Ask the repository's leg hook how this move runs
+        id: hook
+        if: steps.next.outputs.move != 'none' && hashFiles('.github/symphony/hooks/leg') != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MOVE: ${{ steps.next.outputs.move }}
+          ISSUE: ${{ steps.next.outputs.issue }}
+          MODEL: ${{ steps.next.outputs.model }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/leg"
+          cp -r .github/symphony "$RUNNER_TEMP/leg/"
+          sh "$RUNNER_TEMP/leg/symphony/hooks/leg" plan > "$RUNNER_TEMP/leg/plan.txt"
+          grep -E '^(runner|agent|model|effort|attempt)=[A-Za-z0-9._:/@-]*$' "$RUNNER_TEMP/leg/plan.txt" >> "$GITHUB_OUTPUT" || true
       - name: Choose the Claude account the worker runs on
         id: account
-        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true'
+        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true' && steps.hook.outputs.runner != 'external' && steps.hook.outputs.runner != 'skip'
         env:
           POOL: ${{ vars.SYMPHONY_CLAUDE_ACCOUNTS }}
           SETTINGS: ${{ vars.SYMPHONY_CLAUDE_SETTINGS }}
-          MODEL: ${{ steps.next.outputs.model }}
+          MODEL: ${{ steps.hook.outputs.model || steps.next.outputs.model }}
           SPREAD: ${{ strategy.job-index }}
         run: |
+          # A leg hook may answer for choose, with the same arguments and
+          # the same outputs; one that answers nothing, or no slot, leaves
+          # the choice to choose.
+          if [ -f .github/symphony/hooks/leg ]               && sh .github/symphony/hooks/leg account --worker "$WORKER" --pool "$POOL" --spread "$SPREAD"                 --settings "$SETTINGS" --model "$MODEL" > "$RUNNER_TEMP/account.txt"               && grep -q '^slot=' "$RUNNER_TEMP/account.txt"; then
+            grep -E '^(slot|model|effort|fallback|id|wait|until)=' "$RUNNER_TEMP/account.txt" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # .github/symphony/accounts.json names a slot, main or auto for the
           # worker (tools/pool.py); auto takes the pool's slot with the most
           # room, read from the branch pool. SYMPHONY_CLAUDE_SETTINGS, the
@@ -352,7 +380,7 @@ jobs:
           cp tools/check_docs.py scripts/keep-unpushed.sh "$RUNNER_TEMP/" || true
       - uses: anthropics/claude-code-action@v1
         id: claude
-        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true' && steps.account.outputs.wait != 'true'
+        if: steps.next.outputs.move != 'none' && env.HAVE_TOKEN == 'true' && steps.account.outputs.wait != 'true' && steps.hook.outputs.runner != 'external' && steps.hook.outputs.runner != 'skip'
         # a deadline of its own inside the job's 90 minutes, so a run cut off still reaches the step
         # below that keeps its unpushed work, rather than the whole job being cancelled with it
         timeout-minutes: 75
@@ -397,8 +425,8 @@ jobs:
           claude_args: |
             --max-turns ${{ steps.next.outputs.max_turns }}
             ${{ steps.next.outputs.agent != '' && format('--agent {0}', steps.next.outputs.agent) || '' }}
-            ${{ steps.account.outputs.model != '' && format('--model {0}', steps.account.outputs.model) || '' }}
-            ${{ steps.account.outputs.effort != '' && format('--effort {0}', steps.account.outputs.effort) || '' }}
+            ${{ (steps.hook.outputs.model || steps.account.outputs.model) != '' && format('--model {0}', steps.hook.outputs.model || steps.account.outputs.model) || '' }}
+            ${{ (steps.hook.outputs.effort || steps.account.outputs.effort) != '' && format('--effort {0}', steps.hook.outputs.effort || steps.account.outputs.effort) || '' }}
             ${{ steps.account.outputs.fallback != '' && format('--fallback-model {0}', steps.account.outputs.fallback) || '' }}
             --allowedTools "${{ vars.CLAUDE_ALLOWED_TOOLS || 'Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(bash scripts/check.sh),Bash(python3:*)' }}"
           prompt: |
@@ -471,8 +499,45 @@ jobs:
           path: ${{ runner.temp }}/pool-readings/
           if-no-files-found: ignore
           retention-days: 1
+      # Where the leg hook routes the move to another coding agent, the
+      # hook runs it in place of Claude's action, on the same worker prompt,
+      # with that provider's key, each read by its fixed name, as the slots'
+      # secrets are, so no computed name hands the step every secret.
+      - name: Run the agent the leg hook routes this move to
+        id: external
+        if: steps.hook.outputs.runner == 'external'
+        timeout-minutes: 75
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MOVE: ${{ steps.next.outputs.move }}
+          ISSUE: ${{ steps.next.outputs.issue }}
+          AGENT: ${{ steps.hook.outputs.agent }}
+          ROUTE_MODEL: ${{ steps.hook.outputs.model }}
+          ROUTE_EFFORT: ${{ steps.hook.outputs.effort }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SYMPHONY_AGENT_API_KEY: ${{ secrets.SYMPHONY_AGENT_API_KEY }}
+          SYMPHONY_AGENT_GH_TOKEN: ${{ secrets.SYMPHONY_AGENT_GH_TOKEN }}
+          PROMPT: >-
+            You are the worker ${{ matrix.worker }} on the repository ${{ github.repository }}. Run `git fetch origin ${{ env.DEFAULT_BRANCH }} && git show origin/${{ env.DEFAULT_BRANCH }}:docs/agents/routines/worker.md` and do what the last fenced block of that page says, exactly and nothing else, as the worker ${{ matrix.worker }}. This run, ${{ steps.next.outputs.move }} issue #${{ steps.next.outputs.issue }}: the workflow chose it, so that the workers running at the same time each take a different issue.
+        run: sh "$RUNNER_TEMP/leg/symphony/hooks/leg" run
+      - name: Tell the leg hook how the session ended
+        if: always() && steps.hook.outputs.runner != '' && steps.hook.outputs.runner != 'skip'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ steps.next.outputs.issue }}
+          MODEL: ${{ steps.next.outputs.model }}
+          RUNNER: ${{ steps.hook.outputs.runner }}
+          AGENT: ${{ steps.hook.outputs.agent }}
+          ATTEMPT: ${{ steps.hook.outputs.attempt }}
+          ROUTE_MODEL: ${{ steps.hook.outputs.model || steps.account.outputs.model }}
+          ROUTE_EFFORT: ${{ steps.hook.outputs.effort || steps.account.outputs.effort }}
+          OUTCOME: ${{ steps.hook.outputs.runner == 'external' && steps.external.outcome || steps.claude.outcome }}
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        run: sh "$RUNNER_TEMP/leg/symphony/hooks/leg" after
       - name: Go another round while this worker has work
-        if: steps.claude.outcome == 'success'
+        if: steps.claude.outcome == 'success' || steps.external.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GH_TOKEN: ${{ github.token }}
